@@ -91,6 +91,12 @@ namespace psms.Domain.Admissions.Entities
         public Guid AppliedGradeId { get; set; }
 
         /// <summary>
+        /// Academic year the application is for (e.g., 2025)
+        /// </summary>
+        [Required]
+        public Guid AcademicYearId { get; set; }
+
+        /// <summary>
         /// Name of previous school attended
         /// </summary>
         [StringLength(MaxSchoolNameLength)]
@@ -171,6 +177,9 @@ namespace psms.Domain.Admissions.Entities
         [ForeignKey(nameof(AppliedGradeId))]
         public virtual Grade AppliedGrade { get; set; }
 
+        [ForeignKey(nameof(AcademicYearId))]
+        public virtual AcademicYear AcademicYear { get; set; }
+
         [ForeignKey(nameof(CreatedStudentId))]
         public virtual Student CreatedStudent { get; set; }
 
@@ -203,6 +212,7 @@ namespace psms.Domain.Admissions.Entities
             DateTime dateOfBirth,
             Gender gender,
             Guid appliedGradeId,
+            Guid academicYearId,
             string creatorEmailAddress) : this()
         {
             Id = id;
@@ -213,6 +223,7 @@ namespace psms.Domain.Admissions.Entities
             DateOfBirth = dateOfBirth;
             Gender = gender;
             AppliedGradeId = appliedGradeId;
+            AcademicYearId = academicYearId;
             CreatorEmailAddress = creatorEmailAddress;
             ApplicationDate = DateTime.UtcNow;
             Status = ApplicationStatus.Draft;
@@ -230,24 +241,114 @@ namespace psms.Domain.Admissions.Entities
                 : $"{ProspectiveStudentFirstName} {ProspectiveStudentMiddleName} {ProspectiveStudentLastName}";
         }
 
+        #region Workflow Methods (ADM-005)
+
         /// <summary>
-        /// Submits the application for review
+        /// Submits the application - moves to PaymentPending (ADM-005)
         /// </summary>
         public void Submit()
         {
             if (Status != ApplicationStatus.Draft)
                 throw new InvalidOperationException("Only draft applications can be submitted.");
 
-            Status = ApplicationStatus.Submitted;
+            Status = ApplicationStatus.PaymentPending;
             SubmissionDate = DateTime.UtcNow;
         }
 
         /// <summary>
-        /// Approves the application
+        /// Marks payment as received - moves to UnderReview (ADM-006)
+        /// </summary>
+        public void MarkPaymentReceived()
+        {
+            if (Status != ApplicationStatus.PaymentPending)
+                throw new InvalidOperationException("Application must be in PaymentPending status.");
+
+            Status = ApplicationStatus.UnderReview;
+        }
+
+        /// <summary>
+        /// Requests additional documents from parent (ADM-008)
+        /// </summary>
+        public void RequestDocuments()
+        {
+            if (Status != ApplicationStatus.UnderReview)
+                throw new InvalidOperationException("Application must be under review to request documents.");
+
+            Status = ApplicationStatus.DocumentsRequired;
+        }
+
+        /// <summary>
+        /// Marks documents as complete - returns to UnderReview
+        /// </summary>
+        public void MarkDocumentsComplete()
+        {
+            if (Status != ApplicationStatus.DocumentsRequired)
+                throw new InvalidOperationException("Application must be in DocumentsRequired status.");
+
+            Status = ApplicationStatus.UnderReview;
+        }
+
+        /// <summary>
+        /// Schedules interview (ADM-012)
+        /// </summary>
+        public void ScheduleInterview()
+        {
+            if (Status != ApplicationStatus.UnderReview)
+                throw new InvalidOperationException("Application must be under review to schedule interview.");
+
+            Status = ApplicationStatus.InterviewScheduled;
+        }
+
+        /// <summary>
+        /// Marks interview as complete - moves to UnderConsideration
+        /// </summary>
+        public void CompleteInterview()
+        {
+            if (Status != ApplicationStatus.InterviewScheduled)
+                throw new InvalidOperationException("Application must have scheduled interview.");
+
+            Status = ApplicationStatus.UnderConsideration;
+        }
+
+        /// <summary>
+        /// Schedules assessment (ADM-015)
+        /// </summary>
+        public void ScheduleAssessment()
+        {
+            if (Status != ApplicationStatus.UnderReview)
+                throw new InvalidOperationException("Application must be under review to schedule assessment.");
+
+            Status = ApplicationStatus.AssessmentScheduled;
+        }
+
+        /// <summary>
+        /// Marks assessment as complete - moves to UnderConsideration
+        /// </summary>
+        public void CompleteAssessment()
+        {
+            if (Status != ApplicationStatus.AssessmentScheduled)
+                throw new InvalidOperationException("Application must have scheduled assessment.");
+
+            Status = ApplicationStatus.UnderConsideration;
+        }
+
+        /// <summary>
+        /// Moves directly to UnderConsideration (when no interview/assessment required)
+        /// </summary>
+        public void MoveToConsideration()
+        {
+            if (Status != ApplicationStatus.UnderReview)
+                throw new InvalidOperationException("Application must be under review.");
+
+            Status = ApplicationStatus.UnderConsideration;
+        }
+
+        /// <summary>
+        /// Approves the application (ADM-017, ADM-018)
         /// </summary>
         public void Approve(long reviewedByUserId, string reason = null, int offerExpiryDays = 14)
         {
-            if (Status != ApplicationStatus.PendingDecision)
+            if (Status != ApplicationStatus.UnderConsideration)
                 throw new InvalidOperationException("Application must be under consideration to approve.");
 
             Status = ApplicationStatus.Approved;
@@ -260,12 +361,35 @@ namespace psms.Domain.Admissions.Entities
         }
 
         /// <summary>
-        /// Rejects the application
+        /// Approves with conditions (ADM-019)
+        /// </summary>
+        public void ApproveWithConditions(long reviewedByUserId, string conditions, int offerExpiryDays = 14)
+        {
+            if (Status != ApplicationStatus.UnderConsideration)
+                throw new InvalidOperationException("Application must be under consideration to approve.");
+
+            if (string.IsNullOrWhiteSpace(conditions))
+                throw new ArgumentException("Conditions must be specified for conditional approval.");
+
+            Status = ApplicationStatus.Approved;
+            Decision = AdmissionDecision.ConditionalAcceptance;
+            DecisionReason = conditions;
+            DecisionDate = DateTime.UtcNow;
+            ReviewedByUserId = reviewedByUserId;
+            ReviewedDate = DateTime.UtcNow;
+            ExpiryDate = DateTime.UtcNow.AddDays(offerExpiryDays);
+        }
+
+        /// <summary>
+        /// Rejects the application (ADM-020)
         /// </summary>
         public void Reject(long reviewedByUserId, string reason)
         {
-            if (Status != ApplicationStatus.PendingDecision)
+            if (Status != ApplicationStatus.UnderConsideration)
                 throw new InvalidOperationException("Application must be under consideration to reject.");
+
+            if (string.IsNullOrWhiteSpace(reason) || reason.Length < 50)
+                throw new ArgumentException("Rejection reason must be at least 50 characters.");
 
             Status = ApplicationStatus.Rejected;
             Decision = AdmissionDecision.Rejected;
@@ -276,11 +400,11 @@ namespace psms.Domain.Admissions.Entities
         }
 
         /// <summary>
-        /// Places the application on waitlist
+        /// Places the application on waitlist (ADM-021)
         /// </summary>
         public void PlaceOnWaitlist(long reviewedByUserId, string reason = null)
         {
-            if (Status != ApplicationStatus.PendingDecision)
+            if (Status != ApplicationStatus.UnderConsideration)
                 throw new InvalidOperationException("Application must be under consideration to waitlist.");
 
             Status = ApplicationStatus.Waitlisted;
@@ -292,7 +416,7 @@ namespace psms.Domain.Admissions.Entities
         }
 
         /// <summary>
-        /// Marks the application as enrolled and links to created student
+        /// Marks the application as enrolled and links to created student (ADM-026)
         /// </summary>
         public void MarkAsEnrolled(Guid studentId)
         {
@@ -302,5 +426,75 @@ namespace psms.Domain.Admissions.Entities
             Status = ApplicationStatus.Enrolled;
             CreatedStudentId = studentId;
         }
+
+        /// <summary>
+        /// Withdraws the application (ADM-031)
+        /// </summary>
+        public void Withdraw(string reason = null)
+        {
+            if (Status == ApplicationStatus.Enrolled)
+                throw new InvalidOperationException("Cannot withdraw an enrolled application.");
+
+            if (Status == ApplicationStatus.Withdrawn || Status == ApplicationStatus.Expired)
+                throw new InvalidOperationException("Application is already withdrawn or expired.");
+
+            Status = ApplicationStatus.Withdrawn;
+            DecisionReason = reason;
+        }
+
+        /// <summary>
+        /// Expires the application (ADM-030)
+        /// </summary>
+        public void Expire()
+        {
+            if (Status == ApplicationStatus.Enrolled || Status == ApplicationStatus.Withdrawn || Status == ApplicationStatus.Expired)
+                throw new InvalidOperationException("Cannot expire this application.");
+
+            Status = ApplicationStatus.Expired;
+        }
+
+        /// <summary>
+        /// Extends the offer expiry date (ADM-018) - maximum 1 extension of 7 days
+        /// </summary>
+        public void ExtendOfferExpiry(int additionalDays = 7)
+        {
+            if (Status != ApplicationStatus.Approved)
+                throw new InvalidOperationException("Can only extend expiry for approved applications.");
+
+            if (additionalDays > 7)
+                throw new ArgumentException("Maximum extension is 7 days.");
+
+            ExpiryDate = ExpiryDate?.AddDays(additionalDays) ?? DateTime.UtcNow.AddDays(additionalDays);
+        }
+
+        #endregion
+
+        #region Validation Methods
+
+        /// <summary>
+        /// Checks if the offer has expired
+        /// </summary>
+        public bool IsOfferExpired()
+        {
+            return Status == ApplicationStatus.Approved && ExpiryDate.HasValue && DateTime.UtcNow > ExpiryDate.Value;
+        }
+
+        /// <summary>
+        /// Checks if application can be submitted
+        /// </summary>
+        public bool CanSubmit()
+        {
+            return Status == ApplicationStatus.Draft;
+        }
+
+        /// <summary>
+        /// Checks if a decision can be made on this application
+        /// </summary>
+        public bool CanMakeDecision()
+        {
+            return Status == ApplicationStatus.UnderConsideration;
+        }
+
+        #endregion
     }
 }

@@ -149,6 +149,11 @@ public class psmsDbContext : AbpZeroDbContext<Tenant, Role, User, psmsDbContext>
     /// </summary>
     public DbSet<Waitlist> Waitlists { get; set; }
 
+    /// <summary>
+    /// Admission settings/configuration per grade and academic year
+    /// </summary>
+    public DbSet<AdmissionSettings> AdmissionSettings { get; set; }
+
     /* ==================== Financial Module ==================== */
 
     /// <summary>
@@ -357,6 +362,12 @@ public class psmsDbContext : AbpZeroDbContext<Tenant, Role, User, psmsDbContext>
             .HasIndex(w => w.ApplicationId)
             .IsUnique()
             .HasDatabaseName("IX_Waitlists_ApplicationId");
+
+        // AdmissionSettings - unique per academic year and grade
+        modelBuilder.Entity<AdmissionSettings>()
+            .HasIndex(s => new { s.AcademicYearId, s.GradeId })
+            .IsUnique()
+            .HasDatabaseName("IX_AdmissionSettings_AcademicYearId_GradeId");
     }
 
     private void ConfigureFinancialModule(ModelBuilder modelBuilder)
