@@ -354,11 +354,12 @@ public class psmsDbContext : AbpZeroDbContext<Tenant, Role, User, psmsDbContext>
             .IsUnique()
             .HasDatabaseName("IX_Teachers_TenantId_EmployeeNumber");
 
-        // Class - unique class name per grade
+        // Class - unique class name per grade per academic year (soft-delete aware)
         modelBuilder.Entity<Class>()
-            .HasIndex(c => new { c.GradeId, c.ClassName })
+            .HasIndex(c => new { c.GradeId, c.AcademicYearId, c.ClassName })
             .IsUnique()
-            .HasDatabaseName("IX_Classes_GradeId_ClassName");
+            .HasFilter("IsDeleted = 0")
+            .HasDatabaseName("IX_Classes_GradeId_AcademicYearId_ClassName");
 
         // StudentClass - prevent duplicate enrollments per academic year
         modelBuilder.Entity<StudentClass>()

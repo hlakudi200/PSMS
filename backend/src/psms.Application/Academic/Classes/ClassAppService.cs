@@ -95,13 +95,15 @@ public class ClassAppService : ApplicationService, IClassAppService
         if (academicYear == null)
             throw new UserFriendlyException(AcademicExceptionCodes.AcademicYearNotFound, "Academic year not found.");
 
-        // Validate unique class name within grade
+        // Validate unique class name within grade and academic year
         var existingByName = await _classRepository
-            .FirstOrDefaultAsync(c => c.GradeId == input.GradeId && c.ClassName == input.ClassName);
+            .FirstOrDefaultAsync(c => c.GradeId == input.GradeId
+                && c.AcademicYearId == input.AcademicYearId
+                && c.ClassName == input.ClassName);
 
         if (existingByName != null)
             throw new UserFriendlyException(AcademicExceptionCodes.DuplicateClassName,
-                $"A class with name '{input.ClassName}' already exists in this grade.");
+                $"A class with name '{input.ClassName}' already exists in this grade for this academic year.");
 
         // Validate class teacher if provided
         if (input.ClassTeacherId.HasValue)
@@ -135,15 +137,18 @@ public class ClassAppService : ApplicationService, IClassAppService
     {
         var cls = await _classRepository.GetAsync(id);
 
-        // Validate unique class name if changing
+        // Validate unique class name if changing (scoped to grade + academic year)
         if (input.ClassName != null && input.ClassName != cls.ClassName)
         {
             var existingByName = await _classRepository
-                .FirstOrDefaultAsync(c => c.GradeId == cls.GradeId && c.ClassName == input.ClassName && c.Id != id);
+                .FirstOrDefaultAsync(c => c.GradeId == cls.GradeId
+                    && c.AcademicYearId == cls.AcademicYearId
+                    && c.ClassName == input.ClassName
+                    && c.Id != id);
 
             if (existingByName != null)
                 throw new UserFriendlyException(AcademicExceptionCodes.DuplicateClassName,
-                    $"A class with name '{input.ClassName}' already exists in this grade.");
+                    $"A class with name '{input.ClassName}' already exists in this grade for this academic year.");
 
             cls.ClassName = input.ClassName;
         }
