@@ -65,19 +65,9 @@ public class AcademicYearAppService : ApplicationService, IAcademicYearAppServic
             .PageBy(input)
             .ToListAsync();
 
-        var dtos = years.Select(ay => new AcademicYearListDto
-        {
-            Id = ay.Id,
-            Year = ay.Year,
-            YearName = ay.YearName,
-            StartDate = ay.StartDate,
-            EndDate = ay.EndDate,
-            IsCurrent = ay.IsCurrent,
-            TermCount = ay.Terms?.Count ?? 0,
-            ClassCount = ay.Classes?.Count ?? 0
-        }).ToList();
-
-        return new PagedResultDto<AcademicYearListDto>(totalCount, dtos);
+        return new PagedResultDto<AcademicYearListDto>(
+            totalCount,
+            ObjectMapper.Map<List<AcademicYearListDto>>(years));
     }
 
     [AbpAuthorize(PermissionNames.Academic_AcademicYears_Manage)]
@@ -193,6 +183,18 @@ public class AcademicYearAppService : ApplicationService, IAcademicYearAppServic
 
         if (currentYear != null)
         {
+            // Unset current terms in the previous academic year for data integrity
+            var currentTerms = await _termRepository
+                .GetAll()
+                .Where(t => t.AcademicYearId == currentYear.Id && t.IsCurrent)
+                .ToListAsync();
+
+            foreach (var term in currentTerms)
+            {
+                term.IsCurrent = false;
+                await _termRepository.UpdateAsync(term);
+            }
+
             currentYear.IsCurrent = false;
             await _academicYearRepository.UpdateAsync(currentYear);
         }
@@ -209,6 +211,10 @@ public class AcademicYearAppService : ApplicationService, IAcademicYearAppServic
     /// </summary>
     private static void ValidateSADates(DateTime startDate, DateTime endDate)
     {
+        if (startDate >= endDate)
+            throw new UserFriendlyException(AcademicExceptionCodes.InvalidAcademicYearDates,
+                "Start date must be before end date.");
+
         if (startDate.Month < 1 || startDate.Month > 2)
             throw new UserFriendlyException(AcademicExceptionCodes.InvalidAcademicYearStartMonth,
                 "South African academic year must start in January or early February.");
@@ -221,10 +227,6 @@ public class AcademicYearAppService : ApplicationService, IAcademicYearAppServic
         if (duration < 300 || duration > 400)
             throw new UserFriendlyException(AcademicExceptionCodes.InvalidAcademicYearDuration,
                 "Academic year must be approximately 12 months long (300-400 days).");
-
-        if (startDate >= endDate)
-            throw new UserFriendlyException(AcademicExceptionCodes.InvalidAcademicYearDates,
-                "Start date must be before end date.");
     }
 
     /// <summary>

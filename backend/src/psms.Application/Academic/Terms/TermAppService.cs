@@ -97,8 +97,6 @@ public class TermAppService : ApplicationService, ITermAppService
             throw new UserFriendlyException(AcademicExceptionCodes.InvalidTermCount,
                 "South African academic year must have exactly 4 terms. Maximum reached.");
 
-        var termName = input.TermName ?? $"Term {(int)input.TermNumber}";
-
         var term = new Term(
             Guid.NewGuid(),
             AbpSession.TenantId,
