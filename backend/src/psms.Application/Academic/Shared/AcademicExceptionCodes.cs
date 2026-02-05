@@ -47,4 +47,16 @@ public static class AcademicExceptionCodes
     // GradeSubject
     public const string GradeSubjectNotFound = "ACD_GRADE_SUBJECT_NOT_FOUND";
     public const string DuplicateGradeSubject = "ACD_DUPLICATE_GRADE_SUBJECT";
+
+    // Teacher
+    public const string TeacherNotFound = "ACD_TEACHER_NOT_FOUND";
+    public const string DuplicateEmployeeNumber = "ACD_DUPLICATE_EMPLOYEE_NUMBER";
+    public const string DuplicateTeacherEmail = "ACD_DUPLICATE_TEACHER_EMAIL";
+    public const string CannotDeleteTeacherWithSubjects = "ACD_CANNOT_DELETE_TEACHER_WITH_SUBJECTS";
+    public const string CannotDeleteTeacherWithClasses = "ACD_CANNOT_DELETE_TEACHER_WITH_CLASSES";
+
+    // Parent
+    public const string ParentNotFound = "ACD_PARENT_NOT_FOUND";
+    public const string DuplicateParentEmail = "ACD_DUPLICATE_PARENT_EMAIL";
+    public const string CannotDeleteParentWithStudents = "ACD_CANNOT_DELETE_PARENT_WITH_STUDENTS";
 }

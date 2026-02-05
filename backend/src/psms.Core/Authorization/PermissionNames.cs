@@ -117,6 +117,14 @@ public static class PermissionNames
     public const string Academic_Teachers_Edit = "Academic.Teachers.Edit";
     public const string Academic_Teachers_Delete = "Academic.Teachers.Delete";
     public const string Academic_Teachers_AssignSubject = "Academic.Teachers.AssignSubject";
+
+    // Parents
+    public const string Academic_Parents = "Academic.Parents";
+    public const string Academic_Parents_View = "Academic.Parents.View";
+    public const string Academic_Parents_ViewAll = "Academic.Parents.ViewAll";
+    public const string Academic_Parents_Create = "Academic.Parents.Create";
+    public const string Academic_Parents_Edit = "Academic.Parents.Edit";
+    public const string Academic_Parents_Delete = "Academic.Parents.Delete";
     public const string Academic_Teachers_AssignClass = "Academic.Teachers.AssignClass";
 
     // Grades

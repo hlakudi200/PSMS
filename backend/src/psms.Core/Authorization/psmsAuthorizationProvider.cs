@@ -146,6 +146,14 @@ public class psmsAuthorizationProvider : AuthorizationProvider
         teachers.CreateChildPermission(PermissionNames.Academic_Teachers_AssignSubject, L("AssignTeacherSubject"));
         teachers.CreateChildPermission(PermissionNames.Academic_Teachers_AssignClass, L("AssignTeacherClass"));
 
+        // Parents
+        var parents = academic.CreateChildPermission(PermissionNames.Academic_Parents, L("Parents"));
+        parents.CreateChildPermission(PermissionNames.Academic_Parents_View, L("ViewParents"));
+        parents.CreateChildPermission(PermissionNames.Academic_Parents_ViewAll, L("ViewAllParents"));
+        parents.CreateChildPermission(PermissionNames.Academic_Parents_Create, L("CreateParent"));
+        parents.CreateChildPermission(PermissionNames.Academic_Parents_Edit, L("EditParent"));
+        parents.CreateChildPermission(PermissionNames.Academic_Parents_Delete, L("DeleteParent"));
+
         // Grades
         var grades = academic.CreateChildPermission(PermissionNames.Academic_Grades, L("Grades"));
         grades.CreateChildPermission(PermissionNames.Academic_Grades_View, L("ViewGrades"));
