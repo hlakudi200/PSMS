@@ -60,4 +60,12 @@ public static class AcademicExceptionCodes
     public const string DuplicateParentEmail = "ACD_DUPLICATE_PARENT_EMAIL";
     public const string InvalidSAIdNumber = "ACD_INVALID_SA_ID_NUMBER";
     public const string CannotDeleteParentWithStudents = "ACD_CANNOT_DELETE_PARENT_WITH_STUDENTS";
+
+    // Class
+    public const string ClassNotFound = "ACD_CLASS_NOT_FOUND";
+    public const string DuplicateClassName = "ACD_DUPLICATE_CLASS_NAME";
+    public const string ClassCapacityTooLow = "ACD_CLASS_CAPACITY_TOO_LOW";
+    public const string ClassTeacherNotActive = "ACD_CLASS_TEACHER_NOT_ACTIVE";
+    public const string CannotDeleteClassWithStudents = "ACD_CANNOT_DELETE_CLASS_WITH_STUDENTS";
+    public const string CannotDeleteClassWithTeachers = "ACD_CANNOT_DELETE_CLASS_WITH_TEACHERS";
 }

@@ -1,5 +1,6 @@
 using AutoMapper;
 using psms.Academic.AcademicYears.Dto;
+using psms.Academic.Classes.Dto;
 using psms.Academic.Grades.Dto;
 using psms.Academic.GradeSubjects.Dto;
 using psms.Academic.Parents.Dto;
@@ -27,6 +28,7 @@ public class AcademicMapper : Profile
         CreateGradeSubjectMappings();
         CreateTeacherMappings();
         CreateParentMappings();
+        CreateClassMappings();
     }
 
     private void CreateGradeMappings()
@@ -160,5 +162,32 @@ public class AcademicMapper : Profile
                 opt => opt.MapFrom(src => src.GetFullName()))
             .ForMember(dest => dest.StudentCount,
                 opt => opt.MapFrom(src => src.StudentLinks != null ? src.StudentLinks.Count : 0));
+    }
+
+    private void CreateClassMappings()
+    {
+        // Entity to DTO (full)
+        CreateMap<Class, ClassDto>()
+            .ForMember(dest => dest.GradeName,
+                opt => opt.MapFrom(src => src.Grade != null ? src.Grade.GradeName : null))
+            .ForMember(dest => dest.AcademicYearName,
+                opt => opt.MapFrom(src => src.AcademicYear != null ? src.AcademicYear.YearName : null))
+            .ForMember(dest => dest.ClassTeacherName,
+                opt => opt.MapFrom(src => src.ClassTeacher != null ? src.ClassTeacher.GetFullName() : null))
+            .ForMember(dest => dest.StudentCount,
+                opt => opt.MapFrom(src => src.Students != null ? src.Students.Count(s => !s.IsDeleted) : 0))
+            .ForMember(dest => dest.TeacherAssignmentCount,
+                opt => opt.MapFrom(src => src.TeacherAssignments != null ? src.TeacherAssignments.Count : 0));
+
+        // Entity to ListDto (lightweight)
+        CreateMap<Class, ClassListDto>()
+            .ForMember(dest => dest.GradeName,
+                opt => opt.MapFrom(src => src.Grade != null ? src.Grade.GradeName : null))
+            .ForMember(dest => dest.AcademicYearName,
+                opt => opt.MapFrom(src => src.AcademicYear != null ? src.AcademicYear.YearName : null))
+            .ForMember(dest => dest.ClassTeacherName,
+                opt => opt.MapFrom(src => src.ClassTeacher != null ? src.ClassTeacher.GetFullName() : null))
+            .ForMember(dest => dest.StudentCount,
+                opt => opt.MapFrom(src => src.Students != null ? src.Students.Count(s => !s.IsDeleted) : 0));
     }
 }
