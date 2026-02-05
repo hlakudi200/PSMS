@@ -38,5 +38,8 @@ public class UpdateTeacherDto
     [StringLength(50)]
     public string EmploymentStatus { get; set; }
 
+    [StringLength(500)]
+    public string ProfilePhotoUrl { get; set; }
+
     public bool? IsActive { get; set; }
 }

@@ -9,6 +9,7 @@ using psms.Academic.Parents.Dto;
 using psms.Academic.Shared;
 using psms.Authorization;
 using psms.Domain.Academic.Entities;
+using psms.Domain.Shared.Validators;
 using psms.Domain.Shared.ValueObjects;
 using System;
 using System.Collections.Generic;
@@ -67,13 +68,19 @@ public class ParentAppService : ApplicationService, IParentAppService
     [AbpAuthorize(PermissionNames.Academic_Parents_Create)]
     public async Task<ParentDto> CreateAsync(CreateParentDto input)
     {
-        // Validate unique email
+        // Validate unique email (case-insensitive)
+        var normalizedEmail = input.Email.Trim().ToLowerInvariant();
         var existingByEmail = await _parentRepository
-            .FirstOrDefaultAsync(p => p.Email == input.Email);
+            .FirstOrDefaultAsync(p => p.Email.ToLower() == normalizedEmail);
 
         if (existingByEmail != null)
             throw new UserFriendlyException(AcademicExceptionCodes.DuplicateParentEmail,
                 $"A parent with email '{input.Email}' already exists.");
+
+        // ER-002: Validate SA ID number if provided
+        if (!string.IsNullOrWhiteSpace(input.IdNumber) && !SAIdNumberValidator.IsValid(input.IdNumber))
+            throw new UserFriendlyException(AcademicExceptionCodes.InvalidSAIdNumber,
+                "Invalid South African ID number. Must be 13 digits and pass Luhn validation.");
 
         var parent = new Parent(
             Guid.NewGuid(),
@@ -81,7 +88,7 @@ public class ParentAppService : ApplicationService, IParentAppService
             input.UserId,
             input.FirstName,
             input.LastName,
-            input.Email,
+            normalizedEmail,
             input.Phone)
         {
             IdNumber = input.IdNumber,
@@ -112,20 +119,31 @@ public class ParentAppService : ApplicationService, IParentAppService
     {
         var parent = await _parentRepository.GetAsync(id);
 
-        // Validate unique email if changing
-        if (input.Email != null && input.Email != parent.Email)
+        // Validate unique email if changing (case-insensitive)
+        if (input.Email != null)
         {
-            var existingByEmail = await _parentRepository
-                .FirstOrDefaultAsync(p => p.Email == input.Email && p.Id != id);
+            var normalizedEmail = input.Email.Trim().ToLowerInvariant();
+            if (normalizedEmail != parent.Email.ToLowerInvariant())
+            {
+                var existingByEmail = await _parentRepository
+                    .FirstOrDefaultAsync(p => p.Email.ToLower() == normalizedEmail && p.Id != id);
 
-            if (existingByEmail != null)
-                throw new UserFriendlyException(AcademicExceptionCodes.DuplicateParentEmail,
-                    $"A parent with email '{input.Email}' already exists.");
+                if (existingByEmail != null)
+                    throw new UserFriendlyException(AcademicExceptionCodes.DuplicateParentEmail,
+                        $"A parent with email '{input.Email}' already exists.");
+            }
+
+            parent.Email = normalizedEmail;
         }
+
+        // ER-002: Validate SA ID number if changing
+        if (input.IdNumber != null && !string.IsNullOrWhiteSpace(input.IdNumber)
+            && !SAIdNumberValidator.IsValid(input.IdNumber))
+            throw new UserFriendlyException(AcademicExceptionCodes.InvalidSAIdNumber,
+                "Invalid South African ID number. Must be 13 digits and pass Luhn validation.");
 
         if (input.FirstName != null) parent.FirstName = input.FirstName;
         if (input.LastName != null) parent.LastName = input.LastName;
-        if (input.Email != null) parent.Email = input.Email;
         if (input.Phone != null) parent.Phone = input.Phone;
         if (input.IdNumber != null) parent.IdNumber = input.IdNumber;
         if (input.Occupation != null) parent.Occupation = input.Occupation;

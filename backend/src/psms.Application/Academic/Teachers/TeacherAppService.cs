@@ -77,9 +77,10 @@ public class TeacherAppService : ApplicationService, ITeacherAppService
             throw new UserFriendlyException(AcademicExceptionCodes.DuplicateEmployeeNumber,
                 $"A teacher with employee number '{input.EmployeeNumber}' already exists.");
 
-        // Validate unique email
+        // Validate unique email (case-insensitive)
+        var normalizedEmail = input.Email.Trim().ToLowerInvariant();
         var existingByEmail = await _teacherRepository
-            .FirstOrDefaultAsync(t => t.Email == input.Email);
+            .FirstOrDefaultAsync(t => t.Email.ToLower() == normalizedEmail);
 
         if (existingByEmail != null)
             throw new UserFriendlyException(AcademicExceptionCodes.DuplicateTeacherEmail,
@@ -92,7 +93,7 @@ public class TeacherAppService : ApplicationService, ITeacherAppService
             input.FirstName,
             input.LastName,
             input.EmployeeNumber,
-            input.Email)
+            normalizedEmail)
         {
             MiddleName = input.MiddleName,
             Phone = input.Phone,
@@ -126,26 +127,32 @@ public class TeacherAppService : ApplicationService, ITeacherAppService
     {
         var teacher = await _teacherRepository.GetAsync(id);
 
-        // Validate unique email if changing
-        if (input.Email != null && input.Email != teacher.Email)
+        // Validate unique email if changing (case-insensitive)
+        if (input.Email != null)
         {
-            var existingByEmail = await _teacherRepository
-                .FirstOrDefaultAsync(t => t.Email == input.Email && t.Id != id);
+            var normalizedEmail = input.Email.Trim().ToLowerInvariant();
+            if (normalizedEmail != teacher.Email.ToLowerInvariant())
+            {
+                var existingByEmail = await _teacherRepository
+                    .FirstOrDefaultAsync(t => t.Email.ToLower() == normalizedEmail && t.Id != id);
 
-            if (existingByEmail != null)
-                throw new UserFriendlyException(AcademicExceptionCodes.DuplicateTeacherEmail,
-                    $"A teacher with email '{input.Email}' already exists.");
+                if (existingByEmail != null)
+                    throw new UserFriendlyException(AcademicExceptionCodes.DuplicateTeacherEmail,
+                        $"A teacher with email '{input.Email}' already exists.");
+            }
+
+            teacher.Email = normalizedEmail;
         }
 
         if (input.FirstName != null) teacher.FirstName = input.FirstName;
         if (input.LastName != null) teacher.LastName = input.LastName;
         if (input.MiddleName != null) teacher.MiddleName = input.MiddleName;
-        if (input.Email != null) teacher.Email = input.Email;
         if (input.Phone != null) teacher.Phone = input.Phone;
         if (input.DateOfJoining.HasValue) teacher.DateOfJoining = input.DateOfJoining.Value;
         if (input.Qualifications != null) teacher.Qualifications = input.Qualifications;
         if (input.QualifiedSubjects != null) teacher.QualifiedSubjects = input.QualifiedSubjects;
         if (input.EmploymentStatus != null) teacher.EmploymentStatus = input.EmploymentStatus;
+        if (input.ProfilePhotoUrl != null) teacher.ProfilePhotoUrl = input.ProfilePhotoUrl;
         if (input.IsActive.HasValue) teacher.IsActive = input.IsActive.Value;
 
         if (input.Address != null)

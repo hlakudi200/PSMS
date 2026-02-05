@@ -58,5 +58,6 @@ public static class AcademicExceptionCodes
     // Parent
     public const string ParentNotFound = "ACD_PARENT_NOT_FOUND";
     public const string DuplicateParentEmail = "ACD_DUPLICATE_PARENT_EMAIL";
+    public const string InvalidSAIdNumber = "ACD_INVALID_SA_ID_NUMBER";
     public const string CannotDeleteParentWithStudents = "ACD_CANNOT_DELETE_PARENT_WITH_STUDENTS";
 }
