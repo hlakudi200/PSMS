@@ -75,6 +75,8 @@ public static class AcademicExceptionCodes
     // Student
     public const string StudentNotFound = "ACD_STUDENT_NOT_FOUND";
     public const string DuplicateAdmissionNumber = "ACD_DUPLICATE_ADMISSION_NUMBER";
+    public const string InvalidDateOfBirth = "ACD_INVALID_DATE_OF_BIRTH";
+    public const string InvalidAdmissionDate = "ACD_INVALID_ADMISSION_DATE";
     public const string CannotDeleteStudentWithParents = "ACD_CANNOT_DELETE_STUDENT_WITH_PARENTS";
     public const string CannotDeleteStudentWithSubjects = "ACD_CANNOT_DELETE_STUDENT_WITH_SUBJECTS";
 }

@@ -80,6 +80,16 @@ public class StudentAppService : ApplicationService, IStudentAppService
     [AbpAuthorize(PermissionNames.Academic_Students_Create)]
     public async Task<StudentDto> CreateAsync(CreateStudentDto input)
     {
+        // Validate date of birth is in the past
+        if (input.DateOfBirth.Date >= DateTime.Today)
+            throw new UserFriendlyException(AcademicExceptionCodes.InvalidDateOfBirth,
+                "Date of birth must be in the past.");
+
+        // Validate admission date is not in the future
+        if (input.AdmissionDate.Date > DateTime.Today)
+            throw new UserFriendlyException(AcademicExceptionCodes.InvalidAdmissionDate,
+                "Admission date cannot be in the future.");
+
         // Validate unique admission number (scoped to tenant via ABP filter)
         var existingByNumber = await _studentRepository
             .FirstOrDefaultAsync(s => s.AdmissionNumber == input.AdmissionNumber);
@@ -180,6 +190,10 @@ public class StudentAppService : ApplicationService, IStudentAppService
             && !SAIdNumberValidator.IsValid(input.IdNumber))
             throw new UserFriendlyException(AcademicExceptionCodes.InvalidSAIdNumber,
                 "Invalid South African ID number. Must be 13 digits and pass Luhn validation.");
+
+        if (input.DateOfBirth.HasValue && input.DateOfBirth.Value.Date >= DateTime.Today)
+            throw new UserFriendlyException(AcademicExceptionCodes.InvalidDateOfBirth,
+                "Date of birth must be in the past.");
 
         if (input.FirstName != null) student.FirstName = input.FirstName;
         if (input.LastName != null) student.LastName = input.LastName;
