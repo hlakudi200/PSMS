@@ -77,6 +77,26 @@ public static class AcademicExceptionCodes
     public const string DuplicateAdmissionNumber = "ACD_DUPLICATE_ADMISSION_NUMBER";
     public const string InvalidDateOfBirth = "ACD_INVALID_DATE_OF_BIRTH";
     public const string InvalidAdmissionDate = "ACD_INVALID_ADMISSION_DATE";
+    public const string StudentNotActive = "ACD_STUDENT_NOT_ACTIVE";
     public const string CannotDeleteStudentWithParents = "ACD_CANNOT_DELETE_STUDENT_WITH_PARENTS";
     public const string CannotDeleteStudentWithSubjects = "ACD_CANNOT_DELETE_STUDENT_WITH_SUBJECTS";
+
+    // Teacher (additional)
+    public const string TeacherNotActive = "ACD_TEACHER_NOT_ACTIVE";
+
+    // StudentParent (junction)
+    public const string StudentParentLinkNotFound = "ACD_STUDENT_PARENT_LINK_NOT_FOUND";
+    public const string DuplicateStudentParentLink = "ACD_DUPLICATE_STUDENT_PARENT_LINK";
+
+    // TeacherSubject (junction)
+    public const string TeacherSubjectNotFound = "ACD_TEACHER_SUBJECT_NOT_FOUND";
+    public const string DuplicateTeacherSubject = "ACD_DUPLICATE_TEACHER_SUBJECT";
+
+    // TeacherClass (junction)
+    public const string TeacherClassNotFound = "ACD_TEACHER_CLASS_NOT_FOUND";
+    public const string DuplicateTeacherClass = "ACD_DUPLICATE_TEACHER_CLASS";
+
+    // StudentSubject (junction)
+    public const string StudentSubjectNotFound = "ACD_STUDENT_SUBJECT_NOT_FOUND";
+    public const string DuplicateStudentSubject = "ACD_DUPLICATE_STUDENT_SUBJECT";
 }

@@ -4,9 +4,13 @@ using psms.Academic.Classes.Dto;
 using psms.Academic.Grades.Dto;
 using psms.Academic.GradeSubjects.Dto;
 using psms.Academic.Parents.Dto;
+using psms.Academic.StudentParents.Dto;
 using psms.Academic.Students.Dto;
+using psms.Academic.StudentSubjects.Dto;
 using psms.Academic.Subjects.Dto;
+using psms.Academic.TeacherClasses.Dto;
 using psms.Academic.Teachers.Dto;
+using psms.Academic.TeacherSubjects.Dto;
 using psms.Academic.Terms.Dto;
 using psms.Domain.Academic.Entities;
 using psms.Domain.Shared.ValueObjects;
@@ -31,6 +35,10 @@ public class AcademicMapper : Profile
         CreateParentMappings();
         CreateClassMappings();
         CreateStudentMappings();
+        CreateStudentParentMappings();
+        CreateTeacherSubjectMappings();
+        CreateTeacherClassMappings();
+        CreateStudentSubjectMappings();
     }
 
     private void CreateGradeMappings()
@@ -222,5 +230,61 @@ public class AcademicMapper : Profile
                 opt => opt.MapFrom(src => src.CurrentClass != null ? src.CurrentClass.ClassName : null))
             .ForMember(dest => dest.ParentCount,
                 opt => opt.MapFrom(src => src.ParentLinks != null ? src.ParentLinks.Count : 0));
+    }
+
+    private void CreateStudentParentMappings()
+    {
+        CreateMap<StudentParent, StudentParentDto>()
+            .ForMember(dest => dest.StudentName,
+                opt => opt.MapFrom(src => src.Student != null ? src.Student.GetFullName() : null))
+            .ForMember(dest => dest.StudentAdmissionNumber,
+                opt => opt.MapFrom(src => src.Student != null ? src.Student.AdmissionNumber : null))
+            .ForMember(dest => dest.ParentName,
+                opt => opt.MapFrom(src => src.Parent != null ? src.Parent.GetFullName() : null))
+            .ForMember(dest => dest.ParentEmail,
+                opt => opt.MapFrom(src => src.Parent != null ? src.Parent.Email : null))
+            .ForMember(dest => dest.ParentPhone,
+                opt => opt.MapFrom(src => src.Parent != null ? src.Parent.Phone : null));
+    }
+
+    private void CreateTeacherSubjectMappings()
+    {
+        CreateMap<TeacherSubject, TeacherSubjectDto>()
+            .ForMember(dest => dest.TeacherName,
+                opt => opt.MapFrom(src => src.Teacher != null ? src.Teacher.GetFullName() : null))
+            .ForMember(dest => dest.SubjectName,
+                opt => opt.MapFrom(src => src.Subject != null ? src.Subject.SubjectName : null))
+            .ForMember(dest => dest.SubjectCode,
+                opt => opt.MapFrom(src => src.Subject != null ? src.Subject.SubjectCode : null))
+            .ForMember(dest => dest.GradeName,
+                opt => opt.MapFrom(src => src.Grade != null ? src.Grade.GradeName : null));
+    }
+
+    private void CreateTeacherClassMappings()
+    {
+        CreateMap<TeacherClass, TeacherClassDto>()
+            .ForMember(dest => dest.TeacherName,
+                opt => opt.MapFrom(src => src.Teacher != null ? src.Teacher.GetFullName() : null))
+            .ForMember(dest => dest.ClassName,
+                opt => opt.MapFrom(src => src.Class != null ? src.Class.ClassName : null))
+            .ForMember(dest => dest.SubjectName,
+                opt => opt.MapFrom(src => src.Subject != null ? src.Subject.SubjectName : null))
+            .ForMember(dest => dest.SubjectCode,
+                opt => opt.MapFrom(src => src.Subject != null ? src.Subject.SubjectCode : null));
+    }
+
+    private void CreateStudentSubjectMappings()
+    {
+        CreateMap<StudentSubject, StudentSubjectDto>()
+            .ForMember(dest => dest.StudentName,
+                opt => opt.MapFrom(src => src.Student != null ? src.Student.GetFullName() : null))
+            .ForMember(dest => dest.StudentAdmissionNumber,
+                opt => opt.MapFrom(src => src.Student != null ? src.Student.AdmissionNumber : null))
+            .ForMember(dest => dest.SubjectName,
+                opt => opt.MapFrom(src => src.Subject != null ? src.Subject.SubjectName : null))
+            .ForMember(dest => dest.SubjectCode,
+                opt => opt.MapFrom(src => src.Subject != null ? src.Subject.SubjectCode : null))
+            .ForMember(dest => dest.AcademicYearName,
+                opt => opt.MapFrom(src => src.AcademicYear != null ? src.AcademicYear.YearName : null));
     }
 }
