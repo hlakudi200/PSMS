@@ -111,7 +111,11 @@ public class GradeSubjectAppService : ApplicationService, IGradeSubjectAppServic
     [AbpAuthorize(PermissionNames.Academic_Subjects_Manage)]
     public async Task UnassignAsync(Guid id)
     {
-        var gradeSubject = await _gradeSubjectRepository.FirstOrDefaultAsync(id);
+        // Join through Grade to ensure tenant isolation (GradeSubject has no IMayHaveTenant)
+        var gradeSubject = await _gradeSubjectRepository
+            .GetAll()
+            .Include(gs => gs.Grade)
+            .FirstOrDefaultAsync(gs => gs.Id == id);
 
         if (gradeSubject == null)
             throw new UserFriendlyException(AcademicExceptionCodes.GradeSubjectNotFound,
