@@ -1,0 +1,38 @@
+namespace psms.Academic.Shared;
+
+/// <summary>
+/// Exception codes for the Academic module.
+/// Maps to business rules AR-001 through AR-007, ER-001 through ER-005.
+/// </summary>
+public static class AcademicExceptionCodes
+{
+    // Grade (AR-005)
+    public const string GradeNotFound = "ACD_GRADE_NOT_FOUND";
+    public const string DuplicateGradeLevel = "ACD005_DUPLICATE_GRADE_LEVEL";
+    public const string InvalidGradeLevel = "ACD005_INVALID_GRADE_LEVEL";
+    public const string InvalidSchoolPhaseForGrade = "ACD005_INVALID_SCHOOL_PHASE_FOR_GRADE";
+    public const string CannotDeleteGradeWithStudents = "ACD_CANNOT_DELETE_GRADE_WITH_STUDENTS";
+    public const string CannotDeleteGradeWithClasses = "ACD_CANNOT_DELETE_GRADE_WITH_CLASSES";
+    public const string GradeNotActive = "ACD_GRADE_NOT_ACTIVE";
+
+    // Academic Year (AR-001, AR-002)
+    public const string AcademicYearNotFound = "ACD_ACADEMIC_YEAR_NOT_FOUND";
+    public const string DuplicateAcademicYear = "ACD001_DUPLICATE_ACADEMIC_YEAR";
+    public const string AcademicYearAlreadyCurrent = "ACD001_ACADEMIC_YEAR_ALREADY_CURRENT";
+    public const string InvalidAcademicYearDates = "ACD002_INVALID_ACADEMIC_YEAR_DATES";
+    public const string InvalidAcademicYearStartMonth = "ACD002_INVALID_START_MONTH";
+    public const string InvalidAcademicYearEndMonth = "ACD002_INVALID_END_MONTH";
+    public const string InvalidAcademicYearDuration = "ACD002_INVALID_DURATION";
+    public const string CannotDeleteCurrentAcademicYear = "ACD_CANNOT_DELETE_CURRENT_ACADEMIC_YEAR";
+    public const string CannotDeleteAcademicYearWithClasses = "ACD_CANNOT_DELETE_YEAR_WITH_CLASSES";
+
+    // Term (AR-003, AR-004)
+    public const string TermNotFound = "ACD_TERM_NOT_FOUND";
+    public const string InvalidTermCount = "ACD003_INVALID_TERM_COUNT";
+    public const string OverlappingTerms = "ACD003_OVERLAPPING_TERMS";
+    public const string TermAlreadyCurrent = "ACD004_TERM_ALREADY_CURRENT";
+    public const string AcademicYearNotCurrent = "ACD004_ACADEMIC_YEAR_NOT_CURRENT";
+    public const string TermOutsideAcademicYear = "ACD_TERM_OUTSIDE_ACADEMIC_YEAR";
+    public const string DuplicateTermNumber = "ACD_DUPLICATE_TERM_NUMBER";
+    public const string CannotDeleteCurrentTerm = "ACD_CANNOT_DELETE_CURRENT_TERM";
+}

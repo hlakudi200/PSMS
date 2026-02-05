@@ -3,6 +3,7 @@ using psms.Authorization.Roles;
 using psms.Authorization.Users;
 using psms.MultiTenancy;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using System.Linq;
 using System;
 
@@ -288,6 +289,10 @@ public class psmsDbContext : AbpZeroDbContext<Tenant, Role, User, psmsDbContext>
     {
         base.OnModelCreating(modelBuilder);
 
+        // PostgreSQL requires DateTime values to be UTC.
+        // This converter ensures all DateTime properties are stored/retrieved as UTC.
+        ConfigureDateTimeUtcConversion(modelBuilder);
+
         // Configure entity relationships and constraints
         ConfigureAcademicModule(modelBuilder);
         ConfigureAdmissionsModule(modelBuilder);
@@ -296,6 +301,37 @@ public class psmsDbContext : AbpZeroDbContext<Tenant, Role, User, psmsDbContext>
         ConfigureLearningModule(modelBuilder);
         ConfigureCommunicationModule(modelBuilder);
         ConfigureSASpecificModule(modelBuilder);
+    }
+
+    private void ConfigureDateTimeUtcConversion(ModelBuilder modelBuilder)
+    {
+        // Value converter for DateTime (non-nullable)
+        var dateTimeConverter = new ValueConverter<DateTime, DateTime>(
+            v => v.Kind == DateTimeKind.Utc ? v : v.ToUniversalTime(),
+            v => DateTime.SpecifyKind(v, DateTimeKind.Utc)
+        );
+
+        // Value converter for DateTime? (nullable)
+        var nullableDateTimeConverter = new ValueConverter<DateTime?, DateTime?>(
+            v => v.HasValue ? (v.Value.Kind == DateTimeKind.Utc ? v : v.Value.ToUniversalTime()) : v,
+            v => v.HasValue ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) : v
+        );
+
+        // Apply converters to all DateTime and DateTime? properties across all entities
+        foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+        {
+            foreach (var property in entityType.GetProperties())
+            {
+                if (property.ClrType == typeof(DateTime))
+                {
+                    property.SetValueConverter(dateTimeConverter);
+                }
+                else if (property.ClrType == typeof(DateTime?))
+                {
+                    property.SetValueConverter(nullableDateTimeConverter);
+                }
+            }
+        }
     }
 
     private void ConfigureAcademicModule(ModelBuilder modelBuilder)

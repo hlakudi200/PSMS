@@ -14,6 +14,9 @@ namespace psms.Domain.Shared.Enums
         ProofOfResidence = 7,
         ParentIdDocument = 8,
         Photo = 9,
-        Other = 10
+        Other = 10,
+        PassportPhoto = 11,
+        StudyPermit = 12,
+        Passport = 13
     }
 }
