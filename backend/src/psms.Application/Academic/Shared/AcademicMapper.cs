@@ -1,6 +1,8 @@
 using AutoMapper;
 using psms.Academic.AcademicYears.Dto;
 using psms.Academic.Grades.Dto;
+using psms.Academic.GradeSubjects.Dto;
+using psms.Academic.Subjects.Dto;
 using psms.Academic.Terms.Dto;
 using psms.Domain.Academic.Entities;
 using System.Linq;
@@ -18,6 +20,8 @@ public class AcademicMapper : Profile
         CreateGradeMappings();
         CreateAcademicYearMappings();
         CreateTermMappings();
+        CreateSubjectMappings();
+        CreateGradeSubjectMappings();
     }
 
     private void CreateGradeMappings()
@@ -79,5 +83,36 @@ public class AcademicMapper : Profile
         CreateMap<Term, TermListDto>()
             .ForMember(dest => dest.AcademicYearName,
                 opt => opt.MapFrom(src => src.AcademicYear != null ? src.AcademicYear.YearName : null));
+    }
+
+    private void CreateSubjectMappings()
+    {
+        // Entity to DTO (full)
+        CreateMap<Subject, SubjectDto>()
+            .ForMember(dest => dest.GradeCount,
+                opt => opt.MapFrom(src => src.GradeSubjects != null ? src.GradeSubjects.Count : 0))
+            .ForMember(dest => dest.TeacherCount,
+                opt => opt.MapFrom(src => src.TeacherSubjects != null ? src.TeacherSubjects.Count : 0));
+
+        // Entity to ListDto (lightweight)
+        CreateMap<Subject, SubjectListDto>()
+            .ForMember(dest => dest.GradeCount,
+                opt => opt.MapFrom(src => src.GradeSubjects != null ? src.GradeSubjects.Count : 0));
+    }
+
+    private void CreateGradeSubjectMappings()
+    {
+        // Entity to DTO with flattened navigation properties
+        CreateMap<GradeSubject, GradeSubjectDto>()
+            .ForMember(dest => dest.GradeName,
+                opt => opt.MapFrom(src => src.Grade != null ? src.Grade.GradeName : null))
+            .ForMember(dest => dest.GradeLevel,
+                opt => opt.MapFrom(src => src.Grade != null ? src.Grade.GradeLevel : default))
+            .ForMember(dest => dest.SubjectName,
+                opt => opt.MapFrom(src => src.Subject != null ? src.Subject.SubjectName : null))
+            .ForMember(dest => dest.SubjectCode,
+                opt => opt.MapFrom(src => src.Subject != null ? src.Subject.SubjectCode : null))
+            .ForMember(dest => dest.IsCore,
+                opt => opt.MapFrom(src => src.Subject != null && src.Subject.IsCore));
     }
 }

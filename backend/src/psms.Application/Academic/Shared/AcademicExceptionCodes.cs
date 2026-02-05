@@ -35,4 +35,16 @@ public static class AcademicExceptionCodes
     public const string TermOutsideAcademicYear = "ACD_TERM_OUTSIDE_ACADEMIC_YEAR";
     public const string DuplicateTermNumber = "ACD_DUPLICATE_TERM_NUMBER";
     public const string CannotDeleteCurrentTerm = "ACD_CANNOT_DELETE_CURRENT_TERM";
+
+    // Subject
+    public const string SubjectNotFound = "ACD_SUBJECT_NOT_FOUND";
+    public const string DuplicateSubjectCode = "ACD_DUPLICATE_SUBJECT_CODE";
+    public const string SubjectNotActive = "ACD_SUBJECT_NOT_ACTIVE";
+    public const string CannotDeleteSubjectWithGrades = "ACD_CANNOT_DELETE_SUBJECT_WITH_GRADES";
+    public const string CannotDeleteSubjectWithTeachers = "ACD_CANNOT_DELETE_SUBJECT_WITH_TEACHERS";
+    public const string CannotDeleteSubjectWithStudents = "ACD_CANNOT_DELETE_SUBJECT_WITH_STUDENTS";
+
+    // GradeSubject
+    public const string GradeSubjectNotFound = "ACD_GRADE_SUBJECT_NOT_FOUND";
+    public const string DuplicateGradeSubject = "ACD_DUPLICATE_GRADE_SUBJECT";
 }

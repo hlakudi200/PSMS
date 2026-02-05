@@ -124,6 +124,11 @@ public static class PermissionNames
     public const string Academic_Grades_View = "Academic.Grades.View";
     public const string Academic_Grades_Manage = "Academic.Grades.Manage";
 
+    // Subjects
+    public const string Academic_Subjects = "Academic.Subjects";
+    public const string Academic_Subjects_View = "Academic.Subjects.View";
+    public const string Academic_Subjects_Manage = "Academic.Subjects.Manage";
+
     // Classes
     public const string Academic_Classes = "Academic.Classes";
     public const string Academic_Classes_View = "Academic.Classes.View";
