@@ -68,4 +68,13 @@ public static class AcademicExceptionCodes
     public const string ClassTeacherNotActive = "ACD_CLASS_TEACHER_NOT_ACTIVE";
     public const string CannotDeleteClassWithStudents = "ACD_CANNOT_DELETE_CLASS_WITH_STUDENTS";
     public const string CannotDeleteClassWithTeachers = "ACD_CANNOT_DELETE_CLASS_WITH_TEACHERS";
+    public const string ClassNotActive = "ACD_CLASS_NOT_ACTIVE";
+    public const string ClassGradeMismatch = "ACD_CLASS_GRADE_MISMATCH";
+    public const string ClassAtCapacity = "ACD006_CLASS_AT_CAPACITY";
+
+    // Student
+    public const string StudentNotFound = "ACD_STUDENT_NOT_FOUND";
+    public const string DuplicateAdmissionNumber = "ACD_DUPLICATE_ADMISSION_NUMBER";
+    public const string CannotDeleteStudentWithParents = "ACD_CANNOT_DELETE_STUDENT_WITH_PARENTS";
+    public const string CannotDeleteStudentWithSubjects = "ACD_CANNOT_DELETE_STUDENT_WITH_SUBJECTS";
 }

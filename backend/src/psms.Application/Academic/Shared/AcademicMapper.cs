@@ -4,6 +4,7 @@ using psms.Academic.Classes.Dto;
 using psms.Academic.Grades.Dto;
 using psms.Academic.GradeSubjects.Dto;
 using psms.Academic.Parents.Dto;
+using psms.Academic.Students.Dto;
 using psms.Academic.Subjects.Dto;
 using psms.Academic.Teachers.Dto;
 using psms.Academic.Terms.Dto;
@@ -29,6 +30,7 @@ public class AcademicMapper : Profile
         CreateTeacherMappings();
         CreateParentMappings();
         CreateClassMappings();
+        CreateStudentMappings();
     }
 
     private void CreateGradeMappings()
@@ -189,5 +191,36 @@ public class AcademicMapper : Profile
                 opt => opt.MapFrom(src => src.ClassTeacher != null ? src.ClassTeacher.GetFullName() : null))
             .ForMember(dest => dest.StudentCount,
                 opt => opt.MapFrom(src => src.Students != null ? src.Students.Count(s => !s.IsDeleted) : 0));
+    }
+
+    private void CreateStudentMappings()
+    {
+        // Entity to DTO (full)
+        CreateMap<Student, StudentDto>()
+            .ForMember(dest => dest.FullName,
+                opt => opt.MapFrom(src => src.GetFullName()))
+            .ForMember(dest => dest.Age,
+                opt => opt.MapFrom(src => src.GetAge()))
+            .ForMember(dest => dest.CurrentGradeName,
+                opt => opt.MapFrom(src => src.CurrentGrade != null ? src.CurrentGrade.GradeName : null))
+            .ForMember(dest => dest.CurrentClassName,
+                opt => opt.MapFrom(src => src.CurrentClass != null ? src.CurrentClass.ClassName : null))
+            .ForMember(dest => dest.ParentCount,
+                opt => opt.MapFrom(src => src.ParentLinks != null ? src.ParentLinks.Count : 0))
+            .ForMember(dest => dest.SubjectCount,
+                opt => opt.MapFrom(src => src.SubjectEnrollments != null ? src.SubjectEnrollments.Count : 0));
+
+        // Entity to ListDto (lightweight)
+        CreateMap<Student, StudentListDto>()
+            .ForMember(dest => dest.FullName,
+                opt => opt.MapFrom(src => src.GetFullName()))
+            .ForMember(dest => dest.Age,
+                opt => opt.MapFrom(src => src.GetAge()))
+            .ForMember(dest => dest.CurrentGradeName,
+                opt => opt.MapFrom(src => src.CurrentGrade != null ? src.CurrentGrade.GradeName : null))
+            .ForMember(dest => dest.CurrentClassName,
+                opt => opt.MapFrom(src => src.CurrentClass != null ? src.CurrentClass.ClassName : null))
+            .ForMember(dest => dest.ParentCount,
+                opt => opt.MapFrom(src => src.ParentLinks != null ? src.ParentLinks.Count : 0));
     }
 }
