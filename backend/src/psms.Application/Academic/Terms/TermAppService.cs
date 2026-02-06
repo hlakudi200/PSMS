@@ -40,7 +40,7 @@ public class TermAppService : ApplicationService, ITermAppService
         var term = await _termRepository
             .GetAll()
             .Include(t => t.AcademicYear)
-            .FirstOrDefaultAsync(t => t.Id == id);
+            .FirstOrDefaultAsync(t => t.Id == id && t.TenantId == AbpSession.TenantId);
 
         if (term == null)
             throw new UserFriendlyException(AcademicExceptionCodes.TermNotFound, "Term not found.");
@@ -120,7 +120,7 @@ public class TermAppService : ApplicationService, ITermAppService
         var term = await _termRepository
             .GetAll()
             .Include(t => t.AcademicYear)
-            .FirstOrDefaultAsync(t => t.Id == id);
+            .FirstOrDefaultAsync(t => t.Id == id && t.TenantId == AbpSession.TenantId);
 
         if (term == null)
             throw new UserFriendlyException(AcademicExceptionCodes.TermNotFound, "Term not found.");
@@ -184,7 +184,7 @@ public class TermAppService : ApplicationService, ITermAppService
         var term = await _termRepository
             .GetAll()
             .Include(t => t.AcademicYear)
-            .FirstOrDefaultAsync(t => t.Id == id);
+            .FirstOrDefaultAsync(t => t.Id == id && t.TenantId == AbpSession.TenantId);
 
         if (term == null)
             throw new UserFriendlyException(AcademicExceptionCodes.TermNotFound, "Term not found.");

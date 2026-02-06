@@ -54,7 +54,7 @@ public class ApplicationDocumentAppService : ApplicationService, IApplicationDoc
         var document = await _documentRepository
             .GetAll()
             .Include(d => d.Application)
-            .FirstOrDefaultAsync(d => d.Id == id);
+            .FirstOrDefaultAsync(d => d.Id == id && d.TenantId == AbpSession.TenantId);
 
         if (document == null)
             throw new UserFriendlyException(AdmissionsExceptionCodes.DocumentNotFound, "Document not found.");

@@ -48,7 +48,7 @@ public class StudentAppService : ApplicationService, IStudentAppService
             .Include(s => s.CurrentClass)
             .Include(s => s.ParentLinks)
             .Include(s => s.SubjectEnrollments)
-            .FirstOrDefaultAsync(s => s.Id == id);
+            .FirstOrDefaultAsync(s => s.Id == id && s.TenantId == AbpSession.TenantId);
 
         if (student == null)
             throw new UserFriendlyException(AcademicExceptionCodes.StudentNotFound, "Student not found.");
@@ -253,7 +253,7 @@ public class StudentAppService : ApplicationService, IStudentAppService
             .GetAll()
             .Include(s => s.ParentLinks)
             .Include(s => s.SubjectEnrollments)
-            .FirstOrDefaultAsync(s => s.Id == id);
+            .FirstOrDefaultAsync(s => s.Id == id && s.TenantId == AbpSession.TenantId);
 
         if (student == null)
             throw new UserFriendlyException(AcademicExceptionCodes.StudentNotFound, "Student not found.");

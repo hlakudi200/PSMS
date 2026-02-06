@@ -1,6 +1,7 @@
 using System;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using Abp.Domain.Entities;
 using Abp.Domain.Entities.Auditing;
 using psms.Domain.Academic.Entities;
 using psms.Domain.Shared.Enums;
@@ -11,8 +12,10 @@ namespace psms.Domain.Admissions.Entities
     /// Represents a placement assessment for an application
     /// </summary>
     [Table("AdmissionAssessments")]
-    public class AdmissionAssessment : CreationAuditedEntity<Guid>
+    public class AdmissionAssessment : CreationAuditedEntity<Guid>, IMayHaveTenant
     {
+        public int? TenantId { get; set; }
+
         public const int MaxSubjectsLength = 500;
         public const int MaxFeedbackLength = 2000;
 

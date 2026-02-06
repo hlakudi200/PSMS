@@ -38,7 +38,7 @@ public class TeacherAppService : ApplicationService, ITeacherAppService
             .GetAll()
             .Include(t => t.SubjectAssignments)
             .Include(t => t.ClassAssignments)
-            .FirstOrDefaultAsync(t => t.Id == id);
+            .FirstOrDefaultAsync(t => t.Id == id && t.TenantId == AbpSession.TenantId);
 
         if (teacher == null)
             throw new UserFriendlyException(AcademicExceptionCodes.TeacherNotFound, "Teacher not found.");
@@ -179,7 +179,7 @@ public class TeacherAppService : ApplicationService, ITeacherAppService
             .GetAll()
             .Include(t => t.SubjectAssignments)
             .Include(t => t.ClassAssignments)
-            .FirstOrDefaultAsync(t => t.Id == id);
+            .FirstOrDefaultAsync(t => t.Id == id && t.TenantId == AbpSession.TenantId);
 
         if (teacher == null)
             throw new UserFriendlyException(AcademicExceptionCodes.TeacherNotFound, "Teacher not found.");

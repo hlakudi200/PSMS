@@ -50,7 +50,7 @@ public class ClassAppService : ApplicationService, IClassAppService
             .Include(c => c.ClassTeacher)
             .Include(c => c.Students)
             .Include(c => c.TeacherAssignments)
-            .FirstOrDefaultAsync(c => c.Id == id);
+            .FirstOrDefaultAsync(c => c.Id == id && c.TenantId == AbpSession.TenantId);
 
         if (cls == null)
             throw new UserFriendlyException(AcademicExceptionCodes.ClassNotFound, "Class not found.");
@@ -195,7 +195,7 @@ public class ClassAppService : ApplicationService, IClassAppService
             .GetAll()
             .Include(c => c.Students)
             .Include(c => c.TeacherAssignments)
-            .FirstOrDefaultAsync(c => c.Id == id);
+            .FirstOrDefaultAsync(c => c.Id == id && c.TenantId == AbpSession.TenantId);
 
         if (cls == null)
             throw new UserFriendlyException(AcademicExceptionCodes.ClassNotFound, "Class not found.");

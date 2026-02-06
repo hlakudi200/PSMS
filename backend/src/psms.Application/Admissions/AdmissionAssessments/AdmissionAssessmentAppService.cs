@@ -46,7 +46,7 @@ public class AdmissionAssessmentAppService : ApplicationService, IAdmissionAsses
             .Include(a => a.Application)
                 .ThenInclude(app => app.AppliedGrade)
             .Include(a => a.AssessedGrade)
-            .FirstOrDefaultAsync(a => a.Id == id);
+            .FirstOrDefaultAsync(a => a.Id == id && a.TenantId == AbpSession.TenantId);
 
         if (assessment == null)
             throw new UserFriendlyException(AdmissionsExceptionCodes.AssessmentNotFound, "Assessment not found.");
@@ -62,7 +62,7 @@ public class AdmissionAssessmentAppService : ApplicationService, IAdmissionAsses
             .Include(a => a.Application)
                 .ThenInclude(app => app.AppliedGrade)
             .Include(a => a.AssessedGrade)
-            .FirstOrDefaultAsync(a => a.ApplicationId == applicationId);
+            .FirstOrDefaultAsync(a => a.ApplicationId == applicationId && a.TenantId == AbpSession.TenantId);
 
         if (assessment == null)
             return null;

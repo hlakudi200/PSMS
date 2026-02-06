@@ -38,7 +38,7 @@ public class ParentAppService : ApplicationService, IParentAppService
         var parent = await _parentRepository
             .GetAll()
             .Include(p => p.StudentLinks)
-            .FirstOrDefaultAsync(p => p.Id == id);
+            .FirstOrDefaultAsync(p => p.Id == id && p.TenantId == AbpSession.TenantId);
 
         if (parent == null)
             throw new UserFriendlyException(AcademicExceptionCodes.ParentNotFound, "Parent not found.");
@@ -173,7 +173,7 @@ public class ParentAppService : ApplicationService, IParentAppService
         var parent = await _parentRepository
             .GetAll()
             .Include(p => p.StudentLinks)
-            .FirstOrDefaultAsync(p => p.Id == id);
+            .FirstOrDefaultAsync(p => p.Id == id && p.TenantId == AbpSession.TenantId);
 
         if (parent == null)
             throw new UserFriendlyException(AcademicExceptionCodes.ParentNotFound, "Parent not found.");

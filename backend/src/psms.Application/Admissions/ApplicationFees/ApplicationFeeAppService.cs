@@ -40,7 +40,7 @@ public class ApplicationFeeAppService : ApplicationService, IApplicationFeeAppSe
         var fee = await _feeRepository
             .GetAll()
             .Include(f => f.Application)
-            .FirstOrDefaultAsync(f => f.ApplicationId == applicationId);
+            .FirstOrDefaultAsync(f => f.ApplicationId == applicationId && f.TenantId == AbpSession.TenantId);
 
         if (fee == null)
             return null;

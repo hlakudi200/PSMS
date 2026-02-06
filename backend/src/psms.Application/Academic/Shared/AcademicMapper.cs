@@ -14,6 +14,7 @@ using psms.Academic.TeacherSubjects.Dto;
 using psms.Academic.Terms.Dto;
 using psms.Domain.Academic.Entities;
 using psms.Domain.Shared.ValueObjects;
+using psms.Shared;
 using System.Linq;
 
 namespace psms.Academic.Shared;
@@ -164,7 +165,8 @@ public class AcademicMapper : Profile
             .ForMember(dest => dest.FullName,
                 opt => opt.MapFrom(src => src.GetFullName()))
             .ForMember(dest => dest.StudentCount,
-                opt => opt.MapFrom(src => src.StudentLinks != null ? src.StudentLinks.Count : 0));
+                opt => opt.MapFrom(src => src.StudentLinks != null ? src.StudentLinks.Count : 0))
+            .ForMember(dest => dest.IdNumber, opt => opt.MapFrom(src => PiiMasking.Mask(src.IdNumber)));
 
         // Entity to ListDto (lightweight)
         CreateMap<Parent, ParentListDto>()
@@ -216,7 +218,9 @@ public class AcademicMapper : Profile
             .ForMember(dest => dest.ParentCount,
                 opt => opt.MapFrom(src => src.ParentLinks != null ? src.ParentLinks.Count : 0))
             .ForMember(dest => dest.SubjectCount,
-                opt => opt.MapFrom(src => src.SubjectEnrollments != null ? src.SubjectEnrollments.Count : 0));
+                opt => opt.MapFrom(src => src.SubjectEnrollments != null ? src.SubjectEnrollments.Count : 0))
+            .ForMember(dest => dest.IdNumber, opt => opt.MapFrom(src => PiiMasking.Mask(src.IdNumber)))
+            .ForMember(dest => dest.PassportNumber, opt => opt.MapFrom(src => PiiMasking.Mask(src.PassportNumber)));
 
         // Entity to ListDto (lightweight)
         CreateMap<Student, StudentListDto>()

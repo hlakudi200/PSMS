@@ -37,7 +37,7 @@ public class SubjectAppService : ApplicationService, ISubjectAppService
             .GetAll()
             .Include(s => s.GradeSubjects)
             .Include(s => s.TeacherSubjects)
-            .FirstOrDefaultAsync(s => s.Id == id);
+            .FirstOrDefaultAsync(s => s.Id == id && s.TenantId == AbpSession.TenantId);
 
         if (subject == null)
             throw new UserFriendlyException(AcademicExceptionCodes.SubjectNotFound, "Subject not found.");
@@ -127,7 +127,7 @@ public class SubjectAppService : ApplicationService, ISubjectAppService
             .Include(s => s.GradeSubjects)
             .Include(s => s.TeacherSubjects)
             .Include(s => s.StudentSubjects)
-            .FirstOrDefaultAsync(s => s.Id == id);
+            .FirstOrDefaultAsync(s => s.Id == id && s.TenantId == AbpSession.TenantId);
 
         if (subject == null)
             throw new UserFriendlyException(AcademicExceptionCodes.SubjectNotFound, "Subject not found.");

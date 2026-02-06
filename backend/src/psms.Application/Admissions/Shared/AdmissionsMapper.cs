@@ -10,6 +10,7 @@ using psms.Admissions.Applications.Dto;
 using psms.Admissions.Waitlists.Dto;
 using psms.Domain.Admissions.Entities;
 using psms.Domain.Shared.Enums;
+using psms.Shared;
 
 namespace psms.Admissions.Shared;
 
@@ -64,7 +65,9 @@ public class AdmissionsMapper : Profile
             .ForMember(dest => dest.HasInterview, opt => opt.MapFrom(src => src.AdmissionInterview != null))
             .ForMember(dest => dest.HasAssessment, opt => opt.MapFrom(src => src.AdmissionAssessment != null))
             .ForMember(dest => dest.WaitlistPosition, opt => opt.MapFrom(src => src.Waitlist != null ? src.Waitlist.Position : (int?)null))
-            .ForMember(dest => dest.IsFeePaid, opt => opt.MapFrom(src => src.ApplicationFee != null && src.ApplicationFee.Status == PaymentStatus.Completed));
+            .ForMember(dest => dest.IsFeePaid, opt => opt.MapFrom(src => src.ApplicationFee != null && src.ApplicationFee.Status == PaymentStatus.Completed))
+            .ForMember(dest => dest.IdNumber, opt => opt.MapFrom(src => PiiMasking.Mask(src.IdNumber)))
+            .ForMember(dest => dest.PassportNumber, opt => opt.MapFrom(src => PiiMasking.Mask(src.PassportNumber)));
 
         CreateMap<Application, ApplicationListDto>()
             .ForMember(dest => dest.FirstName, opt => opt.MapFrom(src => src.ProspectiveStudentFirstName))
@@ -105,7 +108,8 @@ public class AdmissionsMapper : Profile
 
     private void CreateApplicantParentMappings()
     {
-        CreateMap<ApplicantParent, ApplicantParentDto>();
+        CreateMap<ApplicantParent, ApplicantParentDto>()
+            .ForMember(dest => dest.IdNumber, opt => opt.MapFrom(src => PiiMasking.Mask(src.IdNumber)));
 
         CreateMap<CreateApplicantParentDto, ApplicantParent>()
             .ForMember(dest => dest.Id, opt => opt.Ignore())

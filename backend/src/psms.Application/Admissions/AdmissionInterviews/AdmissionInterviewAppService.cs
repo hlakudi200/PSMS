@@ -46,7 +46,7 @@ public class AdmissionInterviewAppService : ApplicationService, IAdmissionInterv
             .GetAll()
             .Include(i => i.Application)
                 .ThenInclude(a => a.AppliedGrade)
-            .FirstOrDefaultAsync(i => i.Id == id);
+            .FirstOrDefaultAsync(i => i.Id == id && i.TenantId == AbpSession.TenantId);
 
         if (interview == null)
             throw new UserFriendlyException(AdmissionsExceptionCodes.InterviewNotFound, "Interview not found.");
@@ -61,7 +61,7 @@ public class AdmissionInterviewAppService : ApplicationService, IAdmissionInterv
             .GetAll()
             .Include(i => i.Application)
                 .ThenInclude(a => a.AppliedGrade)
-            .FirstOrDefaultAsync(i => i.ApplicationId == applicationId);
+            .FirstOrDefaultAsync(i => i.ApplicationId == applicationId && i.TenantId == AbpSession.TenantId);
 
         if (interview == null)
             return null;
@@ -253,7 +253,8 @@ public class AdmissionInterviewAppService : ApplicationService, IAdmissionInterv
         // Get existing interviews for this interviewer on this date
         var existingInterviews = await _interviewRepository
             .GetAll()
-            .Where(i => i.InterviewerUserId == interviewerUserId
+            .Where(i => i.TenantId == AbpSession.TenantId
+                && i.InterviewerUserId == interviewerUserId
                 && i.ScheduledDate.Date == date.Date
                 && i.Status != InterviewStatus.Cancelled)
             .Select(i => i.ScheduledTime)

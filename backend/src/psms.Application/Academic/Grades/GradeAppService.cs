@@ -39,7 +39,7 @@ public class GradeAppService : ApplicationService, IGradeAppService
             .Include(g => g.Classes)
             .Include(g => g.Students)
             .Include(g => g.GradeSubjects)
-            .FirstOrDefaultAsync(g => g.Id == id);
+            .FirstOrDefaultAsync(g => g.Id == id && g.TenantId == AbpSession.TenantId);
 
         if (grade == null)
             throw new UserFriendlyException(AcademicExceptionCodes.GradeNotFound, "Grade not found.");
@@ -124,7 +124,7 @@ public class GradeAppService : ApplicationService, IGradeAppService
             .GetAll()
             .Include(g => g.Students)
             .Include(g => g.Classes)
-            .FirstOrDefaultAsync(g => g.Id == id);
+            .FirstOrDefaultAsync(g => g.Id == id && g.TenantId == AbpSession.TenantId);
 
         if (grade == null)
             throw new UserFriendlyException(AcademicExceptionCodes.GradeNotFound, "Grade not found.");

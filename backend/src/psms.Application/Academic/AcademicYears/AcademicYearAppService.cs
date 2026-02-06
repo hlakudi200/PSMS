@@ -42,7 +42,7 @@ public class AcademicYearAppService : ApplicationService, IAcademicYearAppServic
             .GetAll()
             .Include(ay => ay.Terms.OrderBy(t => t.TermNumber))
             .Include(ay => ay.Classes)
-            .FirstOrDefaultAsync(ay => ay.Id == id);
+            .FirstOrDefaultAsync(ay => ay.Id == id && ay.TenantId == AbpSession.TenantId);
 
         if (academicYear == null)
             throw new UserFriendlyException(AcademicExceptionCodes.AcademicYearNotFound, "Academic year not found.");
@@ -131,7 +131,7 @@ public class AcademicYearAppService : ApplicationService, IAcademicYearAppServic
         var academicYear = await _academicYearRepository
             .GetAll()
             .Include(ay => ay.Classes)
-            .FirstOrDefaultAsync(ay => ay.Id == id);
+            .FirstOrDefaultAsync(ay => ay.Id == id && ay.TenantId == AbpSession.TenantId);
 
         if (academicYear == null)
             throw new UserFriendlyException(AcademicExceptionCodes.AcademicYearNotFound, "Academic year not found.");
