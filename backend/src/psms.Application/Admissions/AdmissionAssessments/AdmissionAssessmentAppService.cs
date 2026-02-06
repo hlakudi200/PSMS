@@ -169,17 +169,16 @@ public class AdmissionAssessmentAppService : ApplicationService, IAdmissionAsses
             throw new UserFriendlyException(AdmissionsExceptionCodes.CannotCancelAssessment,
                 "Cannot cancel a completed assessment.");
 
-        // Delete the assessment
-        await _assessmentRepository.DeleteAsync(id);
-
         // Revert application status back to UnderReview
         var application = await _applicationRepository.GetAsync(assessment.ApplicationId);
         if (application.Status == ApplicationStatus.AssessmentScheduled)
         {
-            // Note: Application entity may need a method to revert status
-            // For now, we'll manually reset to UnderReview
+            application.RevertToUnderReview();
+            await _applicationRepository.UpdateAsync(application);
         }
 
+        // Delete the assessment
+        await _assessmentRepository.DeleteAsync(id);
         await CurrentUnitOfWork.SaveChangesAsync();
     }
 

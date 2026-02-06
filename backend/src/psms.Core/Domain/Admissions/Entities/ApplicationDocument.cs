@@ -51,6 +51,12 @@ namespace psms.Domain.Admissions.Entities
 
         public DateTime? VerifiedDate { get; set; }
 
+        /// <summary>
+        /// Reason provided when a document is rejected
+        /// </summary>
+        [StringLength(1000)]
+        public string RejectionReason { get; set; }
+
         [ForeignKey(nameof(ApplicationId))]
         public virtual Application Application { get; set; }
 

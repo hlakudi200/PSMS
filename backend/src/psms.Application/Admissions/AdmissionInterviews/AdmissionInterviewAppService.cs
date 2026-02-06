@@ -144,14 +144,18 @@ public class AdmissionInterviewAppService : ApplicationService, IAdmissionInterv
             throw new UserFriendlyException(AdmissionsExceptionCodes.CannotRescheduleInterview,
                 "Only scheduled interviews can be rescheduled.");
 
+        // Enforce maximum reschedule limit (ADM-012: max 2)
+        if (interview.RescheduleCount >= MaxReschedules)
+            throw new UserFriendlyException(AdmissionsExceptionCodes.MaxReschedulesExceeded,
+                $"Maximum of {MaxReschedules} reschedules allowed. Mark as NoShow instead.");
+
         // Validate minimum notice
         if (input.NewScheduledDate < DateTime.UtcNow.AddDays(MinNoticeDaysRequired))
             throw new UserFriendlyException(AdmissionsExceptionCodes.InsufficientInterviewNotice,
                 $"Interview must be scheduled at least {MinNoticeDaysRequired} days in advance.");
 
-        interview.ScheduledDate = input.NewScheduledDate;
-        interview.ScheduledTime = input.NewScheduledTime;
-        interview.Status = InterviewStatus.Rescheduled;
+        // Use entity method which increments RescheduleCount
+        interview.Reschedule(input.NewScheduledDate, input.NewScheduledTime);
 
         if (!string.IsNullOrWhiteSpace(input.Location))
             interview.Location = input.Location;
@@ -174,16 +178,15 @@ public class AdmissionInterviewAppService : ApplicationService, IAdmissionInterv
             throw new UserFriendlyException(AdmissionsExceptionCodes.CannotCancelInterview,
                 "This interview cannot be cancelled.");
 
-        interview.Status = InterviewStatus.Cancelled;
+        interview.Cancel();
         interview.Notes = reason;
 
         // Revert application status back to UnderReview
         var application = await _applicationRepository.GetAsync(interview.ApplicationId);
         if (application.Status == ApplicationStatus.InterviewScheduled)
         {
-            // Note: Application entity needs a method to revert status
-            // For now, we'll manually set it
-            // This would be: application.CancelInterview();
+            application.RevertToUnderReview();
+            await _applicationRepository.UpdateAsync(application);
         }
 
         await _interviewRepository.UpdateAsync(interview);
@@ -226,10 +229,19 @@ public class AdmissionInterviewAppService : ApplicationService, IAdmissionInterv
             throw new UserFriendlyException(AdmissionsExceptionCodes.InterviewNotScheduled,
                 "Interview is not in a schedulable state.");
 
-        interview.Status = InterviewStatus.NoShow;
+        interview.MarkNoShow();
         interview.CompletedDate = DateTime.UtcNow;
 
         await _interviewRepository.UpdateAsync(interview);
+
+        // Revert application status back to UnderReview so it can be rescheduled or decided
+        var application = await _applicationRepository.GetAsync(interview.ApplicationId);
+        if (application.Status == ApplicationStatus.InterviewScheduled)
+        {
+            application.RevertToUnderReview();
+            await _applicationRepository.UpdateAsync(application);
+        }
+
         await CurrentUnitOfWork.SaveChangesAsync();
 
         return await GetAsync(id);

@@ -418,6 +418,24 @@ public class psmsDbContext : AbpZeroDbContext<Tenant, Role, User, psmsDbContext>
             .IsUnique()
             .HasDatabaseName("IX_Applications_ApplicationNumber");
 
+        // ApplicationFee - one fee per application
+        modelBuilder.Entity<ApplicationFee>()
+            .HasIndex(f => f.ApplicationId)
+            .IsUnique()
+            .HasDatabaseName("IX_ApplicationFees_ApplicationId");
+
+        // AdmissionInterview - one interview per application
+        modelBuilder.Entity<AdmissionInterview>()
+            .HasIndex(i => i.ApplicationId)
+            .IsUnique()
+            .HasDatabaseName("IX_AdmissionInterviews_ApplicationId");
+
+        // AdmissionAssessment - one assessment per application
+        modelBuilder.Entity<AdmissionAssessment>()
+            .HasIndex(a => a.ApplicationId)
+            .IsUnique()
+            .HasDatabaseName("IX_AdmissionAssessments_ApplicationId");
+
         // Waitlist - one entry per application
         modelBuilder.Entity<Waitlist>()
             .HasIndex(w => w.ApplicationId)

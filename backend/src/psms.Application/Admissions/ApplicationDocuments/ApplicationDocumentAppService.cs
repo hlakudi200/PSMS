@@ -215,6 +215,7 @@ public class ApplicationDocumentAppService : ApplicationService, IApplicationDoc
         document.IsVerified = false;
         document.VerifiedByUserId = AbpSession.UserId;
         document.VerifiedDate = DateTime.UtcNow;
+        document.RejectionReason = reason;
 
         // Update application status to request documents
         var application = await _applicationRepository.GetAsync(document.ApplicationId);

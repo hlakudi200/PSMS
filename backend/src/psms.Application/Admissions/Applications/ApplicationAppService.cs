@@ -11,6 +11,7 @@ using psms.Admissions.Shared;
 using psms.Authorization;
 using psms.Domain.Admissions.Entities;
 using psms.Domain.Shared.Enums;
+using psms.Domain.Shared.Validators;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -134,6 +135,10 @@ public class ApplicationAppService : ApplicationService, IApplicationAppService
             throw new UserFriendlyException(AdmissionsExceptionCodes.InvalidProspectiveStudentInfo,
                 "SA ID number is required for South African citizens.");
 
+        if (input.IsSACitizen && !string.IsNullOrWhiteSpace(input.IdNumber) && !SAIdNumberValidator.IsValid(input.IdNumber))
+            throw new UserFriendlyException(AdmissionsExceptionCodes.InvalidSaIdNumber,
+                "Invalid South African ID number.");
+
         if (!input.IsSACitizen && string.IsNullOrWhiteSpace(input.PassportNumber))
             throw new UserFriendlyException(AdmissionsExceptionCodes.InvalidProspectiveStudentInfo,
                 "Passport number is required for non-South African citizens.");
@@ -201,7 +206,13 @@ public class ApplicationAppService : ApplicationService, IApplicationAppService
             application.IsSACitizen = input.IsSACitizen.Value;
 
         if (input.ApplyingForGradeId.HasValue)
+        {
+            // Re-validate age for the new grade (ADM-004)
+            var dob = input.DateOfBirth ?? application.DateOfBirth;
+            var newSettings = await GetAdmissionSettingsAsync(application.AcademicYearId, input.ApplyingForGradeId.Value);
+            ValidateAgeForGrade(dob, newSettings);
             application.AppliedGradeId = input.ApplyingForGradeId.Value;
+        }
 
         if (!string.IsNullOrWhiteSpace(input.PreviousSchool))
             application.PreviousSchool = input.PreviousSchool;
@@ -275,31 +286,33 @@ public class ApplicationAppService : ApplicationService, IApplicationAppService
     [AbpAuthorize(PermissionNames.Admissions_Applications_ViewAll)]
     public async Task<ApplicationStatisticsDto> GetStatisticsAsync(Guid academicYearId, Guid? gradeId = null)
     {
-        var query = _applicationRepository
+        var statusCounts = await _applicationRepository
             .GetAll()
             .Where(a => a.AcademicYearId == academicYearId)
-            .WhereIf(gradeId.HasValue, a => a.AppliedGradeId == gradeId.Value);
+            .WhereIf(gradeId.HasValue, a => a.AppliedGradeId == gradeId.Value)
+            .GroupBy(a => a.Status)
+            .Select(g => new { Status = g.Key, Count = g.Count() })
+            .ToListAsync();
 
-        var statistics = new ApplicationStatisticsDto
+        int Count(params ApplicationStatus[] statuses) =>
+            statusCounts.Where(s => statuses.Contains(s.Status)).Sum(s => s.Count);
+
+        return new ApplicationStatisticsDto
         {
             AcademicYearId = academicYearId,
-            TotalApplications = await query.CountAsync(),
-            DraftApplications = await query.CountAsync(a => a.Status == ApplicationStatus.Draft),
-            SubmittedApplications = await query.CountAsync(a => a.Status == ApplicationStatus.PaymentPending),
-            UnderReviewApplications = await query.CountAsync(a => a.Status == ApplicationStatus.UnderReview
-                || a.Status == ApplicationStatus.DocumentsRequired
-                || a.Status == ApplicationStatus.InterviewScheduled
-                || a.Status == ApplicationStatus.AssessmentScheduled),
-            UnderConsiderationApplications = await query.CountAsync(a => a.Status == ApplicationStatus.UnderConsideration),
-            ApprovedApplications = await query.CountAsync(a => a.Status == ApplicationStatus.Approved),
-            RejectedApplications = await query.CountAsync(a => a.Status == ApplicationStatus.Rejected),
-            WaitlistedApplications = await query.CountAsync(a => a.Status == ApplicationStatus.Waitlisted),
-            EnrolledApplications = await query.CountAsync(a => a.Status == ApplicationStatus.Enrolled),
-            WithdrawnApplications = await query.CountAsync(a => a.Status == ApplicationStatus.Withdrawn),
-            ExpiredApplications = await query.CountAsync(a => a.Status == ApplicationStatus.Expired)
+            TotalApplications = statusCounts.Sum(s => s.Count),
+            DraftApplications = Count(ApplicationStatus.Draft),
+            SubmittedApplications = Count(ApplicationStatus.PaymentPending),
+            UnderReviewApplications = Count(ApplicationStatus.UnderReview, ApplicationStatus.DocumentsRequired,
+                ApplicationStatus.InterviewScheduled, ApplicationStatus.AssessmentScheduled),
+            UnderConsiderationApplications = Count(ApplicationStatus.UnderConsideration),
+            ApprovedApplications = Count(ApplicationStatus.Approved),
+            RejectedApplications = Count(ApplicationStatus.Rejected),
+            WaitlistedApplications = Count(ApplicationStatus.Waitlisted),
+            EnrolledApplications = Count(ApplicationStatus.Enrolled),
+            WithdrawnApplications = Count(ApplicationStatus.Withdrawn),
+            ExpiredApplications = Count(ApplicationStatus.Expired)
         };
-
-        return statistics;
     }
 
     #region Private Helper Methods
@@ -357,13 +370,25 @@ public class ApplicationAppService : ApplicationService, IApplicationAppService
     {
         var tenantId = AbpSession.TenantId ?? 0;
         var year = DateTime.UtcNow.Year;
+        var prefix = $"APP-{tenantId:D3}-{year}-";
 
-        // Get the count of applications for this tenant and year
-        var count = await _applicationRepository
-            .CountAsync(a => a.CreationTime.Year == year);
+        // Get the highest existing sequence number to avoid race conditions
+        var lastAppNumber = await _applicationRepository
+            .GetAll()
+            .Where(a => a.ApplicationNumber.StartsWith(prefix))
+            .OrderByDescending(a => a.ApplicationNumber)
+            .Select(a => a.ApplicationNumber)
+            .FirstOrDefaultAsync();
 
-        var sequence = (count + 1).ToString("D5");
-        return $"APP-{tenantId:D3}-{year}-{sequence}";
+        var nextSequence = 1;
+        if (lastAppNumber != null)
+        {
+            var lastSequence = lastAppNumber.Substring(prefix.Length);
+            if (int.TryParse(lastSequence, out var parsed))
+                nextSequence = parsed + 1;
+        }
+
+        return $"{prefix}{nextSequence:D5}";
     }
 
     #endregion

@@ -182,7 +182,32 @@ public class ApplicantParentAppService : ApplicationService, IApplicantParentApp
             throw new UserFriendlyException(AdmissionsExceptionCodes.ParentInformationRequired,
                 "Cannot remove the only parent. At least one parent is required.");
 
+        var wasPrimary = parent.IsPrimaryContact;
+        var wasFinanciallyResponsible = parent.IsFinanciallyResponsible;
+
         await _parentRepository.DeleteAsync(parent);
+        await CurrentUnitOfWork.SaveChangesAsync();
+
+        // Re-assign primary contact and financially responsible if needed
+        if (wasPrimary || wasFinanciallyResponsible)
+        {
+            var remainingParents = await _parentRepository
+                .GetAll()
+                .Where(p => p.ApplicationId == parent.ApplicationId)
+                .OrderBy(p => p.Id)
+                .ToListAsync();
+
+            if (remainingParents.Any())
+            {
+                if (wasPrimary && !remainingParents.Any(p => p.IsPrimaryContact))
+                    remainingParents.First().IsPrimaryContact = true;
+
+                if (wasFinanciallyResponsible && !remainingParents.Any(p => p.IsFinanciallyResponsible))
+                    remainingParents.First().IsFinanciallyResponsible = true;
+
+                await CurrentUnitOfWork.SaveChangesAsync();
+            }
+        }
     }
 
     [AbpAuthorize(PermissionNames.Admissions_Applications_Edit)]

@@ -45,6 +45,11 @@ namespace psms.Domain.Admissions.Entities
         public string Notes { get; set; }
 
         /// <summary>
+        /// Number of times this interview has been rescheduled (ADM-012: max 2)
+        /// </summary>
+        public int RescheduleCount { get; set; }
+
+        /// <summary>
         /// Rating from 1-5
         /// </summary>
         public int? Rating { get; set; }
@@ -84,6 +89,7 @@ namespace psms.Domain.Admissions.Entities
             ScheduledDate = newDate;
             ScheduledTime = newTime;
             Status = InterviewStatus.Rescheduled;
+            RescheduleCount++;
         }
 
         public void Cancel() => Status = InterviewStatus.Cancelled;

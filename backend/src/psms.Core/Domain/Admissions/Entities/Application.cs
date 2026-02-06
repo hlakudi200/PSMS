@@ -443,6 +443,30 @@ namespace psms.Domain.Admissions.Entities
         }
 
         /// <summary>
+        /// Reverts application status to UnderReview (when interview/assessment is cancelled)
+        /// </summary>
+        public void RevertToUnderReview()
+        {
+            if (Status != ApplicationStatus.InterviewScheduled && Status != ApplicationStatus.AssessmentScheduled)
+                throw new InvalidOperationException("Can only revert from InterviewScheduled or AssessmentScheduled.");
+
+            Status = ApplicationStatus.UnderReview;
+        }
+
+        /// <summary>
+        /// Approves the application from the waitlist (ADM-023)
+        /// </summary>
+        public void ApproveFromWaitlist(int offerExpiryDays = 14)
+        {
+            if (Status != ApplicationStatus.Waitlisted)
+                throw new InvalidOperationException("Only waitlisted applications can be approved from waitlist.");
+
+            Status = ApplicationStatus.Approved;
+            Decision = AdmissionDecision.Accepted;
+            ExpiryDate = DateTime.UtcNow.AddDays(offerExpiryDays);
+        }
+
+        /// <summary>
         /// Expires the application (ADM-030)
         /// </summary>
         public void Expire()

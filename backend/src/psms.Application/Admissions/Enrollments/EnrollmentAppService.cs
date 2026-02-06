@@ -32,6 +32,7 @@ public class EnrollmentAppService : ApplicationService, IEnrollmentAppService
     private readonly IRepository<ApplicantParent, Guid> _applicantParentRepository;
     private readonly IRepository<StudentParent, Guid> _studentParentRepository;
     private readonly IRepository<Parent, Guid> _parentRepository;
+    private readonly IRepository<Domain.Admissions.Entities.AdmissionSettings, Guid> _settingsRepository;
 
     public EnrollmentAppService(
         IRepository<Application, Guid> applicationRepository,
@@ -39,7 +40,8 @@ public class EnrollmentAppService : ApplicationService, IEnrollmentAppService
         IRepository<Class, Guid> classRepository,
         IRepository<ApplicantParent, Guid> applicantParentRepository,
         IRepository<StudentParent, Guid> studentParentRepository,
-        IRepository<Parent, Guid> parentRepository)
+        IRepository<Parent, Guid> parentRepository,
+        IRepository<Domain.Admissions.Entities.AdmissionSettings, Guid> settingsRepository)
     {
         _applicationRepository = applicationRepository;
         _studentRepository = studentRepository;
@@ -47,6 +49,7 @@ public class EnrollmentAppService : ApplicationService, IEnrollmentAppService
         _applicantParentRepository = applicantParentRepository;
         _studentParentRepository = studentParentRepository;
         _parentRepository = parentRepository;
+        _settingsRepository = settingsRepository;
     }
 
     [AbpAuthorize(PermissionNames.Admissions_Enrollment_View)]
@@ -250,6 +253,16 @@ public class EnrollmentAppService : ApplicationService, IEnrollmentAppService
         application.MarkAsEnrolled(student.Id);
         await _applicationRepository.UpdateAsync(application);
 
+        // Increment admission settings enrollment count (ADM-028)
+        var settings = await _settingsRepository
+            .FirstOrDefaultAsync(s => s.AcademicYearId == application.AcademicYearId
+                && s.GradeId == application.AppliedGradeId);
+        if (settings != null)
+        {
+            settings.CurrentEnrolledCount++;
+            await _settingsRepository.UpdateAsync(settings);
+        }
+
         await CurrentUnitOfWork.SaveChangesAsync();
 
         return await GetByApplicationAsync(input.ApplicationId);
@@ -288,14 +301,25 @@ public class EnrollmentAppService : ApplicationService, IEnrollmentAppService
     {
         var tenantId = AbpSession.TenantId ?? 0;
         var year = DateTime.UtcNow.Year;
+        var prefix = $"STU-{tenantId:D3}-{year}-";
 
-        // Get count of students for this tenant this year
-        var count = await _studentRepository
+        // Get the highest existing sequence number to avoid race conditions
+        var lastAdmNumber = await _studentRepository
             .GetAll()
-            .Where(s => s.TenantId == AbpSession.TenantId && s.AdmissionDate.Year == year)
-            .CountAsync();
+            .Where(s => s.TenantId == AbpSession.TenantId && s.AdmissionNumber.StartsWith(prefix))
+            .OrderByDescending(s => s.AdmissionNumber)
+            .Select(s => s.AdmissionNumber)
+            .FirstOrDefaultAsync();
 
-        return $"STU-{tenantId:D3}-{year}-{(count + 1):D4}";
+        var nextSequence = 1;
+        if (lastAdmNumber != null)
+        {
+            var lastSequence = lastAdmNumber.Substring(prefix.Length);
+            if (int.TryParse(lastSequence, out var parsed))
+                nextSequence = parsed + 1;
+        }
+
+        return $"{prefix}{nextSequence:D4}";
     }
 
     private async Task LinkParentsToStudentAsync(Guid applicationId, Guid studentId)
@@ -308,11 +332,12 @@ public class EnrollmentAppService : ApplicationService, IEnrollmentAppService
 
         foreach (var applicantParent in applicantParents)
         {
-            // Check if parent already exists (by ID number or email)
+            // Check if parent already exists (by ID number or email, case-insensitive)
+            var normalizedEmail = applicantParent.Email?.Trim().ToLowerInvariant();
             var existingParent = await _parentRepository
                 .FirstOrDefaultAsync(p =>
                     (applicantParent.IdNumber != null && p.IdNumber == applicantParent.IdNumber) ||
-                    (applicantParent.Email != null && p.Email == applicantParent.Email));
+                    (normalizedEmail != null && p.Email.ToLower() == normalizedEmail));
 
             Guid parentId;
 

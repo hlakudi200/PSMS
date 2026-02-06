@@ -43,28 +43,7 @@ public class ApplicationFeeAppService : ApplicationService, IApplicationFeeAppSe
             .FirstOrDefaultAsync(f => f.ApplicationId == applicationId);
 
         if (fee == null)
-        {
-            // Create fee record if it doesn't exist
-            var application = await _applicationRepository
-                .GetAll()
-                .Include(a => a.AppliedGrade)
-                .Include(a => a.AcademicYear)
-                .FirstOrDefaultAsync(a => a.Id == applicationId);
-
-            if (application == null)
-                throw new UserFriendlyException(AdmissionsExceptionCodes.ApplicationNotFound, "Application not found.");
-
-            var settings = await GetAdmissionSettingsAsync(application.AcademicYearId, application.AppliedGradeId);
-
-            fee = new ApplicationFee(
-                Guid.NewGuid(),
-                applicationId,
-                settings.ApplicationFeeAmount,
-                "ZAR");
-
-            await _feeRepository.InsertAsync(fee);
-            await CurrentUnitOfWork.SaveChangesAsync();
-        }
+            return null;
 
         var dto = ObjectMapper.Map<ApplicationFeeDto>(fee);
         dto.ApplicationNumber = fee.Application?.ApplicationNumber;
@@ -123,6 +102,7 @@ public class ApplicationFeeAppService : ApplicationService, IApplicationFeeAppSe
         };
     }
 
+    [AbpAuthorize(PermissionNames.Financial_Payments_RecordManual)]
     public async Task<PaymentResultDto> ProcessPaymentCallbackAsync(PaymentCallbackDto input)
     {
         var fee = await _feeRepository.FirstOrDefaultAsync(f => f.PaymentReference == input.MerchantReference);

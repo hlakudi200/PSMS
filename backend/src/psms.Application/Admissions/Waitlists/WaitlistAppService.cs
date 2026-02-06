@@ -115,6 +115,10 @@ public class WaitlistAppService : ApplicationService, IWaitlistAppService
         if (application == null)
             throw new UserFriendlyException(AdmissionsExceptionCodes.ApplicationNotFound, "Application not found.");
 
+        if (application.Status != ApplicationStatus.UnderConsideration)
+            throw new UserFriendlyException(AdmissionsExceptionCodes.InvalidStatusTransition,
+                "Only applications under consideration can be placed on the waitlist.");
+
         // Check if already on waitlist
         var existingWaitlist = await _waitlistRepository
             .FirstOrDefaultAsync(w => w.ApplicationId == applicationId);
@@ -183,13 +187,12 @@ public class WaitlistAppService : ApplicationService, IWaitlistAppService
 
         // Use entity method to accept offer
         waitlist.AcceptOffer();
-
         await _waitlistRepository.UpdateAsync(waitlist);
 
-        // Update application status to approved
+        // Update application status to approved from waitlist
         var application = await _applicationRepository.GetAsync(waitlist.ApplicationId);
-        // Note: Application needs to be moved to approved status
-        // This would typically be: application.ApproveFromWaitlist();
+        application.ApproveFromWaitlist();
+        await _applicationRepository.UpdateAsync(application);
 
         await CurrentUnitOfWork.SaveChangesAsync();
 
