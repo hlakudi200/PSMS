@@ -12,7 +12,7 @@ using psms.EntityFrameworkCore;
 namespace psms.Migrations
 {
     [DbContext(typeof(psmsDbContext))]
-    [Migration("20260206002607_AdmissionsReviewEntityChanges")]
+    [Migration("20260206003022_AdmissionsReviewEntityChanges")]
     partial class AdmissionsReviewEntityChanges
     {
         /// <inheritdoc />
@@ -1749,7 +1749,7 @@ namespace psms.Migrations
                     b.HasIndex("GradeId", "AcademicYearId", "ClassName")
                         .IsUnique()
                         .HasDatabaseName("IX_Classes_GradeId_AcademicYearId_ClassName")
-                        .HasFilter("IsDeleted = 0");
+                        .HasFilter("\"IsDeleted\" = false");
 
                     b.ToTable("Classes");
                 });

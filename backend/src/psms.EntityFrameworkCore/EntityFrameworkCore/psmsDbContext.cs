@@ -358,7 +358,7 @@ public class psmsDbContext : AbpZeroDbContext<Tenant, Role, User, psmsDbContext>
         modelBuilder.Entity<Class>()
             .HasIndex(c => new { c.GradeId, c.AcademicYearId, c.ClassName })
             .IsUnique()
-            .HasFilter("IsDeleted = 0")
+            .HasFilter("\"IsDeleted\" = false")
             .HasDatabaseName("IX_Classes_GradeId_AcademicYearId_ClassName");
 
         // StudentClass - prevent duplicate enrollments per academic year

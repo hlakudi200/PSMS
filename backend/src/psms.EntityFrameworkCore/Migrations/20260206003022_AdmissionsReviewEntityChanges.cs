@@ -73,7 +73,7 @@ namespace psms.Migrations
                 table: "Classes",
                 columns: new[] { "GradeId", "AcademicYearId", "ClassName" },
                 unique: true,
-                filter: "IsDeleted = 0");
+                filter: "\"IsDeleted\" = false");
         }
 
         /// <inheritdoc />

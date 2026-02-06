@@ -1746,7 +1746,7 @@ namespace psms.Migrations
                     b.HasIndex("GradeId", "AcademicYearId", "ClassName")
                         .IsUnique()
                         .HasDatabaseName("IX_Classes_GradeId_AcademicYearId_ClassName")
-                        .HasFilter("IsDeleted = 0");
+                        .HasFilter("\"IsDeleted\" = false");
 
                     b.ToTable("Classes");
                 });
