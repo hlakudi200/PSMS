@@ -379,6 +379,30 @@ public class psmsDbContext : AbpZeroDbContext<Tenant, Role, User, psmsDbContext>
             .IsUnique()
             .HasDatabaseName("IX_ClassSubjects_ClassId_SubjectId");
 
+        // GradeSubject - prevent duplicate grade-subject assignments
+        modelBuilder.Entity<GradeSubject>()
+            .HasIndex(gs => new { gs.GradeId, gs.SubjectId })
+            .IsUnique()
+            .HasDatabaseName("IX_GradeSubjects_GradeId_SubjectId");
+
+        // TeacherSubject - prevent duplicate teacher-subject-grade assignments
+        modelBuilder.Entity<TeacherSubject>()
+            .HasIndex(ts => new { ts.TeacherId, ts.SubjectId, ts.GradeId })
+            .IsUnique()
+            .HasDatabaseName("IX_TeacherSubjects_TeacherId_SubjectId_GradeId");
+
+        // TeacherClass - prevent duplicate teacher-class-subject assignments
+        modelBuilder.Entity<TeacherClass>()
+            .HasIndex(tc => new { tc.TeacherId, tc.ClassId, tc.SubjectId })
+            .IsUnique()
+            .HasDatabaseName("IX_TeacherClasses_TeacherId_ClassId_SubjectId");
+
+        // StudentSubject - prevent duplicate student-subject enrollments per academic year
+        modelBuilder.Entity<StudentSubject>()
+            .HasIndex(ss => new { ss.StudentId, ss.SubjectId, ss.AcademicYearId })
+            .IsUnique()
+            .HasDatabaseName("IX_StudentSubjects_StudentId_SubjectId_AcademicYearId");
+
         // Attendance - one record per student per day
         modelBuilder.Entity<Attendance>()
             .HasIndex(a => new { a.StudentId, a.AttendanceDate })

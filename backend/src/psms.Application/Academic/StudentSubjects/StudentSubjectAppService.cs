@@ -46,6 +46,7 @@ public class StudentSubjectAppService : ApplicationService, IStudentSubjectAppSe
             .Include(ss => ss.Student)
             .Include(ss => ss.Subject)
             .Include(ss => ss.AcademicYear)
+            .Where(ss => ss.Student.TenantId == AbpSession.TenantId)
             .Where(ss => ss.StudentId == studentId)
             .OrderBy(ss => ss.Subject.SubjectName)
             .ToListAsync();
@@ -62,6 +63,7 @@ public class StudentSubjectAppService : ApplicationService, IStudentSubjectAppSe
             .Include(ss => ss.Student)
             .Include(ss => ss.Subject)
             .Include(ss => ss.AcademicYear)
+            .Where(ss => ss.Student.TenantId == AbpSession.TenantId)
             .Where(ss => ss.SubjectId == subjectId && ss.IsActive)
             .OrderBy(ss => ss.Student.LastName)
             .ThenBy(ss => ss.Student.FirstName)
@@ -79,6 +81,7 @@ public class StudentSubjectAppService : ApplicationService, IStudentSubjectAppSe
             .Include(ss => ss.Student)
             .Include(ss => ss.Subject)
             .Include(ss => ss.AcademicYear)
+            .Where(ss => ss.Student.TenantId == AbpSession.TenantId)
             .Where(ss => ss.StudentId == studentId && ss.AcademicYearId == academicYearId)
             .OrderBy(ss => ss.Subject.SubjectName)
             .ToListAsync();
@@ -109,8 +112,10 @@ public class StudentSubjectAppService : ApplicationService, IStudentSubjectAppSe
         if (academicYear == null)
             throw new UserFriendlyException(AcademicExceptionCodes.AcademicYearNotFound, "Academic year not found.");
 
-        // Check for duplicate enrollment (same student, subject, academic year)
+        // Check for duplicate enrollment (tenant-scoped through validated FKs)
         var existing = await _studentSubjectRepository
+            .GetAll()
+            .Where(ss => ss.Student.TenantId == AbpSession.TenantId)
             .FirstOrDefaultAsync(ss => ss.StudentId == input.StudentId
                 && ss.SubjectId == input.SubjectId
                 && ss.AcademicYearId == input.AcademicYearId);
@@ -134,6 +139,7 @@ public class StudentSubjectAppService : ApplicationService, IStudentSubjectAppSe
             .Include(ss => ss.Student)
             .Include(ss => ss.Subject)
             .Include(ss => ss.AcademicYear)
+            .Where(ss => ss.Student.TenantId == AbpSession.TenantId)
             .FirstOrDefaultAsync(ss => ss.Id == enrollment.Id);
 
         return ObjectMapper.Map<StudentSubjectDto>(saved);
@@ -142,10 +148,10 @@ public class StudentSubjectAppService : ApplicationService, IStudentSubjectAppSe
     [AbpAuthorize(PermissionNames.Academic_Students_Edit)]
     public async Task UnenrollAsync(Guid id)
     {
-        // Join through Student for tenant isolation
         var enrollment = await _studentSubjectRepository
             .GetAll()
             .Include(ss => ss.Student)
+            .Where(ss => ss.Student.TenantId == AbpSession.TenantId)
             .FirstOrDefaultAsync(ss => ss.Id == id);
 
         if (enrollment == null)

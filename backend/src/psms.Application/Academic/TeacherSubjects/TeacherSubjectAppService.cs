@@ -46,6 +46,7 @@ public class TeacherSubjectAppService : ApplicationService, ITeacherSubjectAppSe
             .Include(ts => ts.Teacher)
             .Include(ts => ts.Subject)
             .Include(ts => ts.Grade)
+            .Where(ts => ts.Teacher.TenantId == AbpSession.TenantId)
             .Where(ts => ts.TeacherId == teacherId)
             .OrderBy(ts => ts.Grade.GradeLevel)
             .ThenBy(ts => ts.Subject.SubjectName)
@@ -63,6 +64,7 @@ public class TeacherSubjectAppService : ApplicationService, ITeacherSubjectAppSe
             .Include(ts => ts.Teacher)
             .Include(ts => ts.Subject)
             .Include(ts => ts.Grade)
+            .Where(ts => ts.Teacher.TenantId == AbpSession.TenantId)
             .Where(ts => ts.SubjectId == subjectId)
             .OrderBy(ts => ts.Grade.GradeLevel)
             .ThenBy(ts => ts.Teacher.LastName)
@@ -80,6 +82,7 @@ public class TeacherSubjectAppService : ApplicationService, ITeacherSubjectAppSe
             .Include(ts => ts.Teacher)
             .Include(ts => ts.Subject)
             .Include(ts => ts.Grade)
+            .Where(ts => ts.Grade.TenantId == AbpSession.TenantId)
             .Where(ts => ts.GradeId == gradeId)
             .OrderBy(ts => ts.Subject.SubjectName)
             .ThenBy(ts => ts.Teacher.LastName)
@@ -113,8 +116,10 @@ public class TeacherSubjectAppService : ApplicationService, ITeacherSubjectAppSe
         if (!grade.IsActive)
             throw new UserFriendlyException(AcademicExceptionCodes.GradeNotActive, "Grade is not active.");
 
-        // Check for duplicate assignment
+        // Check for duplicate assignment (tenant-scoped through validated FKs)
         var existing = await _teacherSubjectRepository
+            .GetAll()
+            .Where(ts => ts.Teacher.TenantId == AbpSession.TenantId)
             .FirstOrDefaultAsync(ts => ts.TeacherId == input.TeacherId
                 && ts.SubjectId == input.SubjectId
                 && ts.GradeId == input.GradeId);
@@ -140,6 +145,7 @@ public class TeacherSubjectAppService : ApplicationService, ITeacherSubjectAppSe
             .Include(ts => ts.Teacher)
             .Include(ts => ts.Subject)
             .Include(ts => ts.Grade)
+            .Where(ts => ts.Teacher.TenantId == AbpSession.TenantId)
             .FirstOrDefaultAsync(ts => ts.Id == assignment.Id);
 
         return ObjectMapper.Map<TeacherSubjectDto>(saved);
@@ -148,10 +154,10 @@ public class TeacherSubjectAppService : ApplicationService, ITeacherSubjectAppSe
     [AbpAuthorize(PermissionNames.Academic_Teachers_Edit)]
     public async Task UnassignAsync(Guid id)
     {
-        // Join through Teacher for tenant isolation
         var assignment = await _teacherSubjectRepository
             .GetAll()
             .Include(ts => ts.Teacher)
+            .Where(ts => ts.Teacher.TenantId == AbpSession.TenantId)
             .FirstOrDefaultAsync(ts => ts.Id == id);
 
         if (assignment == null)

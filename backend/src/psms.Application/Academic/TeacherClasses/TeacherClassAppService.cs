@@ -46,6 +46,7 @@ public class TeacherClassAppService : ApplicationService, ITeacherClassAppServic
             .Include(tc => tc.Teacher)
             .Include(tc => tc.Class)
             .Include(tc => tc.Subject)
+            .Where(tc => tc.Teacher.TenantId == AbpSession.TenantId)
             .Where(tc => tc.TeacherId == teacherId)
             .OrderBy(tc => tc.Class.ClassName)
             .ThenBy(tc => tc.Subject.SubjectName)
@@ -63,6 +64,7 @@ public class TeacherClassAppService : ApplicationService, ITeacherClassAppServic
             .Include(tc => tc.Teacher)
             .Include(tc => tc.Class)
             .Include(tc => tc.Subject)
+            .Where(tc => tc.Class.TenantId == AbpSession.TenantId)
             .Where(tc => tc.ClassId == classId)
             .OrderBy(tc => tc.Subject.SubjectName)
             .ThenBy(tc => tc.Teacher.LastName)
@@ -96,8 +98,10 @@ public class TeacherClassAppService : ApplicationService, ITeacherClassAppServic
         if (!subject.IsActive)
             throw new UserFriendlyException(AcademicExceptionCodes.SubjectNotActive, "Subject is not active.");
 
-        // Check for duplicate assignment (same teacher, class, subject)
+        // Check for duplicate assignment (tenant-scoped through validated FKs)
         var existing = await _teacherClassRepository
+            .GetAll()
+            .Where(tc => tc.Class.TenantId == AbpSession.TenantId)
             .FirstOrDefaultAsync(tc => tc.TeacherId == input.TeacherId
                 && tc.ClassId == input.ClassId
                 && tc.SubjectId == input.SubjectId);
@@ -123,6 +127,7 @@ public class TeacherClassAppService : ApplicationService, ITeacherClassAppServic
             .Include(tc => tc.Teacher)
             .Include(tc => tc.Class)
             .Include(tc => tc.Subject)
+            .Where(tc => tc.Class.TenantId == AbpSession.TenantId)
             .FirstOrDefaultAsync(tc => tc.Id == assignment.Id);
 
         return ObjectMapper.Map<TeacherClassDto>(saved);
@@ -131,10 +136,10 @@ public class TeacherClassAppService : ApplicationService, ITeacherClassAppServic
     [AbpAuthorize(PermissionNames.Academic_Teachers_Edit)]
     public async Task UnassignAsync(Guid id)
     {
-        // Join through Class for tenant isolation
         var assignment = await _teacherClassRepository
             .GetAll()
             .Include(tc => tc.Class)
+            .Where(tc => tc.Class.TenantId == AbpSession.TenantId)
             .FirstOrDefaultAsync(tc => tc.Id == id);
 
         if (assignment == null)

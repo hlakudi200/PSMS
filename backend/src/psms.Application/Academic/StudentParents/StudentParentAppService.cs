@@ -42,6 +42,7 @@ public class StudentParentAppService : ApplicationService, IStudentParentAppServ
             .GetAll()
             .Include(sp => sp.Student)
             .Include(sp => sp.Parent)
+            .Where(sp => sp.Student.TenantId == AbpSession.TenantId)
             .Where(sp => sp.StudentId == studentId)
             .OrderBy(sp => sp.RelationshipType)
             .ToListAsync();
@@ -57,6 +58,7 @@ public class StudentParentAppService : ApplicationService, IStudentParentAppServ
             .GetAll()
             .Include(sp => sp.Student)
             .Include(sp => sp.Parent)
+            .Where(sp => sp.Parent.TenantId == AbpSession.TenantId)
             .Where(sp => sp.ParentId == parentId)
             .OrderBy(sp => sp.Student.LastName)
             .ThenBy(sp => sp.Student.FirstName)
@@ -69,18 +71,22 @@ public class StudentParentAppService : ApplicationService, IStudentParentAppServ
     [AbpAuthorize(PermissionNames.Academic_Students_Edit)]
     public async Task<StudentParentDto> LinkAsync(LinkStudentParentDto input)
     {
-        // Validate student exists (join through Student for tenant isolation)
+        // Validate student exists and is active (tenant-isolated via ABP filter)
         var student = await _studentRepository.FirstOrDefaultAsync(s => s.Id == input.StudentId);
         if (student == null)
             throw new UserFriendlyException(AcademicExceptionCodes.StudentNotFound, "Student not found.");
+        if (!student.IsActive)
+            throw new UserFriendlyException(AcademicExceptionCodes.StudentNotActive, "Student is not active.");
 
-        // Validate parent exists
+        // Validate parent exists (tenant-isolated via ABP filter)
         var parent = await _parentRepository.FirstOrDefaultAsync(p => p.Id == input.ParentId);
         if (parent == null)
             throw new UserFriendlyException(AcademicExceptionCodes.ParentNotFound, "Parent not found.");
 
-        // Check for duplicate link
+        // Check for duplicate link (tenant-scoped through validated FKs)
         var existing = await _studentParentRepository
+            .GetAll()
+            .Where(sp => sp.Student.TenantId == AbpSession.TenantId)
             .FirstOrDefaultAsync(sp => sp.StudentId == input.StudentId && sp.ParentId == input.ParentId);
 
         if (existing != null)
@@ -106,6 +112,7 @@ public class StudentParentAppService : ApplicationService, IStudentParentAppServ
             .GetAll()
             .Include(sp => sp.Student)
             .Include(sp => sp.Parent)
+            .Where(sp => sp.Student.TenantId == AbpSession.TenantId)
             .FirstOrDefaultAsync(sp => sp.Id == link.Id);
 
         return ObjectMapper.Map<StudentParentDto>(saved);
@@ -114,10 +121,10 @@ public class StudentParentAppService : ApplicationService, IStudentParentAppServ
     [AbpAuthorize(PermissionNames.Academic_Students_Edit)]
     public async Task<StudentParentDto> UpdateLinkAsync(Guid id, LinkStudentParentDto input)
     {
-        // Join through Student for tenant isolation
         var link = await _studentParentRepository
             .GetAll()
             .Include(sp => sp.Student)
+            .Where(sp => sp.Student.TenantId == AbpSession.TenantId)
             .FirstOrDefaultAsync(sp => sp.Id == id);
 
         if (link == null)
@@ -137,6 +144,7 @@ public class StudentParentAppService : ApplicationService, IStudentParentAppServ
             .GetAll()
             .Include(sp => sp.Student)
             .Include(sp => sp.Parent)
+            .Where(sp => sp.Student.TenantId == AbpSession.TenantId)
             .FirstOrDefaultAsync(sp => sp.Id == id);
 
         return ObjectMapper.Map<StudentParentDto>(saved);
@@ -145,10 +153,10 @@ public class StudentParentAppService : ApplicationService, IStudentParentAppServ
     [AbpAuthorize(PermissionNames.Academic_Students_Edit)]
     public async Task UnlinkAsync(Guid id)
     {
-        // Join through Student for tenant isolation
         var link = await _studentParentRepository
             .GetAll()
             .Include(sp => sp.Student)
+            .Where(sp => sp.Student.TenantId == AbpSession.TenantId)
             .FirstOrDefaultAsync(sp => sp.Id == id);
 
         if (link == null)

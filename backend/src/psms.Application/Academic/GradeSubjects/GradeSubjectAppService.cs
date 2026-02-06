@@ -43,6 +43,7 @@ public class GradeSubjectAppService : ApplicationService, IGradeSubjectAppServic
             .GetAll()
             .Include(gs => gs.Grade)
             .Include(gs => gs.Subject)
+            .Where(gs => gs.Grade.TenantId == AbpSession.TenantId)
             .Where(gs => gs.GradeId == gradeId)
             .OrderBy(gs => gs.Subject.SubjectName)
             .ToListAsync();
@@ -58,6 +59,7 @@ public class GradeSubjectAppService : ApplicationService, IGradeSubjectAppServic
             .GetAll()
             .Include(gs => gs.Grade)
             .Include(gs => gs.Subject)
+            .Where(gs => gs.Grade.TenantId == AbpSession.TenantId)
             .Where(gs => gs.SubjectId == subjectId)
             .OrderBy(gs => gs.Grade.GradeLevel)
             .ToListAsync();
@@ -81,8 +83,10 @@ public class GradeSubjectAppService : ApplicationService, IGradeSubjectAppServic
             throw new UserFriendlyException(AcademicExceptionCodes.SubjectNotActive,
                 "Cannot assign an inactive subject to a grade.");
 
-        // Check for duplicate assignment
+        // Check for duplicate assignment (tenant-scoped through validated FKs)
         var existing = await _gradeSubjectRepository
+            .GetAll()
+            .Where(gs => gs.Grade.TenantId == AbpSession.TenantId)
             .FirstOrDefaultAsync(gs => gs.GradeId == input.GradeId && gs.SubjectId == input.SubjectId);
 
         if (existing != null)
@@ -103,6 +107,7 @@ public class GradeSubjectAppService : ApplicationService, IGradeSubjectAppServic
             .GetAll()
             .Include(gs => gs.Grade)
             .Include(gs => gs.Subject)
+            .Where(gs => gs.Grade.TenantId == AbpSession.TenantId)
             .FirstOrDefaultAsync(gs => gs.Id == gradeSubject.Id);
 
         return ObjectMapper.Map<GradeSubjectDto>(saved);
@@ -115,6 +120,7 @@ public class GradeSubjectAppService : ApplicationService, IGradeSubjectAppServic
         var gradeSubject = await _gradeSubjectRepository
             .GetAll()
             .Include(gs => gs.Grade)
+            .Where(gs => gs.Grade.TenantId == AbpSession.TenantId)
             .FirstOrDefaultAsync(gs => gs.Id == id);
 
         if (gradeSubject == null)
@@ -129,6 +135,7 @@ public class GradeSubjectAppService : ApplicationService, IGradeSubjectAppServic
     {
         var assignedSubjectIds = await _gradeSubjectRepository
             .GetAll()
+            .Where(gs => gs.Grade.TenantId == AbpSession.TenantId)
             .Where(gs => gs.GradeId == gradeId)
             .Select(gs => gs.SubjectId)
             .ToListAsync();
