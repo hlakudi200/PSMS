@@ -1,42 +1,373 @@
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/**
+ * PSMS Global Styles
+ * Classic enterprise system aesthetic (Oracle EBS / SAP GUI inspired)
+ */
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
-html,
-body {
-  max-width: 100vw;
-  overflow-x: hidden;
-}
-
-body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
+/* === CSS RESET === */
 * {
   box-sizing: border-box;
   padding: 0;
   margin: 0;
 }
 
-a {
-  color: inherit;
-  text-decoration: none;
+html,
+body {
+  max-width: 100vw;
+  overflow-x: hidden;
+  height: 100%;
 }
 
-@media (prefers-color-scheme: dark) {
-  html {
-    color-scheme: dark;
+body {
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #262626;
+  background: #f5f5f5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* === LINKS === */
+a {
+  color: #0066cc;
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+a:hover {
+  color: #0050a3;
+  text-decoration: underline;
+}
+
+a:active {
+  color: #003d73;
+}
+
+/* === HEADINGS === */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-weight: 600;
+  color: #262626;
+  margin-bottom: 0.5em;
+}
+
+h1 {
+  font-size: 28px;
+}
+h2 {
+  font-size: 24px;
+}
+h3 {
+  font-size: 20px;
+}
+h4 {
+  font-size: 16px;
+}
+h5 {
+  font-size: 14px;
+}
+h6 {
+  font-size: 13px;
+}
+
+/* === SCROLLBARS === */
+/* Classic Windows-style scrollbars */
+::-webkit-scrollbar {
+  width: 16px;
+  height: 16px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f0f0f0;
+  border: 1px solid #d9d9d9;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #c0c0c0;
+  border: 1px solid #a0a0a0;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #a0a0a0;
+}
+
+::-webkit-scrollbar-corner {
+  background: #f0f0f0;
+}
+
+/* === SELECTION === */
+::selection {
+  background: #bae7ff;
+  color: #262626;
+}
+
+::-moz-selection {
+  background: #bae7ff;
+  color: #262626;
+}
+
+/* === FOCUS STYLES === */
+/* Visible focus for keyboard navigation */
+:focus-visible {
+  outline: 2px solid #0066cc;
+  outline-offset: 2px;
+}
+
+/* No focus ring for mouse clicks */
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* === UTILITY CLASSES === */
+.text-center {
+  text-align: center;
+}
+
+.text-right {
+  text-align: right;
+}
+
+.text-left {
+  text-align: left;
+}
+
+.flex {
+  display: flex;
+}
+
+.flex-col {
+  flex-direction: column;
+}
+
+.items-center {
+  align-items: center;
+}
+
+.justify-center {
+  justify-content: center;
+}
+
+.justify-between {
+  justify-content: space-between;
+}
+
+.gap-1 {
+  gap: 4px;
+}
+.gap-2 {
+  gap: 8px;
+}
+.gap-3 {
+  gap: 12px;
+}
+.gap-4 {
+  gap: 16px;
+}
+
+.w-full {
+  width: 100%;
+}
+
+.h-full {
+  height: 100%;
+}
+
+/* === PRINT STYLES === */
+@media print {
+  body {
+    background: white;
   }
+
+  .no-print {
+    display: none !important;
+  }
+
+  table {
+    page-break-inside: auto;
+  }
+
+  tr {
+    page-break-inside: avoid;
+    page-break-after: auto;
+  }
+
+  thead {
+    display: table-header-group;
+  }
+
+  tfoot {
+    display: table-footer-group;
+  }
+}
+
+/* === RESPONSIVE BREAKPOINTS === */
+@media (max-width: 768px) {
+  body {
+    font-size: 14px;
+  }
+
+  .psms-form-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* === LOADING STATES === */
+.psms-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  color: #8c8c8c;
+}
+
+/* === ERROR STATES === */
+.psms-error {
+  padding: 24px;
+  text-align: center;
+  color: #ff4d4f;
+}
+
+/* === EMPTY STATES === */
+.psms-empty {
+  padding: 48px 24px;
+  text-align: center;
+  color: #8c8c8c;
+}
+
+/* === PAGE LAYOUTS === */
+.psms-page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.psms-content {
+  flex: 1;
+  padding: 16px 24px;
+  background: #f5f5f5;
+}
+
+.psms-content-card {
+  background: white;
+  border: 1px solid #d9d9d9;
+  border-radius: 2px;
+  padding: 16px;
+}
+
+/* === DATA DISPLAY === */
+.psms-label {
+  color: #595959;
+  font-weight: 500;
+  margin-bottom: 4px;
+  display: block;
+}
+
+.psms-value {
+  color: #262626;
+  margin-bottom: 12px;
+}
+
+.psms-readonly-field {
+  padding: 4px 11px;
+  background: #fafafa;
+  border: 1px solid #d9d9d9;
+  border-radius: 2px;
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+}
+
+/* === STATUS INDICATORS === */
+.psms-status {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 2px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.psms-status-success {
+  background: #f6ffed;
+  color: #52c41a;
+  border: 1px solid #b7eb8f;
+}
+
+.psms-status-warning {
+  background: #fffbe6;
+  color: #faad14;
+  border: 1px solid #ffe58f;
+}
+
+.psms-status-error {
+  background: #fff2f0;
+  color: #ff4d4f;
+  border: 1px solid #ffccc7;
+}
+
+.psms-status-info {
+  background: #e6f7ff;
+  color: #1890ff;
+  border: 1px solid #91d5ff;
+}
+
+.psms-status-default {
+  background: #fafafa;
+  color: #595959;
+  border: 1px solid #d9d9d9;
+}
+
+/* === TABLES === */
+.psms-table-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.psms-table-actions button {
+  padding: 0;
+  border: none;
+  background: none;
+  color: #0066cc;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.psms-table-actions button:hover {
+  color: #0050a3;
+  text-decoration: underline;
+}
+
+/* === CARDS === */
+.psms-card-header {
+  background: #fafafa;
+  border-bottom: 1px solid #d9d9d9;
+  padding: 12px 16px;
+  font-weight: 600;
+  color: #262626;
+}
+
+/* === RESPONSIVE TABLES === */
+@media (max-width: 992px) {
+  .ant-table {
+    font-size: 12px;
+  }
+
+  .ant-table-thead > tr > th,
+  .ant-table-tbody > tr > td {
+    padding: 8px 8px !important;
+  }
+}
+
+/* === CUSTOM GEIST FONTS === */
+.font-geist-sans {
+  font-family: var(--font-geist-sans), "Segoe UI", Tahoma, Geneva, Verdana,
+    sans-serif;
+}
+
+.font-geist-mono {
+  font-family: var(--font-geist-mono), "Courier New", Courier, monospace;
 }
