@@ -1,6 +1,7 @@
 using System;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using Abp.Domain.Entities;
 using Abp.Domain.Entities.Auditing;
 using psms.Domain.Shared.Enums;
 
@@ -10,8 +11,10 @@ namespace psms.Domain.Admissions.Entities
     /// Represents the application fee payment
     /// </summary>
     [Table("ApplicationFees")]
-    public class ApplicationFee : CreationAuditedEntity<Guid>
+    public class ApplicationFee : CreationAuditedEntity<Guid>, IMayHaveTenant
     {
+        public int? TenantId { get; set; }
+
         public const int MaxCurrencyLength = 3;
         public const int MaxReferenceLength = 100;
         public const int MaxReceiptNumberLength = 50;

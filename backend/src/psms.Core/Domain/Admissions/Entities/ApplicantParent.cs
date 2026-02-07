@@ -10,8 +10,10 @@ namespace psms.Domain.Admissions.Entities
     /// Represents a parent/guardian associated with an application
     /// </summary>
     [Table("ApplicantParents")]
-    public class ApplicantParent : Entity<Guid>
+    public class ApplicantParent : Entity<Guid>, IMayHaveTenant
     {
+        public int? TenantId { get; set; }
+
         public const int MaxNameLength = 100;
         public const int MaxIdNumberLength = 13;
         public const int MaxEmailLength = 256;

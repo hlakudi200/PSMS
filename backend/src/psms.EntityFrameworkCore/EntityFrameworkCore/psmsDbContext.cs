@@ -3,6 +3,7 @@ using psms.Authorization.Roles;
 using psms.Authorization.Users;
 using psms.MultiTenancy;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using System.Linq;
 using System;
 
@@ -149,6 +150,11 @@ public class psmsDbContext : AbpZeroDbContext<Tenant, Role, User, psmsDbContext>
     /// </summary>
     public DbSet<Waitlist> Waitlists { get; set; }
 
+    /// <summary>
+    /// Admission settings/configuration per grade and academic year
+    /// </summary>
+    public DbSet<AdmissionSettings> AdmissionSettings { get; set; }
+
     /* ==================== Financial Module ==================== */
 
     /// <summary>
@@ -283,6 +289,10 @@ public class psmsDbContext : AbpZeroDbContext<Tenant, Role, User, psmsDbContext>
     {
         base.OnModelCreating(modelBuilder);
 
+        // PostgreSQL requires DateTime values to be UTC.
+        // This converter ensures all DateTime properties are stored/retrieved as UTC.
+        ConfigureDateTimeUtcConversion(modelBuilder);
+
         // Configure entity relationships and constraints
         ConfigureAcademicModule(modelBuilder);
         ConfigureAdmissionsModule(modelBuilder);
@@ -291,6 +301,37 @@ public class psmsDbContext : AbpZeroDbContext<Tenant, Role, User, psmsDbContext>
         ConfigureLearningModule(modelBuilder);
         ConfigureCommunicationModule(modelBuilder);
         ConfigureSASpecificModule(modelBuilder);
+    }
+
+    private void ConfigureDateTimeUtcConversion(ModelBuilder modelBuilder)
+    {
+        // Value converter for DateTime (non-nullable)
+        var dateTimeConverter = new ValueConverter<DateTime, DateTime>(
+            v => v.Kind == DateTimeKind.Utc ? v : v.ToUniversalTime(),
+            v => DateTime.SpecifyKind(v, DateTimeKind.Utc)
+        );
+
+        // Value converter for DateTime? (nullable)
+        var nullableDateTimeConverter = new ValueConverter<DateTime?, DateTime?>(
+            v => v.HasValue ? (v.Value.Kind == DateTimeKind.Utc ? v : v.Value.ToUniversalTime()) : v,
+            v => v.HasValue ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) : v
+        );
+
+        // Apply converters to all DateTime and DateTime? properties across all entities
+        foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+        {
+            foreach (var property in entityType.GetProperties())
+            {
+                if (property.ClrType == typeof(DateTime))
+                {
+                    property.SetValueConverter(dateTimeConverter);
+                }
+                else if (property.ClrType == typeof(DateTime?))
+                {
+                    property.SetValueConverter(nullableDateTimeConverter);
+                }
+            }
+        }
     }
 
     private void ConfigureAcademicModule(ModelBuilder modelBuilder)
@@ -313,11 +354,12 @@ public class psmsDbContext : AbpZeroDbContext<Tenant, Role, User, psmsDbContext>
             .IsUnique()
             .HasDatabaseName("IX_Teachers_TenantId_EmployeeNumber");
 
-        // Class - unique class name per grade
+        // Class - unique class name per grade per academic year (soft-delete aware)
         modelBuilder.Entity<Class>()
-            .HasIndex(c => new { c.GradeId, c.ClassName })
+            .HasIndex(c => new { c.GradeId, c.AcademicYearId, c.ClassName })
             .IsUnique()
-            .HasDatabaseName("IX_Classes_GradeId_ClassName");
+            .HasFilter("\"IsDeleted\" = false")
+            .HasDatabaseName("IX_Classes_GradeId_AcademicYearId_ClassName");
 
         // StudentClass - prevent duplicate enrollments per academic year
         modelBuilder.Entity<StudentClass>()
@@ -337,6 +379,30 @@ public class psmsDbContext : AbpZeroDbContext<Tenant, Role, User, psmsDbContext>
             .IsUnique()
             .HasDatabaseName("IX_ClassSubjects_ClassId_SubjectId");
 
+        // GradeSubject - prevent duplicate grade-subject assignments
+        modelBuilder.Entity<GradeSubject>()
+            .HasIndex(gs => new { gs.GradeId, gs.SubjectId })
+            .IsUnique()
+            .HasDatabaseName("IX_GradeSubjects_GradeId_SubjectId");
+
+        // TeacherSubject - prevent duplicate teacher-subject-grade assignments
+        modelBuilder.Entity<TeacherSubject>()
+            .HasIndex(ts => new { ts.TeacherId, ts.SubjectId, ts.GradeId })
+            .IsUnique()
+            .HasDatabaseName("IX_TeacherSubjects_TeacherId_SubjectId_GradeId");
+
+        // TeacherClass - prevent duplicate teacher-class-subject assignments
+        modelBuilder.Entity<TeacherClass>()
+            .HasIndex(tc => new { tc.TeacherId, tc.ClassId, tc.SubjectId })
+            .IsUnique()
+            .HasDatabaseName("IX_TeacherClasses_TeacherId_ClassId_SubjectId");
+
+        // StudentSubject - prevent duplicate student-subject enrollments per academic year
+        modelBuilder.Entity<StudentSubject>()
+            .HasIndex(ss => new { ss.StudentId, ss.SubjectId, ss.AcademicYearId })
+            .IsUnique()
+            .HasDatabaseName("IX_StudentSubjects_StudentId_SubjectId_AcademicYearId");
+
         // Attendance - one record per student per day
         modelBuilder.Entity<Attendance>()
             .HasIndex(a => new { a.StudentId, a.AttendanceDate })
@@ -352,11 +418,35 @@ public class psmsDbContext : AbpZeroDbContext<Tenant, Role, User, psmsDbContext>
             .IsUnique()
             .HasDatabaseName("IX_Applications_ApplicationNumber");
 
+        // ApplicationFee - one fee per application
+        modelBuilder.Entity<ApplicationFee>()
+            .HasIndex(f => f.ApplicationId)
+            .IsUnique()
+            .HasDatabaseName("IX_ApplicationFees_ApplicationId");
+
+        // AdmissionInterview - one interview per application
+        modelBuilder.Entity<AdmissionInterview>()
+            .HasIndex(i => i.ApplicationId)
+            .IsUnique()
+            .HasDatabaseName("IX_AdmissionInterviews_ApplicationId");
+
+        // AdmissionAssessment - one assessment per application
+        modelBuilder.Entity<AdmissionAssessment>()
+            .HasIndex(a => a.ApplicationId)
+            .IsUnique()
+            .HasDatabaseName("IX_AdmissionAssessments_ApplicationId");
+
         // Waitlist - one entry per application
         modelBuilder.Entity<Waitlist>()
             .HasIndex(w => w.ApplicationId)
             .IsUnique()
             .HasDatabaseName("IX_Waitlists_ApplicationId");
+
+        // AdmissionSettings - unique per academic year and grade
+        modelBuilder.Entity<AdmissionSettings>()
+            .HasIndex(s => new { s.AcademicYearId, s.GradeId })
+            .IsUnique()
+            .HasDatabaseName("IX_AdmissionSettings_AcademicYearId_GradeId");
     }
 
     private void ConfigureFinancialModule(ModelBuilder modelBuilder)

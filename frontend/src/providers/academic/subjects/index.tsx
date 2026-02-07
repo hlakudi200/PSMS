@@ -1,0 +1,77 @@
+"use client";
+import { getAxiosInstance } from "@/utils/axios-instance";
+import { INITIAL_STATE, SubjectActionContext, SubjectStateContext } from "./context";
+import { ISubject, ICreateSubject, IUpdateSubject, IPagedAndSortedResultRequest } from "../shared/interfaces";
+import { SubjectReducer } from "./reducer";
+import { useContext, useReducer } from "react";
+import {
+  getSubjectsError, getSubjectsPending, getSubjectsSuccess,
+  getSubjectError, getSubjectPending, getSubjectSuccess,
+  createSubjectPending, createSubjectError, createSubjectSuccess,
+  updateSubjectPending, updateSubjectSuccess, updateSubjectError,
+  deleteSubjectPending, deleteSubjectSuccess, deleteSubjectError,
+} from "./actions";
+
+export const SubjectProvider = ({ children }: { children: React.ReactNode }) => {
+  const [state, dispatch] = useReducer(SubjectReducer, INITIAL_STATE);
+  const instance = getAxiosInstance();
+
+  const getAsync = async (id: string) => {
+    dispatch(getSubjectPending());
+    await instance.get(`/api/services/app/Subject/Get?id=${id}`)
+      .then((response) => dispatch(getSubjectSuccess(response.data.result)))
+      .catch((error) => { console.error(error); dispatch(getSubjectError()); });
+  };
+
+  const getAllAsync = async (input?: IPagedAndSortedResultRequest) => {
+    dispatch(getSubjectsPending());
+    const params = new URLSearchParams();
+    if (input?.maxResultCount) params.append('MaxResultCount', input.maxResultCount.toString());
+    if (input?.skipCount) params.append('SkipCount', input.skipCount.toString());
+    if (input?.sorting) params.append('Sorting', input.sorting);
+    await instance.get(`/api/services/app/Subject/GetAll?${params.toString()}`)
+      .then((response) => dispatch(getSubjectsSuccess({ items: response.data.result.items, totalCount: response.data.result.totalCount })))
+      .catch((error) => { console.error(error); dispatch(getSubjectsError()); });
+  };
+
+  const createAsync = async (input: ICreateSubject) => {
+    dispatch(createSubjectPending());
+    await instance.post(`/api/services/app/Subject/Create`, input)
+      .then((response) => dispatch(createSubjectSuccess(response.data.result)))
+      .catch((error) => { console.error(error); dispatch(createSubjectError()); });
+  };
+
+  const updateAsync = async (id: string, input: IUpdateSubject) => {
+    dispatch(updateSubjectPending());
+    await instance.put(`/api/services/app/Subject/Update`, { id, ...input })
+      .then((response) => dispatch(updateSubjectSuccess(response.data.result)))
+      .catch((error) => { console.error(error); dispatch(updateSubjectError()); });
+  };
+
+  const deleteAsync = async (id: string) => {
+    dispatch(deleteSubjectPending());
+    await instance.delete(`/api/services/app/Subject/Delete?id=${id}`)
+      .then(() => dispatch(deleteSubjectSuccess()))
+      .catch((error) => { console.error(error); dispatch(deleteSubjectError()); });
+  };
+
+  return (
+    <SubjectStateContext.Provider value={state}>
+      <SubjectActionContext.Provider value={{ getAsync, getAllAsync, createAsync, updateAsync, deleteAsync }}>
+        {children}
+      </SubjectActionContext.Provider>
+    </SubjectStateContext.Provider>
+  );
+};
+
+export const useSubjectState = () => {
+  const context = useContext(SubjectStateContext);
+  if (!context) throw new Error("useSubjectState must be used within a SubjectProvider");
+  return context;
+};
+
+export const useSubjectActions = () => {
+  const context = useContext(SubjectActionContext);
+  if (!context) throw new Error("useSubjectActions must be used within a SubjectProvider");
+  return context;
+};

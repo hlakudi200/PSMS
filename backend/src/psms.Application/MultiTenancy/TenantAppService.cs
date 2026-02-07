@@ -27,6 +27,7 @@ public class TenantAppService : AsyncCrudAppService<Tenant, TenantDto, int, Page
     private readonly UserManager _userManager;
     private readonly RoleManager _roleManager;
     private readonly IAbpZeroDbMigrator _abpZeroDbMigrator;
+    private readonly PsmsRolePermissionSeeder _rolePermissionSeeder;
 
     public TenantAppService(
         IRepository<Tenant, int> repository,
@@ -34,7 +35,8 @@ public class TenantAppService : AsyncCrudAppService<Tenant, TenantDto, int, Page
         EditionManager editionManager,
         UserManager userManager,
         RoleManager roleManager,
-        IAbpZeroDbMigrator abpZeroDbMigrator)
+        IAbpZeroDbMigrator abpZeroDbMigrator,
+        PsmsRolePermissionSeeder rolePermissionSeeder)
         : base(repository)
     {
         _tenantManager = tenantManager;
@@ -42,6 +44,7 @@ public class TenantAppService : AsyncCrudAppService<Tenant, TenantDto, int, Page
         _userManager = userManager;
         _roleManager = roleManager;
         _abpZeroDbMigrator = abpZeroDbMigrator;
+        _rolePermissionSeeder = rolePermissionSeeder;
     }
 
     public override async Task<TenantDto> CreateAsync(CreateTenantDto input)
@@ -77,6 +80,11 @@ public class TenantAppService : AsyncCrudAppService<Tenant, TenantDto, int, Page
             // Grant all permissions to admin role
             var adminRole = _roleManager.Roles.Single(r => r.Name == StaticRoleNames.Tenants.Admin);
             await _roleManager.GrantAllPermissionsAsync(adminRole);
+
+            // Grant PSMS-specific permissions to other roles (Principal, Teacher, etc.)
+            await _rolePermissionSeeder.SeedRolePermissionsAsync(tenant.Id);
+
+            await CurrentUnitOfWork.SaveChangesAsync();
 
             // Create admin user for the tenant
             var adminUser = User.CreateTenantAdminUser(tenant.Id, input.AdminEmailAddress);
@@ -118,6 +126,22 @@ public class TenantAppService : AsyncCrudAppService<Tenant, TenantDto, int, Page
 
         var tenant = await _tenantManager.GetByIdAsync(input.Id);
         await _tenantManager.DeleteAsync(tenant);
+    }
+
+    /// <summary>
+    /// Seeds PSMS role permissions for an existing tenant.
+    /// Use this to fix tenants that were created before the permission seeder was added.
+    /// </summary>
+    [AbpAuthorize(PermissionNames.Pages_Tenants)]
+    public async Task SeedRolePermissionsAsync(EntityDto<int> input)
+    {
+        var tenant = await _tenantManager.GetByIdAsync(input.Id);
+
+        using (CurrentUnitOfWork.SetTenantId(tenant.Id))
+        {
+            await _rolePermissionSeeder.SeedRolePermissionsAsync(tenant.Id);
+            await CurrentUnitOfWork.SaveChangesAsync();
+        }
     }
 
     private void CheckErrors(IdentityResult identityResult)

@@ -1,0 +1,48 @@
+'use client'
+import { createContext } from "react";
+import {
+  IOnlineLesson,
+  IOnlineLessonList,
+  ICreateOnlineLesson,
+  IUpdateOnlineLesson,
+  IGetOnlineLessonsInput,
+  IRescheduleOnlineLesson,
+  IAddRecording,
+} from "../shared/interfaces";
+
+export interface IOnlineLessonStateContext {
+  isPending: boolean;
+  isSuccess: boolean;
+  isError: boolean;
+  onlineLesson?: IOnlineLesson;
+  onlineLessons?: IOnlineLessonList[];
+  totalCount?: number;
+}
+
+export interface IOnlineLessonActionContext {
+  getAsync: (id: string) => void;
+  getAllAsync: (input?: IGetOnlineLessonsInput) => void;
+  getByClassSubjectAsync: (classSubjectId: string) => void;
+  getUpcomingAsync: () => void;
+  createAsync: (input: ICreateOnlineLesson) => void;
+  updateAsync: (id: string, input: IUpdateOnlineLesson) => void;
+  deleteAsync: (id: string) => void;
+  startAsync: (id: string) => void;
+  endAsync: (id: string, attendeeCount: number) => void;
+  cancelAsync: (id: string) => void;
+  rescheduleAsync: (id: string, input: IRescheduleOnlineLesson) => void;
+  addRecordingAsync: (id: string, input: IAddRecording) => void;
+}
+
+export const INITIAL_STATE: IOnlineLessonStateContext = {
+  isPending: false,
+  isSuccess: false,
+  isError: false,
+};
+
+export const OnlineLessonStateContext =
+  createContext<IOnlineLessonStateContext>(INITIAL_STATE);
+
+export const OnlineLessonActionContext = createContext<
+  IOnlineLessonActionContext | undefined
+>(undefined);

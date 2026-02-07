@@ -1,6 +1,7 @@
 using System;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using Abp.Domain.Entities;
 using Abp.Domain.Entities.Auditing;
 using psms.Domain.Shared.Enums;
 
@@ -10,8 +11,10 @@ namespace psms.Domain.Admissions.Entities
     /// Represents an admission interview for an application
     /// </summary>
     [Table("AdmissionInterviews")]
-    public class AdmissionInterview : CreationAuditedEntity<Guid>
+    public class AdmissionInterview : CreationAuditedEntity<Guid>, IMayHaveTenant
     {
+        public int? TenantId { get; set; }
+
         public const int MaxNameLength = 100;
         public const int MaxLocationLength = 200;
         public const int MaxMeetingLinkLength = 500;
@@ -43,6 +46,11 @@ namespace psms.Domain.Admissions.Entities
 
         [StringLength(MaxNotesLength)]
         public string Notes { get; set; }
+
+        /// <summary>
+        /// Number of times this interview has been rescheduled (ADM-012: max 2)
+        /// </summary>
+        public int RescheduleCount { get; set; }
 
         /// <summary>
         /// Rating from 1-5
@@ -84,6 +92,7 @@ namespace psms.Domain.Admissions.Entities
             ScheduledDate = newDate;
             ScheduledTime = newTime;
             Status = InterviewStatus.Rescheduled;
+            RescheduleCount++;
         }
 
         public void Cancel() => Status = InterviewStatus.Cancelled;

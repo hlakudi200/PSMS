@@ -1,0 +1,45 @@
+using psms.Domain.Shared.Enums;
+using System;
+using System.ComponentModel.DataAnnotations;
+
+namespace psms.SASpecific.SchoolTransports.Dto;
+
+/// <summary>
+/// Input DTO for creating a school transport route.
+/// </summary>
+public class CreateSchoolTransportDto
+{
+    [Required]
+    [StringLength(200)]
+    public string RouteName { get; set; }
+
+    [StringLength(1000)]
+    public string Description { get; set; }
+
+    [StringLength(20)]
+    public string VehicleNumber { get; set; }
+
+    [Required]
+    public TransportType TransportType { get; set; }
+
+    [Required]
+    [Range(1, int.MaxValue)]
+    public int Capacity { get; set; }
+
+    [StringLength(100)]
+    public string DriverName { get; set; }
+
+    [StringLength(20)]
+    public string DriverPhone { get; set; }
+
+    [StringLength(2000)]
+    public string AreasCovered { get; set; }
+
+    public TimeSpan? MorningPickupTime { get; set; }
+
+    public TimeSpan? AfternoonDepartureTime { get; set; }
+
+    [Required]
+    [Range(0, 9999999.99)]
+    public decimal MonthlyFee { get; set; }
+}

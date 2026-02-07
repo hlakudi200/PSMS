@@ -1743,9 +1743,10 @@ namespace psms.Migrations
 
                     b.HasIndex("ClassTeacherId");
 
-                    b.HasIndex("GradeId", "ClassName")
+                    b.HasIndex("GradeId", "AcademicYearId", "ClassName")
                         .IsUnique()
-                        .HasDatabaseName("IX_Classes_GradeId_ClassName");
+                        .HasDatabaseName("IX_Classes_GradeId_AcademicYearId_ClassName")
+                        .HasFilter("\"IsDeleted\" = false");
 
                     b.ToTable("Classes");
                 });
@@ -1964,9 +1965,11 @@ namespace psms.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("GradeId");
-
                     b.HasIndex("SubjectId");
+
+                    b.HasIndex("GradeId", "SubjectId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_GradeSubjects_GradeId_SubjectId");
 
                     b.ToTable("GradeSubjects");
                 });
@@ -2461,9 +2464,11 @@ namespace psms.Migrations
 
                     b.HasIndex("AcademicYearId");
 
-                    b.HasIndex("StudentId");
-
                     b.HasIndex("SubjectId");
+
+                    b.HasIndex("StudentId", "SubjectId", "AcademicYearId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_StudentSubjects_StudentId_SubjectId_AcademicYearId");
 
                     b.ToTable("StudentSubjects");
                 });
@@ -2639,7 +2644,9 @@ namespace psms.Migrations
 
                     b.HasIndex("SubjectId");
 
-                    b.HasIndex("TeacherId");
+                    b.HasIndex("TeacherId", "ClassId", "SubjectId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_TeacherClasses_TeacherId_ClassId_SubjectId");
 
                     b.ToTable("TeacherClasses");
                 });
@@ -2668,7 +2675,9 @@ namespace psms.Migrations
 
                     b.HasIndex("SubjectId");
 
-                    b.HasIndex("TeacherId");
+                    b.HasIndex("TeacherId", "SubjectId", "GradeId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_TeacherSubjects_TeacherId_SubjectId_GradeId");
 
                     b.ToTable("TeacherSubjects");
                 });
@@ -2902,6 +2911,9 @@ namespace psms.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
+                    b.Property<int?>("TenantId")
+                        .HasColumnType("integer");
+
                     b.Property<decimal>("TotalScore")
                         .HasColumnType("numeric");
 
@@ -2911,7 +2923,8 @@ namespace psms.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("ApplicationId")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasDatabaseName("IX_AdmissionAssessments_ApplicationId");
 
                     b.HasIndex("AssessedGradeId");
 
@@ -2961,6 +2974,9 @@ namespace psms.Migrations
                     b.Property<bool?>("Recommended")
                         .HasColumnType("boolean");
 
+                    b.Property<int>("RescheduleCount")
+                        .HasColumnType("integer");
+
                     b.Property<DateTime>("ScheduledDate")
                         .HasColumnType("timestamp with time zone");
 
@@ -2970,12 +2986,104 @@ namespace psms.Migrations
                     b.Property<int>("Status")
                         .HasColumnType("integer");
 
+                    b.Property<int?>("TenantId")
+                        .HasColumnType("integer");
+
                     b.HasKey("Id");
 
                     b.HasIndex("ApplicationId")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasDatabaseName("IX_AdmissionInterviews_ApplicationId");
 
                     b.ToTable("AdmissionInterviews");
+                });
+
+            modelBuilder.Entity("psms.Domain.Admissions.Entities.AdmissionSettings", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("AcademicYearId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ApplicationCloseDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("ApplicationFeeAmount")
+                        .HasColumnType("numeric");
+
+                    b.Property<DateTime?>("ApplicationOpenDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("CreatorUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("CurrentEnrolledCount")
+                        .HasColumnType("integer");
+
+                    b.Property<long?>("DeleterUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime?>("DeletionTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("GradeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsAcceptingApplications")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsAssessmentRequired")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsInterviewRequired")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("LastModificationTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("LastModifierUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<int?>("MaxCapacity")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("MaximumAge")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("MinimumAge")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<int>("OfferExpiryDays")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("RequiredDocuments")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<int?>("TenantId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GradeId");
+
+                    b.HasIndex("AcademicYearId", "GradeId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_AdmissionSettings_AcademicYearId_GradeId");
+
+                    b.ToTable("AdmissionSettings");
                 });
 
             modelBuilder.Entity("psms.Domain.Admissions.Entities.ApplicantParent", b =>
@@ -3052,6 +3160,9 @@ namespace psms.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
+                    b.Property<int?>("TenantId")
+                        .HasColumnType("integer");
+
                     b.HasKey("Id");
 
                     b.HasIndex("ApplicationId");
@@ -3063,6 +3174,9 @@ namespace psms.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("AcademicYearId")
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("ApplicationDate")
@@ -3174,6 +3288,8 @@ namespace psms.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("AcademicYearId");
+
                     b.HasIndex("ApplicationNumber")
                         .IsUnique()
                         .HasDatabaseName("IX_Applications_ApplicationNumber");
@@ -3230,6 +3346,13 @@ namespace psms.Migrations
 
                     b.Property<bool>("IsVerified")
                         .HasColumnType("boolean");
+
+                    b.Property<string>("RejectionReason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<int?>("TenantId")
+                        .HasColumnType("integer");
 
                     b.Property<DateTime>("UploadedDate")
                         .HasColumnType("timestamp with time zone");
@@ -3290,10 +3413,14 @@ namespace psms.Migrations
                     b.Property<int>("Status")
                         .HasColumnType("integer");
 
+                    b.Property<int?>("TenantId")
+                        .HasColumnType("integer");
+
                     b.HasKey("Id");
 
                     b.HasIndex("ApplicationId")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasDatabaseName("IX_ApplicationFees_ApplicationId");
 
                     b.ToTable("ApplicationFees");
                 });
@@ -5946,6 +6073,23 @@ namespace psms.Migrations
                     b.Navigation("Application");
                 });
 
+            modelBuilder.Entity("psms.Domain.Admissions.Entities.AdmissionSettings", b =>
+                {
+                    b.HasOne("psms.Domain.Academic.Entities.AcademicYear", "AcademicYear")
+                        .WithMany()
+                        .HasForeignKey("AcademicYearId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("psms.Domain.Academic.Entities.Grade", "Grade")
+                        .WithMany()
+                        .HasForeignKey("GradeId");
+
+                    b.Navigation("AcademicYear");
+
+                    b.Navigation("Grade");
+                });
+
             modelBuilder.Entity("psms.Domain.Admissions.Entities.ApplicantParent", b =>
                 {
                     b.HasOne("psms.Domain.Admissions.Entities.Application", "Application")
@@ -5959,6 +6103,12 @@ namespace psms.Migrations
 
             modelBuilder.Entity("psms.Domain.Admissions.Entities.Application", b =>
                 {
+                    b.HasOne("psms.Domain.Academic.Entities.AcademicYear", "AcademicYear")
+                        .WithMany()
+                        .HasForeignKey("AcademicYearId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
                     b.HasOne("psms.Domain.Academic.Entities.Grade", "AppliedGrade")
                         .WithMany()
                         .HasForeignKey("AppliedGradeId")
@@ -5968,6 +6118,8 @@ namespace psms.Migrations
                     b.HasOne("psms.Domain.Academic.Entities.Student", "CreatedStudent")
                         .WithMany()
                         .HasForeignKey("CreatedStudentId");
+
+                    b.Navigation("AcademicYear");
 
                     b.Navigation("AppliedGrade");
 

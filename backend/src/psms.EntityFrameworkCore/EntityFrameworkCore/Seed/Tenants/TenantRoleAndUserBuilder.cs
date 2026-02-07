@@ -67,6 +67,9 @@ public class TenantRoleAndUserBuilder
             _context.SaveChanges();
         }
 
+        // Create PSMS-specific roles with their permissions
+        new DefaultRolesCreator(_context, _tenantId).Create();
+
         // Admin user
 
         var adminUser = _context.Users.IgnoreQueryFilters().FirstOrDefault(u => u.TenantId == _tenantId && u.UserName == AbpUserBase.AdminUserName);
