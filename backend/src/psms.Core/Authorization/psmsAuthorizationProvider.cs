@@ -171,6 +171,11 @@ public class psmsAuthorizationProvider : AuthorizationProvider
         classes.CreateChildPermission(PermissionNames.Academic_Classes_Edit, L("EditClass"));
         classes.CreateChildPermission(PermissionNames.Academic_Classes_Delete, L("DeleteClass"));
 
+        // ClassSubjects
+        var classSubjects = academic.CreateChildPermission(PermissionNames.Academic_ClassSubjects, L("ClassSubjects"));
+        classSubjects.CreateChildPermission(PermissionNames.Academic_ClassSubjects_View, L("ViewClassSubjects"));
+        classSubjects.CreateChildPermission(PermissionNames.Academic_ClassSubjects_Manage, L("ManageClassSubjects"));
+
         // Timetables
         var timetables = academic.CreateChildPermission(PermissionNames.Academic_Timetables, L("Timetables"));
         timetables.CreateChildPermission(PermissionNames.Academic_Timetables_View, L("ViewTimetables"));

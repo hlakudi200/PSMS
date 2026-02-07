@@ -144,6 +144,11 @@ public static class PermissionNames
     public const string Academic_Classes_Edit = "Academic.Classes.Edit";
     public const string Academic_Classes_Delete = "Academic.Classes.Delete";
 
+    // ClassSubjects
+    public const string Academic_ClassSubjects = "Academic.ClassSubjects";
+    public const string Academic_ClassSubjects_View = "Academic.ClassSubjects.View";
+    public const string Academic_ClassSubjects_Manage = "Academic.ClassSubjects.Manage";
+
     // Timetables
     public const string Academic_Timetables = "Academic.Timetables";
     public const string Academic_Timetables_View = "Academic.Timetables.View";

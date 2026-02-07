@@ -1,6 +1,7 @@
 using AutoMapper;
 using psms.Academic.AcademicYears.Dto;
 using psms.Academic.Classes.Dto;
+using psms.Academic.ClassSubjects.Dto;
 using psms.Academic.Grades.Dto;
 using psms.Academic.GradeSubjects.Dto;
 using psms.Academic.Parents.Dto;
@@ -15,6 +16,7 @@ using psms.Academic.Terms.Dto;
 using psms.Domain.Academic.Entities;
 using psms.Domain.Shared.ValueObjects;
 using psms.Shared;
+using System;
 using System.Linq;
 
 namespace psms.Academic.Shared;
@@ -40,6 +42,7 @@ public class AcademicMapper : Profile
         CreateTeacherSubjectMappings();
         CreateTeacherClassMappings();
         CreateStudentSubjectMappings();
+        CreateClassSubjectMappings();
     }
 
     private void CreateGradeMappings()
@@ -290,5 +293,34 @@ public class AcademicMapper : Profile
                 opt => opt.MapFrom(src => src.Subject != null ? src.Subject.SubjectCode : null))
             .ForMember(dest => dest.AcademicYearName,
                 opt => opt.MapFrom(src => src.AcademicYear != null ? src.AcademicYear.YearName : null));
+    }
+
+    private void CreateClassSubjectMappings()
+    {
+        // Entity to DTO (full)
+        CreateMap<ClassSubject, ClassSubjectDto>()
+            .ForMember(dest => dest.ClassName,
+                opt => opt.MapFrom(src => src.Class != null ? src.Class.ClassName : null))
+            .ForMember(dest => dest.GradeId,
+                opt => opt.MapFrom(src => src.Class != null ? src.Class.GradeId : Guid.Empty))
+            .ForMember(dest => dest.GradeName,
+                opt => opt.MapFrom(src => src.Class != null && src.Class.Grade != null ? src.Class.Grade.GradeName : null))
+            .ForMember(dest => dest.SubjectName,
+                opt => opt.MapFrom(src => src.Subject != null ? src.Subject.SubjectName : null))
+            .ForMember(dest => dest.SubjectCode,
+                opt => opt.MapFrom(src => src.Subject != null ? src.Subject.SubjectCode : null))
+            .ForMember(dest => dest.TeacherName,
+                opt => opt.MapFrom(src => src.Teacher != null ? src.Teacher.GetFullName() : null));
+
+        // Entity to ListDto (lightweight)
+        CreateMap<ClassSubject, ClassSubjectListDto>()
+            .ForMember(dest => dest.ClassName,
+                opt => opt.MapFrom(src => src.Class != null ? src.Class.ClassName : null))
+            .ForMember(dest => dest.SubjectName,
+                opt => opt.MapFrom(src => src.Subject != null ? src.Subject.SubjectName : null))
+            .ForMember(dest => dest.SubjectCode,
+                opt => opt.MapFrom(src => src.Subject != null ? src.Subject.SubjectCode : null))
+            .ForMember(dest => dest.TeacherName,
+                opt => opt.MapFrom(src => src.Teacher != null ? src.Teacher.GetFullName() : null));
     }
 }

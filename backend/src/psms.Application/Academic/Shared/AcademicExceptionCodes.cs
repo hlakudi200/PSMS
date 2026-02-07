@@ -99,4 +99,10 @@ public static class AcademicExceptionCodes
     // StudentSubject (junction)
     public const string StudentSubjectNotFound = "ACD_STUDENT_SUBJECT_NOT_FOUND";
     public const string DuplicateStudentSubject = "ACD_DUPLICATE_STUDENT_SUBJECT";
+
+    // ClassSubject
+    public const string ClassSubjectNotFound = "ACD_CLASS_SUBJECT_NOT_FOUND";
+    public const string DuplicateClassSubject = "ACD_DUPLICATE_CLASS_SUBJECT";
+    public const string ClassSubjectNotActive = "ACD_CLASS_SUBJECT_NOT_ACTIVE";
+    public const string CannotDeleteClassSubjectWithAssessments = "ACD_CANNOT_DELETE_CLASS_SUBJECT_WITH_ASSESSMENTS";
 }
