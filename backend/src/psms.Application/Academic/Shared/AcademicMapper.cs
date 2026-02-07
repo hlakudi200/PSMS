@@ -2,10 +2,18 @@ using AutoMapper;
 using psms.Academic.AcademicYears.Dto;
 using psms.Academic.Classes.Dto;
 using psms.Academic.ClassSubjects.Dto;
+using psms.Academic.EmergencyContacts.Dto;
 using psms.Academic.Grades.Dto;
 using psms.Academic.GradeSubjects.Dto;
+using psms.Academic.MedicalInfos.Dto;
 using psms.Academic.Parents.Dto;
+using psms.Academic.POPIAConsents.Dto;
+using psms.Academic.Attendances.Dto;
+using psms.Academic.StudentClasses.Dto;
 using psms.Academic.StudentParents.Dto;
+using psms.Academic.TermEvents.Dto;
+using psms.Academic.Timetables.Dto;
+using psms.Academic.TimetableSlots.Dto;
 using psms.Academic.Students.Dto;
 using psms.Academic.StudentSubjects.Dto;
 using psms.Academic.Subjects.Dto;
@@ -43,6 +51,14 @@ public class AcademicMapper : Profile
         CreateTeacherClassMappings();
         CreateStudentSubjectMappings();
         CreateClassSubjectMappings();
+        CreateEmergencyContactMappings();
+        CreateMedicalInfoMappings();
+        CreatePOPIAConsentMappings();
+        CreateStudentClassMappings();
+        CreateTermEventMappings();
+        CreateAttendanceMappings();
+        CreateTimetableMappings();
+        CreateTimetableSlotMappings();
     }
 
     private void CreateGradeMappings()
@@ -320,6 +336,115 @@ public class AcademicMapper : Profile
                 opt => opt.MapFrom(src => src.Subject != null ? src.Subject.SubjectName : null))
             .ForMember(dest => dest.SubjectCode,
                 opt => opt.MapFrom(src => src.Subject != null ? src.Subject.SubjectCode : null))
+            .ForMember(dest => dest.TeacherName,
+                opt => opt.MapFrom(src => src.Teacher != null ? src.Teacher.GetFullName() : null));
+    }
+
+    private void CreateEmergencyContactMappings()
+    {
+        CreateMap<EmergencyContact, EmergencyContactDto>()
+            .ForMember(dest => dest.FullName,
+                opt => opt.MapFrom(src => src.GetFullName()))
+            .ForMember(dest => dest.StudentName,
+                opt => opt.MapFrom(src => src.Student != null ? src.Student.GetFullName() : null));
+
+        CreateMap<EmergencyContact, EmergencyContactListDto>()
+            .ForMember(dest => dest.FullName,
+                opt => opt.MapFrom(src => src.GetFullName()));
+    }
+
+    private void CreateMedicalInfoMappings()
+    {
+        CreateMap<MedicalInfo, MedicalInfoDto>()
+            .ForMember(dest => dest.StudentName,
+                opt => opt.MapFrom(src => src.Student != null ? src.Student.GetFullName() : null));
+    }
+
+    private void CreatePOPIAConsentMappings()
+    {
+        CreateMap<POPIAConsent, POPIAConsentDto>()
+            .ForMember(dest => dest.StudentName,
+                opt => opt.MapFrom(src => src.Student != null ? src.Student.GetFullName() : null));
+    }
+
+    private void CreateStudentClassMappings()
+    {
+        CreateMap<StudentClass, StudentClassDto>()
+            .ForMember(dest => dest.StudentName,
+                opt => opt.MapFrom(src => src.Student != null ? src.Student.GetFullName() : null))
+            .ForMember(dest => dest.ClassName,
+                opt => opt.MapFrom(src => src.Class != null ? src.Class.ClassName : null))
+            .ForMember(dest => dest.AcademicYearName,
+                opt => opt.MapFrom(src => src.AcademicYear != null ? src.AcademicYear.YearName : null));
+
+        CreateMap<StudentClass, StudentClassListDto>()
+            .ForMember(dest => dest.StudentName,
+                opt => opt.MapFrom(src => src.Student != null ? src.Student.GetFullName() : null))
+            .ForMember(dest => dest.ClassName,
+                opt => opt.MapFrom(src => src.Class != null ? src.Class.ClassName : null))
+            .ForMember(dest => dest.AcademicYearName,
+                opt => opt.MapFrom(src => src.AcademicYear != null ? src.AcademicYear.YearName : null));
+    }
+
+    private void CreateTermEventMappings()
+    {
+        CreateMap<TermEvent, TermEventDto>()
+            .ForMember(dest => dest.TermName,
+                opt => opt.MapFrom(src => src.Term != null ? src.Term.TermName : null))
+            .ForMember(dest => dest.AcademicYearName,
+                opt => opt.MapFrom(src => src.Term != null && src.Term.AcademicYear != null
+                    ? src.Term.AcademicYear.YearName : null));
+
+        CreateMap<TermEvent, TermEventListDto>()
+            .ForMember(dest => dest.TermName,
+                opt => opt.MapFrom(src => src.Term != null ? src.Term.TermName : null));
+    }
+
+    private void CreateAttendanceMappings()
+    {
+        CreateMap<Attendance, AttendanceDto>()
+            .ForMember(dest => dest.StudentName,
+                opt => opt.MapFrom(src => src.Student != null ? src.Student.GetFullName() : null))
+            .ForMember(dest => dest.ClassName,
+                opt => opt.MapFrom(src => src.Class != null ? src.Class.ClassName : null))
+            .ForMember(dest => dest.TeacherName,
+                opt => opt.MapFrom(src => src.Teacher != null ? src.Teacher.GetFullName() : null))
+            .ForMember(dest => dest.SubjectName,
+                opt => opt.MapFrom(src => src.Subject != null ? src.Subject.SubjectName : null));
+
+        CreateMap<Attendance, AttendanceListDto>()
+            .ForMember(dest => dest.StudentName,
+                opt => opt.MapFrom(src => src.Student != null ? src.Student.GetFullName() : null))
+            .ForMember(dest => dest.ClassName,
+                opt => opt.MapFrom(src => src.Class != null ? src.Class.ClassName : null));
+    }
+
+    private void CreateTimetableMappings()
+    {
+        CreateMap<Timetable, TimetableDto>()
+            .ForMember(dest => dest.ClassName,
+                opt => opt.MapFrom(src => src.Class != null ? src.Class.ClassName : null))
+            .ForMember(dest => dest.SlotCount,
+                opt => opt.MapFrom(src => src.TimetableSlots != null ? src.TimetableSlots.Count : 0));
+
+        CreateMap<Timetable, TimetableListDto>()
+            .ForMember(dest => dest.ClassName,
+                opt => opt.MapFrom(src => src.Class != null ? src.Class.ClassName : null))
+            .ForMember(dest => dest.SlotCount,
+                opt => opt.MapFrom(src => src.TimetableSlots != null ? src.TimetableSlots.Count : 0));
+    }
+
+    private void CreateTimetableSlotMappings()
+    {
+        CreateMap<TimetableSlot, TimetableSlotDto>()
+            .ForMember(dest => dest.SubjectName,
+                opt => opt.MapFrom(src => src.Subject != null ? src.Subject.SubjectName : null))
+            .ForMember(dest => dest.TeacherName,
+                opt => opt.MapFrom(src => src.Teacher != null ? src.Teacher.GetFullName() : null));
+
+        CreateMap<TimetableSlot, TimetableSlotListDto>()
+            .ForMember(dest => dest.SubjectName,
+                opt => opt.MapFrom(src => src.Subject != null ? src.Subject.SubjectName : null))
             .ForMember(dest => dest.TeacherName,
                 opt => opt.MapFrom(src => src.Teacher != null ? src.Teacher.GetFullName() : null));
     }

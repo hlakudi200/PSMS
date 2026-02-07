@@ -105,4 +105,51 @@ public static class AcademicExceptionCodes
     public const string DuplicateClassSubject = "ACD_DUPLICATE_CLASS_SUBJECT";
     public const string ClassSubjectNotActive = "ACD_CLASS_SUBJECT_NOT_ACTIVE";
     public const string CannotDeleteClassSubjectWithAssessments = "ACD_CANNOT_DELETE_CLASS_SUBJECT_WITH_ASSESSMENTS";
+
+    // EmergencyContact
+    public const string EmergencyContactNotFound = "ACD_EMERGENCY_CONTACT_NOT_FOUND";
+    public const string DuplicateEmergencyContactPriority = "ACD_DUPLICATE_EMERGENCY_CONTACT_PRIORITY";
+
+    // MedicalInfo
+    public const string MedicalInfoNotFound = "ACD_MEDICAL_INFO_NOT_FOUND";
+    public const string DuplicateMedicalInfo = "ACD_DUPLICATE_MEDICAL_INFO";
+    public const string InvalidPhysicalExamDate = "ACD_INVALID_PHYSICAL_EXAM_DATE";
+
+    // POPIAConsent
+    public const string POPIAConsentNotFound = "ACD_POPIA_CONSENT_NOT_FOUND";
+    public const string DuplicatePOPIAConsent = "ACD_DUPLICATE_POPIA_CONSENT";
+    public const string InvalidConsentDate = "ACD_INVALID_CONSENT_DATE";
+
+    // StudentClass
+    public const string StudentClassNotFound = "ACD_STUDENT_CLASS_NOT_FOUND";
+    public const string DuplicateStudentClassEnrollment = "ACD_DUPLICATE_STUDENT_CLASS_ENROLLMENT";
+    public const string StudentClassAlreadyCurrent = "ACD_STUDENT_CLASS_ALREADY_CURRENT";
+    public const string InvalidEnrollmentDate = "ACD_INVALID_ENROLLMENT_DATE";
+    public const string InvalidEndDate = "ACD_INVALID_END_DATE";
+    public const string StudentAlreadyEnrolledInClass = "ACD_STUDENT_ALREADY_ENROLLED_IN_CLASS";
+
+    // TermEvent
+    public const string TermEventNotFound = "ACD_TERM_EVENT_NOT_FOUND";
+    public const string DuplicateTermEvent = "ACD_DUPLICATE_TERM_EVENT";
+    public const string EventDateOutsideTerm = "ACD_EVENT_DATE_OUTSIDE_TERM";
+
+    // Attendance
+    public const string AttendanceNotFound = "ACD_ATTENDANCE_NOT_FOUND";
+    public const string DuplicateAttendance = "ACD_DUPLICATE_ATTENDANCE";
+    public const string AttendanceDateInFuture = "ACD_ATTENDANCE_DATE_IN_FUTURE";
+    public const string AttendanceStudentNotInClass = "ACD_ATTENDANCE_STUDENT_NOT_IN_CLASS";
+
+    // Timetable
+    public const string TimetableNotFound = "ACD_TIMETABLE_NOT_FOUND";
+    public const string TimetableNotActive = "ACD_TIMETABLE_NOT_ACTIVE";
+    public const string DuplicateActiveTimetable = "ACD_DUPLICATE_ACTIVE_TIMETABLE";
+    public const string InvalidTimetableDates = "ACD_INVALID_TIMETABLE_DATES";
+    public const string CannotDeleteTimetableWithSlots = "ACD_CANNOT_DELETE_TIMETABLE_WITH_SLOTS";
+
+    // TimetableSlot
+    public const string TimetableSlotNotFound = "ACD_TIMETABLE_SLOT_NOT_FOUND";
+    public const string OverlappingTimetableSlot = "ACD_OVERLAPPING_TIMETABLE_SLOT";
+    public const string InvalidSlotTimes = "ACD_INVALID_SLOT_TIMES";
+    public const string DuplicateSlotPeriod = "ACD_DUPLICATE_SLOT_PERIOD";
+    public const string TeacherScheduleConflict = "ACD_TEACHER_SCHEDULE_CONFLICT";
 }

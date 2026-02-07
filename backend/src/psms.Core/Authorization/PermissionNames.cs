@@ -108,6 +108,9 @@ public static class PermissionNames
     public const string Academic_Students_Edit = "Academic.Students.Edit";
     public const string Academic_Students_Delete = "Academic.Students.Delete";
     public const string Academic_Students_AssignClass = "Academic.Students.AssignClass";
+    public const string Academic_Students_ManageEmergencyContacts = "Academic.Students.ManageEmergencyContacts";
+    public const string Academic_Students_ManageMedicalInfo = "Academic.Students.ManageMedicalInfo";
+    public const string Academic_Students_ManagePOPIAConsent = "Academic.Students.ManagePOPIAConsent";
 
     // Teachers
     public const string Academic_Teachers = "Academic.Teachers";

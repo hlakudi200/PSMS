@@ -135,6 +135,9 @@ public class psmsAuthorizationProvider : AuthorizationProvider
         students.CreateChildPermission(PermissionNames.Academic_Students_Edit, L("EditStudent"));
         students.CreateChildPermission(PermissionNames.Academic_Students_Delete, L("DeleteStudent"));
         students.CreateChildPermission(PermissionNames.Academic_Students_AssignClass, L("AssignStudentClass"));
+        students.CreateChildPermission(PermissionNames.Academic_Students_ManageEmergencyContacts, L("ManageEmergencyContacts"));
+        students.CreateChildPermission(PermissionNames.Academic_Students_ManageMedicalInfo, L("ManageMedicalInfo"));
+        students.CreateChildPermission(PermissionNames.Academic_Students_ManagePOPIAConsent, L("ManagePOPIAConsent"));
 
         // Teachers
         var teachers = academic.CreateChildPermission(PermissionNames.Academic_Teachers, L("Teachers"));
