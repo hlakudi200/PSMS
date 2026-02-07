@@ -23,6 +23,7 @@ public class psmsAuthorizationProvider : AuthorizationProvider
         SetAssessmentPermissions(context);
         SetCommunicationPermissions(context);
         SetLearningPermissions(context);
+        SetSASpecificPermissions(context);
         SetAdministrationPermissions(context);
     }
 
@@ -361,6 +362,39 @@ public class psmsAuthorizationProvider : AuthorizationProvider
         recordings.CreateChildPermission(PermissionNames.Learning_Recordings_View, L("ViewRecordings"));
         recordings.CreateChildPermission(PermissionNames.Learning_Recordings_Upload, L("UploadRecordings"));
         recordings.CreateChildPermission(PermissionNames.Learning_Recordings_Delete, L("DeleteRecordings"));
+    }
+
+    #endregion
+
+    #region SASpecific Module
+
+    private void SetSASpecificPermissions(IPermissionDefinitionContext context)
+    {
+        var saSpecific = context.CreatePermission(PermissionNames.SASpecific, L("SASpecific"));
+
+        // AfterCare
+        var afterCare = saSpecific.CreateChildPermission(PermissionNames.SASpecific_AfterCare, L("AfterCare"));
+        afterCare.CreateChildPermission(PermissionNames.SASpecific_AfterCare_View, L("ViewAfterCare"));
+        afterCare.CreateChildPermission(PermissionNames.SASpecific_AfterCare_Create, L("CreateAfterCare"));
+        afterCare.CreateChildPermission(PermissionNames.SASpecific_AfterCare_Edit, L("EditAfterCare"));
+        afterCare.CreateChildPermission(PermissionNames.SASpecific_AfterCare_Delete, L("DeleteAfterCare"));
+        afterCare.CreateChildPermission(PermissionNames.SASpecific_AfterCare_Manage, L("ManageAfterCare"));
+
+        // Extramurals
+        var extramurals = saSpecific.CreateChildPermission(PermissionNames.SASpecific_Extramurals, L("Extramurals"));
+        extramurals.CreateChildPermission(PermissionNames.SASpecific_Extramurals_View, L("ViewExtramurals"));
+        extramurals.CreateChildPermission(PermissionNames.SASpecific_Extramurals_Create, L("CreateExtramural"));
+        extramurals.CreateChildPermission(PermissionNames.SASpecific_Extramurals_Edit, L("EditExtramural"));
+        extramurals.CreateChildPermission(PermissionNames.SASpecific_Extramurals_Delete, L("DeleteExtramural"));
+        extramurals.CreateChildPermission(PermissionNames.SASpecific_Extramurals_Manage, L("ManageExtramurals"));
+
+        // Transport
+        var transport = saSpecific.CreateChildPermission(PermissionNames.SASpecific_Transport, L("Transport"));
+        transport.CreateChildPermission(PermissionNames.SASpecific_Transport_View, L("ViewTransport"));
+        transport.CreateChildPermission(PermissionNames.SASpecific_Transport_Create, L("CreateTransport"));
+        transport.CreateChildPermission(PermissionNames.SASpecific_Transport_Edit, L("EditTransport"));
+        transport.CreateChildPermission(PermissionNames.SASpecific_Transport_Delete, L("DeleteTransport"));
+        transport.CreateChildPermission(PermissionNames.SASpecific_Transport_Manage, L("ManageTransport"));
     }
 
     #endregion

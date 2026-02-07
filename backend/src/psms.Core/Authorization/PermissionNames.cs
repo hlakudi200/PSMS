@@ -325,6 +325,36 @@ public static class PermissionNames
 
     #endregion
 
+    #region SASpecific Module
+
+    public const string SASpecific = "SASpecific";
+
+    // AfterCare
+    public const string SASpecific_AfterCare = "SASpecific.AfterCare";
+    public const string SASpecific_AfterCare_View = "SASpecific.AfterCare.View";
+    public const string SASpecific_AfterCare_Create = "SASpecific.AfterCare.Create";
+    public const string SASpecific_AfterCare_Edit = "SASpecific.AfterCare.Edit";
+    public const string SASpecific_AfterCare_Delete = "SASpecific.AfterCare.Delete";
+    public const string SASpecific_AfterCare_Manage = "SASpecific.AfterCare.Manage";
+
+    // Extramurals
+    public const string SASpecific_Extramurals = "SASpecific.Extramurals";
+    public const string SASpecific_Extramurals_View = "SASpecific.Extramurals.View";
+    public const string SASpecific_Extramurals_Create = "SASpecific.Extramurals.Create";
+    public const string SASpecific_Extramurals_Edit = "SASpecific.Extramurals.Edit";
+    public const string SASpecific_Extramurals_Delete = "SASpecific.Extramurals.Delete";
+    public const string SASpecific_Extramurals_Manage = "SASpecific.Extramurals.Manage";
+
+    // Transport
+    public const string SASpecific_Transport = "SASpecific.Transport";
+    public const string SASpecific_Transport_View = "SASpecific.Transport.View";
+    public const string SASpecific_Transport_Create = "SASpecific.Transport.Create";
+    public const string SASpecific_Transport_Edit = "SASpecific.Transport.Edit";
+    public const string SASpecific_Transport_Delete = "SASpecific.Transport.Delete";
+    public const string SASpecific_Transport_Manage = "SASpecific.Transport.Manage";
+
+    #endregion
+
     #region Administration Module
 
     public const string Administration = "Administration";
