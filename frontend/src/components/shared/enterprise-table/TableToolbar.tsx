@@ -55,6 +55,12 @@ interface TableToolbarProps<T> {
   onLoadView: (viewId: string) => void;
   onDeleteView: (viewId: string) => void;
 
+  // Search
+  searchable?: boolean;
+  searchPlaceholder?: string;
+  searchValue?: string;
+  onSearchChange?: (value: string) => void;
+
   // Refresh
   onRefresh: () => void;
   lastFetchedAt?: Date;
@@ -98,6 +104,10 @@ export function TableToolbar<T extends Record<string, any>>(
     onSaveView,
     onLoadView,
     onDeleteView,
+    searchable,
+    searchPlaceholder,
+    searchValue,
+    onSearchChange,
     onRefresh,
     lastFetchedAt,
     showLastUpdated,
@@ -213,6 +223,18 @@ export function TableToolbar<T extends Record<string, any>>(
           <Text strong style={{ fontSize: 14, marginRight: 8 }}>
             {title}
           </Text>
+        )}
+
+        {searchable && (
+          <Input.Search
+            placeholder={searchPlaceholder ?? 'Search...'}
+            allowClear
+            size="small"
+            style={{ width: 220 }}
+            value={searchValue}
+            onChange={e => onSearchChange?.(e.target.value)}
+            onSearch={value => onSearchChange?.(value)}
+          />
         )}
 
         {visibleToolbarActions.map(action => (

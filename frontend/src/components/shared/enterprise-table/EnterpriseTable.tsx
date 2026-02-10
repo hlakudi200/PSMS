@@ -1,9 +1,12 @@
 'use client';
 
-import React, { useMemo, useCallback } from 'react';
+import React, { useMemo, useCallback, useState } from 'react';
 import { Table, Button, Space, Tag, Popconfirm, Result } from 'antd';
 import { WarningOutlined, InboxOutlined } from '@ant-design/icons';
 import type { TableProps } from 'antd';
+import { Resizable } from 'react-resizable';
+import type { ResizeCallbackData } from 'react-resizable';
+import 'react-resizable/css/styles.css';
 import type {
   EnterpriseTableProps,
   ColumnConfig,
@@ -18,6 +21,46 @@ import { useTableTelemetry } from './hooks/useTableTelemetry';
 import { useResponsive } from './hooks/useResponsive';
 import { applyRenderer } from './renderers';
 import { TableToolbar } from './TableToolbar';
+
+// Resizable header cell for column dragging
+const ResizableTitle = (
+  props: React.HTMLAttributes<HTMLTableCellElement> & {
+    onResize?: (e: React.SyntheticEvent, data: ResizeCallbackData) => void;
+    width?: number;
+  },
+) => {
+  const { onResize, width, ...restProps } = props;
+
+  if (!width || !onResize) {
+    return <th {...restProps} />;
+  }
+
+  return (
+    <Resizable
+      width={width}
+      height={0}
+      handle={
+        <span
+          className="react-resizable-handle"
+          style={{
+            position: 'absolute',
+            right: -5,
+            bottom: 0,
+            top: 0,
+            width: 10,
+            cursor: 'col-resize',
+            zIndex: 1,
+          }}
+          onClick={e => e.stopPropagation()}
+        />
+      }
+      onResize={onResize}
+      draggableOpts={{ enableUserSelectHack: false }}
+    >
+      <th {...restProps} />
+    </Resizable>
+  );
+};
 
 function hasPermission(requiredPermissions: string[] | undefined, role?: string): boolean {
   if (!requiredPermissions || requiredPermissions.length === 0) return true;
@@ -140,6 +183,9 @@ export function EnterpriseTable<T extends Record<string, any>>(
     pageSize: defaultPageSize = 10,
     virtualizeThreshold = 200,
     telemetry: telemetryConfig,
+    searchable = false,
+    searchPlaceholder,
+    searchFilterKey = 'keyword',
     size = 'small',
     stickyHeader = true,
     scrollX = 'max-content',
@@ -201,7 +247,7 @@ export function EnterpriseTable<T extends Record<string, any>>(
         key: col.key,
         title: col.title,
         dataIndex: dataIdx,
-        width: col.width,
+        width: col.width ?? 150,
         fixed: col.fixed,
         align: col.align,
         ellipsis: col.ellipsis,
@@ -321,6 +367,34 @@ export function EnterpriseTable<T extends Record<string, any>>(
     rowActions,
   ]);
 
+  // --- Resizable column widths ---
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>({});
+
+  const handleColumnResize = useCallback(
+    (key: string) =>
+      (_: React.SyntheticEvent, { size }: ResizeCallbackData) => {
+        setColumnWidths(prev => ({ ...prev, [key]: size.width }));
+      },
+    [],
+  );
+
+  const resizableColumns = useMemo(() => {
+    if (!processedColumns) return processedColumns;
+    return processedColumns.map(col => {
+      const colKey = col.key as string;
+      const w = columnWidths[colKey] ?? (col.width as number | undefined);
+      if (!w) return col;
+      return {
+        ...col,
+        width: w,
+        onHeaderCell: () => ({
+          width: w,
+          onResize: handleColumnResize(colKey),
+        }),
+      };
+    });
+  }, [processedColumns, columnWidths, handleColumnResize]);
+
   // Visible columns for export (non-action columns mapped back to ColumnConfig)
   const visibleColumnsForExport = useMemo(() => {
     return columns
@@ -337,6 +411,13 @@ export function EnterpriseTable<T extends Record<string, any>>(
     currentUserRole,
     onAudit: telemetry.recordExport,
   });
+
+  // --- Search ---
+  const searchValue = (tableState.state.filters[searchFilterKey] as string) ?? '';
+  const handleSearchChange = useCallback(
+    (value: string) => tableState.handleFilterChange(searchFilterKey, value || undefined),
+    [tableState, searchFilterKey],
+  );
 
   // --- Active filters for summary bar ---
   const activeFilters = useMemo(() => {
@@ -392,6 +473,10 @@ export function EnterpriseTable<T extends Record<string, any>>(
           onSaveView={personalizationHook.saveView}
           onLoadView={personalizationHook.loadView}
           onDeleteView={personalizationHook.deleteView}
+          searchable={searchable}
+          searchPlaceholder={searchPlaceholder}
+          searchValue={searchValue}
+          onSearchChange={handleSearchChange}
           onRefresh={tableState.handleRefresh}
           lastFetchedAt={tableState.state.lastFetchedAt}
           showLastUpdated={showLastUpdated}
@@ -436,6 +521,10 @@ export function EnterpriseTable<T extends Record<string, any>>(
           onSaveView={personalizationHook.saveView}
           onLoadView={personalizationHook.loadView}
           onDeleteView={personalizationHook.deleteView}
+          searchable={searchable}
+          searchPlaceholder={searchPlaceholder}
+          searchValue={searchValue}
+          onSearchChange={handleSearchChange}
           onRefresh={tableState.handleRefresh}
           lastFetchedAt={tableState.state.lastFetchedAt}
           showLastUpdated={showLastUpdated}
@@ -513,6 +602,10 @@ export function EnterpriseTable<T extends Record<string, any>>(
         onSaveView={personalizationHook.saveView}
         onLoadView={personalizationHook.loadView}
         onDeleteView={personalizationHook.deleteView}
+        searchable={searchable}
+        searchPlaceholder={searchPlaceholder}
+        searchValue={searchValue}
+        onSearchChange={handleSearchChange}
         onRefresh={tableState.handleRefresh}
         lastFetchedAt={tableState.state.lastFetchedAt}
         showLastUpdated={showLastUpdated}
@@ -549,7 +642,8 @@ export function EnterpriseTable<T extends Record<string, any>>(
       )}
 
       <Table<T>
-        columns={processedColumns}
+        columns={resizableColumns}
+        components={{ header: { cell: ResizableTitle } }}
         dataSource={data}
         rowKey={rowKey}
         loading={loading}

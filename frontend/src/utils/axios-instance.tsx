@@ -11,9 +11,16 @@ export const getAxiosInstance = () => {
   });
 
   instance.interceptors.request.use((config) => {
+    config.headers = config.headers ?? {};
+
+    // ABP multi-tenancy: set tenant ID on every request
+    const tenantId = sessionStorage.getItem("tenantId");
+    if (tenantId) {
+      config.headers["Abp-TenantId"] = tenantId;
+    }
+
     const token = sessionStorage.getItem("accessToken");
     if (token) {
-      config.headers = config.headers ?? {};
       config.headers["Authorization"] = `Bearer ${token}`;
     }
     return config;

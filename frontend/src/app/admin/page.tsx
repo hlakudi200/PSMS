@@ -1,125 +1,115 @@
 "use client";
 
-import { Card, Row, Col, Statistic, Button } from "antd";
+import { useEffect, useState } from "react";
+import { Card, Row, Col, Statistic, Button, Tag } from "antd";
 import {
   UserOutlined,
-  TeamOutlined,
+  SafetyCertificateOutlined,
   SettingOutlined,
-  LogoutOutlined,
 } from "@ant-design/icons";
-import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
-import { useAuthActions, useAuthState } from "@/providers/auth";
+import { useAuthState } from "@/providers/auth";
+import { useRouter } from "next/navigation";
+import { getAxiosInstance } from "@/utils/axios-instance";
 
-function AdminDashboard() {
-  const { signOut } = useAuthActions();
-  const { currentUser } = useAuthState();
+export default function AdminPage() {
+  const { currentTenant } = useAuthState();
+  const router = useRouter();
+  const [userCount, setUserCount] = useState<number>(0);
+  const [roleCount, setRoleCount] = useState<number>(0);
 
-  const handleLogout = () => {
-    signOut();
-  };
+  useEffect(() => {
+    const instance = getAxiosInstance();
+
+    instance
+      .get("/api/services/app/User/GetAll?MaxResultCount=1&SkipCount=0")
+      .then((res) => setUserCount(res.data.result.totalCount))
+      .catch(() => {});
+
+    instance
+      .get("/api/services/app/Role/GetAll?MaxResultCount=1&SkipCount=0")
+      .then((res) => setRoleCount(res.data.result.totalCount))
+      .catch(() => {});
+  }, []);
 
   return (
-    <div style={{ padding: "24px", background: "#F5F5F5", minHeight: "100vh" }}>
-      <div
-        style={{
-          background: "#003D73",
-          padding: "16px 24px",
-          marginBottom: "24px",
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-        }}
-      >
-        <div>
-          <h1 style={{ color: "#FFFFFF", margin: 0, fontSize: "24px" }}>
-            Admin Dashboard
-          </h1>
-          <p style={{ color: "#BAE7FF", margin: "4px 0 0 0", fontSize: "13px" }}>
-            Welcome, {currentUser?.name || "Administrator"}
-          </p>
-        </div>
-        <Button
-          type="primary"
-          danger
-          icon={<LogoutOutlined />}
-          onClick={handleLogout}
-        >
-          Logout
-        </Button>
-      </div>
-
+    <div>
       <Row gutter={[16, 16]}>
-        <Col xs={24} sm={12} lg={6}>
+        <Col xs={24} sm={8}>
           <Card>
             <Statistic
               title="Total Users"
-              value={0}
+              value={userCount}
               prefix={<UserOutlined />}
               valueStyle={{ color: "#0066CC" }}
             />
           </Card>
         </Col>
-        <Col xs={24} sm={12} lg={6}>
+        <Col xs={24} sm={8}>
           <Card>
             <Statistic
-              title="Total Tenants"
-              value={0}
-              prefix={<TeamOutlined />}
+              title="Total Roles"
+              value={roleCount}
+              prefix={<SafetyCertificateOutlined />}
               valueStyle={{ color: "#52C41A" }}
             />
           </Card>
         </Col>
-        <Col xs={24} sm={12} lg={6}>
+        <Col xs={24} sm={8}>
           <Card>
             <Statistic
-              title="Active Sessions"
-              value={0}
-              prefix={<UserOutlined />}
-              valueStyle={{ color: "#FAAD14" }}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} lg={6}>
-          <Card>
-            <Statistic
-              title="System Status"
-              value="Online"
+              title="School Status"
+              value={currentTenant?.name ?? "—"}
               prefix={<SettingOutlined />}
-              valueStyle={{ color: "#52C41A" }}
+              valueStyle={{ color: "#003D73", fontSize: 20 }}
+              suffix={
+                currentTenant ? (
+                  <Tag
+                    color={currentTenant.isActive ? "green" : "default"}
+                    style={{ marginLeft: 8 }}
+                  >
+                    {currentTenant.isActive ? "Active" : "Inactive"}
+                  </Tag>
+                ) : null
+              }
             />
           </Card>
         </Col>
       </Row>
 
-      <Row gutter={[16, 16]} style={{ marginTop: "16px" }}>
-        <Col xs={24} lg={16}>
-          <Card title="System Overview" bordered={false}>
-            <p style={{ fontSize: "13px", color: "#595959" }}>
-              System administration dashboard. Manage users, tenants, and system
-              settings.
-            </p>
-          </Card>
-        </Col>
+      <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
         <Col xs={24} lg={8}>
           <Card title="Quick Actions" bordered={false}>
-            <Button block style={{ marginBottom: "8px" }}>
+            <Button
+              block
+              style={{ marginBottom: 8 }}
+              onClick={() => router.push("/admin/users")}
+            >
               Manage Users
             </Button>
-            <Button block style={{ marginBottom: "8px" }}>
-              Manage Tenants
+            <Button
+              block
+              style={{ marginBottom: 8 }}
+              onClick={() => router.push("/admin/roles")}
+            >
+              Manage Roles
             </Button>
-            <Button block>System Settings</Button>
+            <Button
+              block
+              onClick={() => router.push("/admin/settings")}
+            >
+              School Settings
+            </Button>
+          </Card>
+        </Col>
+        <Col xs={24} lg={16}>
+          <Card title="Overview" bordered={false}>
+            <p style={{ fontSize: 13, color: "#595959" }}>
+              School administration dashboard. Use the sidebar or quick actions
+              to manage users, roles, and school settings for your tenant.
+            </p>
           </Card>
         </Col>
       </Row>
     </div>
-  );
-}
-
-export default function AdminPage() {
-  return (
-    <ProtectedRoute allowedRoles={["Admin"]}>
-      <AdminDashboard />
-    </ProtectedRoute>
   );
 }

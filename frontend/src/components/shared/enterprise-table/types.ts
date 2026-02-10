@@ -193,6 +193,11 @@ export interface EnterpriseTableProps<T extends Record<string, any>> {
   title?: string;
   toolbarActions?: ToolbarAction[];
 
+  // Search
+  searchable?: boolean;
+  searchPlaceholder?: string;
+  searchFilterKey?: string;
+
   // Export
   exportConfig?: ExportConfig;
 
