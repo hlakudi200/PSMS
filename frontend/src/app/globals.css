@@ -371,3 +371,97 @@ h6 {
 .font-geist-mono {
   font-family: var(--font-geist-mono), "Courier New", Courier, monospace;
 }
+
+/* === ENTERPRISE TABLE === */
+.psms-enterprise-table {
+  background: #fff;
+  border: 1px solid #d9d9d9;
+  border-radius: 2px;
+}
+
+.psms-enterprise-table .psms-toolbar {
+  border-top: none;
+}
+
+/* Filter summary bar */
+.psms-filter-summary {
+  background: #E6F7FF;
+  border-bottom: 1px solid #91D5FF;
+  padding: 4px 16px;
+  font-size: 12px;
+  color: #0066CC;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.psms-filter-tag {
+  background: #BAE7FF;
+  border: 1px solid #91D5FF;
+  border-radius: 2px;
+  padding: 0 6px;
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Last updated indicator */
+.psms-last-updated {
+  font-size: 11px;
+  color: #8C8C8C;
+  white-space: nowrap;
+}
+
+/* Column visibility dropdown */
+.psms-column-visibility .ant-checkbox-wrapper {
+  display: block;
+  padding: 4px 12px;
+}
+
+/* Export dropdown */
+.psms-export-menu .ant-dropdown-menu-item {
+  font-size: 13px;
+}
+
+/* Bulk action bar */
+.psms-bulk-bar {
+  background: #E6F7FF;
+  border-bottom: 1px solid #91D5FF;
+  padding: 6px 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Responsive: mobile card fallback */
+@media (max-width: 768px) {
+  .psms-enterprise-table .psms-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .psms-mobile-card {
+    border-bottom: 1px solid #d9d9d9;
+    padding: 12px 16px;
+  }
+
+  .psms-mobile-card:last-child {
+    border-bottom: none;
+  }
+}
+
+/* Masked/sensitive data */
+.psms-masked {
+  font-family: "Courier New", monospace;
+  letter-spacing: 1px;
+  color: #8C8C8C;
+}
+
+.psms-masked-reveal {
+  cursor: pointer;
+  color: #0066CC;
+  font-size: 11px;
+  margin-left: 4px;
+}
