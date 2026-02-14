@@ -76,6 +76,7 @@ namespace psms.Controllers
                 case AbpLoginResultType.Success:
                     return loginResult;
                 default:
+                    Logger.Warn($"Login failed for user '{usernameOrEmailAddress}', tenant '{tenancyName}', AbpSession.TenantId={AbpSession.TenantId}. Result: {loginResult.Result}");
                     throw _abpLoginResultTypeHelper.CreateExceptionForFailedLoginAttempt(loginResult.Result, usernameOrEmailAddress, tenancyName);
             }
         }

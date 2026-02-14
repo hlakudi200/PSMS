@@ -1,0 +1,1771 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PSMS - Primary School Management System | UI Mockup</title>
+<style>
+/* ============================================================
+   DESIGN SYSTEM — PSMS South Africa
+   ============================================================ */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+:root {
+  /* Primary Palette */
+  --navy: #003D73;
+  --navy-light: #0A5A9E;
+  --navy-dark: #002B52;
+  --navy-950: #001A33;
+
+  /* Accent — SA Gold */
+  --gold: #F5A623;
+  --gold-light: #FBBF24;
+  --gold-dark: #D97706;
+
+  /* Success / Growth */
+  --emerald: #10B981;
+  --emerald-light: #34D399;
+  --emerald-bg: #ECFDF5;
+
+  /* Status Colors */
+  --blue: #3B82F6;
+  --blue-bg: #EFF6FF;
+  --red: #EF4444;
+  --red-bg: #FEF2F2;
+  --orange: #F97316;
+  --orange-bg: #FFF7ED;
+  --purple: #8B5CF6;
+  --purple-bg: #F5F3FF;
+  --cyan: #06B6D4;
+  --cyan-bg: #ECFEFF;
+  --pink: #EC4899;
+
+  /* Neutrals */
+  --white: #FFFFFF;
+  --gray-50: #F9FAFB;
+  --gray-100: #F3F4F6;
+  --gray-200: #E5E7EB;
+  --gray-300: #D1D5DB;
+  --gray-400: #9CA3AF;
+  --gray-500: #6B7280;
+  --gray-600: #4B5563;
+  --gray-700: #374151;
+  --gray-800: #1F2937;
+  --gray-900: #111827;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+  --shadow: 0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06);
+  --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
+  --shadow-xl: 0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04);
+  --shadow-glow: 0 0 20px rgba(0,61,115,0.15);
+
+  /* Radius */
+  --radius-sm: 6px;
+  --radius: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+  --radius-full: 9999px;
+
+  /* Transitions */
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: var(--gray-50);
+  color: var(--gray-800);
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ============================================================
+   ROLE SWITCHER — Presentation Bar
+   ============================================================ */
+.role-switcher-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  background: linear-gradient(135deg, var(--navy-950) 0%, var(--navy-dark) 50%, var(--navy) 100%);
+  padding: 10px 24px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+.role-switcher-bar .brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-right: 16px;
+  padding-right: 20px;
+  border-right: 1px solid rgba(255,255,255,0.15);
+}
+.brand-icon {
+  width: 36px;
+  height: 36px;
+  background: linear-gradient(135deg, var(--gold) 0%, var(--gold-dark) 100%);
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 900;
+  font-size: 16px;
+  color: var(--white);
+  letter-spacing: -0.5px;
+}
+.brand-text {
+  color: var(--white);
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: -0.3px;
+}
+.brand-text span { color: var(--gold); }
+.role-switcher-bar .label {
+  color: rgba(255,255,255,0.5);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+}
+.role-tabs {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.role-tab {
+  padding: 6px 14px;
+  border-radius: var(--radius-full);
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.05);
+  color: rgba(255,255,255,0.7);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.25s var(--ease);
+  white-space: nowrap;
+}
+.role-tab:hover {
+  background: rgba(255,255,255,0.12);
+  color: var(--white);
+  border-color: rgba(255,255,255,0.25);
+}
+.role-tab.active {
+  background: linear-gradient(135deg, var(--gold) 0%, var(--gold-dark) 100%);
+  color: var(--white);
+  border-color: transparent;
+  font-weight: 600;
+  box-shadow: 0 2px 10px rgba(245,166,35,0.4);
+}
+
+/* ============================================================
+   APP SHELL
+   ============================================================ */
+.app-shell {
+  margin-top: 56px;
+  display: flex;
+  min-height: calc(100vh - 56px);
+}
+
+/* ============================================================
+   SIDEBAR
+   ============================================================ */
+.sidebar {
+  width: 260px;
+  background: var(--white);
+  border-right: 1px solid var(--gray-200);
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  top: 56px;
+  bottom: 0;
+  left: 0;
+  z-index: 100;
+  overflow-y: auto;
+  transition: transform 0.3s var(--ease);
+}
+.sidebar-header {
+  padding: 20px 20px 16px;
+  border-bottom: 1px solid var(--gray-100);
+}
+.sidebar-header .module-name {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--navy);
+  margin-bottom: 2px;
+}
+.sidebar-header .school-name {
+  font-size: 11px;
+  color: var(--gray-400);
+  font-weight: 500;
+}
+.sidebar-nav { padding: 12px 10px; flex: 1; }
+.nav-section {
+  margin-bottom: 8px;
+}
+.nav-section-title {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--gray-400);
+  padding: 8px 12px 6px;
+}
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: var(--radius);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--gray-600);
+  cursor: pointer;
+  transition: all 0.2s var(--ease);
+  position: relative;
+}
+.nav-item:hover {
+  background: var(--gray-50);
+  color: var(--gray-800);
+}
+.nav-item.active {
+  background: linear-gradient(135deg, rgba(0,61,115,0.08) 0%, rgba(0,61,115,0.04) 100%);
+  color: var(--navy);
+  font-weight: 600;
+}
+.nav-item.active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 6px;
+  bottom: 6px;
+  width: 3px;
+  background: var(--navy);
+  border-radius: 0 3px 3px 0;
+}
+.nav-icon {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  flex-shrink: 0;
+}
+.nav-badge {
+  margin-left: auto;
+  background: var(--red);
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: var(--radius-full);
+  min-width: 18px;
+  text-align: center;
+}
+.nav-badge.info {
+  background: var(--blue);
+}
+.nav-badge.warn {
+  background: var(--orange);
+}
+
+/* Sidebar User Profile */
+.sidebar-profile {
+  padding: 16px 20px;
+  border-top: 1px solid var(--gray-100);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.profile-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--white);
+  flex-shrink: 0;
+}
+.profile-info { flex: 1; min-width: 0; }
+.profile-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--gray-800);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.profile-role {
+  font-size: 11px;
+  color: var(--gray-400);
+  font-weight: 500;
+}
+
+/* ============================================================
+   MAIN CONTENT
+   ============================================================ */
+.main-content {
+  margin-left: 260px;
+  flex: 1;
+  padding: 0;
+  min-height: calc(100vh - 56px);
+}
+
+/* Page Header */
+.page-header {
+  background: var(--white);
+  border-bottom: 1px solid var(--gray-200);
+  padding: 20px 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.page-header h1 {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--gray-900);
+  letter-spacing: -0.5px;
+}
+.page-header .breadcrumb {
+  font-size: 12px;
+  color: var(--gray-400);
+  margin-top: 2px;
+}
+.page-header .breadcrumb a {
+  color: var(--navy-light);
+  text-decoration: none;
+}
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Page Body */
+.page-body { padding: 24px 32px; }
+
+/* ============================================================
+   STAT CARDS
+   ============================================================ */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.stat-card {
+  background: var(--white);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  border: 1px solid var(--gray-100);
+  box-shadow: var(--shadow-sm);
+  transition: all 0.3s var(--ease);
+  position: relative;
+  overflow: hidden;
+}
+.stat-card:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+.stat-card::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+}
+.stat-card.navy::after { background: linear-gradient(90deg, var(--navy), var(--navy-light)); }
+.stat-card.emerald::after { background: linear-gradient(90deg, var(--emerald), var(--emerald-light)); }
+.stat-card.gold::after { background: linear-gradient(90deg, var(--gold), var(--gold-light)); }
+.stat-card.blue::after { background: linear-gradient(90deg, var(--blue), #60A5FA); }
+.stat-card.purple::after { background: linear-gradient(90deg, var(--purple), #A78BFA); }
+.stat-card.red::after { background: linear-gradient(90deg, var(--red), #F87171); }
+.stat-card.orange::after { background: linear-gradient(90deg, var(--orange), #FB923C); }
+.stat-card.cyan::after { background: linear-gradient(90deg, var(--cyan), #22D3EE); }
+
+.stat-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.stat-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--gray-500);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.stat-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+}
+.stat-icon.navy { background: rgba(0,61,115,0.1); color: var(--navy); }
+.stat-icon.emerald { background: var(--emerald-bg); color: var(--emerald); }
+.stat-icon.gold { background: rgba(245,166,35,0.12); color: var(--gold-dark); }
+.stat-icon.blue { background: var(--blue-bg); color: var(--blue); }
+.stat-icon.purple { background: var(--purple-bg); color: var(--purple); }
+.stat-icon.red { background: var(--red-bg); color: var(--red); }
+.stat-icon.orange { background: var(--orange-bg); color: var(--orange); }
+.stat-icon.cyan { background: var(--cyan-bg); color: var(--cyan); }
+
+.stat-value {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--gray-900);
+  letter-spacing: -1px;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+.stat-change {
+  font-size: 11px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+.stat-change.up { color: var(--emerald); }
+.stat-change.down { color: var(--red); }
+
+/* ============================================================
+   CARDS
+   ============================================================ */
+.card {
+  background: var(--white);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--gray-100);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+.card-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--gray-100);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.card-title {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--gray-800);
+}
+.card-body { padding: 20px; }
+.content-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.content-grid.three { grid-template-columns: 1fr 1fr 1fr; }
+.content-grid.sidebar-layout { grid-template-columns: 2fr 1fr; }
+
+/* ============================================================
+   TABLE
+   ============================================================ */
+.table-toolbar {
+  padding: 12px 16px;
+  background: var(--gray-50);
+  border-bottom: 1px solid var(--gray-100);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.search-input {
+  display: flex;
+  align-items: center;
+  background: var(--white);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius);
+  padding: 6px 12px;
+  gap: 8px;
+  flex: 0 0 220px;
+  transition: border-color 0.2s;
+}
+.search-input:focus-within { border-color: var(--navy-light); box-shadow: 0 0 0 3px rgba(0,61,115,0.08); }
+.search-input input {
+  border: none;
+  outline: none;
+  font-size: 13px;
+  color: var(--gray-700);
+  width: 100%;
+  font-family: inherit;
+}
+.search-input input::placeholder { color: var(--gray-400); }
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.data-table thead th {
+  padding: 10px 16px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--gray-500);
+  text-align: left;
+  background: var(--gray-50);
+  border-bottom: 1px solid var(--gray-200);
+  position: relative;
+  user-select: none;
+}
+.data-table thead th .resize-handle {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  cursor: col-resize;
+  background: transparent;
+  transition: background 0.2s;
+}
+.data-table thead th:hover .resize-handle { background: var(--navy-light); }
+.data-table tbody td {
+  padding: 12px 16px;
+  font-size: 13px;
+  color: var(--gray-700);
+  border-bottom: 1px solid var(--gray-100);
+}
+.data-table tbody tr {
+  transition: background 0.15s;
+}
+.data-table tbody tr:hover { background: var(--gray-50); }
+.data-table tbody tr:last-child td { border-bottom: none; }
+
+/* ============================================================
+   BUTTONS
+   ============================================================ */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 16px;
+  border-radius: var(--radius);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.2s var(--ease);
+  font-family: inherit;
+  white-space: nowrap;
+}
+.btn-primary {
+  background: linear-gradient(135deg, var(--navy) 0%, var(--navy-light) 100%);
+  color: var(--white);
+  box-shadow: 0 2px 8px rgba(0,61,115,0.25);
+}
+.btn-primary:hover { box-shadow: 0 4px 12px rgba(0,61,115,0.35); transform: translateY(-1px); }
+.btn-gold {
+  background: linear-gradient(135deg, var(--gold) 0%, var(--gold-dark) 100%);
+  color: var(--white);
+  box-shadow: 0 2px 8px rgba(245,166,35,0.25);
+}
+.btn-success {
+  background: linear-gradient(135deg, var(--emerald) 0%, #059669 100%);
+  color: var(--white);
+}
+.btn-outline {
+  background: var(--white);
+  border-color: var(--gray-200);
+  color: var(--gray-700);
+}
+.btn-outline:hover { background: var(--gray-50); border-color: var(--gray-300); }
+.btn-ghost {
+  background: transparent;
+  color: var(--gray-600);
+  padding: 6px 10px;
+}
+.btn-ghost:hover { background: var(--gray-100); }
+.btn-danger {
+  background: var(--red);
+  color: var(--white);
+}
+.btn-sm { padding: 5px 10px; font-size: 12px; }
+
+/* ============================================================
+   BADGES & TAGS
+   ============================================================ */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: var(--radius-full);
+  font-size: 11px;
+  font-weight: 600;
+}
+.badge.green { background: var(--emerald-bg); color: #065F46; }
+.badge.red { background: var(--red-bg); color: #991B1B; }
+.badge.blue { background: var(--blue-bg); color: #1E40AF; }
+.badge.orange { background: var(--orange-bg); color: #9A3412; }
+.badge.purple { background: var(--purple-bg); color: #5B21B6; }
+.badge.gray { background: var(--gray-100); color: var(--gray-600); }
+.badge.gold { background: rgba(245,166,35,0.12); color: var(--gold-dark); }
+
+.tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  font-weight: 600;
+}
+.tag.navy { background: rgba(0,61,115,0.1); color: var(--navy); }
+.tag.blue { background: var(--blue-bg); color: var(--blue); }
+
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.dot.green { background: var(--emerald); }
+.dot.red { background: var(--red); }
+.dot.orange { background: var(--orange); }
+.dot.gray { background: var(--gray-400); }
+
+/* ============================================================
+   QUICK ACTIONS
+   ============================================================ */
+.quick-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 10px;
+}
+.quick-action {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-radius: var(--radius);
+  border: 1px solid var(--gray-200);
+  background: var(--white);
+  cursor: pointer;
+  transition: all 0.2s var(--ease);
+}
+.quick-action:hover {
+  border-color: var(--navy-light);
+  background: rgba(0,61,115,0.02);
+  box-shadow: var(--shadow);
+  transform: translateY(-1px);
+}
+.quick-action .qa-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  flex-shrink: 0;
+}
+.quick-action .qa-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--gray-700);
+}
+
+/* ============================================================
+   PROGRESS & CHARTS (Mockup)
+   ============================================================ */
+.progress-bar {
+  height: 8px;
+  background: var(--gray-100);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  border-radius: var(--radius-full);
+  transition: width 0.6s var(--ease);
+}
+.progress-fill.green { background: linear-gradient(90deg, var(--emerald), var(--emerald-light)); }
+.progress-fill.blue { background: linear-gradient(90deg, var(--blue), #60A5FA); }
+.progress-fill.gold { background: linear-gradient(90deg, var(--gold), var(--gold-light)); }
+.progress-fill.navy { background: linear-gradient(90deg, var(--navy), var(--navy-light)); }
+.progress-fill.red { background: linear-gradient(90deg, var(--red), #F87171); }
+
+/* Mini bar chart */
+.mini-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 40px;
+}
+.mini-bar {
+  width: 8px;
+  border-radius: 3px 3px 0 0;
+  transition: height 0.4s var(--ease);
+}
+
+/* ============================================================
+   TIMETABLE
+   ============================================================ */
+.timetable-slot {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  border-left: 3px solid;
+  background: var(--gray-50);
+  margin-bottom: 8px;
+}
+.timetable-slot .time {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--gray-500);
+  width: 48px;
+  flex-shrink: 0;
+}
+.timetable-slot .subject {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--gray-800);
+}
+.timetable-slot .room {
+  font-size: 11px;
+  color: var(--gray-400);
+}
+.timetable-slot.navy { border-color: var(--navy); }
+.timetable-slot.emerald { border-color: var(--emerald); }
+.timetable-slot.gold { border-color: var(--gold); }
+.timetable-slot.purple { border-color: var(--purple); }
+.timetable-slot.blue { border-color: var(--blue); }
+
+/* ============================================================
+   STEPS / PROGRESS TRACKER
+   ============================================================ */
+.step-tracker {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  margin: 20px 0;
+}
+.step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.step-dot {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.step.completed .step-dot { background: var(--emerald); color: white; }
+.step.active .step-dot { background: var(--navy); color: white; box-shadow: 0 0 0 4px rgba(0,61,115,0.15); }
+.step.pending .step-dot { background: var(--gray-200); color: var(--gray-400); }
+.step-line {
+  flex: 1;
+  height: 2px;
+  background: var(--gray-200);
+  margin: 0 8px;
+  min-width: 30px;
+}
+.step-line.completed { background: var(--emerald); }
+
+/* ============================================================
+   DOCUMENT CHECKLIST
+   ============================================================ */
+.checklist-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--gray-100);
+}
+.checklist-item:last-child { border-bottom: none; }
+.check-icon {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+.check-icon.done { background: var(--emerald-bg); color: var(--emerald); }
+.check-icon.pending { background: var(--gray-100); color: var(--gray-400); }
+
+/* ============================================================
+   DESCRIPTION LIST
+   ============================================================ */
+.desc-list { }
+.desc-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--gray-100);
+}
+.desc-item:last-child { border-bottom: none; }
+.desc-label { font-size: 13px; color: var(--gray-500); font-weight: 500; }
+.desc-value { font-size: 13px; color: var(--gray-800); font-weight: 600; }
+
+/* ============================================================
+   ROLE VIEWS — Show/Hide
+   ============================================================ */
+.role-view { display: none; }
+.role-view.active { display: flex; }
+
+/* ============================================================
+   PAGINATION
+   ============================================================ */
+.table-footer {
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px solid var(--gray-100);
+  font-size: 12px;
+  color: var(--gray-500);
+}
+.pagination {
+  display: flex;
+  gap: 4px;
+}
+.page-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--gray-200);
+  background: var(--white);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  color: var(--gray-600);
+}
+.page-btn:hover { border-color: var(--navy-light); color: var(--navy); }
+.page-btn.active { background: var(--navy); color: var(--white); border-color: var(--navy); }
+
+/* ============================================================
+   NOTIFICATION DOT
+   ============================================================ */
+.notif-dot {
+  position: relative;
+}
+.notif-dot::after {
+  content: '';
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 8px;
+  height: 8px;
+  background: var(--red);
+  border-radius: 50%;
+  border: 2px solid var(--white);
+}
+
+/* ============================================================
+   ANIMATIONS
+   ============================================================ */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes slideInLeft {
+  from { opacity: 0; transform: translateX(-16px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+.animate-in {
+  animation: fadeInUp 0.4s var(--ease) forwards;
+}
+.animate-in-delay-1 { animation-delay: 0.05s; opacity: 0; }
+.animate-in-delay-2 { animation-delay: 0.1s; opacity: 0; }
+.animate-in-delay-3 { animation-delay: 0.15s; opacity: 0; }
+.animate-in-delay-4 { animation-delay: 0.2s; opacity: 0; }
+
+/* Fee highlight */
+.fee-summary {
+  background: linear-gradient(135deg, var(--navy-950) 0%, var(--navy) 100%);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  color: var(--white);
+}
+.fee-summary .fee-label { font-size: 12px; opacity: 0.7; margin-bottom: 4px; }
+.fee-summary .fee-value { font-family: 'Plus Jakarta Sans'; font-size: 32px; font-weight: 800; letter-spacing: -1px; }
+.fee-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.1); }
+.fee-row:last-child { border-bottom: none; }
+
+/* Checkbox mock */
+.mock-checkbox {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--gray-300);
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+.mock-checkbox.checked {
+  background: var(--navy);
+  border-color: var(--navy);
+  position: relative;
+}
+.mock-checkbox.checked::after {
+  content: '✓';
+  color: white;
+  font-size: 10px;
+  position: absolute;
+  top: -1px;
+  left: 2px;
+}
+
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
+@media (max-width: 1100px) {
+  .content-grid { grid-template-columns: 1fr; }
+  .content-grid.three { grid-template-columns: 1fr 1fr; }
+  .content-grid.sidebar-layout { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<!-- ============================================================
+     ROLE SWITCHER BAR
+     ============================================================ -->
+<div class="role-switcher-bar">
+  <div class="brand">
+    <div class="brand-icon">PS</div>
+    <div class="brand-text">PSMS <span>South Africa</span></div>
+  </div>
+  <span class="label">View as:</span>
+  <div class="role-tabs">
+    <div class="role-tab active" onclick="switchRole('admin')">Admin</div>
+    <div class="role-tab" onclick="switchRole('principal')">Principal</div>
+    <div class="role-tab" onclick="switchRole('hod')">HOD</div>
+    <div class="role-tab" onclick="switchRole('teacher')">Teacher</div>
+    <div class="role-tab" onclick="switchRole('student')">Student</div>
+    <div class="role-tab" onclick="switchRole('parent')">Parent</div>
+    <div class="role-tab" onclick="switchRole('finance')">Finance</div>
+    <div class="role-tab" onclick="switchRole('admissions')">Admissions</div>
+    <div class="role-tab" onclick="switchRole('applicant')">Applicant</div>
+  </div>
+</div>
+
+<!-- ============================================================
+     ADMIN VIEW
+     ============================================================ -->
+<div class="role-view active" id="view-admin">
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <div class="module-name">School Administration</div>
+      <div class="school-name">Greenfield High School</div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section">
+        <div class="nav-item active"><span class="nav-icon">&#9671;</span> Dashboard</div>
+        <div class="nav-item"><span class="nav-icon">&#9775;</span> Users <span class="nav-badge info">45</span></div>
+        <div class="nav-item"><span class="nav-icon">&#9881;</span> Roles</div>
+        <div class="nav-item"><span class="nav-icon">&#9881;</span> School Settings</div>
+      </div>
+    </nav>
+    <div class="sidebar-profile">
+      <div class="profile-avatar" style="background:linear-gradient(135deg,var(--navy),var(--navy-light))">SA</div>
+      <div class="profile-info">
+        <div class="profile-name">System Admin</div>
+        <div class="profile-role">Admin</div>
+      </div>
+    </div>
+  </aside>
+  <main class="main-content">
+    <div class="page-header">
+      <div><h1>Admin Dashboard</h1><div class="breadcrumb">Home / Dashboard</div></div>
+      <div class="header-actions">
+        <button class="btn btn-outline btn-sm">&#128276; Notifications</button>
+      </div>
+    </div>
+    <div class="page-body">
+      <div class="stats-grid animate-in">
+        <div class="stat-card navy">
+          <div class="stat-top"><span class="stat-label">Total Users</span><div class="stat-icon navy">&#9775;</div></div>
+          <div class="stat-value">45</div>
+          <div class="stat-change up">&#9650; 3 this week</div>
+        </div>
+        <div class="stat-card emerald">
+          <div class="stat-top"><span class="stat-label">Total Roles</span><div class="stat-icon emerald">&#9881;</div></div>
+          <div class="stat-value">6</div>
+          <div class="stat-change up">All configured</div>
+        </div>
+        <div class="stat-card gold">
+          <div class="stat-top"><span class="stat-label">Active Users</span><div class="stat-icon gold">&#10004;</div></div>
+          <div class="stat-value">42</div>
+          <div class="stat-change">3 inactive</div>
+        </div>
+        <div class="stat-card blue">
+          <div class="stat-top"><span class="stat-label">School Status</span><div class="stat-icon blue">&#9673;</div></div>
+          <div class="stat-value" style="font-size:20px">Greenfield High</div>
+          <span class="badge green"><span class="dot green"></span> Active</span>
+        </div>
+      </div>
+
+      <div class="content-grid sidebar-layout">
+        <div class="card">
+          <div class="card-header"><span class="card-title">Recent Users</span><button class="btn btn-primary btn-sm">+ New User</button></div>
+          <div class="table-toolbar">
+            <div class="search-input"><span>&#128269;</span><input placeholder="Search users..." /></div>
+            <button class="btn btn-outline btn-sm">&#8681; Export</button>
+            <button class="btn btn-ghost btn-sm">Columns</button>
+          </div>
+          <table class="data-table">
+            <thead><tr><th><div class="mock-checkbox"></div></th><th>Username<span class="resize-handle"></span></th><th>Name<span class="resize-handle"></span></th><th>Roles<span class="resize-handle"></span></th><th>Status</th><th>Actions</th></tr></thead>
+            <tbody>
+              <tr><td><div class="mock-checkbox"></div></td><td>admin</td><td>System Admin</td><td><span class="tag navy">Admin</span></td><td><span class="badge green"><span class="dot green"></span> Active</span></td><td><button class="btn btn-ghost btn-sm">&#9998;</button><button class="btn btn-ghost btn-sm">&#128273;</button></td></tr>
+              <tr><td><div class="mock-checkbox"></div></td><td>jmokoena</td><td>John Mokoena</td><td><span class="tag blue">Teacher</span></td><td><span class="badge green"><span class="dot green"></span> Active</span></td><td><button class="btn btn-ghost btn-sm">&#9998;</button><button class="btn btn-ghost btn-sm">&#128273;</button></td></tr>
+              <tr><td><div class="mock-checkbox"></div></td><td>snkosi</td><td>Sarah Nkosi</td><td><span class="tag navy">Principal</span></td><td><span class="badge green"><span class="dot green"></span> Active</span></td><td><button class="btn btn-ghost btn-sm">&#9998;</button><button class="btn btn-ghost btn-sm">&#128273;</button></td></tr>
+              <tr><td><div class="mock-checkbox"></div></td><td>mpatel</td><td>Mahesh Patel</td><td><span class="tag blue">Finance</span></td><td><span class="badge red"><span class="dot red"></span> Inactive</span></td><td><button class="btn btn-ghost btn-sm">&#9998;</button><button class="btn btn-ghost btn-sm">&#128273;</button></td></tr>
+            </tbody>
+          </table>
+          <div class="table-footer">
+            <span>1-4 of 45 records</span>
+            <div class="pagination">
+              <div class="page-btn">&lsaquo;</div>
+              <div class="page-btn active">1</div>
+              <div class="page-btn">2</div>
+              <div class="page-btn">3</div>
+              <div class="page-btn">&rsaquo;</div>
+            </div>
+          </div>
+        </div>
+        <div>
+          <div class="card" style="margin-bottom:16px">
+            <div class="card-header"><span class="card-title">Quick Actions</span></div>
+            <div class="card-body">
+              <div class="quick-actions" style="grid-template-columns:1fr">
+                <div class="quick-action"><div class="qa-icon stat-icon navy">&#9775;</div><span class="qa-label">Manage Users</span></div>
+                <div class="quick-action"><div class="qa-icon stat-icon emerald">&#9881;</div><span class="qa-label">Manage Roles</span></div>
+                <div class="quick-action"><div class="qa-icon stat-icon gold">&#9881;</div><span class="qa-label">School Settings</span></div>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header"><span class="card-title">Roles Overview</span></div>
+            <div class="card-body">
+              <div style="display:flex;justify-content:space-between;margin-bottom:8px"><span style="font-size:12px;color:var(--gray-500)">Admin</span><span style="font-size:12px;font-weight:700">2</span></div>
+              <div class="progress-bar" style="margin-bottom:12px"><div class="progress-fill navy" style="width:10%"></div></div>
+              <div style="display:flex;justify-content:space-between;margin-bottom:8px"><span style="font-size:12px;color:var(--gray-500)">Teacher</span><span style="font-size:12px;font-weight:700">18</span></div>
+              <div class="progress-bar" style="margin-bottom:12px"><div class="progress-fill blue" style="width:60%"></div></div>
+              <div style="display:flex;justify-content:space-between;margin-bottom:8px"><span style="font-size:12px;color:var(--gray-500)">Student</span><span style="font-size:12px;font-weight:700">320</span></div>
+              <div class="progress-bar" style="margin-bottom:12px"><div class="progress-fill green" style="width:90%"></div></div>
+              <div style="display:flex;justify-content:space-between;margin-bottom:8px"><span style="font-size:12px;color:var(--gray-500)">Parent</span><span style="font-size:12px;font-weight:700">245</span></div>
+              <div class="progress-bar"><div class="progress-fill gold" style="width:75%"></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+</div>
+
+<!-- ============================================================
+     PRINCIPAL VIEW
+     ============================================================ -->
+<div class="role-view" id="view-principal">
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <div class="module-name">School Management</div>
+      <div class="school-name">Greenfield High School</div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section">
+        <div class="nav-item active"><span class="nav-icon">&#9671;</span> Dashboard</div>
+      </div>
+      <div class="nav-section">
+        <div class="nav-section-title">Academic</div>
+        <div class="nav-item"><span class="nav-icon">&#128197;</span> Academic Years</div>
+        <div class="nav-item"><span class="nav-icon">&#128218;</span> Grades</div>
+        <div class="nav-item"><span class="nav-icon">&#128214;</span> Subjects</div>
+        <div class="nav-item"><span class="nav-icon">&#127979;</span> Classes</div>
+        <div class="nav-item"><span class="nav-icon">&#128100;</span> Teachers</div>
+      </div>
+      <div class="nav-section">
+        <div class="nav-section-title">Students</div>
+        <div class="nav-item"><span class="nav-icon">&#128101;</span> All Students</div>
+        <div class="nav-item"><span class="nav-icon">&#128203;</span> Attendance</div>
+        <div class="nav-item"><span class="nav-icon">&#128106;</span> Parents</div>
+      </div>
+      <div class="nav-section">
+        <div class="nav-section-title">Assessments</div>
+        <div class="nav-item"><span class="nav-icon">&#128200;</span> Reports</div>
+        <div class="nav-item"><span class="nav-icon">&#128221;</span> Mark Sheets</div>
+      </div>
+      <div class="nav-section">
+        <div class="nav-section-title">Communication</div>
+        <div class="nav-item"><span class="nav-icon">&#128226;</span> Announcements <span class="nav-badge">2</span></div>
+        <div class="nav-item"><span class="nav-icon">&#128172;</span> Messages <span class="nav-badge info">5</span></div>
+      </div>
+      <div class="nav-section">
+        <div class="nav-section-title">More</div>
+        <div class="nav-item"><span class="nav-icon">&#128338;</span> Timetable</div>
+        <div class="nav-item"><span class="nav-icon">&#128652;</span> Transport</div>
+        <div class="nav-item"><span class="nav-icon">&#127934;</span> Extramurals</div>
+        <div class="nav-item"><span class="nav-icon">&#128176;</span> Finance Overview</div>
+        <div class="nav-item"><span class="nav-icon">&#128196;</span> Admissions</div>
+      </div>
+    </nav>
+    <div class="sidebar-profile">
+      <div class="profile-avatar" style="background:linear-gradient(135deg,var(--purple),#7C3AED)">SN</div>
+      <div class="profile-info"><div class="profile-name">Sarah Nkosi</div><div class="profile-role">Principal</div></div>
+    </div>
+  </aside>
+  <main class="main-content">
+    <div class="page-header">
+      <div><h1>School Overview</h1><div class="breadcrumb">Home / Dashboard</div></div>
+      <div class="header-actions">
+        <button class="btn btn-outline btn-sm notif-dot">&#128276;</button>
+        <button class="btn btn-primary btn-sm">&#128226; New Announcement</button>
+      </div>
+    </div>
+    <div class="page-body">
+      <div class="stats-grid">
+        <div class="stat-card navy"><div class="stat-top"><span class="stat-label">Total Students</span><div class="stat-icon navy">&#127891;</div></div><div class="stat-value">320</div><div class="stat-change up">&#9650; 12 new enrolments</div></div>
+        <div class="stat-card emerald"><div class="stat-top"><span class="stat-label">Teachers</span><div class="stat-icon emerald">&#128100;</div></div><div class="stat-value">24</div><div class="stat-change">Full complement</div></div>
+        <div class="stat-card gold"><div class="stat-top"><span class="stat-label">Classes</span><div class="stat-icon gold">&#127979;</div></div><div class="stat-value">18</div><div class="stat-change up">Gr 1-12</div></div>
+        <div class="stat-card blue"><div class="stat-top"><span class="stat-label">Attendance Today</span><div class="stat-icon blue">&#128203;</div></div><div class="stat-value">94%</div><div class="stat-change up">&#9650; 2% from yesterday</div></div>
+      </div>
+
+      <div class="content-grid sidebar-layout">
+        <div>
+          <div class="card" style="margin-bottom:16px">
+            <div class="card-header"><span class="card-title">Grade Performance Overview</span><button class="btn btn-outline btn-sm">View Full Report</button></div>
+            <div class="card-body">
+              <table class="data-table">
+                <thead><tr><th>Grade</th><th>Students</th><th>Avg %</th><th>Pass Rate</th><th>Trend</th></tr></thead>
+                <tbody>
+                  <tr><td><strong>Grade 12</strong></td><td>48</td><td>65%</td><td><span class="badge green">82%</span></td><td><span class="stat-change up" style="font-size:12px">&#9650; 3%</span></td></tr>
+                  <tr><td><strong>Grade 11</strong></td><td>52</td><td>58%</td><td><span class="badge orange">71%</span></td><td><span class="stat-change down" style="font-size:12px">&#9660; 1%</span></td></tr>
+                  <tr><td><strong>Grade 10</strong></td><td>55</td><td>62%</td><td><span class="badge green">78%</span></td><td><span class="stat-change up" style="font-size:12px">&#9650; 5%</span></td></tr>
+                  <tr><td><strong>Grade 9</strong></td><td>60</td><td>70%</td><td><span class="badge green">88%</span></td><td><span class="stat-change up" style="font-size:12px">&#9650; 2%</span></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header"><span class="card-title">Recent Announcements</span></div>
+            <div class="card-body">
+              <div style="padding:10px 0;border-bottom:1px solid var(--gray-100)"><div style="font-size:13px;font-weight:600;margin-bottom:3px">Staff Meeting — Friday 14 Feb</div><div style="font-size:12px;color:var(--gray-400)">All teaching staff required in hall at 14:00</div></div>
+              <div style="padding:10px 0;border-bottom:1px solid var(--gray-100)"><div style="font-size:13px;font-weight:600;margin-bottom:3px">Parent-Teacher Evening — 20 Feb</div><div style="font-size:12px;color:var(--gray-400)">Grades 10-12, 17:00-19:00</div></div>
+              <div style="padding:10px 0"><div style="font-size:13px;font-weight:600;margin-bottom:3px">Sports Day — 28 Feb</div><div style="font-size:12px;color:var(--gray-400)">Inter-house athletics at main field</div></div>
+            </div>
+          </div>
+        </div>
+        <div>
+          <div class="card" style="margin-bottom:16px">
+            <div class="card-header"><span class="card-title">Quick Actions</span></div>
+            <div class="card-body">
+              <div class="quick-actions" style="grid-template-columns:1fr">
+                <div class="quick-action"><div class="qa-icon stat-icon navy">&#128200;</div><span class="qa-label">View Reports</span></div>
+                <div class="quick-action"><div class="qa-icon stat-icon emerald">&#128226;</div><span class="qa-label">Announcements</span></div>
+                <div class="quick-action"><div class="qa-icon stat-icon gold">&#128338;</div><span class="qa-label">Timetables</span></div>
+                <div class="quick-action"><div class="qa-icon stat-icon purple">&#128196;</div><span class="qa-label">Admissions</span></div>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header"><span class="card-title">Attendance This Week</span></div>
+            <div class="card-body">
+              <div style="display:flex;justify-content:space-between;margin-bottom:6px"><span style="font-size:12px;color:var(--gray-500)">Mon</span><span style="font-size:12px;font-weight:600">96%</span></div>
+              <div class="progress-bar" style="margin-bottom:10px"><div class="progress-fill green" style="width:96%"></div></div>
+              <div style="display:flex;justify-content:space-between;margin-bottom:6px"><span style="font-size:12px;color:var(--gray-500)">Tue</span><span style="font-size:12px;font-weight:600">93%</span></div>
+              <div class="progress-bar" style="margin-bottom:10px"><div class="progress-fill green" style="width:93%"></div></div>
+              <div style="display:flex;justify-content:space-between;margin-bottom:6px"><span style="font-size:12px;color:var(--gray-500)">Wed</span><span style="font-size:12px;font-weight:600">94%</span></div>
+              <div class="progress-bar" style="margin-bottom:10px"><div class="progress-fill green" style="width:94%"></div></div>
+              <div style="display:flex;justify-content:space-between;margin-bottom:6px"><span style="font-size:12px;color:var(--gray-500)">Today</span><span style="font-size:12px;font-weight:600">94%</span></div>
+              <div class="progress-bar"><div class="progress-fill navy" style="width:94%"></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+</div>
+
+<!-- ============================================================
+     HOD VIEW
+     ============================================================ -->
+<div class="role-view" id="view-hod">
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="sidebar-header"><div class="module-name">Department Management</div><div class="school-name">Mathematics Department</div></div>
+    <nav class="sidebar-nav">
+      <div class="nav-section">
+        <div class="nav-item active"><span class="nav-icon">&#9671;</span> Dashboard</div>
+      </div>
+      <div class="nav-section"><div class="nav-section-title">Academic</div>
+        <div class="nav-item"><span class="nav-icon">&#128218;</span> Grades</div>
+        <div class="nav-item"><span class="nav-icon">&#128214;</span> Subjects</div>
+        <div class="nav-item"><span class="nav-icon">&#127979;</span> Classes</div>
+        <div class="nav-item"><span class="nav-icon">&#128100;</span> Teachers</div>
+      </div>
+      <div class="nav-section"><div class="nav-section-title">Assessments</div>
+        <div class="nav-item"><span class="nav-icon">&#128221;</span> Mark Sheets</div>
+        <div class="nav-item"><span class="nav-icon">&#128200;</span> Reports</div>
+      </div>
+      <div class="nav-section"><div class="nav-section-title">Communication</div>
+        <div class="nav-item"><span class="nav-icon">&#128226;</span> Announcements</div>
+        <div class="nav-item"><span class="nav-icon">&#128172;</span> Messages</div>
+      </div>
+      <div class="nav-section"><div class="nav-item"><span class="nav-icon">&#128338;</span> Timetable</div></div>
+    </nav>
+    <div class="sidebar-profile"><div class="profile-avatar" style="background:linear-gradient(135deg,var(--orange),#EA580C)">PD</div><div class="profile-info"><div class="profile-name">Peter Dlamini</div><div class="profile-role">HOD - Mathematics</div></div></div>
+  </aside>
+  <main class="main-content">
+    <div class="page-header"><div><h1>Maths Department</h1><div class="breadcrumb">Home / Department Dashboard</div></div></div>
+    <div class="page-body">
+      <div class="stats-grid">
+        <div class="stat-card navy"><div class="stat-top"><span class="stat-label">My Subjects</span><div class="stat-icon navy">&#128214;</div></div><div class="stat-value">4</div></div>
+        <div class="stat-card emerald"><div class="stat-top"><span class="stat-label">Teachers</span><div class="stat-icon emerald">&#128100;</div></div><div class="stat-value">8</div></div>
+        <div class="stat-card gold"><div class="stat-top"><span class="stat-label">Classes</span><div class="stat-icon gold">&#127979;</div></div><div class="stat-value">12</div></div>
+        <div class="stat-card purple"><div class="stat-top"><span class="stat-label">Dept. Average</span><div class="stat-icon purple">&#128200;</div></div><div class="stat-value">62%</div><div class="stat-change up">&#9650; 4% from Term 4</div></div>
+      </div>
+      <div class="content-grid">
+        <div class="card">
+          <div class="card-header"><span class="card-title">Subject Performance</span></div>
+          <div class="card-body">
+            <table class="data-table"><thead><tr><th>Subject</th><th>Avg %</th><th>Pass %</th><th>Teachers</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Mathematics</strong></td><td>58%</td><td><span class="badge orange">72%</span></td><td>3</td></tr>
+              <tr><td><strong>Maths Literacy</strong></td><td>65%</td><td><span class="badge green">85%</span></td><td>2</td></tr>
+              <tr><td><strong>AP Mathematics</strong></td><td>52%</td><td><span class="badge orange">68%</span></td><td>2</td></tr>
+              <tr><td><strong>Technical Maths</strong></td><td>60%</td><td><span class="badge green">75%</span></td><td>1</td></tr>
+            </tbody></table>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><span class="card-title">Department Teachers</span></div>
+          <div class="card-body">
+            <table class="data-table"><thead><tr><th>Teacher</th><th>Subject</th><th>Classes</th></tr></thead>
+            <tbody>
+              <tr><td>J. Mokoena</td><td><span class="tag navy">Maths</span></td><td>3</td></tr>
+              <tr><td>T. van Wyk</td><td><span class="tag navy">Maths</span></td><td>2</td></tr>
+              <tr><td>L. Ndaba</td><td><span class="tag blue">Maths Lit</span></td><td>3</td></tr>
+              <tr><td>S. Govender</td><td><span class="tag blue">AP Maths</span></td><td>2</td></tr>
+            </tbody></table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+</div>
+
+<!-- ============================================================
+     TEACHER VIEW
+     ============================================================ -->
+<div class="role-view" id="view-teacher">
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="sidebar-header"><div class="module-name">Teacher Portal</div><div class="school-name">Greenfield High School</div></div>
+    <nav class="sidebar-nav">
+      <div class="nav-section"><div class="nav-item active"><span class="nav-icon">&#9671;</span> Dashboard</div></div>
+      <div class="nav-section"><div class="nav-section-title">Teaching</div>
+        <div class="nav-item"><span class="nav-icon">&#127979;</span> My Classes <span class="nav-badge info">3</span></div>
+      </div>
+      <div class="nav-section"><div class="nav-section-title">Assessments</div>
+        <div class="nav-item"><span class="nav-icon">&#128221;</span> My Assessments</div>
+        <div class="nav-item"><span class="nav-icon">&#128203;</span> Record Marks <span class="nav-badge warn">2</span></div>
+        <div class="nav-item"><span class="nav-icon">&#128200;</span> View Reports</div>
+      </div>
+      <div class="nav-section"><div class="nav-section-title">Learning</div>
+        <div class="nav-item"><span class="nav-icon">&#128196;</span> Materials</div>
+        <div class="nav-item"><span class="nav-icon">&#127909;</span> Online Lessons</div>
+      </div>
+      <div class="nav-section"><div class="nav-section-title">Class Mgmt</div>
+        <div class="nav-item"><span class="nav-icon">&#128203;</span> Attendance</div>
+      </div>
+      <div class="nav-section"><div class="nav-section-title">Communication</div>
+        <div class="nav-item"><span class="nav-icon">&#128226;</span> Announcements</div>
+        <div class="nav-item"><span class="nav-icon">&#128172;</span> Messages <span class="nav-badge">3</span></div>
+      </div>
+      <div class="nav-section"><div class="nav-item"><span class="nav-icon">&#128338;</span> My Timetable</div></div>
+    </nav>
+    <div class="sidebar-profile"><div class="profile-avatar" style="background:linear-gradient(135deg,var(--emerald),#059669)">JM</div><div class="profile-info"><div class="profile-name">John Mokoena</div><div class="profile-role">Teacher - Mathematics</div></div></div>
+  </aside>
+  <main class="main-content">
+    <div class="page-header"><div><h1>Good Morning, John</h1><div class="breadcrumb">Tuesday, 10 February 2026</div></div>
+      <div class="header-actions"><button class="btn btn-primary btn-sm">&#128203; Take Attendance</button></div>
+    </div>
+    <div class="page-body">
+      <div class="stats-grid">
+        <div class="stat-card navy"><div class="stat-top"><span class="stat-label">My Classes</span><div class="stat-icon navy">&#127979;</div></div><div class="stat-value">3</div></div>
+        <div class="stat-card emerald"><div class="stat-top"><span class="stat-label">My Students</span><div class="stat-icon emerald">&#128101;</div></div><div class="stat-value">96</div></div>
+        <div class="stat-card orange"><div class="stat-top"><span class="stat-label">Marks Due</span><div class="stat-icon orange">&#128221;</div></div><div class="stat-value">2</div><div class="stat-change down" style="color:var(--orange)">Due by Friday</div></div>
+        <div class="stat-card blue"><div class="stat-top"><span class="stat-label">Lessons Today</span><div class="stat-icon blue">&#127909;</div></div><div class="stat-value">4</div></div>
+      </div>
+      <div class="content-grid sidebar-layout">
+        <div>
+          <div class="card" style="margin-bottom:16px">
+            <div class="card-header"><span class="card-title">Today's Timetable</span></div>
+            <div class="card-body">
+              <div class="timetable-slot navy"><span class="time">08:00</span><div><div class="subject">Mathematics — Grade 10A</div><div class="room">Room 12 &middot; 32 students</div></div></div>
+              <div class="timetable-slot emerald"><span class="time">09:00</span><div><div class="subject">Mathematics — Grade 11B</div><div class="room">Room 12 &middot; 30 students</div></div></div>
+              <div class="timetable-slot gold" style="opacity:0.5"><span class="time">10:00</span><div><div class="subject">Break</div><div class="room">30 minutes</div></div></div>
+              <div class="timetable-slot purple"><span class="time">10:30</span><div><div class="subject">Mathematics — Grade 10C</div><div class="room">Room 14 &middot; 34 students</div></div></div>
+              <div class="timetable-slot blue"><span class="time">12:00</span><div><div class="subject">AP Mathematics — Grade 12A</div><div class="room">Room 12 &middot; 18 students</div></div></div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header"><span class="card-title">Record Marks — Grade 10A Test 1</span></div>
+            <div class="card-body">
+              <table class="data-table"><thead><tr><th>Student</th><th>Mark</th><th>/ 100</th><th>%</th></tr></thead>
+              <tbody>
+                <tr><td>Thabo Mokoena</td><td><span style="display:inline-block;width:50px;border:1px solid var(--gray-200);border-radius:4px;padding:3px 8px;font-size:13px;text-align:center">72</span></td><td>100</td><td><span class="badge green">72%</span></td></tr>
+                <tr><td>Lerato Sithole</td><td><span style="display:inline-block;width:50px;border:1px solid var(--gray-200);border-radius:4px;padding:3px 8px;font-size:13px;text-align:center">85</span></td><td>100</td><td><span class="badge green">85%</span></td></tr>
+                <tr><td>Sipho Ngcobo</td><td><span style="display:inline-block;width:50px;border:1px solid var(--gray-200);border-radius:4px;padding:3px 8px;font-size:13px;text-align:center;color:var(--gray-300)"></span></td><td>100</td><td></td></tr>
+              </tbody></table>
+              <div style="margin-top:12px;display:flex;gap:8px"><button class="btn btn-primary btn-sm">Save Marks</button><button class="btn btn-success btn-sm">Submit Final</button></div>
+            </div>
+          </div>
+        </div>
+        <div>
+          <div class="card" style="margin-bottom:16px">
+            <div class="card-header"><span class="card-title">Quick Actions</span></div>
+            <div class="card-body">
+              <div class="quick-actions" style="grid-template-columns:1fr">
+                <div class="quick-action"><div class="qa-icon stat-icon navy">&#128221;</div><span class="qa-label">Record Marks</span></div>
+                <div class="quick-action"><div class="qa-icon stat-icon emerald">&#128196;</div><span class="qa-label">Upload Material</span></div>
+                <div class="quick-action"><div class="qa-icon stat-icon gold">&#128203;</div><span class="qa-label">Take Attendance</span></div>
+                <div class="quick-action"><div class="qa-icon stat-icon purple">&#127909;</div><span class="qa-label">Start Lesson</span></div>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header"><span class="card-title">My Classes</span></div>
+            <div class="card-body">
+              <div style="padding:8px 0;border-bottom:1px solid var(--gray-100);display:flex;justify-content:space-between"><div><div style="font-size:13px;font-weight:600">Grade 10A</div><div style="font-size:11px;color:var(--gray-400)">Mathematics &middot; 32 students</div></div><span class="badge green">96%</span></div>
+              <div style="padding:8px 0;border-bottom:1px solid var(--gray-100);display:flex;justify-content:space-between"><div><div style="font-size:13px;font-weight:600">Grade 11B</div><div style="font-size:11px;color:var(--gray-400)">Mathematics &middot; 30 students</div></div><span class="badge green">92%</span></div>
+              <div style="padding:8px 0;display:flex;justify-content:space-between"><div><div style="font-size:13px;font-weight:600">Grade 10C</div><div style="font-size:11px;color:var(--gray-400)">Mathematics &middot; 34 students</div></div><span class="badge orange">88%</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+</div>
+
+<!-- ============================================================
+     STUDENT VIEW
+     ============================================================ -->
+<div class="role-view" id="view-student">
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="sidebar-header"><div class="module-name">Student Portal</div><div class="school-name">Grade 10A</div></div>
+    <nav class="sidebar-nav">
+      <div class="nav-section"><div class="nav-item active"><span class="nav-icon">&#9671;</span> Dashboard</div></div>
+      <div class="nav-section"><div class="nav-section-title">Academics</div>
+        <div class="nav-item"><span class="nav-icon">&#128214;</span> My Subjects</div>
+        <div class="nav-item"><span class="nav-icon">&#128338;</span> My Timetable</div>
+      </div>
+      <div class="nav-section"><div class="nav-section-title">Assessments</div>
+        <div class="nav-item"><span class="nav-icon">&#128203;</span> Upcoming <span class="nav-badge warn">2</span></div>
+        <div class="nav-item"><span class="nav-icon">&#128200;</span> My Marks</div>
+        <div class="nav-item"><span class="nav-icon">&#128196;</span> My Reports</div>
+      </div>
+      <div class="nav-section"><div class="nav-section-title">Learning</div>
+        <div class="nav-item"><span class="nav-icon">&#128218;</span> Materials</div>
+        <div class="nav-item"><span class="nav-icon">&#127909;</span> Online Lessons</div>
+      </div>
+      <div class="nav-section">
+        <div class="nav-item"><span class="nav-icon">&#128203;</span> My Attendance</div>
+        <div class="nav-item"><span class="nav-icon">&#128226;</span> Announcements</div>
+      </div>
+      <div class="nav-section"><div class="nav-section-title">SA Features</div>
+        <div class="nav-item"><span class="nav-icon">&#128652;</span> Transport</div>
+        <div class="nav-item"><span class="nav-icon">&#127934;</span> Extramurals</div>
+        <div class="nav-item"><span class="nav-icon">&#127968;</span> After Care</div>
+      </div>
+    </nav>
+    <div class="sidebar-profile"><div class="profile-avatar" style="background:linear-gradient(135deg,var(--blue),#2563EB)">TM</div><div class="profile-info"><div class="profile-name">Thabo Mokoena</div><div class="profile-role">Student - Grade 10A</div></div></div>
+  </aside>
+  <main class="main-content">
+    <div class="page-header"><div><h1>Welcome, Thabo</h1><div class="breadcrumb">Tuesday, 10 February 2026</div></div></div>
+    <div class="page-body">
+      <div class="stats-grid">
+        <div class="stat-card navy"><div class="stat-top"><span class="stat-label">My Subjects</span><div class="stat-icon navy">&#128214;</div></div><div class="stat-value">7</div></div>
+        <div class="stat-card emerald"><div class="stat-top"><span class="stat-label">Current Average</span><div class="stat-icon emerald">&#128200;</div></div><div class="stat-value">68%</div><div class="stat-change up">&#9650; 3% from last term</div></div>
+        <div class="stat-card blue"><div class="stat-top"><span class="stat-label">Attendance</span><div class="stat-icon blue">&#128203;</div></div><div class="stat-value">94%</div></div>
+        <div class="stat-card orange"><div class="stat-top"><span class="stat-label">Upcoming Tests</span><div class="stat-icon orange">&#128221;</div></div><div class="stat-value">2</div><div class="stat-change" style="color:var(--orange)">Next: Maths — Fri</div></div>
+      </div>
+      <div class="content-grid sidebar-layout">
+        <div>
+          <div class="card" style="margin-bottom:16px">
+            <div class="card-header"><span class="card-title">My Subject Performance</span></div>
+            <div class="card-body">
+              <table class="data-table"><thead><tr><th>Subject</th><th>Term 1</th><th>Year</th><th>Level</th></tr></thead>
+              <tbody>
+                <tr><td><strong>Mathematics</strong></td><td>72%</td><td>72%</td><td><span class="badge green">5</span></td></tr>
+                <tr><td><strong>English FAL</strong></td><td>65%</td><td>65%</td><td><span class="badge green">5</span></td></tr>
+                <tr><td><strong>Life Sciences</strong></td><td>78%</td><td>78%</td><td><span class="badge green">6</span></td></tr>
+                <tr><td><strong>Physical Science</strong></td><td>55%</td><td>55%</td><td><span class="badge orange">4</span></td></tr>
+                <tr><td><strong>Geography</strong></td><td>70%</td><td>70%</td><td><span class="badge green">5</span></td></tr>
+                <tr><td><strong>Life Orientation</strong></td><td>82%</td><td>82%</td><td><span class="badge green">7</span></td></tr>
+                <tr><td><strong>isiZulu HL</strong></td><td>60%</td><td>60%</td><td><span class="badge green">5</span></td></tr>
+              </tbody></table>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header"><span class="card-title">Learning Materials</span></div>
+            <div class="card-body">
+              <div style="padding:8px 0;border-bottom:1px solid var(--gray-100);display:flex;align-items:center;gap:10px"><div class="qa-icon stat-icon red" style="width:28px;height:28px;font-size:12px">PDF</div><div><div style="font-size:13px;font-weight:600">Chapter 5 — Trigonometry Notes</div><div style="font-size:11px;color:var(--gray-400)">Mathematics &middot; Uploaded Feb 3</div></div></div>
+              <div style="padding:8px 0;display:flex;align-items:center;gap:10px"><div class="qa-icon stat-icon purple" style="width:28px;height:28px;font-size:12px">&#9654;</div><div><div style="font-size:13px;font-weight:600">Trig Functions — Video Lesson</div><div style="font-size:11px;color:var(--gray-400)">Mathematics &middot; Uploaded Feb 1</div></div></div>
+            </div>
+          </div>
+        </div>
+        <div>
+          <div class="card" style="margin-bottom:16px">
+            <div class="card-header"><span class="card-title">Today's Schedule</span></div>
+            <div class="card-body">
+              <div class="timetable-slot navy"><span class="time">08:00</span><div><div class="subject">Mathematics</div><div class="room">Room 12</div></div></div>
+              <div class="timetable-slot emerald"><span class="time">09:00</span><div><div class="subject">English FAL</div><div class="room">Room 8</div></div></div>
+              <div class="timetable-slot purple"><span class="time">11:00</span><div><div class="subject">Life Sciences</div><div class="room">Lab 2</div></div></div>
+              <div class="timetable-slot blue"><span class="time">12:00</span><div><div class="subject">Geography</div><div class="room">Room 5</div></div></div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header"><span class="card-title">Upcoming Assessments</span></div>
+            <div class="card-body">
+              <div style="padding:8px 0;border-bottom:1px solid var(--gray-100)"><div style="font-size:13px;font-weight:600">Maths — Test 2</div><div style="font-size:12px;color:var(--orange);font-weight:600">Friday 14 Feb</div></div>
+              <div style="padding:8px 0"><div style="font-size:13px;font-weight:600">Science — Practical</div><div style="font-size:12px;color:var(--gray-400)">Monday 17 Feb</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+</div>
+
+<!-- ============================================================
+     PARENT VIEW
+     ============================================================ -->
+<div class="role-view" id="view-parent">
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="sidebar-header"><div class="module-name">Parent Portal</div><div class="school-name">Greenfield High School</div></div>
+    <nav class="sidebar-nav">
+      <div class="nav-section"><div class="nav-item active"><span class="nav-icon">&#9671;</span> Dashboard</div></div>
+      <div class="nav-section"><div class="nav-section-title">My Children</div>
+        <div class="nav-item"><span class="nav-icon">&#128106;</span> Children Overview</div>
+      </div>
+      <div class="nav-section"><div class="nav-section-title">Academics</div>
+        <div class="nav-item"><span class="nav-icon">&#128200;</span> Progress & Reports</div>
+        <div class="nav-item"><span class="nav-icon">&#128203;</span> Attendance</div>
+      </div>
+      <div class="nav-section"><div class="nav-section-title">Finance</div>
+        <div class="nav-item"><span class="nav-icon">&#128176;</span> Fees & Balance <span class="nav-badge warn">!</span></div>
+        <div class="nav-item"><span class="nav-icon">&#128179;</span> Payments</div>
+        <div class="nav-item"><span class="nav-icon">&#128178;</span> Pay Now</div>
+      </div>
+      <div class="nav-section"><div class="nav-section-title">Communication</div>
+        <div class="nav-item"><span class="nav-icon">&#128226;</span> Announcements</div>
+        <div class="nav-item"><span class="nav-icon">&#128172;</span> Messages <span class="nav-badge">3</span></div>
+      </div>
+      <div class="nav-section"><div class="nav-section-title">SA Features</div>
+        <div class="nav-item"><span class="nav-icon">&#128652;</span> Transport</div>
+        <div class="nav-item"><span class="nav-icon">&#127968;</span> After Care</div>
+        <div class="nav-item"><span class="nav-icon">&#127934;</span> Extramurals</div>
+      </div>
+    </nav>
+    <div class="sidebar-profile"><div class="profile-avatar" style="background:linear-gradient(135deg,var(--pink),#DB2777)">NM</div><div class="profile-info"><div class="profile-name">Nomsa Mokoena</div><div class="profile-role">Parent</div></div></div>
+  </aside>
+  <main class="main-content">
+    <div class="page-header"><div><h1>Parent Dashboard</h1><div class="breadcrumb">Home / Dashboard</div></div></div>
+    <div class="page-body">
+      <div class="stats-grid">
+        <div class="stat-card navy"><div class="stat-top"><span class="stat-label">My Children</span><div class="stat-icon navy">&#128106;</div></div><div class="stat-value">2</div></div>
+        <div class="stat-card blue"><div class="stat-top"><span class="stat-label">Unread Messages</span><div class="stat-icon blue">&#128172;</div></div><div class="stat-value">3</div></div>
+        <div class="stat-card orange"><div class="stat-top"><span class="stat-label">Outstanding Fees</span><div class="stat-icon orange">R</div></div><div class="stat-value">R4,500</div><div class="stat-change down">Due 01 Mar</div></div>
+        <div class="stat-card emerald"><div class="stat-top"><span class="stat-label">Upcoming Events</span><div class="stat-icon emerald">&#128197;</div></div><div class="stat-value">1</div></div>
+      </div>
+      <div class="content-grid sidebar-layout">
+        <div>
+          <div class="card" style="margin-bottom:16px">
+            <div class="card-header"><span class="card-title">My Children</span></div>
+            <div class="card-body">
+              <table class="data-table"><thead><tr><th>Child</th><th>Grade</th><th>Average</th><th>Attendance</th><th></th></tr></thead>
+              <tbody>
+                <tr><td><strong>Thabo Mokoena</strong></td><td>Grade 10A</td><td><span class="badge green">68%</span></td><td>94%</td><td><button class="btn btn-outline btn-sm">View Report</button></td></tr>
+                <tr><td><strong>Naledi Mokoena</strong></td><td>Grade 7B</td><td><span class="badge green">75%</span></td><td>97%</td><td><button class="btn btn-outline btn-sm">View Report</button></td></tr>
+              </tbody></table>
+            </div>
+          </div>
+          <div class="fee-summary">
+            <div class="fee-label">Total Outstanding</div>
+            <div class="fee-value">R 4,500</div>
+            <div style="margin-top:16px">
+              <div class="fee-row"><span style="opacity:0.7;font-size:13px">Annual Fees</span><span style="font-weight:600;font-size:13px">R 25,000</span></div>
+              <div class="fee-row"><span style="opacity:0.7;font-size:13px">Paid to Date</span><span style="font-weight:600;font-size:13px;color:var(--emerald-light)">R 20,500</span></div>
+              <div class="fee-row"><span style="opacity:0.7;font-size:13px">Next Due Date</span><span style="font-weight:600;font-size:13px">01 Mar 2026</span></div>
+            </div>
+            <button class="btn btn-gold" style="margin-top:16px;width:100%;justify-content:center">Pay Now</button>
+          </div>
+        </div>
+        <div>
+          <div class="card" style="margin-bottom:16px">
+            <div class="card-header"><span class="card-title">Transport — Thabo</span></div>
+            <div class="card-body">
+              <div class="desc-list">
+                <div class="desc-item"><span class="desc-label">Route</span><span class="desc-value">North Route</span></div>
+                <div class="desc-item"><span class="desc-label">Pickup</span><span class="desc-value">07:15 — Main Rd</span></div>
+                <div class="desc-item"><span class="desc-label">Dropoff</span><span class="desc-value">14:30 — Main Rd</span></div>
+                <div class="desc-item"><span class="desc-label">Status</span><span class="badge green"><span class="dot green"></span> Active</span></div>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header"><span class="card-title">Recent Announcements</span></div>
+            <div class="card-body">
+              <div style="padding:8px 0;border-bottom:1px solid var(--gray-100)"><div style="font-size:13px;font-weight:600">Parent-Teacher Evening</div><div style="font-size:12px;color:var(--gray-400)">20 Feb &middot; Grades 10-12</div></div>
+              <div style="padding:8px 0"><div style="font-size:13px;font-weight:600">Sports Day</div><div style="font-size:12px;color:var(--gray-400)">28 Feb &middot; Main field</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+</div>
+
+<!-- ============================================================
+     FINANCE VIEW
+     ============================================================ -->
+<div class="role-view" id="view-finance">
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="sidebar-header"><div class="module-name">Finance Management</div><div class="school-name">Greenfield High School</div></div>
+    <nav class="sidebar-nav">
+      <div class="nav-section"><div class="nav-item active"><span class="nav-icon">&#9671;</span> Dashboard</div></div>
+      <div class="nav-section"><div class="nav-section-title">Management</div>
+        <div class="nav-item"><span class="nav-icon">&#128176;</span> Fee Structures</div>
+        <div class="nav-item"><span class="nav-icon">&#128179;</span> Student Fees</div>
+      </div>
+      <div class="nav-section"><div class="nav-section-title">Payments</div>
+        <div class="nav-item"><span class="nav-icon">&#128178;</span> All Payments</div>
+        <div class="nav-item"><span class="nav-icon">&#10010;</span> Record Payment</div>
+        <div class="nav-item"><span class="nav-icon">&#128221;</span> Allocations</div>
+      </div>
+      <div class="nav-section"><div class="nav-item"><span class="nav-icon">&#128200;</span> Reports</div></div>
+    </nav>
+    <div class="sidebar-profile"><div class="profile-avatar" style="background:linear-gradient(135deg,var(--gold),var(--gold-dark))">MP</div><div class="profile-info"><div class="profile-name">Mahesh Patel</div><div class="profile-role">Finance</div></div></div>
+  </aside>
+  <main class="main-content">
+    <div class="page-header"><div><h1>Finance Dashboard</h1><div class="breadcrumb">Home / Dashboard</div></div>
+      <div class="header-actions"><button class="btn btn-primary btn-sm">+ Record Payment</button></div>
+    </div>
+    <div class="page-body">
+      <div class="stats-grid">
+        <div class="stat-card emerald"><div class="stat-top"><span class="stat-label">Total Revenue</span><div class="stat-icon emerald">R</div></div><div class="stat-value">R850K</div><div class="stat-change up">&#9650; 12% from last year</div></div>
+        <div class="stat-card orange"><div class="stat-top"><span class="stat-label">Outstanding</span><div class="stat-icon orange">R</div></div><div class="stat-value">R120K</div><div class="stat-change down">38 students behind</div></div>
+        <div class="stat-card blue"><div class="stat-top"><span class="stat-label">Today's Payments</span><div class="stat-icon blue">R</div></div><div class="stat-value">R12,500</div><div class="stat-change up">4 payments</div></div>
+        <div class="stat-card navy"><div class="stat-top"><span class="stat-label">Collection Rate</span><div class="stat-icon navy">%</div></div><div class="stat-value">88%</div><div class="stat-change up">&#9650; 5% improvement</div></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="card-title">Student Fee Summary</span><button class="btn btn-outline btn-sm">&#8681; Export</button></div>
+        <div class="table-toolbar"><div class="search-input"><span>&#128269;</span><input placeholder="Search students..." /></div></div>
+        <table class="data-table"><thead><tr><th>Student</th><th>Grade</th><th>Annual Fee</th><th>Paid</th><th>Outstanding</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Thabo Mokoena</strong></td><td>Gr 10</td><td>R 25,000</td><td>R 20,500</td><td style="color:var(--orange);font-weight:600">R 4,500</td><td><span class="badge orange">Partial</span></td></tr>
+          <tr><td><strong>Lerato Sithole</strong></td><td>Gr 11</td><td>R 25,000</td><td>R 25,000</td><td style="color:var(--emerald);font-weight:600">R 0</td><td><span class="badge green">Paid</span></td></tr>
+          <tr><td><strong>Sipho Ngcobo</strong></td><td>Gr 10</td><td>R 25,000</td><td>R 12,500</td><td style="color:var(--red);font-weight:600">R 12,500</td><td><span class="badge red">Overdue</span></td></tr>
+          <tr><td><strong>Ayanda Ndlovu</strong></td><td>Gr 9</td><td>R 22,000</td><td>R 22,000</td><td style="color:var(--emerald);font-weight:600">R 0</td><td><span class="badge green">Paid</span></td></tr>
+        </tbody></table>
+        <div class="table-footer"><span>1-4 of 320 records</span><div class="pagination"><div class="page-btn">&lsaquo;</div><div class="page-btn active">1</div><div class="page-btn">2</div><div class="page-btn">3</div><div class="page-btn">&rsaquo;</div></div></div>
+      </div>
+    </div>
+  </main>
+</div>
+</div>
+
+<!-- ============================================================
+     ADMISSIONS VIEW
+     ============================================================ -->
+<div class="role-view" id="view-admissions">
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="sidebar-header"><div class="module-name">Admissions</div><div class="school-name">2026 Intake</div></div>
+    <nav class="sidebar-nav">
+      <div class="nav-section"><div class="nav-item active"><span class="nav-icon">&#9671;</span> Dashboard</div></div>
+      <div class="nav-section"><div class="nav-section-title">Applications</div>
+        <div class="nav-item"><span class="nav-icon">&#128196;</span> Applications <span class="nav-badge info">85</span></div>
+        <div class="nav-item"><span class="nav-icon">&#128203;</span> Documents</div>
+      </div>
+      <div class="nav-section"><div class="nav-section-title">Process</div>
+        <div class="nav-item"><span class="nav-icon">&#128483;</span> Interviews <span class="nav-badge warn">15</span></div>
+        <div class="nav-item"><span class="nav-icon">&#128221;</span> Assessments</div>
+        <div class="nav-item"><span class="nav-icon">&#128178;</span> App. Fees</div>
+      </div>
+      <div class="nav-section"><div class="nav-section-title">Outcomes</div>
+        <div class="nav-item"><span class="nav-icon">&#10004;</span> Enrollments</div>
+        <div class="nav-item"><span class="nav-icon">&#128338;</span> Waitlist</div>
+      </div>
+      <div class="nav-section"><div class="nav-item"><span class="nav-icon">&#9881;</span> Settings</div></div>
+    </nav>
+    <div class="sidebar-profile"><div class="profile-avatar" style="background:linear-gradient(135deg,var(--cyan),#0891B2)">LK</div><div class="profile-info"><div class="profile-name">Linda Khumalo</div><div class="profile-role">Admissions Officer</div></div></div>
+  </aside>
+  <main class="main-content">
+    <div class="page-header"><div><h1>Admissions Dashboard</h1><div class="breadcrumb">Home / Dashboard</div></div></div>
+    <div class="page-body">
+      <div class="stats-grid">
+        <div class="stat-card navy"><div class="stat-top"><span class="stat-label">Total Applications</span><div class="stat-icon navy">&#128196;</div></div><div class="stat-value">85</div></div>
+        <div class="stat-card emerald"><div class="stat-top"><span class="stat-label">Approved</span><div class="stat-icon emerald">&#10004;</div></div><div class="stat-value">42</div></div>
+        <div class="stat-card orange"><div class="stat-top"><span class="stat-label">Pending Review</span><div class="stat-icon orange">&#128338;</div></div><div class="stat-value">28</div></div>
+        <div class="stat-card purple"><div class="stat-top"><span class="stat-label">Interviews</span><div class="stat-icon purple">&#128483;</div></div><div class="stat-value">15</div></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="card-title">Recent Applications</span><button class="btn btn-outline btn-sm">&#8681; Export</button></div>
+        <div class="table-toolbar"><div class="search-input"><span>&#128269;</span><input placeholder="Search applicants..." /></div>
+          <button class="btn btn-outline btn-sm">Status &#9662;</button>
+          <button class="btn btn-outline btn-sm">Grade &#9662;</button>
+        </div>
+        <table class="data-table"><thead><tr><th>Applicant</th><th>Grade</th><th>Date</th><th>Documents</th><th>Fee</th><th>Status</th><th>Actions</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Themba Khumalo</strong></td><td>Gr 8</td><td>15 Jan</td><td><span class="badge blue">3/4</span></td><td><span class="badge green">Paid</span></td><td><span class="badge orange">Review</span></td><td><button class="btn btn-ghost btn-sm">&#128065;</button><button class="btn btn-ghost btn-sm">&#128197;</button></td></tr>
+          <tr><td><strong>Ayanda Naidoo</strong></td><td>Gr 10</td><td>20 Jan</td><td><span class="badge green">4/4</span></td><td><span class="badge green">Paid</span></td><td><span class="badge purple">Interview</span></td><td><button class="btn btn-ghost btn-sm">&#128065;</button><button class="btn btn-ghost btn-sm">&#128197;</button></td></tr>
+          <tr><td><strong>Busi Mthembu</strong></td><td>Gr 1</td><td>01 Feb</td><td><span class="badge green">4/4</span></td><td><span class="badge green">Paid</span></td><td><span class="badge green">Approved</span></td><td><button class="btn btn-ghost btn-sm">&#128065;</button><button class="btn btn-success btn-sm">Enrol</button></td></tr>
+          <tr><td><strong>David van Wyk</strong></td><td>Gr 8</td><td>05 Feb</td><td><span class="badge red">1/4</span></td><td><span class="badge gray">Pending</span></td><td><span class="badge gray">Incomplete</span></td><td><button class="btn btn-ghost btn-sm">&#128065;</button></td></tr>
+        </tbody></table>
+        <div class="table-footer"><span>1-4 of 85 records</span><div class="pagination"><div class="page-btn">&lsaquo;</div><div class="page-btn active">1</div><div class="page-btn">2</div><div class="page-btn">3</div><div class="page-btn">&rsaquo;</div></div></div>
+      </div>
+    </div>
+  </main>
+</div>
+</div>
+
+<!-- ============================================================
+     APPLICANT VIEW
+     ============================================================ -->
+<div class="role-view" id="view-applicant">
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="sidebar-header"><div class="module-name">My Application</div><div class="school-name">Greenfield High School</div></div>
+    <nav class="sidebar-nav">
+      <div class="nav-section">
+        <div class="nav-item active"><span class="nav-icon">&#9671;</span> Application Status</div>
+        <div class="nav-item"><span class="nav-icon">&#128196;</span> My Documents</div>
+        <div class="nav-item"><span class="nav-icon">&#128178;</span> Application Fee</div>
+        <div class="nav-item"><span class="nav-icon">&#128483;</span> Interview</div>
+        <div class="nav-item"><span class="nav-icon">&#128203;</span> Requirements</div>
+      </div>
+    </nav>
+    <div class="sidebar-profile"><div class="profile-avatar" style="background:linear-gradient(135deg,var(--cyan),#0891B2)">TK</div><div class="profile-info"><div class="profile-name">Themba Khumalo</div><div class="profile-role">Applicant</div></div></div>
+  </aside>
+  <main class="main-content">
+    <div class="page-header"><div><h1>My Application</h1><div class="breadcrumb">Greenfield High School &middot; Grade 8</div></div></div>
+    <div class="page-body">
+      <div class="card" style="margin-bottom:24px">
+        <div class="card-body" style="padding:24px">
+          <div style="text-align:center;margin-bottom:8px;font-size:13px;font-weight:600;color:var(--gray-500)">Application Progress</div>
+          <div class="step-tracker" style="justify-content:center;max-width:600px;margin:0 auto">
+            <div class="step completed"><div class="step-dot">&#10003;</div><span>Personal Info</span></div>
+            <div class="step-line completed"></div>
+            <div class="step completed"><div class="step-dot">&#10003;</div><span>Documents</span></div>
+            <div class="step-line completed"></div>
+            <div class="step active"><div class="step-dot">3</div><span>Pay Fee</span></div>
+            <div class="step-line"></div>
+            <div class="step pending"><div class="step-dot">4</div><span>Submit</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="content-grid">
+        <div class="card">
+          <div class="card-header"><span class="card-title">Application Details</span></div>
+          <div class="card-body">
+            <div class="desc-list">
+              <div class="desc-item"><span class="desc-label">Status</span><span class="badge orange">Pending Review</span></div>
+              <div class="desc-item"><span class="desc-label">Applied</span><span class="desc-value">15 Jan 2026</span></div>
+              <div class="desc-item"><span class="desc-label">Grade</span><span class="desc-value">Grade 8</span></div>
+              <div class="desc-item"><span class="desc-label">Documents</span><span class="desc-value">3 / 4 uploaded</span></div>
+              <div class="desc-item"><span class="desc-label">Application Fee</span><span class="badge green"><span class="dot green"></span> Paid (R500)</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><span class="card-title">Required Documents</span></div>
+          <div class="card-body">
+            <div class="checklist-item"><div class="check-icon done">&#10003;</div><div><div style="font-size:13px;font-weight:600">Birth Certificate</div><div style="font-size:11px;color:var(--gray-400)">Uploaded 15 Jan</div></div></div>
+            <div class="checklist-item"><div class="check-icon done">&#10003;</div><div><div style="font-size:13px;font-weight:600">Previous Report Card</div><div style="font-size:11px;color:var(--gray-400)">Uploaded 15 Jan</div></div></div>
+            <div class="checklist-item"><div class="check-icon done">&#10003;</div><div><div style="font-size:13px;font-weight:600">Proof of Address</div><div style="font-size:11px;color:var(--gray-400)">Uploaded 16 Jan</div></div></div>
+            <div class="checklist-item"><div class="check-icon pending">&#8226;</div><div style="flex:1;display:flex;justify-content:space-between;align-items:center"><div><div style="font-size:13px;font-weight:600;color:var(--gray-400)">Transfer Letter</div><div style="font-size:11px;color:var(--gray-400)">Not yet uploaded</div></div><button class="btn btn-primary btn-sm">Upload</button></div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:16px">
+        <div class="card-header"><span class="card-title">Interview</span></div>
+        <div class="card-body" style="text-align:center;padding:32px">
+          <div style="font-size:40px;margin-bottom:12px;opacity:0.3">&#128483;</div>
+          <div style="font-size:14px;font-weight:600;color:var(--gray-600);margin-bottom:4px">Not Yet Scheduled</div>
+          <div style="font-size:12px;color:var(--gray-400)">You will be notified by email once an interview is scheduled</div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+</div>
+
+<!-- ============================================================
+     JAVASCRIPT — Role Switching
+     ============================================================ -->
+<script>
+function switchRole(role) {
+  // Update tabs
+  document.querySelectorAll('.role-tab').forEach(tab => tab.classList.remove('active'));
+  event.target.classList.add('active');
+
+  // Update views
+  document.querySelectorAll('.role-view').forEach(view => view.classList.remove('active'));
+  const targetView = document.getElementById('view-' + role);
+  if (targetView) {
+    targetView.classList.add('active');
+    // Trigger animations
+    targetView.querySelectorAll('.stat-card').forEach((card, i) => {
+      card.style.opacity = '0';
+      card.style.transform = 'translateY(12px)';
+      setTimeout(() => {
+        card.style.transition = 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)';
+        card.style.opacity = '1';
+        card.style.transform = 'translateY(0)';
+      }, i * 60);
+    });
+  }
+}
+</script>
+</body>
+</html>

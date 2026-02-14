@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect } from "react";
-import { Form, Input, Button, Card, message } from "antd";
-import { UserOutlined, LockOutlined } from "@ant-design/icons";
+import { Form, Input, Button, message } from "antd";
+import { UserOutlined, LockOutlined, BankOutlined } from "@ant-design/icons";
 import { useRouter } from "next/navigation";
 import { useAuthState, useAuthActions } from "@/providers/auth";
 import styles from "./login.module.css";
 
 interface LoginFormValues {
+  tenancyName: string;
   userNameOrEmailAddress: string;
   password: string;
 }
@@ -19,7 +20,6 @@ export default function LoginPage() {
   const [form] = Form.useForm();
 
   useEffect(() => {
-    // Reset flags on mount
     resetStateFlags();
   }, [resetStateFlags]);
 
@@ -27,7 +27,6 @@ export default function LoginPage() {
     if (isSuccess && currentRole) {
       message.success("Login successful!");
 
-      // Role-based navigation
       switch (currentRole.toLowerCase()) {
         case "admin":
           router.push("/admin");
@@ -74,19 +73,29 @@ export default function LoginPage() {
 
   return (
     <div className={styles.container}>
-      <div className={styles.loginBox}>
-        <div className={styles.header}>
+      {/* Left - Image */}
+      <div className={styles.imagePanel}>
+        <img
+          src="/images/login-bg.jpg"
+          alt="School"
+        />
+        <div className={styles.imageOverlay}>
+          <h2>Private School Management System</h2>
+          <p>Empowering educators, students, and parents with seamless school administration.</p>
+        </div>
+      </div>
+
+      {/* Right - Form */}
+      <div className={styles.formPanel}>
+        <div className={styles.formContainer}>
           <div className={styles.logo}>
             <div className={styles.logoIcon}>PSMS</div>
+            <span className={styles.logoText}>
+              Private School <span className={styles.logoTextAccent}>MS.</span>
+            </span>
           </div>
-          <h1 className={styles.title}>Private School Management System</h1>
-          <p className={styles.subtitle}>Enterprise Edition</p>
-        </div>
 
-        <Card className={styles.card}>
-          <div className={styles.cardHeader}>
-            <h2>System Login</h2>
-          </div>
+          <h1 className={styles.heading}>Login.</h1>
 
           <Form
             form={form}
@@ -97,50 +106,47 @@ export default function LoginPage() {
             disabled={isPending}
           >
             <Form.Item
-              label="Username or Email"
-              name="userNameOrEmailAddress"
-              rules={[
-                {
-                  required: true,
-                  message: "Please enter your username or email",
-                },
-              ]}
+              name="tenancyName"
+              initialValue="Default"
+              rules={[{ required: true, message: "Please enter your school name" }]}
             >
               <Input
-                prefix={<UserOutlined />}
+                suffix={<BankOutlined style={{ color: "#8C8C8C" }} />}
+                placeholder="School Name"
+              />
+            </Form.Item>
+
+            <Form.Item
+              name="userNameOrEmailAddress"
+              rules={[{ required: true, message: "Please enter your username or email" }]}
+            >
+              <Input
+                suffix={<UserOutlined style={{ color: "#8C8C8C" }} />}
                 placeholder="Username or Email"
                 autoComplete="username"
               />
             </Form.Item>
 
             <Form.Item
-              label="Password"
               name="password"
-              rules={[
-                {
-                  required: true,
-                  message: "Please enter your password",
-                },
-              ]}
+              rules={[{ required: true, message: "Please enter your password" }]}
             >
               <Input.Password
-                prefix={<LockOutlined />}
                 placeholder="Password"
                 autoComplete="current-password"
               />
             </Form.Item>
 
-            <Form.Item>
+            <div className={styles.buttonRow}>
               <Button
                 type="primary"
                 htmlType="submit"
-                block
                 loading={isPending}
-                size="large"
+                className={styles.signInButton}
               >
-                {isPending ? "Logging in..." : "Log In"}
+                {isPending ? "Signing in..." : "Sign In"}
               </Button>
-            </Form.Item>
+            </div>
           </Form>
 
           <div className={styles.footer}>
@@ -150,11 +156,10 @@ export default function LoginPage() {
               <a href="#">Need Help?</a>
             </div>
           </div>
-        </Card>
 
-        <div className={styles.systemInfo}>
-          <p>© 2024 Private School Management System</p>
-          <p className={styles.version}>Version 1.0.0</p>
+          <div className={styles.systemInfo}>
+            <p>&copy; 2025 Private School Management System</p>
+          </div>
         </div>
       </div>
     </div>

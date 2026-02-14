@@ -16,6 +16,7 @@ export interface IUser {
 export interface ILoginData {
   userNameOrEmailAddress: string;
   password: string;
+  tenancyName?: string;
 }
 
 export interface ITenant {

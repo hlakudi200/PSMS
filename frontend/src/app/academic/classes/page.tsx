@@ -1,0 +1,160 @@
+'use client';
+
+import React, { useState, useCallback } from 'react';
+import { message } from 'antd';
+import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
+import { EnterpriseTable } from '@/components/shared/enterprise-table';
+import type { ColumnConfig, TableQuery, RowAction, BulkAction, ToolbarAction } from '@/components/shared/enterprise-table';
+import { ClassProvider, useClassState, useClassActions } from '@/providers/academic/classes';
+import { GradeProvider } from '@/providers/academic/grades';
+import { AcademicYearProvider } from '@/providers/academic/academic_years';
+import { TeacherProvider } from '@/providers/academic/teachers';
+import { useAuthState } from '@/providers/auth';
+import { ClassFormModal } from '@/components/academic/ClassFormModal';
+import type { IClass } from '@/providers/academic/shared/interfaces';
+
+function ClassesContent() {
+  const { classes, totalCount, isPending, isError } = useClassState();
+  const { getAllAsync, deleteAsync, activateAsync, deactivateAsync } = useClassActions();
+  const { currentRole } = useAuthState();
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editRecord, setEditRecord] = useState<IClass | null>(null);
+  const [lastQuery, setLastQuery] = useState<TableQuery | null>(null);
+
+  const handleQueryChange = useCallback((query: TableQuery) => {
+    setLastQuery(query);
+    getAllAsync({
+      maxResultCount: query.maxResultCount,
+      skipCount: query.skipCount,
+      sorting: query.sorting,
+    });
+  }, [getAllAsync]);
+
+  const refreshData = useCallback(() => {
+    if (lastQuery) handleQueryChange(lastQuery);
+  }, [lastQuery, handleQueryChange]);
+
+  const handleModalClose = (refresh?: boolean) => {
+    setModalOpen(false);
+    setEditRecord(null);
+    if (refresh) refreshData();
+  };
+
+  const columns: ColumnConfig<IClass>[] = [
+    { key: 'className', title: 'Class', dataIndex: 'className', sortable: true, filterable: true },
+    { key: 'gradeName', title: 'Grade', dataIndex: 'gradeName', sortable: true },
+    { key: 'academicYearName', title: 'Year', dataIndex: 'academicYearName' },
+    { key: 'classTeacherName', title: 'Class Teacher', dataIndex: 'classTeacherName' },
+    { key: 'maxCapacity', title: 'Capacity', dataIndex: 'maxCapacity', sortable: true },
+    { key: 'studentCount', title: 'Students', dataIndex: 'studentCount' },
+    { key: 'availableCapacity', title: 'Available', dataIndex: 'availableCapacity' },
+    {
+      key: 'isActive', title: 'Status', dataIndex: 'isActive',
+      renderType: 'status',
+      renderConfig: {
+        statusMap: {
+          true: { label: 'Active', color: 'green' },
+          false: { label: 'Inactive', color: 'default' },
+        },
+      },
+    },
+  ];
+
+  const toolbarActions: ToolbarAction[] = [
+    {
+      key: 'new',
+      label: 'New Class',
+      icon: <PlusOutlined />,
+      type: 'primary',
+      onClick: () => { setEditRecord(null); setModalOpen(true); },
+    },
+  ];
+
+  const rowActions: RowAction<IClass>[] = [
+    {
+      key: 'edit',
+      label: 'Edit',
+      icon: <EditOutlined />,
+      onClick: (record) => { setEditRecord(record); setModalOpen(true); },
+    },
+    {
+      key: 'delete',
+      label: 'Delete',
+      icon: <DeleteOutlined />,
+      danger: true,
+      confirm: { title: 'Delete this class?', description: 'This action cannot be undone.' },
+      onClick: async (record) => {
+        await deleteAsync(record.id);
+        message.success('Class deleted');
+        refreshData();
+      },
+    },
+  ];
+
+  const bulkActions: BulkAction<IClass>[] = [
+    {
+      key: 'activate',
+      label: 'Activate',
+      onClick: async (rows) => {
+        for (const row of rows) await activateAsync(row.id);
+        message.success(`${rows.length} class(es) activated`);
+        refreshData();
+      },
+    },
+    {
+      key: 'deactivate',
+      label: 'Deactivate',
+      danger: true,
+      confirm: { title: 'Deactivate selected classes?' },
+      onClick: async (rows) => {
+        for (const row of rows) await deactivateAsync(row.id);
+        message.success(`${rows.length} class(es) deactivated`);
+        refreshData();
+      },
+    },
+  ];
+
+  return (
+    <>
+      <EnterpriseTable<IClass>
+        title="Classes"
+        columns={columns}
+        data={classes ?? []}
+        totalCount={totalCount}
+        loading={isPending}
+        error={isError}
+        onQueryChange={handleQueryChange}
+        rowKey="id"
+        toolbarActions={toolbarActions}
+        rowActions={rowActions}
+        bulkActions={bulkActions}
+        selectionMode="multi"
+        currentUserRole={currentRole}
+        exportConfig={{
+          enabled: true,
+          formats: ['csv', 'xlsx'],
+          requiredPermissions: ['Admin', 'Principal', 'VicePrincipal'],
+        }}
+      />
+      <ClassFormModal
+        open={modalOpen}
+        onClose={handleModalClose}
+        editRecord={editRecord}
+      />
+    </>
+  );
+}
+
+export default function ClassesPage() {
+  return (
+    <ClassProvider>
+      <GradeProvider>
+        <AcademicYearProvider>
+          <TeacherProvider>
+            <ClassesContent />
+          </TeacherProvider>
+        </AcademicYearProvider>
+      </GradeProvider>
+    </ClassProvider>
+  );
+}

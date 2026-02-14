@@ -74,6 +74,26 @@ public class psmsDbContext : AbpZeroDbContext<Tenant, Role, User, psmsDbContext>
     public DbSet<ClassSubject> ClassSubjects { get; set; }
 
     /// <summary>
+    /// Teacher-Subject assignments per grade
+    /// </summary>
+    public DbSet<TeacherSubject> TeacherSubjects { get; set; }
+
+    /// <summary>
+    /// Teacher-Class assignments per subject
+    /// </summary>
+    public DbSet<TeacherClass> TeacherClasses { get; set; }
+
+    /// <summary>
+    /// Grade-Subject mappings
+    /// </summary>
+    public DbSet<GradeSubject> GradeSubjects { get; set; }
+
+    /// <summary>
+    /// Student-Subject enrollments per academic year
+    /// </summary>
+    public DbSet<StudentSubject> StudentSubjects { get; set; }
+
+    /// <summary>
     /// Daily attendance records
     /// </summary>
     public DbSet<Attendance> Attendances { get; set; }
