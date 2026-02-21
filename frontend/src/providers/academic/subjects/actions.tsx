@@ -18,6 +18,12 @@ export enum SubjectActionEnums {
   deleteSubjectPending = "DELETE_SUBJECT_PENDING",
   deleteSubjectSuccess = "DELETE_SUBJECT_SUCCESS",
   deleteSubjectError = "DELETE_SUBJECT_ERROR",
+  activateSubjectPending = "ACTIVATE_SUBJECT_PENDING",
+  activateSubjectSuccess = "ACTIVATE_SUBJECT_SUCCESS",
+  activateSubjectError = "ACTIVATE_SUBJECT_ERROR",
+  deactivateSubjectPending = "DEACTIVATE_SUBJECT_PENDING",
+  deactivateSubjectSuccess = "DEACTIVATE_SUBJECT_SUCCESS",
+  deactivateSubjectError = "DEACTIVATE_SUBJECT_ERROR",
 }
 
 export const getSubjectsPending = createAction<ISubjectStateContext>(
@@ -120,5 +126,35 @@ export const deleteSubjectSuccess = createAction<ISubjectStateContext>(
 
 export const deleteSubjectError = createAction<ISubjectStateContext>(
   SubjectActionEnums.deleteSubjectError,
+  () => ({ isPending: false, isSuccess: false, isError: true })
+);
+
+export const activateSubjectPending = createAction<ISubjectStateContext>(
+  SubjectActionEnums.activateSubjectPending,
+  () => ({ isPending: true, isSuccess: false, isError: false })
+);
+
+export const activateSubjectSuccess = createAction<ISubjectStateContext>(
+  SubjectActionEnums.activateSubjectSuccess,
+  () => ({ isPending: false, isSuccess: true, isError: false })
+);
+
+export const activateSubjectError = createAction<ISubjectStateContext>(
+  SubjectActionEnums.activateSubjectError,
+  () => ({ isPending: false, isSuccess: false, isError: true })
+);
+
+export const deactivateSubjectPending = createAction<ISubjectStateContext>(
+  SubjectActionEnums.deactivateSubjectPending,
+  () => ({ isPending: true, isSuccess: false, isError: false })
+);
+
+export const deactivateSubjectSuccess = createAction<ISubjectStateContext>(
+  SubjectActionEnums.deactivateSubjectSuccess,
+  () => ({ isPending: false, isSuccess: true, isError: false })
+);
+
+export const deactivateSubjectError = createAction<ISubjectStateContext>(
+  SubjectActionEnums.deactivateSubjectError,
   () => ({ isPending: false, isSuccess: false, isError: true })
 );

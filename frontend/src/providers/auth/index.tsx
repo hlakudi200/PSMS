@@ -46,6 +46,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               currentTenant: tenant,
             })
           );
+
+          // Fallback: if JWT didn't contain a role claim, derive from user's roleNames
+          const jwtRole = getRole(jwtToken);
+          if (!jwtRole && user?.roleNames?.length > 0) {
+            dispatch(
+              loginUserSuccess({
+                jwtToken,
+                currentRole: user.roleNames[0].toLowerCase(),
+              })
+            );
+          }
         }
       })
       .catch((error) => {

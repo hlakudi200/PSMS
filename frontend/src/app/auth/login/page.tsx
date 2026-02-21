@@ -32,6 +32,8 @@ export default function LoginPage() {
           router.push("/admin");
           break;
         case "principal":
+          router.push("/principal");
+          break;
         case "viceprincipal":
         case "hod":
           router.push("/academic");

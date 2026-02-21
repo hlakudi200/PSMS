@@ -19,6 +19,12 @@ export const SubjectReducer = handleActions<ISubjectStateContext, ISubjectStateC
     [SubjectActionEnums.deleteSubjectPending]: (state, action) => ({ ...state, ...action.payload }),
     [SubjectActionEnums.deleteSubjectSuccess]: (state, action) => ({ ...state, ...action.payload }),
     [SubjectActionEnums.deleteSubjectError]: (state, action) => ({ ...state, ...action.payload }),
+    [SubjectActionEnums.activateSubjectPending]: (state, action) => ({ ...state, ...action.payload }),
+    [SubjectActionEnums.activateSubjectSuccess]: (state, action) => ({ ...state, ...action.payload }),
+    [SubjectActionEnums.activateSubjectError]: (state, action) => ({ ...state, ...action.payload }),
+    [SubjectActionEnums.deactivateSubjectPending]: (state, action) => ({ ...state, ...action.payload }),
+    [SubjectActionEnums.deactivateSubjectSuccess]: (state, action) => ({ ...state, ...action.payload }),
+    [SubjectActionEnums.deactivateSubjectError]: (state, action) => ({ ...state, ...action.payload }),
   },
   INITIAL_STATE
 );

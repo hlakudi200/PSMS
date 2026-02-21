@@ -22,6 +22,8 @@ export interface ISubjectActionContext {
   createAsync: (input: ICreateSubject) => void;
   updateAsync: (id: string, input: IUpdateSubject) => void;
   deleteAsync: (id: string) => void;
+  activateAsync: (id: string) => void;
+  deactivateAsync: (id: string) => void;
 }
 
 export const INITIAL_STATE: ISubjectStateContext = {
