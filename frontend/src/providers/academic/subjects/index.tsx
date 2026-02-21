@@ -10,6 +10,8 @@ import {
   createSubjectPending, createSubjectError, createSubjectSuccess,
   updateSubjectPending, updateSubjectSuccess, updateSubjectError,
   deleteSubjectPending, deleteSubjectSuccess, deleteSubjectError,
+  activateSubjectPending, activateSubjectSuccess, activateSubjectError,
+  deactivateSubjectPending, deactivateSubjectSuccess, deactivateSubjectError,
 } from "./actions";
 
 export const SubjectProvider = ({ children }: { children: React.ReactNode }) => {
@@ -55,9 +57,23 @@ export const SubjectProvider = ({ children }: { children: React.ReactNode }) => 
       .catch((error) => { console.error(error); dispatch(deleteSubjectError()); });
   };
 
+  const activateAsync = async (id: string) => {
+    dispatch(activateSubjectPending());
+    await instance.post(`/api/services/app/Subject/Activate`, { id })
+      .then(() => dispatch(activateSubjectSuccess()))
+      .catch((error) => { console.error(error); dispatch(activateSubjectError()); });
+  };
+
+  const deactivateAsync = async (id: string) => {
+    dispatch(deactivateSubjectPending());
+    await instance.post(`/api/services/app/Subject/Deactivate`, { id })
+      .then(() => dispatch(deactivateSubjectSuccess()))
+      .catch((error) => { console.error(error); dispatch(deactivateSubjectError()); });
+  };
+
   return (
     <SubjectStateContext.Provider value={state}>
-      <SubjectActionContext.Provider value={{ getAsync, getAllAsync, createAsync, updateAsync, deleteAsync }}>
+      <SubjectActionContext.Provider value={{ getAsync, getAllAsync, createAsync, updateAsync, deleteAsync, activateAsync, deactivateAsync }}>
         {children}
       </SubjectActionContext.Provider>
     </SubjectStateContext.Provider>

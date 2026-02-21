@@ -11,7 +11,7 @@ export interface IDecodedToken {
   [AbpTokenProperties.nameidentifier]: string;
   [AbpTokenProperties.name]: string;
   [AbpTokenProperties.emailaddress]: string;
-  [AbpTokenProperties.role]: string;
+  [AbpTokenProperties.role]: string | string[];
 }
 
 export enum AbpTokenProperties {
@@ -29,7 +29,15 @@ export const decodeToken = (accessToken: string): IDecodedToken => {
 export const getRole = (accessToken: string): string => {
   if (accessToken) {
     const decoded = decodeToken(accessToken);
-    return `${decoded[AbpTokenProperties.role]}`.toLowerCase();
+    const role = decoded[AbpTokenProperties.role];
+
+    // ABP sends a string for single role, an array for multiple roles
+    if (Array.isArray(role)) {
+      return role[0]?.toLowerCase() ?? "";
+    }
+    if (role) {
+      return String(role).toLowerCase();
+    }
   }
   return "";
 };
