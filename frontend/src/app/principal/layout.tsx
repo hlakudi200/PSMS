@@ -37,7 +37,7 @@ const menuItems = [
       { key: '/principal/academic-years', icon: <CalendarOutlined />, label: 'Academic Years' },
       { key: '/principal/grades', icon: <BookOutlined />, label: 'Grades' },
       { key: '/principal/subjects', icon: <ReadOutlined />, label: 'Subjects' },
-      { key: 'classes', icon: <ApartmentOutlined />, label: 'Classes', disabled: true },
+      { key: '/principal/classes', icon: <ApartmentOutlined />, label: 'Classes' },
       { key: 'teachers', icon: <TeamOutlined />, label: 'Teachers', disabled: true },
     ],
   },
