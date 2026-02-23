@@ -22,6 +22,8 @@ export interface ITeacherActionContext {
   createAsync: (input: ICreateTeacher) => void;
   updateAsync: (id: string, input: IUpdateTeacher) => void;
   deleteAsync: (id: string) => void;
+  activateAsync: (id: string) => void;
+  deactivateAsync: (id: string) => void;
 }
 
 export const INITIAL_STATE: ITeacherStateContext = {

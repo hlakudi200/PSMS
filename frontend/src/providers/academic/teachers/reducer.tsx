@@ -67,6 +67,30 @@ export const TeacherReducer = handleActions<
       ...state,
       ...action.payload,
     }),
+    [TeacherActionEnums.activateTeacherPending]: (state, action) => ({
+      ...state,
+      ...action.payload,
+    }),
+    [TeacherActionEnums.activateTeacherSuccess]: (state, action) => ({
+      ...state,
+      ...action.payload,
+    }),
+    [TeacherActionEnums.activateTeacherError]: (state, action) => ({
+      ...state,
+      ...action.payload,
+    }),
+    [TeacherActionEnums.deactivateTeacherPending]: (state, action) => ({
+      ...state,
+      ...action.payload,
+    }),
+    [TeacherActionEnums.deactivateTeacherSuccess]: (state, action) => ({
+      ...state,
+      ...action.payload,
+    }),
+    [TeacherActionEnums.deactivateTeacherError]: (state, action) => ({
+      ...state,
+      ...action.payload,
+    }),
   },
   INITIAL_STATE
 );

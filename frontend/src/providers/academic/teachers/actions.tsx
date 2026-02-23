@@ -22,6 +22,14 @@ export enum TeacherActionEnums {
   deleteTeacherPending = "DELETE_TEACHER_PENDING",
   deleteTeacherSuccess = "DELETE_TEACHER_SUCCESS",
   deleteTeacherError = "DELETE_TEACHER_ERROR",
+
+  activateTeacherPending = "ACTIVATE_TEACHER_PENDING",
+  activateTeacherSuccess = "ACTIVATE_TEACHER_SUCCESS",
+  activateTeacherError = "ACTIVATE_TEACHER_ERROR",
+
+  deactivateTeacherPending = "DEACTIVATE_TEACHER_PENDING",
+  deactivateTeacherSuccess = "DEACTIVATE_TEACHER_SUCCESS",
+  deactivateTeacherError = "DEACTIVATE_TEACHER_ERROR",
 }
 
 // Get All Teachers Actions
@@ -129,5 +137,37 @@ export const deleteTeacherSuccess = createAction<ITeacherStateContext>(
 
 export const deleteTeacherError = createAction<ITeacherStateContext>(
   TeacherActionEnums.deleteTeacherError,
+  () => ({ isPending: false, isSuccess: false, isError: true })
+);
+
+// Activate Teacher Actions
+export const activateTeacherPending = createAction<ITeacherStateContext>(
+  TeacherActionEnums.activateTeacherPending,
+  () => ({ isPending: true, isSuccess: false, isError: false })
+);
+
+export const activateTeacherSuccess = createAction<ITeacherStateContext>(
+  TeacherActionEnums.activateTeacherSuccess,
+  () => ({ isPending: false, isSuccess: true, isError: false })
+);
+
+export const activateTeacherError = createAction<ITeacherStateContext>(
+  TeacherActionEnums.activateTeacherError,
+  () => ({ isPending: false, isSuccess: false, isError: true })
+);
+
+// Deactivate Teacher Actions
+export const deactivateTeacherPending = createAction<ITeacherStateContext>(
+  TeacherActionEnums.deactivateTeacherPending,
+  () => ({ isPending: true, isSuccess: false, isError: false })
+);
+
+export const deactivateTeacherSuccess = createAction<ITeacherStateContext>(
+  TeacherActionEnums.deactivateTeacherSuccess,
+  () => ({ isPending: false, isSuccess: true, isError: false })
+);
+
+export const deactivateTeacherError = createAction<ITeacherStateContext>(
+  TeacherActionEnums.deactivateTeacherError,
   () => ({ isPending: false, isSuccess: false, isError: true })
 );
