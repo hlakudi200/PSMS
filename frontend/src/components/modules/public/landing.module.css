@@ -1,0 +1,268 @@
+/* Landing Page Styles - Oracle/SAP Enterprise Aesthetic */
+
+.container {
+  min-height: 100vh;
+  background: #ffffff;
+}
+
+/* Header */
+.header {
+  background: #ffffff;
+  border-bottom: 2px solid #0066cc;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.headerContent {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 16px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.logo {
+  font-size: 24px;
+  font-weight: 700;
+  color: #0066cc;
+  letter-spacing: 2px;
+}
+
+.nav {
+  display: flex;
+  gap: 32px;
+  align-items: center;
+}
+
+.nav a {
+  color: #262626;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 500;
+  transition: color 0.2s;
+}
+
+.nav a:hover {
+  color: #0066cc;
+}
+
+/* Hero Section */
+.hero {
+  background: linear-gradient(135deg, #003d73 0%, #0066cc 100%);
+  padding: 120px 24px;
+  text-align: center;
+}
+
+.heroContent {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.heroTitle {
+  font-size: 48px;
+  font-weight: 600;
+  color: #ffffff;
+  margin: 0 0 24px 0;
+  line-height: 1.2;
+}
+
+.heroSubtitle {
+  font-size: 18px;
+  color: #bae7ff;
+  margin: 0 0 48px 0;
+  line-height: 1.6;
+}
+
+.heroActions {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+/* Features Section */
+.features {
+  padding: 80px 24px;
+  background: #f5f5f5;
+}
+
+.sectionContent {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.sectionTitle {
+  font-size: 36px;
+  font-weight: 600;
+  color: #262626;
+  text-align: center;
+  margin: 0 0 16px 0;
+}
+
+.sectionSubtitle {
+  font-size: 16px;
+  color: #595959;
+  text-align: center;
+  margin: 0;
+}
+
+.featureCard {
+  height: 100%;
+  text-align: center;
+  border: 1px solid #d9d9d9;
+  border-radius: 2px;
+  transition: box-shadow 0.2s;
+}
+
+.featureCard:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.featureCard h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: #262626;
+  margin: 16px 0 12px 0;
+}
+
+.featureCard p {
+  font-size: 14px;
+  color: #595959;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.featureIcon {
+  font-size: 48px;
+  color: #0066cc;
+}
+
+/* SA Features Section */
+.saFeatures {
+  padding: 80px 24px;
+  background: #ffffff;
+}
+
+.featureList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.featureList li {
+  padding: 12px 0;
+  font-size: 15px;
+  color: #262626;
+  border-bottom: 1px solid #e8e8e8;
+  position: relative;
+  padding-left: 24px;
+}
+
+.featureList li:before {
+  content: "✓";
+  position: absolute;
+  left: 0;
+  color: #52c41a;
+  font-weight: 700;
+}
+
+.featureList li:last-child {
+  border-bottom: none;
+}
+
+.demoCard {
+  background: linear-gradient(135deg, #003d73 0%, #0066cc 100%);
+  border: none;
+  color: #ffffff;
+  text-align: center;
+  padding: 32px;
+}
+
+.demoCard h3 {
+  color: #ffffff;
+  font-size: 20px;
+}
+
+.demoCard p {
+  color: #bae7ff;
+  font-size: 14px;
+}
+
+/* Footer */
+.footer {
+  background: #003d73;
+  color: #ffffff;
+  padding: 48px 24px 0;
+}
+
+.footerContent {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 32px;
+  padding-bottom: 32px;
+}
+
+.footerSection h4 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #ffffff;
+  margin: 0 0 16px 0;
+}
+
+.footerSection p,
+.footerSection a {
+  font-size: 13px;
+  color: #bae7ff;
+  margin: 8px 0;
+  display: block;
+  text-decoration: none;
+}
+
+.footerSection a:hover {
+  color: #ffffff;
+  text-decoration: underline;
+}
+
+.footerBottom {
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 24px 0;
+  text-align: center;
+}
+
+.footerBottom p {
+  margin: 0;
+  font-size: 13px;
+  color: #bae7ff;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .heroTitle {
+    font-size: 32px;
+  }
+
+  .heroSubtitle {
+    font-size: 16px;
+  }
+
+  .sectionTitle {
+    font-size: 28px;
+  }
+
+  .nav {
+    gap: 16px;
+  }
+
+  .nav a {
+    display: none;
+  }
+
+  .footerContent {
+    grid-template-columns: 1fr;
+  }
+}

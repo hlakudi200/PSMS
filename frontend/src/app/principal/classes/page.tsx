@@ -1,3 +1,3 @@
 'use client';
 
-export { default } from '@/components/academic/ClassesPageContent';
+export { default } from '@/components/modules/academic/ClassesPageContent';

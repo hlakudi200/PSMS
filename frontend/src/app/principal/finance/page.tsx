@@ -1,3 +1,3 @@
 'use client';
 
-export { default } from '@/components/financial/FinanceOverviewPageContent';
+export { default } from '@/components/modules/financial/FinanceOverviewPageContent';

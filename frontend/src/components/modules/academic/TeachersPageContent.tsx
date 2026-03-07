@@ -7,7 +7,7 @@ import { EnterpriseTable } from '@/components/shared/enterprise-table';
 import type { ColumnConfig, TableQuery, RowAction, BulkAction, ToolbarAction } from '@/components/shared/enterprise-table';
 import { TeacherProvider, useTeacherState, useTeacherActions } from '@/providers/academic/teachers';
 import { useAuthState } from '@/providers/auth';
-import { TeacherFormModal } from '@/components/academic/TeacherFormModal';
+import { TeacherFormModal } from '@/components/modals/academic/TeacherFormModal';
 import type { ITeacher } from '@/providers/academic/shared/interfaces';
 
 function TeachersContent() {

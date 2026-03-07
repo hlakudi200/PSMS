@@ -1,3 +1,3 @@
 'use client';
 
-export { default } from '@/components/communication/MessagesPageContent';
+export { default } from '@/components/modules/communication/MessagesPageContent';
