@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Users/Rapudi Hlakudi/Desktop/PSMS/.claude/**)"
+    ]
+  }
+}
