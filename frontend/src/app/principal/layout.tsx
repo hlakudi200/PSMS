@@ -45,7 +45,7 @@ const menuItems = [
     type: 'group' as const,
     label: 'Students',
     children: [
-      { key: 'students', icon: <UserOutlined />, label: 'All Students', disabled: true },
+      { key: '/principal/students', icon: <UserOutlined />, label: 'All Students' },
       { key: 'attendances', icon: <CheckSquareOutlined />, label: 'Attendance', disabled: true },
       { key: 'parents', icon: <UsergroupAddOutlined />, label: 'Parents', disabled: true },
     ],
