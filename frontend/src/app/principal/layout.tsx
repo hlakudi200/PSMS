@@ -63,7 +63,7 @@ const menuItems = [
     label: 'Communication',
     children: [
       { key: '/principal/announcements', icon: <NotificationOutlined />, label: 'Announcements' },
-      { key: 'messages', icon: <MessageOutlined />, label: 'Messages', disabled: true },
+      { key: '/principal/messages', icon: <MessageOutlined />, label: 'Messages' },
     ],
   },
   {
