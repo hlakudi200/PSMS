@@ -47,7 +47,7 @@ const menuItems = [
     children: [
       { key: '/principal/students', icon: <UserOutlined />, label: 'All Students' },
       { key: '/principal/attendance', icon: <CheckSquareOutlined />, label: 'Attendance' },
-      { key: 'parents', icon: <UsergroupAddOutlined />, label: 'Parents', disabled: true },
+      { key: '/principal/parents', icon: <UsergroupAddOutlined />, label: 'Parents' },
     ],
   },
   {
