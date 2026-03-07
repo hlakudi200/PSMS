@@ -1,19 +1,20 @@
 'use client';
 
 import React, { useState, useCallback, useEffect } from 'react';
-import { Card, Tabs, List, Tag, Typography, Button, Drawer, Divider, Space, Empty, Spin, message } from 'antd';
+import { Card, Tabs, List, Tag, Typography, Button, Drawer, Divider, Space, Empty, Spin, Input, message } from 'antd';
 import {
   MailOutlined,
   SendOutlined,
   CheckOutlined,
   ArrowLeftOutlined,
+  PlusOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { MessageProvider, useMessageState, useMessageActions } from '@/providers/communication/messages';
+import { ComposeMessageModal } from '@/components/modals/communication/ComposeMessageModal';
 import type { IMessageList } from '@/providers/communication/shared/interfaces';
 
-// Thread messages include creationTime from API (CreationAuditedEntity)
 interface IThreadMessage {
   id: string;
   senderUserId: number;
@@ -31,12 +32,15 @@ const { Text, Paragraph } = Typography;
 
 function MessagesContent() {
   const { messages, threadMessages, totalCount, isPending } = useMessageState();
-  const { getInboxAsync, getSentAsync, getThreadAsync, markAsReadAsync } = useMessageActions();
+  const { getInboxAsync, getSentAsync, getThreadAsync, markAsReadAsync, sendAsync } = useMessageActions();
 
   const [activeTab, setActiveTab] = useState<'inbox' | 'sent'>('inbox');
   const [currentPage, setCurrentPage] = useState(1);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedMessage, setSelectedMessage] = useState<IMessageList | null>(null);
+  const [composeOpen, setComposeOpen] = useState(false);
+  const [replyText, setReplyText] = useState('');
+  const [replySending, setReplySending] = useState(false);
   const pageSize = 15;
 
   const fetchMessages = useCallback((tab: string, page: number) => {
@@ -64,13 +68,12 @@ function MessagesContent() {
   const handleMessageClick = async (msg: IMessageList) => {
     setSelectedMessage(msg);
     setDrawerOpen(true);
+    setReplyText('');
 
-    // Load thread
     if (msg.threadId) {
       getThreadAsync(msg.threadId);
     }
 
-    // Mark as read if inbox and unread
     if (activeTab === 'inbox' && !msg.isRead) {
       await markAsReadAsync(msg.id);
       fetchMessages(activeTab, currentPage);
@@ -80,12 +83,46 @@ function MessagesContent() {
   const handleDrawerClose = () => {
     setDrawerOpen(false);
     setSelectedMessage(null);
+    setReplyText('');
   };
 
   const handleMarkAsRead = async (msg: IMessageList) => {
     await markAsReadAsync(msg.id);
     message.success('Marked as read');
     fetchMessages(activeTab, currentPage);
+  };
+
+  const handleReply = async () => {
+    if (!replyText.trim() || !selectedMessage) return;
+
+    setReplySending(true);
+    try {
+      const recipientId = activeTab === 'inbox'
+        ? selectedMessage.senderUserId
+        : selectedMessage.recipientUserId;
+
+      await sendAsync({
+        recipientUserId: recipientId,
+        subject: selectedMessage.subject ? `Re: ${selectedMessage.subject.replace(/^Re:\s*/i, '')}` : undefined,
+        content: replyText.trim(),
+        parentMessageId: selectedMessage.id,
+      });
+      message.success('Reply sent');
+      setReplyText('');
+      if (selectedMessage.threadId) {
+        getThreadAsync(selectedMessage.threadId);
+      }
+      fetchMessages(activeTab, currentPage);
+    } catch {
+      message.error('Failed to send reply');
+    } finally {
+      setReplySending(false);
+    }
+  };
+
+  const handleComposeClose = (refresh?: boolean) => {
+    setComposeOpen(false);
+    if (refresh) fetchMessages(activeTab, currentPage);
   };
 
   const renderMessageItem = (msg: IMessageList) => {
@@ -245,6 +282,11 @@ function MessagesContent() {
       <Card
         size="small"
         title="Messages"
+        extra={
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => setComposeOpen(true)}>
+            New Message
+          </Button>
+        }
         styles={{ body: { padding: 0 } }}
       >
         <Tabs
@@ -265,7 +307,7 @@ function MessagesContent() {
         open={drawerOpen}
         onClose={handleDrawerClose}
         width={520}
-        styles={{ body: { padding: '16px' } }}
+        styles={{ body: { padding: '16px', display: 'flex', flexDirection: 'column' } }}
       >
         {selectedMessage && (
           <>
@@ -282,14 +324,47 @@ function MessagesContent() {
               {!selectedMessage.isRead && <Tag color="blue">Unread</Tag>}
             </Space>
             <Divider style={{ margin: '12px 0' }} />
-            {selectedMessage.threadId ? (
-              renderThread()
-            ) : (
-              <Empty description="No thread data available" />
-            )}
+            <div style={{ flex: 1, overflow: 'auto' }}>
+              {selectedMessage.threadId ? (
+                renderThread()
+              ) : (
+                <Empty description="No thread data available" />
+              )}
+            </div>
+            <Divider style={{ margin: '12px 0' }} />
+            <div style={{ display: 'flex', gap: 8 }}>
+              <Input.TextArea
+                value={replyText}
+                onChange={(e) => setReplyText(e.target.value)}
+                placeholder="Type a reply..."
+                autoSize={{ minRows: 1, maxRows: 4 }}
+                maxLength={5000}
+                style={{ flex: 1 }}
+                onPressEnter={(e) => {
+                  if (!e.shiftKey) {
+                    e.preventDefault();
+                    handleReply();
+                  }
+                }}
+              />
+              <Button
+                type="primary"
+                icon={<SendOutlined />}
+                onClick={handleReply}
+                loading={replySending}
+                disabled={!replyText.trim()}
+              >
+                Send
+              </Button>
+            </div>
           </>
         )}
       </Drawer>
+
+      <ComposeMessageModal
+        open={composeOpen}
+        onClose={handleComposeClose}
+      />
     </>
   );
 }

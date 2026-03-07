@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useCallback, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Card, Col, Row, Select, Statistic, Tabs, Tag, message } from 'antd';
 import {
   EyeOutlined,
@@ -47,6 +48,7 @@ const waitlistStatusMap: Record<string, { label: string; color: string }> = {
 };
 
 function AdmissionsContent() {
+  const router = useRouter();
   const { applications, totalCount, statistics, isPending, isError } = useApplicationState();
   const { getAllAsync, getStatisticsAsync } = useApplicationActions();
   const { admissionSettingsList, isPending: settingsPending } = useAdmissionSettingsState();
@@ -137,7 +139,7 @@ function AdmissionsContent() {
       label: 'View Application',
       icon: <EyeOutlined />,
       onClick: (record) => {
-        console.log('View application:', record.id);
+        router.push(`/principal/admissions/${record.id}`);
       },
     },
   ];

@@ -82,6 +82,24 @@ export const TermProvider = ({
       });
   };
 
+  const getByAcademicYearAsync = async (academicYearId: string) => {
+    dispatch(getTermsPending());
+    const endpoint = `/api/services/app/Term/GetByAcademicYear?academicYearId=${academicYearId}`;
+    await instance
+      .get(endpoint)
+      .then((response) => {
+        const items = response.data.result.items ?? response.data.result;
+        dispatch(getTermsSuccess({
+          items: Array.isArray(items) ? items : [],
+          totalCount: Array.isArray(items) ? items.length : 0,
+        }));
+      })
+      .catch((error) => {
+        console.error(error);
+        dispatch(getTermsError());
+      });
+  };
+
   const getCurrentAsync = async () => {
     dispatch(getCurrentTermPending());
     const endpoint = `/api/services/app/Term/GetCurrent`;
@@ -159,6 +177,7 @@ export const TermProvider = ({
         value={{
           getAsync,
           getAllAsync,
+          getByAcademicYearAsync,
           getCurrentAsync,
           createAsync,
           updateAsync,

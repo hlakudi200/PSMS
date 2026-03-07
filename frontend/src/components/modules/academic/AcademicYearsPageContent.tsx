@@ -2,12 +2,13 @@
 
 import React, { useState, useCallback } from 'react';
 import { message } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, CheckCircleOutlined } from '@ant-design/icons';
+import { PlusOutlined, EditOutlined, DeleteOutlined, CheckCircleOutlined, CalendarOutlined } from '@ant-design/icons';
 import { EnterpriseTable } from '@/components/shared/enterprise-table';
 import type { ColumnConfig, TableQuery, RowAction, ToolbarAction } from '@/components/shared/enterprise-table';
 import { AcademicYearProvider, useAcademicYearState, useAcademicYearActions } from '@/providers/academic/academic_years';
 import { useAuthState } from '@/providers/auth';
 import { AcademicYearFormModal } from '@/components/modals/academic/AcademicYearFormModal';
+import TermManagementDrawer from '@/components/modules/academic/TermManagementDrawer';
 import type { IAcademicYear } from '@/providers/academic/shared/interfaces';
 
 function AcademicYearsContent() {
@@ -17,6 +18,8 @@ function AcademicYearsContent() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editRecord, setEditRecord] = useState<IAcademicYear | null>(null);
   const [lastQuery, setLastQuery] = useState<TableQuery | null>(null);
+  const [termDrawerOpen, setTermDrawerOpen] = useState(false);
+  const [termDrawerYear, setTermDrawerYear] = useState<IAcademicYear | null>(null);
 
   const handleQueryChange = useCallback((query: TableQuery) => {
     setLastQuery(query);
@@ -67,6 +70,12 @@ function AcademicYearsContent() {
   ];
 
   const rowActions: RowAction<IAcademicYear>[] = [
+    {
+      key: 'manageTerms',
+      label: 'Manage Terms',
+      icon: <CalendarOutlined />,
+      onClick: (record) => { setTermDrawerYear(record); setTermDrawerOpen(true); },
+    },
     {
       key: 'edit',
       label: 'Edit',
@@ -122,6 +131,11 @@ function AcademicYearsContent() {
         open={modalOpen}
         onClose={handleModalClose}
         editRecord={editRecord}
+      />
+      <TermManagementDrawer
+        open={termDrawerOpen}
+        onClose={() => setTermDrawerOpen(false)}
+        academicYear={termDrawerYear}
       />
     </>
   );

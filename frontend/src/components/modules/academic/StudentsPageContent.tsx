@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { EyeOutlined } from '@ant-design/icons';
 import { EnterpriseTable } from '@/components/shared/enterprise-table';
 import type { ColumnConfig, TableQuery, RowAction } from '@/components/shared/enterprise-table';
@@ -12,6 +13,7 @@ function StudentsContent() {
   const { students, totalCount, isPending, isError } = useStudentState();
   const { getAllAsync } = useStudentActions();
   const { currentRole } = useAuthState();
+  const router = useRouter();
   const [lastQuery, setLastQuery] = useState<TableQuery | null>(null);
 
   const handleQueryChange = useCallback((query: TableQuery) => {
@@ -57,8 +59,7 @@ function StudentsContent() {
       label: 'View Profile',
       icon: <EyeOutlined />,
       onClick: (record) => {
-        // TODO: Navigate to student profile page when implemented
-        console.log('View student profile:', record.id);
+        router.push(`/principal/students/${record.id}`);
       },
     },
   ];

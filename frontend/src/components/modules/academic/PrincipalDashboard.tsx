@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   Card,
   Row,
@@ -14,7 +15,6 @@ import {
   List,
   Spin,
   Badge,
-  message,
 } from 'antd';
 import {
   TeamOutlined,
@@ -26,6 +26,8 @@ import {
   CalendarOutlined,
   BarChartOutlined,
   MinusOutlined,
+  DollarOutlined,
+  MessageOutlined,
 } from '@ant-design/icons';
 import {
   StudentProvider,
@@ -68,7 +70,6 @@ import { IAnnouncementList } from '@/providers/communication/shared/interfaces';
 
 const { Text } = Typography;
 
-// Attendance status enum: 0=Present, 1=Absent, 2=Late, 3=Excused, 4=SickLeave
 const ATTENDANCE_PRESENT = 0;
 
 interface WeeklyAttendanceDay {
@@ -110,7 +111,7 @@ function formatPublishDate(dateStr: string): string {
 
 function getWeekDays(): { label: string; date: string }[] {
   const now = new Date();
-  const dayOfWeek = now.getDay(); // 0=Sun, 1=Mon, ...
+  const dayOfWeek = now.getDay();
   const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
   const monday = new Date(now);
   monday.setDate(now.getDate() + mondayOffset);
@@ -128,9 +129,8 @@ function getWeekDays(): { label: string; date: string }[] {
   return days;
 }
 
-const comingSoon = () => message.info('This section is coming soon.');
-
 function PrincipalDashboardContent() {
+  const router = useRouter();
 
   const { getCurrentAsync } = useAcademicYearActions();
   const { academicYear: currentAcademicYear, isPending: academicYearPending } = useAcademicYearState();
@@ -159,7 +159,6 @@ function PrincipalDashboardContent() {
 
   const today = formatDate(new Date());
 
-  // Initial data fetch
   useEffect(() => {
     getCurrentAsync();
     getAllStudents({ maxResultCount: 1, skipCount: 0 });
@@ -171,7 +170,6 @@ function PrincipalDashboardContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Calculate today's attendance percentage
   useEffect(() => {
     if (attendances && attendances.length > 0) {
       const presentCount = attendances.filter(
@@ -181,7 +179,6 @@ function PrincipalDashboardContent() {
     }
   }, [attendances]);
 
-  // Fetch weekly attendance via direct API calls to avoid context state conflicts
   const fetchWeeklyAttendance = useCallback(async () => {
     const instance = getAxiosInstance();
     const days = getWeekDays();
@@ -329,7 +326,12 @@ function PrincipalDashboardContent() {
       {/* Stats Grid */}
       <Row gutter={[16, 16]} style={{ marginBottom: '24px' }}>
         <Col xs={24} sm={12} lg={6}>
-          <Card bordered={false} style={{ borderTop: '4px solid #003D73' }}>
+          <Card
+            bordered={false}
+            style={{ borderTop: '4px solid #003D73', cursor: 'pointer' }}
+            onClick={() => router.push('/principal/students')}
+            hoverable
+          >
             <Statistic
               title="Total Students"
               value={studentCount ?? 0}
@@ -340,7 +342,12 @@ function PrincipalDashboardContent() {
           </Card>
         </Col>
         <Col xs={24} sm={12} lg={6}>
-          <Card bordered={false} style={{ borderTop: '4px solid #52C41A' }}>
+          <Card
+            bordered={false}
+            style={{ borderTop: '4px solid #52C41A', cursor: 'pointer' }}
+            onClick={() => router.push('/principal/teachers')}
+            hoverable
+          >
             <Statistic
               title="Teachers"
               value={teacherCount ?? 0}
@@ -351,7 +358,12 @@ function PrincipalDashboardContent() {
           </Card>
         </Col>
         <Col xs={24} sm={12} lg={6}>
-          <Card bordered={false} style={{ borderTop: '4px solid #FAAD14' }}>
+          <Card
+            bordered={false}
+            style={{ borderTop: '4px solid #FAAD14', cursor: 'pointer' }}
+            onClick={() => router.push('/principal/classes')}
+            hoverable
+          >
             <Statistic
               title="Classes"
               value={classCount ?? 0}
@@ -388,7 +400,7 @@ function PrincipalDashboardContent() {
               </span>
             }
             extra={
-              <Button type="link" onClick={comingSoon}>
+              <Button type="link" onClick={() => router.push('/principal/reports')}>
                 View Full Report
               </Button>
             }
@@ -415,7 +427,7 @@ function PrincipalDashboardContent() {
               </span>
             }
             extra={
-              <Button type="link" onClick={comingSoon}>
+              <Button type="link" onClick={() => router.push('/principal/announcements')}>
                 View All
               </Button>
             }
@@ -472,7 +484,7 @@ function PrincipalDashboardContent() {
               block
               icon={<BarChartOutlined />}
               style={{ marginBottom: '8px', textAlign: 'left' }}
-              onClick={comingSoon}
+              onClick={() => router.push('/principal/reports')}
             >
               View Reports
             </Button>
@@ -480,7 +492,7 @@ function PrincipalDashboardContent() {
               block
               icon={<NotificationOutlined />}
               style={{ marginBottom: '8px', textAlign: 'left' }}
-              onClick={comingSoon}
+              onClick={() => router.push('/principal/announcements')}
             >
               Announcements
             </Button>
@@ -488,17 +500,33 @@ function PrincipalDashboardContent() {
               block
               icon={<CalendarOutlined />}
               style={{ marginBottom: '8px', textAlign: 'left' }}
-              onClick={comingSoon}
+              onClick={() => router.push('/principal/timetables')}
             >
               Timetables
             </Button>
             <Button
               block
               icon={<TeamOutlined />}
-              style={{ textAlign: 'left' }}
-              onClick={comingSoon}
+              style={{ marginBottom: '8px', textAlign: 'left' }}
+              onClick={() => router.push('/principal/admissions')}
             >
               Admissions
+            </Button>
+            <Button
+              block
+              icon={<DollarOutlined />}
+              style={{ marginBottom: '8px', textAlign: 'left' }}
+              onClick={() => router.push('/principal/fees')}
+            >
+              Fee Management
+            </Button>
+            <Button
+              block
+              icon={<MessageOutlined />}
+              style={{ textAlign: 'left' }}
+              onClick={() => router.push('/principal/messages')}
+            >
+              Messages
             </Button>
           </Card>
 
