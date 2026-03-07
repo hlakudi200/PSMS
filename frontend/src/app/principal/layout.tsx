@@ -74,7 +74,7 @@ const menuItems = [
       { key: 'transport', icon: <CarOutlined />, label: 'Transport', disabled: true },
       { key: 'extramurals', icon: <TrophyOutlined />, label: 'Extramurals', disabled: true },
       { key: '/principal/finance', icon: <DollarOutlined />, label: 'Finance Overview' },
-      { key: 'admissions', icon: <FormOutlined />, label: 'Admissions', disabled: true },
+      { key: '/principal/admissions', icon: <FormOutlined />, label: 'Admissions' },
     ],
   },
 ];
