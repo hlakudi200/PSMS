@@ -38,7 +38,7 @@ const menuItems = [
       { key: '/principal/grades', icon: <BookOutlined />, label: 'Grades' },
       { key: '/principal/subjects', icon: <ReadOutlined />, label: 'Subjects' },
       { key: '/principal/classes', icon: <ApartmentOutlined />, label: 'Classes' },
-      { key: 'teachers', icon: <TeamOutlined />, label: 'Teachers', disabled: true },
+      { key: '/principal/teachers', icon: <TeamOutlined />, label: 'Teachers' },
     ],
   },
   {
