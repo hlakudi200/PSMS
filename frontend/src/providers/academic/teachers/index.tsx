@@ -29,6 +29,12 @@ import {
   deleteTeacherPending,
   deleteTeacherSuccess,
   deleteTeacherError,
+  activateTeacherPending,
+  activateTeacherSuccess,
+  activateTeacherError,
+  deactivateTeacherPending,
+  deactivateTeacherSuccess,
+  deactivateTeacherError,
 } from "./actions";
 
 export const TeacherProvider = ({
@@ -119,6 +125,34 @@ export const TeacherProvider = ({
       });
   };
 
+  const activateAsync = async (id: string) => {
+    dispatch(activateTeacherPending());
+    const endpoint = `/api/services/app/Teacher/Update`;
+    await instance
+      .put(endpoint, { id, isActive: true })
+      .then(() => {
+        dispatch(activateTeacherSuccess());
+      })
+      .catch((error) => {
+        console.error(error);
+        dispatch(activateTeacherError());
+      });
+  };
+
+  const deactivateAsync = async (id: string) => {
+    dispatch(deactivateTeacherPending());
+    const endpoint = `/api/services/app/Teacher/Update`;
+    await instance
+      .put(endpoint, { id, isActive: false })
+      .then(() => {
+        dispatch(deactivateTeacherSuccess());
+      })
+      .catch((error) => {
+        console.error(error);
+        dispatch(deactivateTeacherError());
+      });
+  };
+
   return (
     <TeacherStateContext.Provider value={state}>
       <TeacherActionContext.Provider
@@ -128,6 +162,8 @@ export const TeacherProvider = ({
           createAsync,
           updateAsync,
           deleteAsync,
+          activateAsync,
+          deactivateAsync,
         }}
       >
         {children}

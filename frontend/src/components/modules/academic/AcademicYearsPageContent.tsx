@@ -7,7 +7,7 @@ import { EnterpriseTable } from '@/components/shared/enterprise-table';
 import type { ColumnConfig, TableQuery, RowAction, ToolbarAction } from '@/components/shared/enterprise-table';
 import { AcademicYearProvider, useAcademicYearState, useAcademicYearActions } from '@/providers/academic/academic_years';
 import { useAuthState } from '@/providers/auth';
-import { AcademicYearFormModal } from '@/components/academic/AcademicYearFormModal';
+import { AcademicYearFormModal } from '@/components/modals/academic/AcademicYearFormModal';
 import type { IAcademicYear } from '@/providers/academic/shared/interfaces';
 
 function AcademicYearsContent() {

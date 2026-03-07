@@ -1,3 +1,3 @@
 'use client';
 
-export { default } from '@/components/academic/GradesPageContent';
+export { default } from '@/components/modules/academic/GradesPageContent';

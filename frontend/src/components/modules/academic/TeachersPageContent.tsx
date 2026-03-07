@@ -5,17 +5,17 @@ import { message } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import { EnterpriseTable } from '@/components/shared/enterprise-table';
 import type { ColumnConfig, TableQuery, RowAction, BulkAction, ToolbarAction } from '@/components/shared/enterprise-table';
-import { GradeProvider, useGradeState, useGradeActions } from '@/providers/academic/grades';
+import { TeacherProvider, useTeacherState, useTeacherActions } from '@/providers/academic/teachers';
 import { useAuthState } from '@/providers/auth';
-import { GradeFormModal } from '@/components/academic/GradeFormModal';
-import type { IGradeList } from '@/providers/academic/shared/interfaces';
+import { TeacherFormModal } from '@/components/modals/academic/TeacherFormModal';
+import type { ITeacher } from '@/providers/academic/shared/interfaces';
 
-function GradesContent() {
-  const { grades, totalCount, isPending, isError } = useGradeState();
-  const { getAllAsync, deleteAsync, activateAsync, deactivateAsync } = useGradeActions();
+function TeachersContent() {
+  const { teachers, totalCount, isPending, isError } = useTeacherState();
+  const { getAllAsync, deleteAsync, activateAsync, deactivateAsync } = useTeacherActions();
   const { currentRole } = useAuthState();
   const [modalOpen, setModalOpen] = useState(false);
-  const [editRecord, setEditRecord] = useState<IGradeList | null>(null);
+  const [editRecord, setEditRecord] = useState<ITeacher | null>(null);
   const [lastQuery, setLastQuery] = useState<TableQuery | null>(null);
 
   const handleQueryChange = useCallback((query: TableQuery) => {
@@ -37,25 +37,13 @@ function GradesContent() {
     if (refresh) refreshData();
   };
 
-  const columns: ColumnConfig<IGradeList>[] = [
-    { key: 'gradeName', title: 'Grade', dataIndex: 'gradeName', sortable: true, filterable: true },
-    { key: 'gradeLevel', title: 'Level', dataIndex: 'gradeLevel', sortable: true, width: 80 },
-    {
-      key: 'schoolPhase', title: 'Phase', dataIndex: 'schoolPhase',
-      filterable: true, filterType: 'enum',
-      filterOptions: [
-        { label: 'Foundation', value: 0 },
-        { label: 'Intermediate', value: 1 },
-        { label: 'Senior', value: 2 },
-        { label: 'FET', value: 3 },
-      ],
-      render: (value: number) => {
-        const phases = ['Foundation', 'Intermediate', 'Senior', 'FET'];
-        return phases[value] ?? value;
-      },
-    },
-    { key: 'classCount', title: 'Classes', dataIndex: 'classCount', sortable: true },
-    { key: 'studentCount', title: 'Students', dataIndex: 'studentCount', sortable: true },
+  const columns: ColumnConfig<ITeacher>[] = [
+    { key: 'employeeNumber', title: 'Emp #', dataIndex: 'employeeNumber', sortable: true, width: 100 },
+    { key: 'fullName', title: 'Name', dataIndex: 'fullName', sortable: true, filterable: true },
+    { key: 'email', title: 'Email', dataIndex: 'email', hideOnMobile: true },
+    { key: 'phone', title: 'Phone', dataIndex: 'phone', hideOnMobile: true },
+    { key: 'subjectAssignmentCount', title: 'Subjects', dataIndex: 'subjectAssignmentCount' },
+    { key: 'classAssignmentCount', title: 'Classes', dataIndex: 'classAssignmentCount' },
     {
       key: 'isActive', title: 'Status', dataIndex: 'isActive',
       renderType: 'status',
@@ -71,14 +59,14 @@ function GradesContent() {
   const toolbarActions: ToolbarAction[] = [
     {
       key: 'new',
-      label: 'New Grade',
+      label: 'New Teacher',
       icon: <PlusOutlined />,
       type: 'primary',
       onClick: () => { setEditRecord(null); setModalOpen(true); },
     },
   ];
 
-  const rowActions: RowAction<IGradeList>[] = [
+  const rowActions: RowAction<ITeacher>[] = [
     {
       key: 'edit',
       label: 'Edit',
@@ -90,22 +78,22 @@ function GradesContent() {
       label: 'Delete',
       icon: <DeleteOutlined />,
       danger: true,
-      confirm: { title: 'Delete this grade?', description: 'This action cannot be undone.' },
+      confirm: { title: 'Delete this teacher?', description: 'This action cannot be undone.' },
       onClick: async (record) => {
         await deleteAsync(record.id);
-        message.success('Grade deleted');
+        message.success('Teacher deleted');
         refreshData();
       },
     },
   ];
 
-  const bulkActions: BulkAction<IGradeList>[] = [
+  const bulkActions: BulkAction<ITeacher>[] = [
     {
       key: 'activate',
       label: 'Activate',
       onClick: async (rows) => {
         for (const row of rows) await activateAsync(row.id);
-        message.success(`${rows.length} grade(s) activated`);
+        message.success(`${rows.length} teacher(s) activated`);
         refreshData();
       },
     },
@@ -113,10 +101,10 @@ function GradesContent() {
       key: 'deactivate',
       label: 'Deactivate',
       danger: true,
-      confirm: { title: 'Deactivate selected grades?' },
+      confirm: { title: 'Deactivate selected teachers?' },
       onClick: async (rows) => {
         for (const row of rows) await deactivateAsync(row.id);
-        message.success(`${rows.length} grade(s) deactivated`);
+        message.success(`${rows.length} teacher(s) deactivated`);
         refreshData();
       },
     },
@@ -124,10 +112,10 @@ function GradesContent() {
 
   return (
     <>
-      <EnterpriseTable<IGradeList>
-        title="Grades"
+      <EnterpriseTable<ITeacher>
+        title="Teachers"
         columns={columns}
-        data={grades ?? []}
+        data={teachers ?? []}
         totalCount={totalCount}
         loading={isPending}
         error={isError}
@@ -144,7 +132,7 @@ function GradesContent() {
           requiredPermissions: ['Admin', 'Principal', 'VicePrincipal'],
         }}
       />
-      <GradeFormModal
+      <TeacherFormModal
         open={modalOpen}
         onClose={handleModalClose}
         editRecord={editRecord}
@@ -153,10 +141,10 @@ function GradesContent() {
   );
 }
 
-export default function GradesPageContent() {
+export default function TeachersPageContent() {
   return (
-    <GradeProvider>
-      <GradesContent />
-    </GradeProvider>
+    <TeacherProvider>
+      <TeachersContent />
+    </TeacherProvider>
   );
 }

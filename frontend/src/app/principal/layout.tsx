@@ -38,23 +38,23 @@ const menuItems = [
       { key: '/principal/grades', icon: <BookOutlined />, label: 'Grades' },
       { key: '/principal/subjects', icon: <ReadOutlined />, label: 'Subjects' },
       { key: '/principal/classes', icon: <ApartmentOutlined />, label: 'Classes' },
-      { key: 'teachers', icon: <TeamOutlined />, label: 'Teachers', disabled: true },
+      { key: '/principal/teachers', icon: <TeamOutlined />, label: 'Teachers' },
     ],
   },
   {
     type: 'group' as const,
     label: 'Students',
     children: [
-      { key: 'students', icon: <UserOutlined />, label: 'All Students', disabled: true },
-      { key: 'attendances', icon: <CheckSquareOutlined />, label: 'Attendance', disabled: true },
-      { key: 'parents', icon: <UsergroupAddOutlined />, label: 'Parents', disabled: true },
+      { key: '/principal/students', icon: <UserOutlined />, label: 'All Students' },
+      { key: '/principal/attendance', icon: <CheckSquareOutlined />, label: 'Attendance' },
+      { key: '/principal/parents', icon: <UsergroupAddOutlined />, label: 'Parents' },
     ],
   },
   {
     type: 'group' as const,
     label: 'Assessments',
     children: [
-      { key: 'reports', icon: <BarChartOutlined />, label: 'Reports', disabled: true },
+      { key: '/principal/reports', icon: <BarChartOutlined />, label: 'Reports' },
       { key: 'mark-sheets', icon: <FileTextOutlined />, label: 'Mark Sheets', disabled: true },
     ],
   },
@@ -62,19 +62,19 @@ const menuItems = [
     type: 'group' as const,
     label: 'Communication',
     children: [
-      { key: 'announcements', icon: <NotificationOutlined />, label: 'Announcements', disabled: true },
-      { key: 'messages', icon: <MessageOutlined />, label: 'Messages', disabled: true },
+      { key: '/principal/announcements', icon: <NotificationOutlined />, label: 'Announcements' },
+      { key: '/principal/messages', icon: <MessageOutlined />, label: 'Messages' },
     ],
   },
   {
     type: 'group' as const,
     label: 'More',
     children: [
-      { key: 'timetables', icon: <ClockCircleOutlined />, label: 'Timetable', disabled: true },
+      { key: '/principal/timetables', icon: <ClockCircleOutlined />, label: 'Timetable' },
       { key: 'transport', icon: <CarOutlined />, label: 'Transport', disabled: true },
       { key: 'extramurals', icon: <TrophyOutlined />, label: 'Extramurals', disabled: true },
-      { key: 'finance', icon: <DollarOutlined />, label: 'Finance Overview', disabled: true },
-      { key: 'admissions', icon: <FormOutlined />, label: 'Admissions', disabled: true },
+      { key: '/principal/finance', icon: <DollarOutlined />, label: 'Finance Overview' },
+      { key: '/principal/admissions', icon: <FormOutlined />, label: 'Admissions' },
     ],
   },
 ];
