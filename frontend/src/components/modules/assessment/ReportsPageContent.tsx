@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useCallback, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Card, Col, Row, Select, message } from 'antd';
 import {
   CheckCircleOutlined,
@@ -31,6 +32,7 @@ const reportTypeMap: Record<number, { label: string; color: string }> = {
 };
 
 function ReportsContent() {
+  const router = useRouter();
   const { reports, totalCount, isPending, isError } = useReportState();
   const { getAllAsync, approveAsync, publishAsync } = useReportActions();
   const { academicYears } = useAcademicYearState();
@@ -107,8 +109,7 @@ function ReportsContent() {
       label: 'View Report',
       icon: <EyeOutlined />,
       onClick: (record) => {
-        // TODO: Navigate to report detail page
-        console.log('View report:', record.id);
+        router.push(`/principal/reports/${record.id}`);
       },
     },
     {

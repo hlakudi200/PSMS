@@ -1,13 +1,14 @@
 'use client';
 
-import React, { useState, useCallback, useEffect } from 'react';
-import { Card, Col, Row, Select, DatePicker, Statistic, Tabs, Empty } from 'antd';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import { Card, Col, Row, Select, DatePicker, Statistic, Tabs, Empty, Table, Tag, Progress, Typography, Alert } from 'antd';
 import {
   CheckCircleOutlined,
   CloseCircleOutlined,
   ClockCircleOutlined,
   MedicineBoxOutlined,
   EyeOutlined,
+  WarningOutlined,
 } from '@ant-design/icons';
 import dayjs, { Dayjs } from 'dayjs';
 import { EnterpriseTable } from '@/components/shared/enterprise-table';
@@ -18,6 +19,9 @@ import { useAuthState } from '@/providers/auth';
 import type { IAttendanceList, IAttendanceSummary } from '@/providers/academic/shared/interfaces';
 
 const { RangePicker } = DatePicker;
+const { Text } = Typography;
+
+const AT_RISK_THRESHOLD = 80;
 
 const statusMap: Record<number, { label: string; color: string }> = {
   0: { label: 'Present', color: 'green' },
@@ -27,6 +31,137 @@ const statusMap: Record<number, { label: string; color: string }> = {
   4: { label: 'Sick Leave', color: 'purple' },
 };
 
+// ─── Analytics Tab Content ─────────────────────────────────────
+function AnalyticsSection({ summaries }: { summaries: IAttendanceSummary[] }) {
+  const atRisk = useMemo(
+    () => summaries.filter(s => s.attendancePercentage < AT_RISK_THRESHOLD).sort((a, b) => a.attendancePercentage - b.attendancePercentage),
+    [summaries],
+  );
+
+  const aggregate = useMemo(() => {
+    if (summaries.length === 0) return null;
+    const totals = summaries.reduce((acc, s) => ({
+      totalDays: acc.totalDays + s.totalDays,
+      present: acc.present + s.presentCount,
+      absent: acc.absent + s.absentCount,
+      late: acc.late + s.lateCount,
+      excused: acc.excused + s.excusedCount,
+      sickLeave: acc.sickLeave + s.sickLeaveCount,
+    }), { totalDays: 0, present: 0, absent: 0, late: 0, excused: 0, sickLeave: 0 });
+    const rate = totals.totalDays > 0 ? Math.round((totals.present / totals.totalDays) * 100) : 0;
+    return { ...totals, rate, studentCount: summaries.length };
+  }, [summaries]);
+
+  if (!aggregate) return <Empty description="Select a class and date range, then switch to the Summary tab first to load data." />;
+
+  const breakdownItems = [
+    { label: 'Present', count: aggregate.present, color: '#52c41a' },
+    { label: 'Absent', count: aggregate.absent, color: '#ff4d4f' },
+    { label: 'Late', count: aggregate.late, color: '#faad14' },
+    { label: 'Excused', count: aggregate.excused, color: '#1890ff' },
+    { label: 'Sick Leave', count: aggregate.sickLeave, color: '#722ed1' },
+  ];
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* Overview Stats */}
+      <Row gutter={16}>
+        <Col xs={12} sm={6}>
+          <Card size="small">
+            <Statistic title="Overall Rate" value={aggregate.rate} suffix="%" />
+            <Progress percent={aggregate.rate} showInfo={false} status={aggregate.rate >= 80 ? 'success' : aggregate.rate >= 60 ? 'normal' : 'exception'} />
+          </Card>
+        </Col>
+        <Col xs={12} sm={6}>
+          <Card size="small"><Statistic title="Students" value={aggregate.studentCount} /></Card>
+        </Col>
+        <Col xs={12} sm={6}>
+          <Card size="small"><Statistic title="Total Records" value={aggregate.totalDays} /></Card>
+        </Col>
+        <Col xs={12} sm={6}>
+          <Card size="small">
+            <Statistic title="At Risk" value={atRisk.length} valueStyle={{ color: atRisk.length > 0 ? '#cf1322' : '#3f8600' }} prefix={<WarningOutlined />} />
+          </Card>
+        </Col>
+      </Row>
+
+      {/* Status Breakdown */}
+      <Card title="Attendance Breakdown" size="small">
+        {breakdownItems.map(item => {
+          const pct = aggregate.totalDays > 0 ? Math.round((item.count / aggregate.totalDays) * 100) : 0;
+          return (
+            <div key={item.label} style={{ marginBottom: 12 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                <Text>{item.label}</Text>
+                <Text strong>{item.count} ({pct}%)</Text>
+              </div>
+              <Progress percent={pct} showInfo={false} strokeColor={item.color} size="small" />
+            </div>
+          );
+        })}
+      </Card>
+
+      {/* Per-Student Attendance Distribution */}
+      <Card title="Student Attendance Rates" size="small">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {summaries
+            .slice()
+            .sort((a, b) => a.attendancePercentage - b.attendancePercentage)
+            .map(s => (
+              <div key={s.studentId} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <Text style={{ width: 160, flexShrink: 0, fontSize: 13 }} ellipsis>{s.studentName}</Text>
+                <Progress
+                  percent={s.attendancePercentage}
+                  size="small"
+                  style={{ flex: 1 }}
+                  strokeColor={s.attendancePercentage >= 90 ? '#52c41a' : s.attendancePercentage >= AT_RISK_THRESHOLD ? '#faad14' : '#ff4d4f'}
+                />
+              </div>
+            ))
+          }
+        </div>
+      </Card>
+
+      {/* At-Risk Students */}
+      {atRisk.length > 0 && (
+        <Card
+          title={
+            <span style={{ color: '#cf1322' }}>
+              <WarningOutlined style={{ marginRight: 8 }} />
+              At-Risk Students (below {AT_RISK_THRESHOLD}%)
+            </span>
+          }
+          size="small"
+        >
+          <Alert
+            type="warning"
+            showIcon
+            message={`${atRisk.length} student${atRisk.length !== 1 ? 's' : ''} with attendance below ${AT_RISK_THRESHOLD}% — chronic absenteeism risk`}
+            style={{ marginBottom: 12 }}
+          />
+          <Table
+            dataSource={atRisk}
+            rowKey="studentId"
+            pagination={false}
+            size="small"
+            columns={[
+              { title: 'Student', dataIndex: 'studentName', key: 'studentName' },
+              { title: 'Days', dataIndex: 'totalDays', key: 'totalDays', width: 70 },
+              { title: 'Present', dataIndex: 'presentCount', key: 'presentCount', width: 80 },
+              { title: 'Absent', dataIndex: 'absentCount', key: 'absentCount', width: 80 },
+              {
+                title: 'Rate', dataIndex: 'attendancePercentage', key: 'rate', width: 100,
+                render: (v: number) => <Tag color="red">{v}%</Tag>,
+              },
+            ]}
+          />
+        </Card>
+      )}
+    </div>
+  );
+}
+
+// ─── Main Content ──────────────────────────────────────────────
 function AttendanceContent() {
   const {
     attendances,
@@ -52,9 +187,8 @@ function AttendanceContent() {
     getActiveClassesAsync();
   }, []);
 
-  // Fetch class summary when filters or tab change
   useEffect(() => {
-    if (activeTab === 'summary' && selectedClassId && dateRange) {
+    if ((activeTab === 'summary' || activeTab === 'analytics') && selectedClassId && dateRange) {
       getClassSummaryAsync(
         selectedClassId,
         dateRange[0].format('YYYY-MM-DD'),
@@ -79,7 +213,6 @@ function AttendanceContent() {
     if (lastQuery) handleQueryChange(lastQuery);
   }, [lastQuery, handleQueryChange]);
 
-  // Re-fetch when filters change
   useEffect(() => {
     refreshData();
   }, [selectedClassId, dateRange]);
@@ -90,7 +223,6 @@ function AttendanceContent() {
     }
   };
 
-  // Compute summary stats from current records
   const stats = {
     total: attendances?.length ?? 0,
     present: attendances?.filter(a => a.status === 0).length ?? 0,
@@ -99,7 +231,6 @@ function AttendanceContent() {
     sickLeave: attendances?.filter(a => a.status === 4).length ?? 0,
   };
 
-  // --- Records Tab ---
   const recordColumns: ColumnConfig<IAttendanceList>[] = [
     { key: 'attendanceDate', title: 'Date', dataIndex: 'attendanceDate', sortable: true, renderType: 'date', width: 110 },
     { key: 'studentName', title: 'Student', dataIndex: 'studentName', sortable: true, filterable: true },
@@ -123,7 +254,6 @@ function AttendanceContent() {
     },
   ];
 
-  // --- Summary Tab ---
   const summaryColumns: ColumnConfig<IAttendanceSummary>[] = [
     { key: 'studentName', title: 'Student', dataIndex: 'studentName', sortable: true, filterable: true },
     { key: 'totalDays', title: 'Total Days', dataIndex: 'totalDays', sortable: true, width: 100 },
@@ -181,6 +311,15 @@ function AttendanceContent() {
         />
       ) : (
         <Empty description="Select a class to view attendance summary" />
+      ),
+    },
+    {
+      key: 'analytics',
+      label: 'Analytics',
+      children: selectedClassId ? (
+        <AnalyticsSection summaries={attendanceSummaries ?? []} />
+      ) : (
+        <Empty description="Select a class to view attendance analytics" />
       ),
     },
   ];
@@ -262,7 +401,7 @@ function AttendanceContent() {
         </Col>
       </Row>
 
-      {/* Tabs: Records / Class Summary */}
+      {/* Tabs: Records / Class Summary / Analytics */}
       <Card size="small" styles={{ body: { padding: 0 } }}>
         <Tabs
           activeKey={activeTab}

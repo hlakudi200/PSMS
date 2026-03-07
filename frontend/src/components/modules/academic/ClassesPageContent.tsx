@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useState, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { message } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, UserSwitchOutlined } from '@ant-design/icons';
+import { PlusOutlined, EditOutlined, DeleteOutlined, UserSwitchOutlined, EyeOutlined } from '@ant-design/icons';
 import { EnterpriseTable } from '@/components/shared/enterprise-table';
 import type { ColumnConfig, TableQuery, RowAction, BulkAction, ToolbarAction } from '@/components/shared/enterprise-table';
 import { ClassProvider, useClassState, useClassActions } from '@/providers/academic/classes';
@@ -18,6 +19,7 @@ function ClassesContent() {
   const { classes, totalCount, isPending, isError } = useClassState();
   const { getAllAsync, deleteAsync, activateAsync, deactivateAsync } = useClassActions();
   const { currentRole } = useAuthState();
+  const router = useRouter();
   const [modalOpen, setModalOpen] = useState(false);
   const [assignTeacherOpen, setAssignTeacherOpen] = useState(false);
   const [editRecord, setEditRecord] = useState<IClass | null>(null);
@@ -80,6 +82,12 @@ function ClassesContent() {
   ];
 
   const rowActions: RowAction<IClass>[] = [
+    {
+      key: 'view',
+      label: 'View Details',
+      icon: <EyeOutlined />,
+      onClick: (record) => { router.push(`/principal/classes/${record.id}`); },
+    },
     {
       key: 'edit',
       label: 'Edit',
