@@ -62,7 +62,7 @@ const menuItems = [
     type: 'group' as const,
     label: 'Communication',
     children: [
-      { key: 'announcements', icon: <NotificationOutlined />, label: 'Announcements', disabled: true },
+      { key: '/principal/announcements', icon: <NotificationOutlined />, label: 'Announcements' },
       { key: 'messages', icon: <MessageOutlined />, label: 'Messages', disabled: true },
     ],
   },
