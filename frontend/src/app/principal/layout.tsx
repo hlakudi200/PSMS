@@ -54,7 +54,7 @@ const menuItems = [
     type: 'group' as const,
     label: 'Assessments',
     children: [
-      { key: 'reports', icon: <BarChartOutlined />, label: 'Reports', disabled: true },
+      { key: '/principal/reports', icon: <BarChartOutlined />, label: 'Reports' },
       { key: 'mark-sheets', icon: <FileTextOutlined />, label: 'Mark Sheets', disabled: true },
     ],
   },
