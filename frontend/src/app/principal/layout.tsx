@@ -70,7 +70,7 @@ const menuItems = [
     type: 'group' as const,
     label: 'More',
     children: [
-      { key: 'timetables', icon: <ClockCircleOutlined />, label: 'Timetable', disabled: true },
+      { key: '/principal/timetables', icon: <ClockCircleOutlined />, label: 'Timetable' },
       { key: 'transport', icon: <CarOutlined />, label: 'Transport', disabled: true },
       { key: 'extramurals', icon: <TrophyOutlined />, label: 'Extramurals', disabled: true },
       { key: 'finance', icon: <DollarOutlined />, label: 'Finance Overview', disabled: true },
