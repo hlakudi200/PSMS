@@ -1,3 +1,3 @@
 'use client';
 
-export { default } from '@/components/assessment/ReportsPageContent';
+export { default } from '@/components/modules/assessment/ReportsPageContent';

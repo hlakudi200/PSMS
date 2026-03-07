@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Read(//c/Users/Rapudi Hlakudi/Desktop/PSMS/.claude/**)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(mv:*)"
     ]
   }
 }

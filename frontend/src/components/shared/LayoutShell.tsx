@@ -10,7 +10,7 @@ import {
   NotificationOutlined,
 } from '@ant-design/icons';
 import { usePathname, useRouter } from 'next/navigation';
-import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
+import { ProtectedRoute } from '@/components/shared/ProtectedRoute';
 import { useAuthActions, useAuthState } from '@/providers/auth';
 
 const { Header, Sider, Content } = Layout;

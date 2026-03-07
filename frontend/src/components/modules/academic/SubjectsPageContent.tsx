@@ -5,17 +5,17 @@ import { message } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import { EnterpriseTable } from '@/components/shared/enterprise-table';
 import type { ColumnConfig, TableQuery, RowAction, BulkAction, ToolbarAction } from '@/components/shared/enterprise-table';
-import { GradeProvider, useGradeState, useGradeActions } from '@/providers/academic/grades';
+import { SubjectProvider, useSubjectState, useSubjectActions } from '@/providers/academic/subjects';
 import { useAuthState } from '@/providers/auth';
-import { GradeFormModal } from '@/components/academic/GradeFormModal';
-import type { IGradeList } from '@/providers/academic/shared/interfaces';
+import { SubjectFormModal } from '@/components/modals/academic/SubjectFormModal';
+import type { ISubject } from '@/providers/academic/shared/interfaces';
 
-function GradesContent() {
-  const { grades, totalCount, isPending, isError } = useGradeState();
-  const { getAllAsync, deleteAsync, activateAsync, deactivateAsync } = useGradeActions();
+function SubjectsContent() {
+  const { subjects, totalCount, isPending, isError } = useSubjectState();
+  const { getAllAsync, deleteAsync, activateAsync, deactivateAsync } = useSubjectActions();
   const { currentRole } = useAuthState();
   const [modalOpen, setModalOpen] = useState(false);
-  const [editRecord, setEditRecord] = useState<IGradeList | null>(null);
+  const [editRecord, setEditRecord] = useState<ISubject | null>(null);
   const [lastQuery, setLastQuery] = useState<TableQuery | null>(null);
 
   const handleQueryChange = useCallback((query: TableQuery) => {
@@ -37,25 +37,12 @@ function GradesContent() {
     if (refresh) refreshData();
   };
 
-  const columns: ColumnConfig<IGradeList>[] = [
-    { key: 'gradeName', title: 'Grade', dataIndex: 'gradeName', sortable: true, filterable: true },
-    { key: 'gradeLevel', title: 'Level', dataIndex: 'gradeLevel', sortable: true, width: 80 },
-    {
-      key: 'schoolPhase', title: 'Phase', dataIndex: 'schoolPhase',
-      filterable: true, filterType: 'enum',
-      filterOptions: [
-        { label: 'Foundation', value: 0 },
-        { label: 'Intermediate', value: 1 },
-        { label: 'Senior', value: 2 },
-        { label: 'FET', value: 3 },
-      ],
-      render: (value: number) => {
-        const phases = ['Foundation', 'Intermediate', 'Senior', 'FET'];
-        return phases[value] ?? value;
-      },
-    },
-    { key: 'classCount', title: 'Classes', dataIndex: 'classCount', sortable: true },
-    { key: 'studentCount', title: 'Students', dataIndex: 'studentCount', sortable: true },
+  const columns: ColumnConfig<ISubject>[] = [
+    { key: 'subjectCode', title: 'Code', dataIndex: 'subjectCode', sortable: true, filterable: true, width: 100 },
+    { key: 'subjectName', title: 'Subject', dataIndex: 'subjectName', sortable: true, filterable: true },
+    { key: 'isCore', title: 'Core', dataIndex: 'isCore', renderType: 'boolean' },
+    { key: 'gradeCount', title: 'Grades', dataIndex: 'gradeCount' },
+    { key: 'teacherCount', title: 'Teachers', dataIndex: 'teacherCount' },
     {
       key: 'isActive', title: 'Status', dataIndex: 'isActive',
       renderType: 'status',
@@ -71,14 +58,14 @@ function GradesContent() {
   const toolbarActions: ToolbarAction[] = [
     {
       key: 'new',
-      label: 'New Grade',
+      label: 'New Subject',
       icon: <PlusOutlined />,
       type: 'primary',
       onClick: () => { setEditRecord(null); setModalOpen(true); },
     },
   ];
 
-  const rowActions: RowAction<IGradeList>[] = [
+  const rowActions: RowAction<ISubject>[] = [
     {
       key: 'edit',
       label: 'Edit',
@@ -90,22 +77,22 @@ function GradesContent() {
       label: 'Delete',
       icon: <DeleteOutlined />,
       danger: true,
-      confirm: { title: 'Delete this grade?', description: 'This action cannot be undone.' },
+      confirm: { title: 'Delete this subject?', description: 'This action cannot be undone.' },
       onClick: async (record) => {
         await deleteAsync(record.id);
-        message.success('Grade deleted');
+        message.success('Subject deleted');
         refreshData();
       },
     },
   ];
 
-  const bulkActions: BulkAction<IGradeList>[] = [
+  const bulkActions: BulkAction<ISubject>[] = [
     {
       key: 'activate',
       label: 'Activate',
       onClick: async (rows) => {
         for (const row of rows) await activateAsync(row.id);
-        message.success(`${rows.length} grade(s) activated`);
+        message.success(`${rows.length} subject(s) activated`);
         refreshData();
       },
     },
@@ -113,10 +100,10 @@ function GradesContent() {
       key: 'deactivate',
       label: 'Deactivate',
       danger: true,
-      confirm: { title: 'Deactivate selected grades?' },
+      confirm: { title: 'Deactivate selected subjects?' },
       onClick: async (rows) => {
         for (const row of rows) await deactivateAsync(row.id);
-        message.success(`${rows.length} grade(s) deactivated`);
+        message.success(`${rows.length} subject(s) deactivated`);
         refreshData();
       },
     },
@@ -124,10 +111,10 @@ function GradesContent() {
 
   return (
     <>
-      <EnterpriseTable<IGradeList>
-        title="Grades"
+      <EnterpriseTable<ISubject>
+        title="Subjects"
         columns={columns}
-        data={grades ?? []}
+        data={subjects ?? []}
         totalCount={totalCount}
         loading={isPending}
         error={isError}
@@ -144,7 +131,7 @@ function GradesContent() {
           requiredPermissions: ['Admin', 'Principal', 'VicePrincipal'],
         }}
       />
-      <GradeFormModal
+      <SubjectFormModal
         open={modalOpen}
         onClose={handleModalClose}
         editRecord={editRecord}
@@ -153,10 +140,10 @@ function GradesContent() {
   );
 }
 
-export default function GradesPageContent() {
+export default function SubjectsPageContent() {
   return (
-    <GradeProvider>
-      <GradesContent />
-    </GradeProvider>
+    <SubjectProvider>
+      <SubjectsContent />
+    </SubjectProvider>
   );
 }

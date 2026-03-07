@@ -1,3 +1,3 @@
 'use client';
 
-export { default } from '@/components/admissions/AdmissionsPageContent';
+export { default } from '@/components/modules/admissions/AdmissionsPageContent';

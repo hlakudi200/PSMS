@@ -1,0 +1,247 @@
+/* About Page Styles */
+
+.container {
+  min-height: 100vh;
+  background: #ffffff;
+}
+
+/* Header (reused from landing) */
+.header {
+  background: #ffffff;
+  border-bottom: 2px solid #0066cc;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.headerContent {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 16px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.logo {
+  font-size: 24px;
+  font-weight: 700;
+  color: #0066cc;
+  letter-spacing: 2px;
+  cursor: pointer;
+}
+
+.nav {
+  display: flex;
+  gap: 32px;
+  align-items: center;
+}
+
+.nav a {
+  color: #262626;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 500;
+  transition: color 0.2s;
+}
+
+.nav a:hover {
+  color: #0066cc;
+}
+
+/* Page Header */
+.pageHeader {
+  background: linear-gradient(135deg, #003d73 0%, #0066cc 100%);
+  padding: 80px 24px;
+  text-align: center;
+}
+
+.pageHeaderContent {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.pageHeader h1 {
+  font-size: 42px;
+  font-weight: 600;
+  color: #ffffff;
+  margin: 0 0 16px 0;
+}
+
+.pageHeader p {
+  font-size: 18px;
+  color: #bae7ff;
+  margin: 0;
+}
+
+/* Content */
+.content {
+  padding: 80px 24px;
+  background: #f5f5f5;
+}
+
+.contentInner {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.content h2 {
+  font-size: 28px;
+  font-weight: 600;
+  color: #262626;
+  margin: 0 0 24px 0;
+}
+
+.paragraph {
+  font-size: 15px;
+  color: #595959;
+  line-height: 1.8;
+  margin: 0 0 16px 0;
+}
+
+.divider {
+  height: 2px;
+  background: #d9d9d9;
+  margin: 64px 0;
+}
+
+.centered {
+  text-align: center;
+  font-size: 32px;
+}
+
+/* Value Cards */
+.valueCard {
+  height: 100%;
+  text-align: center;
+  border: 1px solid #d9d9d9;
+  border-radius: 2px;
+  transition: box-shadow 0.2s;
+}
+
+.valueCard:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.valueCard h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: #262626;
+  margin: 16px 0 12px 0;
+}
+
+.valueCard p {
+  font-size: 14px;
+  color: #595959;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.valueIcon {
+  font-size: 48px;
+  color: #0066cc;
+}
+
+/* CTA Section */
+.ctaSection {
+  text-align: center;
+  background: #ffffff;
+  padding: 48px;
+  border: 2px solid #0066cc;
+  border-radius: 2px;
+}
+
+.ctaSection h2 {
+  font-size: 32px;
+  margin: 0 0 16px 0;
+}
+
+.ctaSection p {
+  font-size: 16px;
+  color: #595959;
+  margin: 0 0 32px 0;
+}
+
+.ctaButtons {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+/* Footer */
+.footer {
+  background: #003d73;
+  color: #ffffff;
+  padding: 48px 24px 0;
+}
+
+.footerContent {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 32px;
+  padding-bottom: 32px;
+}
+
+.footerSection h4 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #ffffff;
+  margin: 0 0 16px 0;
+}
+
+.footerSection p,
+.footerSection a {
+  font-size: 13px;
+  color: #bae7ff;
+  margin: 8px 0;
+  display: block;
+  text-decoration: none;
+}
+
+.footerSection a:hover {
+  color: #ffffff;
+  text-decoration: underline;
+}
+
+.footerBottom {
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 24px 0;
+  text-align: center;
+}
+
+.footerBottom p {
+  margin: 0;
+  font-size: 13px;
+  color: #bae7ff;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .pageHeader h1 {
+    font-size: 32px;
+  }
+
+  .pageHeader p {
+    font-size: 16px;
+  }
+
+  .content h2 {
+    font-size: 24px;
+  }
+
+  .centered {
+    font-size: 28px;
+  }
+
+  .nav a {
+    display: none;
+  }
+
+  .footerContent {
+    grid-template-columns: 1fr;
+  }
+}

@@ -14,7 +14,7 @@ import { EnterpriseTable } from '@/components/shared/enterprise-table';
 import type { ColumnConfig, TableQuery, RowAction, ToolbarAction } from '@/components/shared/enterprise-table';
 import { AnnouncementProvider, useAnnouncementState, useAnnouncementActions } from '@/providers/communication/announcements';
 import { useAuthState } from '@/providers/auth';
-import { AnnouncementFormModal } from '@/components/communication/AnnouncementFormModal';
+import { AnnouncementFormModal } from '@/components/modals/communication/AnnouncementFormModal';
 import type { IAnnouncementList } from '@/providers/communication/shared/interfaces';
 
 const typeMap: Record<number, { label: string; color: string }> = {

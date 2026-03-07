@@ -10,8 +10,8 @@ import { GradeProvider } from '@/providers/academic/grades';
 import { AcademicYearProvider } from '@/providers/academic/academic_years';
 import { TeacherProvider } from '@/providers/academic/teachers';
 import { useAuthState } from '@/providers/auth';
-import { ClassFormModal } from '@/components/academic/ClassFormModal';
-import { AssignTeacherModal } from '@/components/academic/AssignTeacherModal';
+import { ClassFormModal } from '@/components/modals/academic/ClassFormModal';
+import { AssignTeacherModal } from '@/components/modals/academic/AssignTeacherModal';
 import type { IClass } from '@/providers/academic/shared/interfaces';
 
 function ClassesContent() {
