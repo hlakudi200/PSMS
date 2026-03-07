@@ -73,7 +73,7 @@ const menuItems = [
       { key: '/principal/timetables', icon: <ClockCircleOutlined />, label: 'Timetable' },
       { key: 'transport', icon: <CarOutlined />, label: 'Transport', disabled: true },
       { key: 'extramurals', icon: <TrophyOutlined />, label: 'Extramurals', disabled: true },
-      { key: 'finance', icon: <DollarOutlined />, label: 'Finance Overview', disabled: true },
+      { key: '/principal/finance', icon: <DollarOutlined />, label: 'Finance Overview' },
       { key: 'admissions', icon: <FormOutlined />, label: 'Admissions', disabled: true },
     ],
   },
