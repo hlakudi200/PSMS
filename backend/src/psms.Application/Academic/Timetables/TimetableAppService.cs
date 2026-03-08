@@ -47,13 +47,15 @@ public class TimetableAppService : ApplicationService, ITimetableAppService
     }
 
     [AbpAuthorize(PermissionNames.Academic_Timetables_View)]
-    public async Task<PagedResultDto<TimetableListDto>> GetAllAsync(PagedAndSortedResultRequestDto input)
+    public async Task<PagedResultDto<TimetableListDto>> GetAllAsync(GetAcademicEntityInput input)
     {
         var query = _timetableRepository
             .GetAll()
             .Include(t => t.Class)
             .Include(t => t.TimetableSlots)
-            .Where(t => t.TenantId == AbpSession.TenantId);
+            .Where(t => t.TenantId == AbpSession.TenantId)
+            .WhereIf(!string.IsNullOrWhiteSpace(input.Keyword),
+                t => t.Class.ClassName.ToLower().Contains(input.Keyword.ToLower()));
 
         var totalCount = await query.CountAsync();
 

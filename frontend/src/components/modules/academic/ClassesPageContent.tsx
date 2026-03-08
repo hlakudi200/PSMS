@@ -32,6 +32,7 @@ function ClassesContent() {
       maxResultCount: query.maxResultCount,
       skipCount: query.skipCount,
       sorting: query.sorting,
+      keyword: query.filters?.keyword as string | undefined,
     });
   }, [getAllAsync]);
 
@@ -53,14 +54,19 @@ function ClassesContent() {
 
   const columns: ColumnConfig<IClass>[] = [
     { key: 'className', title: 'Class', dataIndex: 'className', sortable: true, filterable: true },
-    { key: 'gradeName', title: 'Grade', dataIndex: 'gradeName', sortable: true },
-    { key: 'academicYearName', title: 'Year', dataIndex: 'academicYearName' },
-    { key: 'classTeacherName', title: 'Class Teacher', dataIndex: 'classTeacherName' },
+    { key: 'gradeName', title: 'Grade', dataIndex: 'gradeName', sortable: true, filterable: true },
+    { key: 'academicYearName', title: 'Year', dataIndex: 'academicYearName', filterable: true },
+    { key: 'classTeacherName', title: 'Class Teacher', dataIndex: 'classTeacherName', filterable: true },
     { key: 'maxCapacity', title: 'Capacity', dataIndex: 'maxCapacity', sortable: true },
     { key: 'studentCount', title: 'Students', dataIndex: 'studentCount' },
     { key: 'availableCapacity', title: 'Available', dataIndex: 'availableCapacity' },
     {
       key: 'isActive', title: 'Status', dataIndex: 'isActive',
+      filterable: true, filterType: 'enum',
+      filterOptions: [
+        { label: 'Active', value: 'true' },
+        { label: 'Inactive', value: 'false' },
+      ],
       renderType: 'status',
       renderConfig: {
         statusMap: {

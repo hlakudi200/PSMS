@@ -21,6 +21,7 @@ import { useTableTelemetry } from './hooks/useTableTelemetry';
 import { useResponsive } from './hooks/useResponsive';
 import { applyRenderer } from './renderers';
 import { TableToolbar } from './TableToolbar';
+import { TableFilters } from './TableFilters';
 
 // Resizable header cell for column dragging
 const ResizableTitle = (
@@ -183,7 +184,7 @@ export function EnterpriseTable<T extends Record<string, any>>(
     pageSize: defaultPageSize = 10,
     virtualizeThreshold = 200,
     telemetry: telemetryConfig,
-    searchable = false,
+    searchable = true,
     searchPlaceholder,
     searchFilterKey = 'keyword',
     size = 'small',
@@ -530,6 +531,13 @@ export function EnterpriseTable<T extends Record<string, any>>(
           showLastUpdated={showLastUpdated}
         />
 
+        <TableFilters
+          columns={columns}
+          filters={tableState.state.filters}
+          onFilterChange={tableState.handleFilterChange}
+          onFiltersReset={tableState.handleFiltersReset}
+        />
+
         {error && (
           <div style={{ background: '#FFF7E6', borderBottom: '1px solid #FFD591', padding: '4px 16px', fontSize: 12, color: '#D46B08' }}>
             <WarningOutlined /> Data may be incomplete due to an error.
@@ -611,32 +619,19 @@ export function EnterpriseTable<T extends Record<string, any>>(
         showLastUpdated={showLastUpdated}
       />
 
+      <TableFilters
+        columns={columns}
+        filters={tableState.state.filters}
+        onFilterChange={tableState.handleFilterChange}
+        onFiltersReset={tableState.handleFiltersReset}
+      />
+
       {/* Error warning banner (when data exists but error occurred) */}
       {error && data.length > 0 && (
         <div style={{ background: '#FFF7E6', borderBottom: '1px solid #FFD591', padding: '4px 16px', fontSize: 12, color: '#D46B08' }}>
           <WarningOutlined /> Data may be incomplete due to an error.{' '}
           <Button type="link" size="small" onClick={tableState.handleRefresh} style={{ padding: 0, fontSize: 12 }}>
             Retry
-          </Button>
-        </div>
-      )}
-
-      {/* Active filter summary */}
-      {activeFilters.length > 0 && (
-        <div className="psms-filter-summary">
-          <span>Filters:</span>
-          {activeFilters.map(([key, value]) => (
-            <Tag
-              key={key}
-              closable
-              onClose={() => tableState.handleFilterChange(key, undefined)}
-              className="psms-filter-tag"
-            >
-              {key}: {String(value)}
-            </Tag>
-          ))}
-          <Button type="link" size="small" onClick={tableState.handleFiltersReset} style={{ padding: 0, fontSize: 12 }}>
-            Clear all
           </Button>
         </div>
       )}

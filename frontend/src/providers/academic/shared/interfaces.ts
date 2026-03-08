@@ -3,6 +3,7 @@ export interface IPagedAndSortedResultRequest {
   maxResultCount?: number;
   skipCount?: number;
   sorting?: string;
+  keyword?: string;
 }
 
 export interface IPagedResult<T> {

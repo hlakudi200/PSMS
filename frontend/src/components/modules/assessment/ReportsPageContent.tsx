@@ -70,6 +70,7 @@ function ReportsContent() {
       academicYearId: selectedAcademicYearId,
       termId: selectedTermId,
       status: selectedStatus,
+      studentName: query.filters?.keyword as string | undefined,
     });
   }, [getAllAsync, selectedAcademicYearId, selectedTermId, selectedStatus]);
 
@@ -86,10 +87,16 @@ function ReportsContent() {
     { key: 'studentName', title: 'Student', dataIndex: 'studentName', sortable: true, filterable: true },
     { key: 'studentAdmissionNumber', title: 'Adm #', dataIndex: 'studentAdmissionNumber', sortable: true, width: 100 },
     { key: 'className', title: 'Class', dataIndex: 'className', sortable: true, filterable: true },
-    { key: 'termName', title: 'Term', dataIndex: 'termName', sortable: true },
-    { key: 'academicYearName', title: 'Year', dataIndex: 'academicYearName', sortable: true, hideOnMobile: true },
+    { key: 'termName', title: 'Term', dataIndex: 'termName', sortable: true, filterable: true },
+    { key: 'academicYearName', title: 'Year', dataIndex: 'academicYearName', sortable: true, filterable: true, hideOnMobile: true },
     {
       key: 'reportType', title: 'Type', dataIndex: 'reportType', width: 90,
+      filterable: true, filterType: 'enum',
+      filterOptions: [
+        { label: 'Term', value: 0 },
+        { label: 'Mid-Year', value: 1 },
+        { label: 'Final', value: 2 },
+      ],
       renderType: 'status',
       renderConfig: { statusMap: reportTypeMap },
     },
@@ -98,6 +105,14 @@ function ReportsContent() {
     { key: 'subjectCount', title: 'Subjects', dataIndex: 'subjectCount', hideOnMobile: true, width: 85 },
     {
       key: 'status', title: 'Status', dataIndex: 'status',
+      filterable: true, filterType: 'enum',
+      filterOptions: [
+        { label: 'Draft', value: 0 },
+        { label: 'Submitted', value: 1 },
+        { label: 'Approved', value: 2 },
+        { label: 'Published', value: 3 },
+        { label: 'Acknowledged', value: 4 },
+      ],
       renderType: 'status',
       renderConfig: { statusMap: reportStatusMap },
     },

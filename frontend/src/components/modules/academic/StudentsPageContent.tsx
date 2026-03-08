@@ -22,6 +22,7 @@ function StudentsContent() {
       maxResultCount: query.maxResultCount,
       skipCount: query.skipCount,
       sorting: query.sorting,
+      keyword: query.filters?.keyword as string | undefined,
     });
   }, [getAllAsync]);
 
@@ -31,6 +32,12 @@ function StudentsContent() {
     { key: 'currentGradeName', title: 'Grade', dataIndex: 'currentGradeName', sortable: true, filterable: true },
     { key: 'currentClassName', title: 'Class', dataIndex: 'currentClassName', sortable: true, filterable: true },
     { key: 'gender', title: 'Gender', dataIndex: 'gender', hideOnMobile: true,
+      filterable: true, filterType: 'enum',
+      filterOptions: [
+        { label: 'Male', value: 0 },
+        { label: 'Female', value: 1 },
+        { label: 'Other', value: 2 },
+      ],
       renderType: 'status',
       renderConfig: {
         statusMap: {
@@ -43,6 +50,11 @@ function StudentsContent() {
     { key: 'age', title: 'Age', dataIndex: 'age', sortable: true, hideOnMobile: true, width: 70 },
     {
       key: 'isActive', title: 'Status', dataIndex: 'isActive',
+      filterable: true, filterType: 'enum',
+      filterOptions: [
+        { label: 'Active', value: true },
+        { label: 'Inactive', value: false },
+      ],
       renderType: 'status',
       renderConfig: {
         statusMap: {

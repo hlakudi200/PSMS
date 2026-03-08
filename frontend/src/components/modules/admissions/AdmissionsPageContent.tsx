@@ -91,6 +91,7 @@ function AdmissionsContent() {
       academicYearId: selectedAcademicYearId,
       gradeId: selectedGradeId,
       status: selectedStatus,
+      applicantName: query.filters?.keyword as string | undefined,
     });
   }, [getAllAsync, selectedAcademicYearId, selectedGradeId, selectedStatus]);
 
@@ -114,9 +115,14 @@ function AdmissionsContent() {
     { key: 'fullName', title: 'Applicant', dataIndex: 'fullName', sortable: true, filterable: true },
     { key: 'gradeName', title: 'Grade', dataIndex: 'gradeName', sortable: true, filterable: true },
     { key: 'academicYearName', title: 'Year', dataIndex: 'academicYearName', sortable: true, hideOnMobile: true },
-    { key: 'submittedDate', title: 'Submitted', dataIndex: 'submittedDate', sortable: true, renderType: 'date', width: 110 },
+    { key: 'submittedDate', title: 'Submitted', dataIndex: 'submittedDate', sortable: true, filterable: true, filterType: 'date', renderType: 'date', width: 110 },
     {
       key: 'isFeePaid', title: 'Fee', dataIndex: 'isFeePaid', width: 70,
+      filterable: true, filterType: 'enum',
+      filterOptions: [
+        { label: 'Paid', value: 'true' },
+        { label: 'No', value: 'false' },
+      ],
       renderType: 'status',
       renderConfig: {
         statusMap: {
@@ -128,6 +134,8 @@ function AdmissionsContent() {
     { key: 'documentCount', title: 'Docs', dataIndex: 'documentCount', hideOnMobile: true, width: 60 },
     {
       key: 'statusDisplayName', title: 'Status', dataIndex: 'statusDisplayName', sortable: true,
+      filterable: true, filterType: 'enum',
+      filterOptions: Object.entries(applicationStatusMap).map(([key, val]) => ({ label: val.label, value: key })),
       renderType: 'status',
       renderConfig: { statusMap: applicationStatusMap },
     },
@@ -146,8 +154,8 @@ function AdmissionsContent() {
 
   // --- Settings Tab ---
   const settingsColumns: ColumnConfig<IAdmissionSettings>[] = [
-    { key: 'gradeName', title: 'Grade', dataIndex: 'gradeName', sortable: true },
-    { key: 'academicYearName', title: 'Year', dataIndex: 'academicYearName', sortable: true },
+    { key: 'gradeName', title: 'Grade', dataIndex: 'gradeName', sortable: true, filterable: true },
+    { key: 'academicYearName', title: 'Year', dataIndex: 'academicYearName', sortable: true, filterable: true },
     { key: 'applicationOpenDate', title: 'Open Date', dataIndex: 'applicationOpenDate', renderType: 'date', width: 110 },
     { key: 'applicationCloseDate', title: 'Close Date', dataIndex: 'applicationCloseDate', renderType: 'date', width: 110 },
     { key: 'maxCapacity', title: 'Capacity', dataIndex: 'maxCapacity', width: 90 },
@@ -156,6 +164,11 @@ function AdmissionsContent() {
     { key: 'applicationFeeDisplay', title: 'App Fee', dataIndex: 'applicationFeeDisplay', hideOnMobile: true, width: 100 },
     {
       key: 'isAcceptingApplications', title: 'Accepting', dataIndex: 'isAcceptingApplications',
+      filterable: true, filterType: 'enum',
+      filterOptions: [
+        { label: 'Open', value: 'true' },
+        { label: 'Closed', value: 'false' },
+      ],
       renderType: 'status',
       renderConfig: {
         statusMap: {
@@ -176,6 +189,8 @@ function AdmissionsContent() {
     { key: 'offerExpiryDate', title: 'Offer Expires', dataIndex: 'offerExpiryDate', renderType: 'date', hideOnMobile: true, width: 110 },
     {
       key: 'statusDisplayName', title: 'Status', dataIndex: 'statusDisplayName',
+      filterable: true, filterType: 'enum',
+      filterOptions: Object.entries(waitlistStatusMap).map(([key, val]) => ({ label: val.label, value: key })),
       renderType: 'status',
       renderConfig: { statusMap: waitlistStatusMap },
     },

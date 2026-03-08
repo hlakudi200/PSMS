@@ -1,6 +1,7 @@
 using Abp.Application.Services;
 using Abp.Application.Services.Dto;
 using psms.Academic.Parents.Dto;
+using psms.Academic.Shared;
 using System;
 using System.Threading.Tasks;
 
@@ -12,7 +13,7 @@ namespace psms.Academic.Parents;
 public interface IParentAppService : IApplicationService
 {
     Task<ParentDto> GetAsync(Guid id);
-    Task<PagedResultDto<ParentListDto>> GetAllAsync(PagedAndSortedResultRequestDto input);
+    Task<PagedResultDto<ParentListDto>> GetAllAsync(GetAcademicEntityInput input);
     Task<ParentDto> CreateAsync(CreateParentDto input);
     Task<ParentDto> UpdateAsync(Guid id, UpdateParentDto input);
     Task DeleteAsync(Guid id);

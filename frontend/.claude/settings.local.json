@@ -3,7 +3,12 @@
     "allow": [
       "Read(//c/Users/Rapudi Hlakudi/Desktop/PSMS/.claude/**)",
       "Bash(npx tsc:*)",
-      "Bash(mv:*)"
+      "Bash(mv:*)",
+      "Read(//c/Program Files/**)",
+      "Read(//c/Program Files \\(x86\\)/**)",
+      "Read(//c/Users/Rapudi Hlakudi/Desktop/PSMS/frontend/$LOCALAPPDATA/Programs/**)",
+      "Bash(export:*)",
+      "Bash(curl:*)"
     ]
   }
 }

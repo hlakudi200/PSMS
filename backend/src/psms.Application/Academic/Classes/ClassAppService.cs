@@ -59,14 +59,17 @@ public class ClassAppService : ApplicationService, IClassAppService
     }
 
     [AbpAuthorize(PermissionNames.Academic_Classes_View)]
-    public async Task<PagedResultDto<ClassListDto>> GetAllAsync(PagedAndSortedResultRequestDto input)
+    public async Task<PagedResultDto<ClassListDto>> GetAllAsync(GetAcademicEntityInput input)
     {
         var query = _classRepository
             .GetAll()
             .Include(c => c.Grade)
             .Include(c => c.AcademicYear)
             .Include(c => c.ClassTeacher)
-            .Include(c => c.Students);
+            .Include(c => c.Students)
+            .WhereIf(!string.IsNullOrWhiteSpace(input.Keyword),
+                c => c.ClassName.ToLower().Contains(input.Keyword.ToLower())
+                  || c.Grade.GradeName.ToLower().Contains(input.Keyword.ToLower()));
 
         var totalCount = await query.CountAsync();
 

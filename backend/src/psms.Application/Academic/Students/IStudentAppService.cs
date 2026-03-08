@@ -1,5 +1,6 @@
 using Abp.Application.Services;
 using Abp.Application.Services.Dto;
+using psms.Academic.Shared;
 using psms.Academic.Students.Dto;
 using System;
 using System.Threading.Tasks;
@@ -12,7 +13,7 @@ namespace psms.Academic.Students;
 public interface IStudentAppService : IApplicationService
 {
     Task<StudentDto> GetAsync(Guid id);
-    Task<PagedResultDto<StudentListDto>> GetAllAsync(PagedAndSortedResultRequestDto input);
+    Task<PagedResultDto<StudentListDto>> GetAllAsync(GetAcademicEntityInput input);
     Task<StudentDto> CreateAsync(CreateStudentDto input);
     Task<StudentDto> UpdateAsync(Guid id, UpdateStudentDto input);
     Task DeleteAsync(Guid id);

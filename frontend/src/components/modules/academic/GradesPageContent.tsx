@@ -24,6 +24,7 @@ function GradesContent() {
       maxResultCount: query.maxResultCount,
       skipCount: query.skipCount,
       sorting: query.sorting,
+      keyword: query.filters?.keyword as string | undefined,
     });
   }, [getAllAsync]);
 
@@ -58,6 +59,11 @@ function GradesContent() {
     { key: 'studentCount', title: 'Students', dataIndex: 'studentCount', sortable: true },
     {
       key: 'isActive', title: 'Status', dataIndex: 'isActive',
+      filterable: true, filterType: 'enum',
+      filterOptions: [
+        { label: 'Active', value: 'true' },
+        { label: 'Inactive', value: 'false' },
+      ],
       renderType: 'status',
       renderConfig: {
         statusMap: {

@@ -57,13 +57,17 @@ public class StudentAppService : ApplicationService, IStudentAppService
     }
 
     [AbpAuthorize(PermissionNames.Academic_Students_View)]
-    public async Task<PagedResultDto<StudentListDto>> GetAllAsync(PagedAndSortedResultRequestDto input)
+    public async Task<PagedResultDto<StudentListDto>> GetAllAsync(GetAcademicEntityInput input)
     {
         var query = _studentRepository
             .GetAll()
             .Include(s => s.CurrentGrade)
             .Include(s => s.CurrentClass)
-            .Include(s => s.ParentLinks);
+            .Include(s => s.ParentLinks)
+            .WhereIf(!string.IsNullOrWhiteSpace(input.Keyword),
+                s => s.FirstName.ToLower().Contains(input.Keyword.ToLower())
+                  || s.LastName.ToLower().Contains(input.Keyword.ToLower())
+                  || s.AdmissionNumber.ToLower().Contains(input.Keyword.ToLower()));
 
         var totalCount = await query.CountAsync();
 

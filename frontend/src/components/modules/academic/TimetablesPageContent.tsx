@@ -33,6 +33,7 @@ function TimetablesContent() {
       maxResultCount: query.maxResultCount,
       skipCount: query.skipCount,
       sorting: query.sorting,
+      keyword: query.filters?.keyword as string | undefined,
     });
   }, [getAllAsync]);
 

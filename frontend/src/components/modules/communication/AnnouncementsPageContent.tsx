@@ -52,6 +52,7 @@ function AnnouncementsContent() {
       maxResultCount: query.maxResultCount,
       skipCount: query.skipCount,
       sorting: query.sorting,
+      search: query.filters?.keyword as string | undefined,
     });
   }, [getAllAsync]);
 
@@ -69,16 +70,37 @@ function AnnouncementsContent() {
     { key: 'title', title: 'Title', dataIndex: 'title', sortable: true, filterable: true },
     {
       key: 'type', title: 'Type', dataIndex: 'type', width: 100,
+      filterable: true, filterType: 'enum',
+      filterOptions: [
+        { label: 'General', value: 0 },
+        { label: 'Academic', value: 1 },
+        { label: 'Event', value: 2 },
+        { label: 'Emergency', value: 3 },
+      ],
       renderType: 'status',
       renderConfig: { statusMap: typeMap },
     },
     {
       key: 'priority', title: 'Priority', dataIndex: 'priority', width: 90,
+      filterable: true, filterType: 'enum',
+      filterOptions: [
+        { label: 'Low', value: 0 },
+        { label: 'Normal', value: 1 },
+        { label: 'High', value: 2 },
+      ],
       renderType: 'status',
       renderConfig: { statusMap: priorityMap },
     },
     {
       key: 'targetAudience', title: 'Audience', dataIndex: 'targetAudience', width: 100,
+      filterable: true, filterType: 'enum',
+      filterOptions: [
+        { label: 'All', value: 0 },
+        { label: 'Teachers', value: 1 },
+        { label: 'Parents', value: 2 },
+        { label: 'Students', value: 3 },
+        { label: 'Specific', value: 4 },
+      ],
       renderType: 'status',
       renderConfig: { statusMap: audienceMap },
     },

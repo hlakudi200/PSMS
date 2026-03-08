@@ -93,8 +93,7 @@ function TermManagementContent({ academicYear, onClose, open }: TermManagementDr
     {
       title: 'Duration',
       key: 'totalDays',
-      dataIndex: 'totalDays',
-      render: (days: number) => `${days} days`,
+      render: (_: unknown, record: ITerm) => `${dayjs(record.endDate).diff(dayjs(record.startDate), 'day')} days`,
     },
     {
       title: 'Actions',

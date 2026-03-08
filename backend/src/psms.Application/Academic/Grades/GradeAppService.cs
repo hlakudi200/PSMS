@@ -48,12 +48,14 @@ public class GradeAppService : ApplicationService, IGradeAppService
     }
 
     [AbpAuthorize(PermissionNames.Academic_Grades_View)]
-    public async Task<PagedResultDto<GradeListDto>> GetAllAsync(PagedAndSortedResultRequestDto input)
+    public async Task<PagedResultDto<GradeListDto>> GetAllAsync(GetAcademicEntityInput input)
     {
         var query = _gradeRepository
             .GetAll()
             .Include(g => g.Classes)
-            .Include(g => g.Students);
+            .Include(g => g.Students)
+            .WhereIf(!string.IsNullOrWhiteSpace(input.Keyword),
+                g => g.GradeName.ToLower().Contains(input.Keyword.ToLower()));
 
         var totalCount = await query.CountAsync();
 

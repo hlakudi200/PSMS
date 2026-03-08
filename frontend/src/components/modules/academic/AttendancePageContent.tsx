@@ -232,11 +232,19 @@ function AttendanceContent() {
   };
 
   const recordColumns: ColumnConfig<IAttendanceList>[] = [
-    { key: 'attendanceDate', title: 'Date', dataIndex: 'attendanceDate', sortable: true, renderType: 'date', width: 110 },
+    { key: 'attendanceDate', title: 'Date', dataIndex: 'attendanceDate', sortable: true, filterable: true, filterType: 'date', renderType: 'date', width: 110 },
     { key: 'studentName', title: 'Student', dataIndex: 'studentName', sortable: true, filterable: true },
     { key: 'className', title: 'Class', dataIndex: 'className', sortable: true, filterable: true },
     {
       key: 'status', title: 'Status', dataIndex: 'status',
+      filterable: true, filterType: 'enum',
+      filterOptions: [
+        { label: 'Present', value: 0 },
+        { label: 'Absent', value: 1 },
+        { label: 'Late', value: 2 },
+        { label: 'Excused', value: 3 },
+        { label: 'Sick Leave', value: 4 },
+      ],
       renderType: 'status',
       renderConfig: { statusMap },
     },
