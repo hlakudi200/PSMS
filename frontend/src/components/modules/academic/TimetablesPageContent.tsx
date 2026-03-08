@@ -33,7 +33,7 @@ function TimetablesContent() {
       maxResultCount: query.maxResultCount,
       skipCount: query.skipCount,
       sorting: query.sorting,
-      keyword: query.filters?.keyword as string | undefined,
+      ...query.filters,
     });
   }, [getAllAsync]);
 
@@ -53,7 +53,7 @@ function TimetablesContent() {
   };
 
   const columns: ColumnConfig<ITimetableList>[] = [
-    { key: 'className', title: 'Class', dataIndex: 'className', sortable: true, filterable: true },
+    { key: 'className', title: 'Class', dataIndex: 'className', sortable: true },
     { key: 'effectiveDate', title: 'Effective From', dataIndex: 'effectiveDate', sortable: true, renderType: 'date', width: 130 },
     { key: 'endDate', title: 'End Date', dataIndex: 'endDate', sortable: true, renderType: 'date', hideOnMobile: true, width: 130 },
     { key: 'slotCount', title: 'Slots', dataIndex: 'slotCount', sortable: true, width: 80 },

@@ -22,15 +22,15 @@ function StudentsContent() {
       maxResultCount: query.maxResultCount,
       skipCount: query.skipCount,
       sorting: query.sorting,
-      keyword: query.filters?.keyword as string | undefined,
+      ...query.filters,
     });
   }, [getAllAsync]);
 
   const columns: ColumnConfig<IStudentList>[] = [
     { key: 'admissionNumber', title: 'Admission #', dataIndex: 'admissionNumber', sortable: true, width: 120 },
-    { key: 'fullName', title: 'Full Name', dataIndex: 'fullName', sortable: true, filterable: true },
-    { key: 'currentGradeName', title: 'Grade', dataIndex: 'currentGradeName', sortable: true, filterable: true },
-    { key: 'currentClassName', title: 'Class', dataIndex: 'currentClassName', sortable: true, filterable: true },
+    { key: 'fullName', title: 'Full Name', dataIndex: 'fullName', sortable: true },
+    { key: 'currentGradeName', title: 'Grade', dataIndex: 'currentGradeName', sortable: true },
+    { key: 'currentClassName', title: 'Class', dataIndex: 'currentClassName', sortable: true },
     { key: 'gender', title: 'Gender', dataIndex: 'gender', hideOnMobile: true,
       filterable: true, filterType: 'enum',
       filterOptions: [

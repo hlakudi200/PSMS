@@ -1,5 +1,6 @@
 "use client";
 import { getAxiosInstance } from "@/utils/axios-instance";
+import { buildQueryParams } from "@/utils/query-params";
 import {
   INITIAL_STATE,
   ParentActionContext,
@@ -56,11 +57,7 @@ export const ParentProvider = ({
   const getAllAsync = async (input?: IPagedAndSortedResultRequest) => {
     dispatch(getParentsPending());
 
-    const params = new URLSearchParams();
-    if (input?.maxResultCount) params.append('MaxResultCount', input.maxResultCount.toString());
-    if (input?.skipCount) params.append('SkipCount', input.skipCount.toString());
-    if (input?.sorting) params.append('Sorting', input.sorting);
-
+    const params = buildQueryParams(input as Record<string, unknown>);
     const endpoint = `/api/services/app/Parent/GetAll?${params.toString()}`;
     await instance
       .get(endpoint)

@@ -84,6 +84,7 @@ function AdmissionsContent() {
 
   const handleAppQueryChange = useCallback((query: TableQuery) => {
     setLastAppQuery(query);
+    const { keyword, ...columnFilters } = query.filters ?? {};
     getAllAsync({
       maxResultCount: query.maxResultCount,
       skipCount: query.skipCount,
@@ -91,7 +92,8 @@ function AdmissionsContent() {
       academicYearId: selectedAcademicYearId,
       gradeId: selectedGradeId,
       status: selectedStatus,
-      applicantName: query.filters?.keyword as string | undefined,
+      applicantName: keyword as string | undefined,
+      ...columnFilters,
     });
   }, [getAllAsync, selectedAcademicYearId, selectedGradeId, selectedStatus]);
 
@@ -112,10 +114,10 @@ function AdmissionsContent() {
   // --- Applications Tab ---
   const appColumns: ColumnConfig<IApplicationList>[] = [
     { key: 'applicationNumber', title: 'App #', dataIndex: 'applicationNumber', sortable: true, width: 100 },
-    { key: 'fullName', title: 'Applicant', dataIndex: 'fullName', sortable: true, filterable: true },
-    { key: 'gradeName', title: 'Grade', dataIndex: 'gradeName', sortable: true, filterable: true },
+    { key: 'fullName', title: 'Applicant', dataIndex: 'fullName', sortable: true },
+    { key: 'gradeName', title: 'Grade', dataIndex: 'gradeName', sortable: true },
     { key: 'academicYearName', title: 'Year', dataIndex: 'academicYearName', sortable: true, hideOnMobile: true },
-    { key: 'submittedDate', title: 'Submitted', dataIndex: 'submittedDate', sortable: true, filterable: true, filterType: 'date', renderType: 'date', width: 110 },
+    { key: 'submittedDate', title: 'Submitted', dataIndex: 'submittedDate', sortable: true, renderType: 'date', width: 110 },
     {
       key: 'isFeePaid', title: 'Fee', dataIndex: 'isFeePaid', width: 70,
       filterable: true, filterType: 'enum',
@@ -134,7 +136,7 @@ function AdmissionsContent() {
     { key: 'documentCount', title: 'Docs', dataIndex: 'documentCount', hideOnMobile: true, width: 60 },
     {
       key: 'statusDisplayName', title: 'Status', dataIndex: 'statusDisplayName', sortable: true,
-      filterable: true, filterType: 'enum',
+      filterable: true, filterType: 'enum', filterKey: 'status',
       filterOptions: Object.entries(applicationStatusMap).map(([key, val]) => ({ label: val.label, value: key })),
       renderType: 'status',
       renderConfig: { statusMap: applicationStatusMap },

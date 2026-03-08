@@ -22,15 +22,15 @@ function ParentsContent() {
       maxResultCount: query.maxResultCount,
       skipCount: query.skipCount,
       sorting: query.sorting,
-      keyword: query.filters?.keyword as string | undefined,
+      ...query.filters,
     });
   }, [getAllAsync]);
 
   const columns: ColumnConfig<IParent>[] = [
-    { key: 'fullName', title: 'Full Name', dataIndex: 'fullName', sortable: true, filterable: true },
-    { key: 'email', title: 'Email', dataIndex: 'email', sortable: true, filterable: true },
+    { key: 'fullName', title: 'Full Name', dataIndex: 'fullName', sortable: true },
+    { key: 'email', title: 'Email', dataIndex: 'email', sortable: true },
     { key: 'phone', title: 'Phone', dataIndex: 'phone', hideOnMobile: true },
-    { key: 'occupation', title: 'Occupation', dataIndex: 'occupation', filterable: true, hideOnMobile: true },
+    { key: 'occupation', title: 'Occupation', dataIndex: 'occupation', hideOnMobile: true },
     { key: 'studentCount', title: 'Children', dataIndex: 'studentCount', sortable: true, width: 100 },
   ];
 

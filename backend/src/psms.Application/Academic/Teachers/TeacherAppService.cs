@@ -57,7 +57,9 @@ public class TeacherAppService : ApplicationService, ITeacherAppService
                 t => t.FirstName.ToLower().Contains(input.Keyword.ToLower())
                   || t.LastName.ToLower().Contains(input.Keyword.ToLower())
                   || t.EmployeeNumber.ToLower().Contains(input.Keyword.ToLower())
-                  || t.Email.ToLower().Contains(input.Keyword.ToLower()));
+                  || t.Email.ToLower().Contains(input.Keyword.ToLower()))
+            .WhereIf(input.IsActive.HasValue,
+                t => t.IsActive == input.IsActive.Value);
 
         var totalCount = await query.CountAsync();
 

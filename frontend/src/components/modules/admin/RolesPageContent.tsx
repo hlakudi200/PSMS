@@ -39,7 +39,7 @@ function RolesContent() {
   };
 
   const columns: ColumnConfig<IAdminRole>[] = [
-    { key: 'name', title: 'Name', dataIndex: 'name', sortable: true, filterable: true },
+    { key: 'name', title: 'Name', dataIndex: 'name', sortable: true },
     { key: 'displayName', title: 'Display Name', dataIndex: 'displayName', sortable: true },
     { key: 'isStatic', title: 'Static', dataIndex: 'isStatic', renderType: 'boolean' },
     { key: 'isDefault', title: 'Default', dataIndex: 'isDefault', renderType: 'boolean' },

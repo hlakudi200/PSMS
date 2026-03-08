@@ -26,7 +26,7 @@ function TeachersContent() {
       maxResultCount: query.maxResultCount,
       skipCount: query.skipCount,
       sorting: query.sorting,
-      keyword: query.filters?.keyword as string | undefined,
+      ...query.filters,
     });
   }, [getAllAsync]);
 
@@ -42,8 +42,8 @@ function TeachersContent() {
 
   const columns: ColumnConfig<ITeacher>[] = [
     { key: 'employeeNumber', title: 'Emp #', dataIndex: 'employeeNumber', sortable: true, width: 100 },
-    { key: 'fullName', title: 'Name', dataIndex: 'fullName', sortable: true, filterable: true },
-    { key: 'email', title: 'Email', dataIndex: 'email', filterable: true, hideOnMobile: true },
+    { key: 'fullName', title: 'Name', dataIndex: 'fullName', sortable: true },
+    { key: 'email', title: 'Email', dataIndex: 'email', hideOnMobile: true },
     { key: 'phone', title: 'Phone', dataIndex: 'phone', hideOnMobile: true },
     { key: 'subjectAssignmentCount', title: 'Subjects', dataIndex: 'subjectAssignmentCount' },
     { key: 'classAssignmentCount', title: 'Classes', dataIndex: 'classAssignmentCount' },

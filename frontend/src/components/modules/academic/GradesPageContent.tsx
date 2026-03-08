@@ -24,7 +24,7 @@ function GradesContent() {
       maxResultCount: query.maxResultCount,
       skipCount: query.skipCount,
       sorting: query.sorting,
-      keyword: query.filters?.keyword as string | undefined,
+      ...query.filters,
     });
   }, [getAllAsync]);
 
@@ -39,7 +39,7 @@ function GradesContent() {
   };
 
   const columns: ColumnConfig<IGradeList>[] = [
-    { key: 'gradeName', title: 'Grade', dataIndex: 'gradeName', sortable: true, filterable: true },
+    { key: 'gradeName', title: 'Grade', dataIndex: 'gradeName', sortable: true },
     { key: 'gradeLevel', title: 'Level', dataIndex: 'gradeLevel', sortable: true, width: 80 },
     {
       key: 'schoolPhase', title: 'Phase', dataIndex: 'schoolPhase',

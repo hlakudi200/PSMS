@@ -27,7 +27,7 @@ function AcademicYearsContent() {
       maxResultCount: query.maxResultCount,
       skipCount: query.skipCount,
       sorting: query.sorting,
-      keyword: query.filters?.keyword as string | undefined,
+      ...query.filters,
     });
   }, [getAllAsync]);
 
@@ -42,7 +42,7 @@ function AcademicYearsContent() {
   };
 
   const columns: ColumnConfig<IAcademicYear>[] = [
-    { key: 'yearName', title: 'Year', dataIndex: 'yearName', sortable: true, filterable: true },
+    { key: 'yearName', title: 'Year', dataIndex: 'yearName', sortable: true },
     { key: 'year', title: 'Year Number', dataIndex: 'year', sortable: true },
     { key: 'startDate', title: 'Start Date', dataIndex: 'startDate', sortable: true, renderType: 'date' },
     { key: 'endDate', title: 'End Date', dataIndex: 'endDate', sortable: true, renderType: 'date' },

@@ -32,7 +32,7 @@ function ClassesContent() {
       maxResultCount: query.maxResultCount,
       skipCount: query.skipCount,
       sorting: query.sorting,
-      keyword: query.filters?.keyword as string | undefined,
+      ...query.filters,
     });
   }, [getAllAsync]);
 
@@ -53,10 +53,10 @@ function ClassesContent() {
   };
 
   const columns: ColumnConfig<IClass>[] = [
-    { key: 'className', title: 'Class', dataIndex: 'className', sortable: true, filterable: true },
-    { key: 'gradeName', title: 'Grade', dataIndex: 'gradeName', sortable: true, filterable: true },
-    { key: 'academicYearName', title: 'Year', dataIndex: 'academicYearName', filterable: true },
-    { key: 'classTeacherName', title: 'Class Teacher', dataIndex: 'classTeacherName', filterable: true },
+    { key: 'className', title: 'Class', dataIndex: 'className', sortable: true },
+    { key: 'gradeName', title: 'Grade', dataIndex: 'gradeName', sortable: true },
+    { key: 'academicYearName', title: 'Year', dataIndex: 'academicYearName' },
+    { key: 'classTeacherName', title: 'Class Teacher', dataIndex: 'classTeacherName' },
     { key: 'maxCapacity', title: 'Capacity', dataIndex: 'maxCapacity', sortable: true },
     { key: 'studentCount', title: 'Students', dataIndex: 'studentCount' },
     { key: 'availableCapacity', title: 'Available', dataIndex: 'availableCapacity' },

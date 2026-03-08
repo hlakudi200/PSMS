@@ -55,7 +55,9 @@ public class TimetableAppService : ApplicationService, ITimetableAppService
             .Include(t => t.TimetableSlots)
             .Where(t => t.TenantId == AbpSession.TenantId)
             .WhereIf(!string.IsNullOrWhiteSpace(input.Keyword),
-                t => t.Class.ClassName.ToLower().Contains(input.Keyword.ToLower()));
+                t => t.Class.ClassName.ToLower().Contains(input.Keyword.ToLower()))
+            .WhereIf(input.IsActive.HasValue,
+                t => t.IsActive == input.IsActive.Value);
 
         var totalCount = await query.CountAsync();
 

@@ -58,23 +58,27 @@ function FinanceContent() {
 
   const handleFeeQueryChange = useCallback((query: TableQuery) => {
     setLastFeeQuery(query);
+    const { keyword, ...columnFilters } = query.filters ?? {};
     getAllFees({
       maxResultCount: query.maxResultCount,
       skipCount: query.skipCount,
       sorting: query.sorting,
-      feeName: query.filters?.keyword as string | undefined,
+      feeName: keyword as string | undefined,
+      ...columnFilters,
     });
   }, [getAllFees]);
 
   const handlePaymentQueryChange = useCallback((query: TableQuery) => {
     setLastPaymentQuery(query);
+    const { keyword, ...columnFilters } = query.filters ?? {};
     getAllPayments({
       maxResultCount: query.maxResultCount,
       skipCount: query.skipCount,
       sorting: query.sorting,
       fromDate: paymentDateRange?.[0]?.format('YYYY-MM-DD'),
       toDate: paymentDateRange?.[1]?.format('YYYY-MM-DD'),
-      studentName: query.filters?.keyword as string | undefined,
+      studentName: keyword as string | undefined,
+      ...columnFilters,
     });
   }, [getAllPayments, paymentDateRange]);
 
@@ -99,7 +103,7 @@ function FinanceContent() {
 
   // --- Fee Structures Tab ---
   const feeColumns: ColumnConfig<IFeeStructureList>[] = [
-    { key: 'feeName', title: 'Fee Name', dataIndex: 'feeName', sortable: true, filterable: true },
+    { key: 'feeName', title: 'Fee Name', dataIndex: 'feeName', sortable: true },
     {
       key: 'feeType', title: 'Type', dataIndex: 'feeType', width: 110,
       filterable: true, filterType: 'enum',
@@ -114,8 +118,8 @@ function FinanceContent() {
       renderType: 'status',
       renderConfig: { statusMap: feeTypeMap },
     },
-    { key: 'gradeName', title: 'Grade', dataIndex: 'gradeName', sortable: true, filterable: true },
-    { key: 'academicYearName', title: 'Year', dataIndex: 'academicYearName', sortable: true, filterable: true, hideOnMobile: true },
+    { key: 'gradeName', title: 'Grade', dataIndex: 'gradeName', sortable: true },
+    { key: 'academicYearName', title: 'Year', dataIndex: 'academicYearName', sortable: true, hideOnMobile: true },
     { key: 'formattedAmount', title: 'Amount', dataIndex: 'formattedAmount', sortable: true, width: 120 },
     { key: 'billingFrequency', title: 'Frequency', dataIndex: 'billingFrequency', hideOnMobile: true, width: 100 },
     { key: 'studentFeeCount', title: 'Students', dataIndex: 'studentFeeCount', sortable: true, width: 90 },
@@ -150,8 +154,8 @@ function FinanceContent() {
   // --- Payments Tab ---
   const paymentColumns: ColumnConfig<IPaymentList>[] = [
     { key: 'receiptNumber', title: 'Receipt #', dataIndex: 'receiptNumber', sortable: true, width: 110 },
-    { key: 'studentName', title: 'Student', dataIndex: 'studentName', sortable: true, filterable: true },
-    { key: 'parentName', title: 'Parent', dataIndex: 'parentName', sortable: true, filterable: true, hideOnMobile: true },
+    { key: 'studentName', title: 'Student', dataIndex: 'studentName', sortable: true },
+    { key: 'parentName', title: 'Parent', dataIndex: 'parentName', sortable: true, hideOnMobile: true },
     { key: 'formattedAmount', title: 'Amount', dataIndex: 'formattedAmount', sortable: true, width: 120 },
     {
       key: 'paymentMethod', title: 'Method', dataIndex: 'paymentMethod', width: 110, hideOnMobile: true,

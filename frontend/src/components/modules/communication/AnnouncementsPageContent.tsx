@@ -48,11 +48,13 @@ function AnnouncementsContent() {
 
   const handleQueryChange = useCallback((query: TableQuery) => {
     setLastQuery(query);
+    const { keyword, ...columnFilters } = query.filters ?? {};
     getAllAsync({
       maxResultCount: query.maxResultCount,
       skipCount: query.skipCount,
       sorting: query.sorting,
-      search: query.filters?.keyword as string | undefined,
+      search: keyword as string | undefined,
+      ...columnFilters,
     });
   }, [getAllAsync]);
 
@@ -67,7 +69,7 @@ function AnnouncementsContent() {
   };
 
   const columns: ColumnConfig<IAnnouncementList>[] = [
-    { key: 'title', title: 'Title', dataIndex: 'title', sortable: true, filterable: true },
+    { key: 'title', title: 'Title', dataIndex: 'title', sortable: true },
     {
       key: 'type', title: 'Type', dataIndex: 'type', width: 100,
       filterable: true, filterType: 'enum',

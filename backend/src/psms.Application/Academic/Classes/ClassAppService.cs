@@ -69,7 +69,9 @@ public class ClassAppService : ApplicationService, IClassAppService
             .Include(c => c.Students)
             .WhereIf(!string.IsNullOrWhiteSpace(input.Keyword),
                 c => c.ClassName.ToLower().Contains(input.Keyword.ToLower())
-                  || c.Grade.GradeName.ToLower().Contains(input.Keyword.ToLower()));
+                  || c.Grade.GradeName.ToLower().Contains(input.Keyword.ToLower()))
+            .WhereIf(input.IsActive.HasValue,
+                c => c.IsActive == input.IsActive.Value);
 
         var totalCount = await query.CountAsync();
 

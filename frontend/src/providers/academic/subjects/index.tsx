@@ -1,5 +1,6 @@
 "use client";
 import { getAxiosInstance } from "@/utils/axios-instance";
+import { buildQueryParams } from "@/utils/query-params";
 import { INITIAL_STATE, SubjectActionContext, SubjectStateContext } from "./context";
 import { ISubject, ICreateSubject, IUpdateSubject, IPagedAndSortedResultRequest } from "../shared/interfaces";
 import { SubjectReducer } from "./reducer";
@@ -27,10 +28,7 @@ export const SubjectProvider = ({ children }: { children: React.ReactNode }) => 
 
   const getAllAsync = async (input?: IPagedAndSortedResultRequest) => {
     dispatch(getSubjectsPending());
-    const params = new URLSearchParams();
-    if (input?.maxResultCount) params.append('MaxResultCount', input.maxResultCount.toString());
-    if (input?.skipCount) params.append('SkipCount', input.skipCount.toString());
-    if (input?.sorting) params.append('Sorting', input.sorting);
+    const params = buildQueryParams(input as Record<string, unknown>);
     await instance.get(`/api/services/app/Subject/GetAll?${params.toString()}`)
       .then((response) => dispatch(getSubjectsSuccess({ items: response.data.result.items, totalCount: response.data.result.totalCount })))
       .catch((error) => { console.error(error); dispatch(getSubjectsError()); });

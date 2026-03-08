@@ -63,14 +63,16 @@ function ReportsContent() {
 
   const handleQueryChange = useCallback((query: TableQuery) => {
     setLastQuery(query);
+    const { keyword, ...columnFilters } = query.filters ?? {};
     getAllAsync({
       maxResultCount: query.maxResultCount,
       skipCount: query.skipCount,
       sorting: query.sorting,
       academicYearId: selectedAcademicYearId,
       termId: selectedTermId,
-      status: selectedStatus,
-      studentName: query.filters?.keyword as string | undefined,
+      status: selectedStatus ?? columnFilters.status as number | undefined,
+      studentName: keyword as string | undefined,
+      ...columnFilters,
     });
   }, [getAllAsync, selectedAcademicYearId, selectedTermId, selectedStatus]);
 
@@ -84,11 +86,11 @@ function ReportsContent() {
   }, [selectedAcademicYearId, selectedTermId, selectedStatus]);
 
   const columns: ColumnConfig<IReportList>[] = [
-    { key: 'studentName', title: 'Student', dataIndex: 'studentName', sortable: true, filterable: true },
+    { key: 'studentName', title: 'Student', dataIndex: 'studentName', sortable: true },
     { key: 'studentAdmissionNumber', title: 'Adm #', dataIndex: 'studentAdmissionNumber', sortable: true, width: 100 },
-    { key: 'className', title: 'Class', dataIndex: 'className', sortable: true, filterable: true },
-    { key: 'termName', title: 'Term', dataIndex: 'termName', sortable: true, filterable: true },
-    { key: 'academicYearName', title: 'Year', dataIndex: 'academicYearName', sortable: true, filterable: true, hideOnMobile: true },
+    { key: 'className', title: 'Class', dataIndex: 'className', sortable: true },
+    { key: 'termName', title: 'Term', dataIndex: 'termName', sortable: true },
+    { key: 'academicYearName', title: 'Year', dataIndex: 'academicYearName', sortable: true, hideOnMobile: true },
     {
       key: 'reportType', title: 'Type', dataIndex: 'reportType', width: 90,
       filterable: true, filterType: 'enum',

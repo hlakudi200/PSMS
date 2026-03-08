@@ -24,7 +24,7 @@ function SubjectsContent() {
       maxResultCount: query.maxResultCount,
       skipCount: query.skipCount,
       sorting: query.sorting,
-      keyword: query.filters?.keyword as string | undefined,
+      ...query.filters,
     });
   }, [getAllAsync]);
 
@@ -39,8 +39,8 @@ function SubjectsContent() {
   };
 
   const columns: ColumnConfig<ISubject>[] = [
-    { key: 'subjectCode', title: 'Code', dataIndex: 'subjectCode', sortable: true, filterable: true, width: 100 },
-    { key: 'subjectName', title: 'Subject', dataIndex: 'subjectName', sortable: true, filterable: true },
+    { key: 'subjectCode', title: 'Code', dataIndex: 'subjectCode', sortable: true, width: 100 },
+    { key: 'subjectName', title: 'Subject', dataIndex: 'subjectName', sortable: true },
     { key: 'isCore', title: 'Core', dataIndex: 'isCore', renderType: 'boolean',
       filterable: true, filterType: 'enum',
       filterOptions: [

@@ -53,7 +53,11 @@ public class SubjectAppService : ApplicationService, ISubjectAppService
             .Include(s => s.GradeSubjects)
             .WhereIf(!string.IsNullOrWhiteSpace(input.Keyword),
                 s => s.SubjectName.ToLower().Contains(input.Keyword.ToLower())
-                  || s.SubjectCode.ToLower().Contains(input.Keyword.ToLower()));
+                  || s.SubjectCode.ToLower().Contains(input.Keyword.ToLower()))
+            .WhereIf(input.IsActive.HasValue,
+                s => s.IsActive == input.IsActive.Value)
+            .WhereIf(input.IsCore.HasValue,
+                s => s.IsCore == input.IsCore.Value);
 
         var totalCount = await query.CountAsync();
 

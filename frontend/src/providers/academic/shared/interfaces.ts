@@ -4,6 +4,7 @@ export interface IPagedAndSortedResultRequest {
   skipCount?: number;
   sorting?: string;
   keyword?: string;
+  [key: string]: unknown;
 }
 
 export interface IPagedResult<T> {

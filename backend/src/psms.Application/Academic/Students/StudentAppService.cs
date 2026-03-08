@@ -67,7 +67,11 @@ public class StudentAppService : ApplicationService, IStudentAppService
             .WhereIf(!string.IsNullOrWhiteSpace(input.Keyword),
                 s => s.FirstName.ToLower().Contains(input.Keyword.ToLower())
                   || s.LastName.ToLower().Contains(input.Keyword.ToLower())
-                  || s.AdmissionNumber.ToLower().Contains(input.Keyword.ToLower()));
+                  || s.AdmissionNumber.ToLower().Contains(input.Keyword.ToLower()))
+            .WhereIf(input.IsActive.HasValue,
+                s => s.IsActive == input.IsActive.Value)
+            .WhereIf(input.Gender.HasValue,
+                s => (int)s.Gender == input.Gender.Value);
 
         var totalCount = await query.CountAsync();
 
