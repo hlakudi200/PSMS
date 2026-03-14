@@ -20,28 +20,39 @@ import type { IPaymentList } from '@/providers/financial/shared/interfaces';
 const { RangePicker } = DatePicker;
 
 const feeTypeMap: Record<number, { label: string; color: string }> = {
-  0: { label: 'Tuition', color: 'blue' },
-  1: { label: 'Registration', color: 'green' },
-  2: { label: 'Uniform', color: 'purple' },
-  3: { label: 'Transport', color: 'orange' },
-  4: { label: 'Stationery', color: 'cyan' },
-  5: { label: 'Other', color: 'default' },
+  1: { label: 'Tuition', color: 'blue' },
+  2: { label: 'Registration', color: 'green' },
+  3: { label: 'Application', color: 'geekblue' },
+  4: { label: 'Transport', color: 'orange' },
+  5: { label: 'After Care', color: 'magenta' },
+  6: { label: 'Extramural', color: 'lime' },
+  7: { label: 'Uniform', color: 'purple' },
+  8: { label: 'Stationery', color: 'cyan' },
+  9: { label: 'Other', color: 'default' },
 };
 
 const paymentStatusMap: Record<number, { label: string; color: string }> = {
-  0: { label: 'Pending', color: 'orange' },
-  1: { label: 'Completed', color: 'green' },
-  2: { label: 'Failed', color: 'red' },
-  3: { label: 'Refunded', color: 'purple' },
+  1: { label: 'Pending', color: 'orange' },
+  2: { label: 'Completed', color: 'green' },
+  3: { label: 'Failed', color: 'red' },
   4: { label: 'Cancelled', color: 'default' },
+  5: { label: 'Refunded', color: 'purple' },
+  6: { label: 'Partially Paid', color: 'gold' },
+  7: { label: 'Overdue', color: 'volcano' },
 };
 
 const paymentMethodMap: Record<number, { label: string; color: string }> = {
-  0: { label: 'Cash', color: 'green' },
   1: { label: 'EFT', color: 'blue' },
-  2: { label: 'Card', color: 'purple' },
-  3: { label: 'Debit Order', color: 'cyan' },
-  4: { label: 'Other', color: 'default' },
+  2: { label: 'Debit Order', color: 'cyan' },
+  3: { label: 'Credit Card', color: 'purple' },
+  4: { label: 'Debit Card', color: 'geekblue' },
+  5: { label: 'Cash', color: 'green' },
+  6: { label: 'Cheque', color: 'default' },
+  7: { label: 'PayFast', color: 'orange' },
+  8: { label: 'SnapScan', color: 'magenta' },
+  9: { label: 'Zapper', color: 'lime' },
+  10: { label: 'Ozow', color: 'gold' },
+  11: { label: 'Bank Deposit', color: 'volcano' },
 };
 
 function FinanceContent() {
@@ -96,9 +107,9 @@ function FinanceContent() {
   };
 
   // Payment summary stats
-  const completedPayments = payments?.filter(p => p.status === 1) ?? [];
+  const completedPayments = payments?.filter(p => p.status === 2) ?? [];
   const totalCollected = completedPayments.reduce((sum, p) => sum + p.amount, 0);
-  const pendingPayments = payments?.filter(p => p.status === 0) ?? [];
+  const pendingPayments = payments?.filter(p => p.status === 1) ?? [];
   const totalPending = pendingPayments.reduce((sum, p) => sum + p.amount, 0);
 
   // --- Fee Structures Tab ---
@@ -108,12 +119,15 @@ function FinanceContent() {
       key: 'feeType', title: 'Type', dataIndex: 'feeType', width: 110,
       filterable: true, filterType: 'enum',
       filterOptions: [
-        { label: 'Tuition', value: 0 },
-        { label: 'Registration', value: 1 },
-        { label: 'Uniform', value: 2 },
-        { label: 'Transport', value: 3 },
-        { label: 'Stationery', value: 4 },
-        { label: 'Other', value: 5 },
+        { label: 'Tuition', value: 1 },
+        { label: 'Registration', value: 2 },
+        { label: 'Application', value: 3 },
+        { label: 'Transport', value: 4 },
+        { label: 'After Care', value: 5 },
+        { label: 'Extramural', value: 6 },
+        { label: 'Uniform', value: 7 },
+        { label: 'Stationery', value: 8 },
+        { label: 'Other', value: 9 },
       ],
       renderType: 'status',
       renderConfig: { statusMap: feeTypeMap },
@@ -161,11 +175,17 @@ function FinanceContent() {
       key: 'paymentMethod', title: 'Method', dataIndex: 'paymentMethod', width: 110, hideOnMobile: true,
       filterable: true, filterType: 'enum',
       filterOptions: [
-        { label: 'Cash', value: 0 },
         { label: 'EFT', value: 1 },
-        { label: 'Card', value: 2 },
-        { label: 'Debit Order', value: 3 },
-        { label: 'Other', value: 4 },
+        { label: 'Debit Order', value: 2 },
+        { label: 'Credit Card', value: 3 },
+        { label: 'Debit Card', value: 4 },
+        { label: 'Cash', value: 5 },
+        { label: 'Cheque', value: 6 },
+        { label: 'PayFast', value: 7 },
+        { label: 'SnapScan', value: 8 },
+        { label: 'Zapper', value: 9 },
+        { label: 'Ozow', value: 10 },
+        { label: 'Bank Deposit', value: 11 },
       ],
       renderType: 'status',
       renderConfig: { statusMap: paymentMethodMap },
@@ -175,11 +195,13 @@ function FinanceContent() {
       key: 'status', title: 'Status', dataIndex: 'status',
       filterable: true, filterType: 'enum',
       filterOptions: [
-        { label: 'Pending', value: 0 },
-        { label: 'Completed', value: 1 },
-        { label: 'Failed', value: 2 },
-        { label: 'Refunded', value: 3 },
+        { label: 'Pending', value: 1 },
+        { label: 'Completed', value: 2 },
+        { label: 'Failed', value: 3 },
         { label: 'Cancelled', value: 4 },
+        { label: 'Refunded', value: 5 },
+        { label: 'Partially Paid', value: 6 },
+        { label: 'Overdue', value: 7 },
       ],
       renderType: 'status',
       renderConfig: { statusMap: paymentStatusMap },

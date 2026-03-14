@@ -24,11 +24,11 @@ const { Text } = Typography;
 const AT_RISK_THRESHOLD = 80;
 
 const statusMap: Record<number, { label: string; color: string }> = {
-  0: { label: 'Present', color: 'green' },
-  1: { label: 'Absent', color: 'red' },
-  2: { label: 'Late', color: 'orange' },
-  3: { label: 'Excused', color: 'blue' },
-  4: { label: 'Sick Leave', color: 'purple' },
+  1: { label: 'Present', color: 'green' },
+  2: { label: 'Absent', color: 'red' },
+  3: { label: 'Late', color: 'orange' },
+  4: { label: 'Excused', color: 'blue' },
+  5: { label: 'Sick Leave', color: 'purple' },
 };
 
 // ─── Analytics Tab Content ─────────────────────────────────────
@@ -225,10 +225,10 @@ function AttendanceContent() {
 
   const stats = {
     total: attendances?.length ?? 0,
-    present: attendances?.filter(a => a.status === 0).length ?? 0,
-    absent: attendances?.filter(a => a.status === 1).length ?? 0,
-    late: attendances?.filter(a => a.status === 2).length ?? 0,
-    sickLeave: attendances?.filter(a => a.status === 4).length ?? 0,
+    present: attendances?.filter(a => a.status === 1).length ?? 0,
+    absent: attendances?.filter(a => a.status === 2).length ?? 0,
+    late: attendances?.filter(a => a.status === 3).length ?? 0,
+    sickLeave: attendances?.filter(a => a.status === 5).length ?? 0,
   };
 
   const recordColumns: ColumnConfig<IAttendanceList>[] = [
@@ -239,11 +239,11 @@ function AttendanceContent() {
       key: 'status', title: 'Status', dataIndex: 'status',
       filterable: true, filterType: 'enum',
       filterOptions: [
-        { label: 'Present', value: 0 },
-        { label: 'Absent', value: 1 },
-        { label: 'Late', value: 2 },
-        { label: 'Excused', value: 3 },
-        { label: 'Sick Leave', value: 4 },
+        { label: 'Present', value: 1 },
+        { label: 'Absent', value: 2 },
+        { label: 'Late', value: 3 },
+        { label: 'Excused', value: 4 },
+        { label: 'Sick Leave', value: 5 },
       ],
       renderType: 'status',
       renderConfig: { statusMap },

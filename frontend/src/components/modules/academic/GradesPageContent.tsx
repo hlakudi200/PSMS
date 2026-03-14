@@ -45,13 +45,13 @@ function GradesContent() {
       key: 'schoolPhase', title: 'Phase', dataIndex: 'schoolPhase',
       filterable: true, filterType: 'enum',
       filterOptions: [
-        { label: 'Foundation', value: 0 },
-        { label: 'Intermediate', value: 1 },
-        { label: 'Senior', value: 2 },
-        { label: 'FET', value: 3 },
+        { label: 'Foundation', value: 1 },
+        { label: 'Intermediate', value: 2 },
+        { label: 'Senior', value: 3 },
+        { label: 'FET', value: 4 },
       ],
       render: (value: number) => {
-        const phases = ['Foundation', 'Intermediate', 'Senior', 'FET'];
+        const phases: Record<number, string> = { 1: 'Foundation', 2: 'Intermediate', 3: 'Senior', 4: 'FET' };
         return phases[value] ?? value;
       },
     },

@@ -34,17 +34,21 @@ import type { IReport, IReportSubject } from '@/providers/assessment/shared/inte
 const { Title, Text, Paragraph } = Typography;
 
 const statusMap: Record<number, { label: string; color: string }> = {
-  0: { label: 'Draft', color: 'default' },
-  1: { label: 'Submitted', color: 'orange' },
-  2: { label: 'Approved', color: 'blue' },
-  3: { label: 'Published', color: 'green' },
-  4: { label: 'Acknowledged', color: 'purple' },
+  1: { label: 'Draft', color: 'default' },
+  2: { label: 'Generated', color: 'blue' },
+  3: { label: 'Pending Approval', color: 'orange' },
+  4: { label: 'Approved', color: 'green' },
+  5: { label: 'Published', color: 'purple' },
 };
 
 const reportTypeMap: Record<number, string> = {
-  0: 'Term Report',
-  1: 'Mid-Year Report',
-  2: 'Final Report',
+  1: 'Term 1 Report',
+  2: 'Term 2 Report',
+  3: 'Term 3 Report',
+  4: 'Term 4 Report',
+  5: 'Mid-Year Report',
+  6: 'Year-End Report',
+  7: 'Progress Report',
 };
 
 const achievementLabels: Record<number, { symbol: string; desc: string }> = {
@@ -183,7 +187,7 @@ function ReportDetailContent() {
       </Space>
 
       {/* Status Banner */}
-      {report.status === 1 && (
+      {report.status === 3 && (
         <Alert
           className="no-print"
           type="warning"
@@ -197,7 +201,7 @@ function ReportDetailContent() {
           }
         />
       )}
-      {report.status === 2 && (
+      {report.status === 4 && (
         <Alert
           className="no-print"
           type="info"

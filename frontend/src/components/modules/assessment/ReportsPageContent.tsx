@@ -18,17 +18,21 @@ import { useAuthState } from '@/providers/auth';
 import type { IReportList } from '@/providers/assessment/shared/interfaces';
 
 const reportStatusMap: Record<number, { label: string; color: string }> = {
-  0: { label: 'Draft', color: 'default' },
-  1: { label: 'Submitted', color: 'blue' },
-  2: { label: 'Approved', color: 'green' },
-  3: { label: 'Published', color: 'purple' },
-  4: { label: 'Acknowledged', color: 'cyan' },
+  1: { label: 'Draft', color: 'default' },
+  2: { label: 'Generated', color: 'blue' },
+  3: { label: 'Pending Approval', color: 'orange' },
+  4: { label: 'Approved', color: 'green' },
+  5: { label: 'Published', color: 'purple' },
 };
 
 const reportTypeMap: Record<number, { label: string; color: string }> = {
-  0: { label: 'Term', color: 'blue' },
-  1: { label: 'Mid-Year', color: 'orange' },
-  2: { label: 'Final', color: 'green' },
+  1: { label: 'Term 1', color: 'blue' },
+  2: { label: 'Term 2', color: 'blue' },
+  3: { label: 'Term 3', color: 'blue' },
+  4: { label: 'Term 4', color: 'blue' },
+  5: { label: 'Mid-Year', color: 'orange' },
+  6: { label: 'Year-End', color: 'green' },
+  7: { label: 'Progress', color: 'cyan' },
 };
 
 function ReportsContent() {
@@ -95,9 +99,13 @@ function ReportsContent() {
       key: 'reportType', title: 'Type', dataIndex: 'reportType', width: 90,
       filterable: true, filterType: 'enum',
       filterOptions: [
-        { label: 'Term', value: 0 },
-        { label: 'Mid-Year', value: 1 },
-        { label: 'Final', value: 2 },
+        { label: 'Term 1', value: 1 },
+        { label: 'Term 2', value: 2 },
+        { label: 'Term 3', value: 3 },
+        { label: 'Term 4', value: 4 },
+        { label: 'Mid-Year', value: 5 },
+        { label: 'Year-End', value: 6 },
+        { label: 'Progress', value: 7 },
       ],
       renderType: 'status',
       renderConfig: { statusMap: reportTypeMap },
@@ -109,11 +117,11 @@ function ReportsContent() {
       key: 'status', title: 'Status', dataIndex: 'status',
       filterable: true, filterType: 'enum',
       filterOptions: [
-        { label: 'Draft', value: 0 },
-        { label: 'Submitted', value: 1 },
-        { label: 'Approved', value: 2 },
-        { label: 'Published', value: 3 },
-        { label: 'Acknowledged', value: 4 },
+        { label: 'Draft', value: 1 },
+        { label: 'Generated', value: 2 },
+        { label: 'Pending Approval', value: 3 },
+        { label: 'Approved', value: 4 },
+        { label: 'Published', value: 5 },
       ],
       renderType: 'status',
       renderConfig: { statusMap: reportStatusMap },
@@ -133,7 +141,7 @@ function ReportsContent() {
       key: 'approve',
       label: 'Approve',
       icon: <CheckCircleOutlined />,
-      visible: (record) => record.status === 1, // Submitted
+      visible: (record) => record.status === 3, // Pending Approval
       confirm: { title: 'Approve this report card?', description: 'The report will be ready for publication.' },
       onClick: async (record) => {
         await approveAsync(record.id);
@@ -145,7 +153,7 @@ function ReportsContent() {
       key: 'publish',
       label: 'Publish',
       icon: <SendOutlined />,
-      visible: (record) => record.status === 2, // Approved
+      visible: (record) => record.status === 4, // Approved
       confirm: { title: 'Publish this report card?', description: 'Parents and students will be able to view it.' },
       onClick: async (record) => {
         await publishAsync(record.id);
@@ -161,9 +169,9 @@ function ReportsContent() {
       label: 'Approve Selected',
       confirm: { title: 'Approve all selected reports?' },
       onClick: async (rows) => {
-        const submitted = rows.filter(r => r.status === 1);
+        const submitted = rows.filter(r => r.status === 3);
         if (submitted.length === 0) {
-          message.warning('No reports in "Submitted" status selected');
+          message.warning('No reports in "Pending Approval" status selected');
           return;
         }
         for (const row of submitted) await approveAsync(row.id);
@@ -176,7 +184,7 @@ function ReportsContent() {
       label: 'Publish Selected',
       confirm: { title: 'Publish all selected reports?' },
       onClick: async (rows) => {
-        const approved = rows.filter(r => r.status === 2);
+        const approved = rows.filter(r => r.status === 4);
         if (approved.length === 0) {
           message.warning('No reports in "Approved" status selected');
           return;

@@ -18,24 +18,30 @@ import { AnnouncementFormModal } from '@/components/modals/communication/Announc
 import type { IAnnouncementList } from '@/providers/communication/shared/interfaces';
 
 const typeMap: Record<number, { label: string; color: string }> = {
-  0: { label: 'General', color: 'default' },
-  1: { label: 'Academic', color: 'blue' },
-  2: { label: 'Event', color: 'purple' },
-  3: { label: 'Emergency', color: 'red' },
+  1: { label: 'General', color: 'default' },
+  2: { label: 'Academic', color: 'blue' },
+  3: { label: 'Sports', color: 'green' },
+  4: { label: 'Event', color: 'purple' },
+  5: { label: 'Emergency', color: 'red' },
+  6: { label: 'Holiday', color: 'orange' },
+  7: { label: 'Administrative', color: 'cyan' },
 };
 
 const priorityMap: Record<number, { label: string; color: string }> = {
-  0: { label: 'Low', color: 'default' },
-  1: { label: 'Normal', color: 'blue' },
-  2: { label: 'High', color: 'red' },
+  1: { label: 'Low', color: 'default' },
+  2: { label: 'Normal', color: 'blue' },
+  3: { label: 'High', color: 'orange' },
+  4: { label: 'Urgent', color: 'red' },
 };
 
 const audienceMap: Record<number, { label: string; color: string }> = {
-  0: { label: 'All', color: 'green' },
-  1: { label: 'Teachers', color: 'blue' },
-  2: { label: 'Parents', color: 'purple' },
-  3: { label: 'Students', color: 'orange' },
-  4: { label: 'Specific', color: 'cyan' },
+  1: { label: 'All', color: 'green' },
+  2: { label: 'Staff', color: 'geekblue' },
+  3: { label: 'Teachers', color: 'blue' },
+  4: { label: 'Parents', color: 'purple' },
+  5: { label: 'Students', color: 'orange' },
+  6: { label: 'Grade', color: 'cyan' },
+  7: { label: 'Class', color: 'magenta' },
 };
 
 function AnnouncementsContent() {
@@ -74,10 +80,13 @@ function AnnouncementsContent() {
       key: 'type', title: 'Type', dataIndex: 'type', width: 100,
       filterable: true, filterType: 'enum',
       filterOptions: [
-        { label: 'General', value: 0 },
-        { label: 'Academic', value: 1 },
-        { label: 'Event', value: 2 },
-        { label: 'Emergency', value: 3 },
+        { label: 'General', value: 1 },
+        { label: 'Academic', value: 2 },
+        { label: 'Sports', value: 3 },
+        { label: 'Event', value: 4 },
+        { label: 'Emergency', value: 5 },
+        { label: 'Holiday', value: 6 },
+        { label: 'Administrative', value: 7 },
       ],
       renderType: 'status',
       renderConfig: { statusMap: typeMap },
@@ -86,9 +95,10 @@ function AnnouncementsContent() {
       key: 'priority', title: 'Priority', dataIndex: 'priority', width: 90,
       filterable: true, filterType: 'enum',
       filterOptions: [
-        { label: 'Low', value: 0 },
-        { label: 'Normal', value: 1 },
-        { label: 'High', value: 2 },
+        { label: 'Low', value: 1 },
+        { label: 'Normal', value: 2 },
+        { label: 'High', value: 3 },
+        { label: 'Urgent', value: 4 },
       ],
       renderType: 'status',
       renderConfig: { statusMap: priorityMap },
@@ -97,11 +107,13 @@ function AnnouncementsContent() {
       key: 'targetAudience', title: 'Audience', dataIndex: 'targetAudience', width: 100,
       filterable: true, filterType: 'enum',
       filterOptions: [
-        { label: 'All', value: 0 },
-        { label: 'Teachers', value: 1 },
-        { label: 'Parents', value: 2 },
-        { label: 'Students', value: 3 },
-        { label: 'Specific', value: 4 },
+        { label: 'All', value: 1 },
+        { label: 'Staff', value: 2 },
+        { label: 'Teachers', value: 3 },
+        { label: 'Parents', value: 4 },
+        { label: 'Students', value: 5 },
+        { label: 'Grade', value: 6 },
+        { label: 'Class', value: 7 },
       ],
       renderType: 'status',
       renderConfig: { statusMap: audienceMap },
