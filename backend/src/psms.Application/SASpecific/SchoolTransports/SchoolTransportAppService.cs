@@ -57,7 +57,9 @@ public class SchoolTransportAppService : ApplicationService, ISchoolTransportApp
             .WhereIf(input.TransportType.HasValue, st => st.TransportType == input.TransportType.Value)
             .WhereIf(input.IsActive.HasValue, st => st.IsActive == input.IsActive.Value)
             .WhereIf(!string.IsNullOrWhiteSpace(input.RouteName),
-                st => st.RouteName.ToLower().Contains(input.RouteName.Trim().ToLower()));
+                st => st.RouteName.ToLower().Contains(input.RouteName.Trim().ToLower()))
+            .WhereIf(!string.IsNullOrWhiteSpace(input.Keyword),
+                st => st.RouteName.ToLower().Contains(input.Keyword.ToLower()));
 
         var totalCount = await query.CountAsync();
 

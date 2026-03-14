@@ -71,7 +71,10 @@ public class StudentFeeAppService : ApplicationService, IStudentFeeAppService
             .WhereIf(input.Status.HasValue, sf => sf.Status == input.Status.Value)
             .WhereIf(!string.IsNullOrWhiteSpace(input.StudentName),
                 sf => (sf.Student.FirstName + " " + sf.Student.LastName).ToLower()
-                    .Contains(input.StudentName.Trim().ToLower()));
+                    .Contains(input.StudentName.Trim().ToLower()))
+            .WhereIf(!string.IsNullOrWhiteSpace(input.Keyword),
+                sf => sf.Student.FirstName.ToLower().Contains(input.Keyword.Trim().ToLower())
+                    || sf.Student.LastName.ToLower().Contains(input.Keyword.Trim().ToLower()));
 
         var totalCount = await query.CountAsync();
 

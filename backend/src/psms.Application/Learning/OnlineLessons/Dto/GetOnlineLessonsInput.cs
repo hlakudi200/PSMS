@@ -14,4 +14,5 @@ public class GetOnlineLessonsInput : PagedAndSortedResultRequestDto
     public DateTime? StartDate { get; set; }
     public DateTime? EndDate { get; set; }
     public long? HostTeacherUserId { get; set; }
+    public string Keyword { get; set; }
 }

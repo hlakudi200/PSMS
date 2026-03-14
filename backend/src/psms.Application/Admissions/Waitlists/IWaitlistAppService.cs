@@ -31,7 +31,7 @@ public interface IWaitlistAppService : IApplicationService
     /// <summary>
     /// Gets all waitlist entries with filters.
     /// </summary>
-    Task<PagedResultDto<WaitlistDto>> GetAllAsync(PagedAndSortedResultRequestDto input);
+    Task<PagedResultDto<WaitlistDto>> GetAllAsync(GetWaitlistsInput input);
 
     /// <summary>
     /// Adds an application to the waitlist.

@@ -16,4 +16,5 @@ public class GetAssessmentsInput : PagedAndSortedResultRequestDto
     public AssessmentType? AssessmentType { get; set; }
     public bool? IsPublished { get; set; }
     public string Name { get; set; }
+    public string Keyword { get; set; }
 }

@@ -64,7 +64,9 @@ public class ExtramuralActivityAppService : ApplicationService, IExtramuralActiv
             .WhereIf(input.IsActive.HasValue, ea => ea.IsActive == input.IsActive.Value)
             .WhereIf(input.IsRegistrationOpen.HasValue, ea => ea.IsRegistrationOpen == input.IsRegistrationOpen.Value)
             .WhereIf(!string.IsNullOrWhiteSpace(input.ActivityName),
-                ea => ea.ActivityName.ToLower().Contains(input.ActivityName.Trim().ToLower()));
+                ea => ea.ActivityName.ToLower().Contains(input.ActivityName.Trim().ToLower()))
+            .WhereIf(!string.IsNullOrWhiteSpace(input.Keyword),
+                ea => ea.ActivityName.ToLower().Contains(input.Keyword.ToLower()));
 
         var totalCount = await query.CountAsync();
 

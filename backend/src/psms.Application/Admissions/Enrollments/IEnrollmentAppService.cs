@@ -21,7 +21,7 @@ public interface IEnrollmentAppService : IApplicationService
     /// <summary>
     /// Gets all applications ready for enrollment.
     /// </summary>
-    Task<PagedResultDto<EnrollmentDto>> GetPendingEnrollmentsAsync(PagedAndSortedResultRequestDto input);
+    Task<PagedResultDto<EnrollmentDto>> GetPendingEnrollmentsAsync(GetPendingEnrollmentsInput input);
 
     /// <summary>
     /// Gets available classes for a grade.

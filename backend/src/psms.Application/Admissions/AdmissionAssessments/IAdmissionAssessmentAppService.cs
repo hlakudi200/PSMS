@@ -25,7 +25,7 @@ public interface IAdmissionAssessmentAppService : IApplicationService
     /// <summary>
     /// Gets all assessments with filters.
     /// </summary>
-    Task<PagedResultDto<AdmissionAssessmentDto>> GetAllAsync(PagedAndSortedResultRequestDto input);
+    Task<PagedResultDto<AdmissionAssessmentDto>> GetAllAsync(GetAdmissionAssessmentsInput input);
 
     /// <summary>
     /// Schedules an assessment for an application.

@@ -71,7 +71,11 @@ public class StudentExtramuralAppService : ApplicationService, IStudentExtramura
             .WhereIf(input.StudentId.HasValue, se => se.StudentId == input.StudentId.Value)
             .WhereIf(input.ExtramuralActivityId.HasValue, se => se.ExtramuralActivityId == input.ExtramuralActivityId.Value)
             .WhereIf(input.AcademicYearId.HasValue, se => se.AcademicYearId == input.AcademicYearId.Value)
-            .WhereIf(input.Status.HasValue, se => se.Status == input.Status.Value);
+            .WhereIf(input.Status.HasValue, se => se.Status == input.Status.Value)
+            .WhereIf(!string.IsNullOrWhiteSpace(input.Keyword),
+                se => se.Student.FirstName.ToLower().Contains(input.Keyword.ToLower())
+                    || se.Student.LastName.ToLower().Contains(input.Keyword.ToLower())
+                    || se.ExtramuralActivity.ActivityName.ToLower().Contains(input.Keyword.ToLower()));
 
         var totalCount = await query.CountAsync();
 

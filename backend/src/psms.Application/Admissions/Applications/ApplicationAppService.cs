@@ -86,6 +86,10 @@ public class ApplicationAppService : ApplicationService, IApplicationAppService
             .Include(a => a.AdmissionInterview)
             .Include(a => a.AdmissionAssessment)
             .Include(a => a.Waitlist)
+            .WhereIf(!string.IsNullOrWhiteSpace(input.Keyword),
+                a => a.ProspectiveStudentFirstName.ToLower().Contains(input.Keyword.ToLower())
+                    || a.ProspectiveStudentLastName.ToLower().Contains(input.Keyword.ToLower())
+                    || a.ApplicationNumber.ToLower().Contains(input.Keyword.ToLower()))
             .WhereIf(!string.IsNullOrWhiteSpace(input.ApplicationNumber),
                 a => a.ApplicationNumber.Contains(input.ApplicationNumber))
             .WhereIf(!string.IsNullOrWhiteSpace(input.ApplicantName),

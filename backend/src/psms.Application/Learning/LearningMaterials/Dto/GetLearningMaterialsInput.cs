@@ -13,4 +13,5 @@ public class GetLearningMaterialsInput : PagedAndSortedResultRequestDto
     public Guid? TermId { get; set; }
     public LearningMaterialType? MaterialType { get; set; }
     public bool? IsPublished { get; set; }
+    public string Keyword { get; set; }
 }

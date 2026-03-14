@@ -13,4 +13,5 @@ public class GetAfterCaresInput : PagedAndSortedResultRequestDto
     public AfterCareType? AfterCareType { get; set; }
     public bool? IsActive { get; set; }
     public string ProgramName { get; set; }
+    public string Keyword { get; set; }
 }

@@ -58,7 +58,9 @@ public class DocumentAppService : ApplicationService, IDocumentAppService
             .WhereIf(input.IsPublished.HasValue, d => d.IsPublished == input.IsPublished.Value)
             .WhereIf(input.AcademicYearId.HasValue, d => d.AcademicYearId == input.AcademicYearId.Value)
             .WhereIf(!string.IsNullOrWhiteSpace(input.Search),
-                d => d.Title.ToLower().Contains(input.Search.Trim().ToLower()));
+                d => d.Title.ToLower().Contains(input.Search.Trim().ToLower()))
+            .WhereIf(!string.IsNullOrWhiteSpace(input.Keyword),
+                d => d.Title.ToLower().Contains(input.Keyword.ToLower()));
 
         var totalCount = await query.CountAsync();
 

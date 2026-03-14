@@ -6,6 +6,7 @@ namespace psms.Academic.Attendances.Dto;
 
 public class GetAttendanceInput : PagedAndSortedResultRequestDto
 {
+    public string Keyword { get; set; }
     public Guid? ClassId { get; set; }
     public Guid? StudentId { get; set; }
     public Guid? TeacherId { get; set; }

@@ -71,6 +71,12 @@ public class ClassSubjectAppService : ApplicationService, IClassSubjectAppServic
             .Include(cs => cs.Subject)
             .Include(cs => cs.Teacher)
             .Where(cs => cs.TenantId == AbpSession.TenantId)
+            .WhereIf(!string.IsNullOrWhiteSpace(input.Keyword),
+                cs => cs.Class.ClassName.ToLower().Contains(input.Keyword.ToLower())
+                  || cs.Subject.SubjectName.ToLower().Contains(input.Keyword.ToLower())
+                  || cs.Subject.SubjectCode.ToLower().Contains(input.Keyword.ToLower())
+                  || (cs.Teacher != null && (cs.Teacher.FirstName.ToLower().Contains(input.Keyword.ToLower()) 
+                                            || cs.Teacher.LastName.ToLower().Contains(input.Keyword.ToLower()))))
             .WhereIf(input.ClassId.HasValue, cs => cs.ClassId == input.ClassId.Value)
             .WhereIf(input.SubjectId.HasValue, cs => cs.SubjectId == input.SubjectId.Value)
             .WhereIf(input.TeacherId.HasValue, cs => cs.TeacherId == input.TeacherId.Value)

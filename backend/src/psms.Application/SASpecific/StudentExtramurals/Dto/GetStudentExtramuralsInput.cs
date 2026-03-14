@@ -13,4 +13,5 @@ public class GetStudentExtramuralsInput : PagedAndSortedResultRequestDto
     public Guid? ExtramuralActivityId { get; set; }
     public Guid? AcademicYearId { get; set; }
     public EnrollmentStatus? Status { get; set; }
+    public string Keyword { get; set; }
 }

@@ -69,12 +69,16 @@ public class EnrollmentAppService : ApplicationService, IEnrollmentAppService
     }
 
     [AbpAuthorize(PermissionNames.Admissions_Enrollment_View)]
-    public async Task<PagedResultDto<EnrollmentDto>> GetPendingEnrollmentsAsync(PagedAndSortedResultRequestDto input)
+    public async Task<PagedResultDto<EnrollmentDto>> GetPendingEnrollmentsAsync(GetPendingEnrollmentsInput input)
     {
         var query = _applicationRepository
             .GetAll()
             .Include(a => a.AppliedGrade)
-            .Where(a => a.Status == ApplicationStatus.Approved);
+            .Where(a => a.Status == ApplicationStatus.Approved)
+            .WhereIf(!string.IsNullOrWhiteSpace(input.Keyword),
+                a => a.ProspectiveStudentFirstName.ToLower().Contains(input.Keyword.ToLower())
+                    || a.ProspectiveStudentLastName.ToLower().Contains(input.Keyword.ToLower())
+                    || a.ApplicationNumber.ToLower().Contains(input.Keyword.ToLower()));
 
         var totalCount = await query.CountAsync();
 

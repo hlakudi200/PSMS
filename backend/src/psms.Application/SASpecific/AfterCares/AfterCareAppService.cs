@@ -61,7 +61,9 @@ public class AfterCareAppService : ApplicationService, IAfterCareAppService
             .WhereIf(input.AfterCareType.HasValue, ac => ac.AfterCareType == input.AfterCareType.Value)
             .WhereIf(input.IsActive.HasValue, ac => ac.IsActive == input.IsActive.Value)
             .WhereIf(!string.IsNullOrWhiteSpace(input.ProgramName),
-                ac => ac.ProgramName.ToLower().Contains(input.ProgramName.Trim().ToLower()));
+                ac => ac.ProgramName.ToLower().Contains(input.ProgramName.Trim().ToLower()))
+            .WhereIf(!string.IsNullOrWhiteSpace(input.Keyword),
+                ac => ac.ProgramName.ToLower().Contains(input.Keyword.ToLower()));
 
         var totalCount = await query.CountAsync();
 

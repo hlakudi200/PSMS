@@ -6,4 +6,5 @@ public class GetMessagesInput : PagedAndSortedResultRequestDto
 {
     public bool? IsRead { get; set; }
     public string Search { get; set; }
+    public string Keyword { get; set; }
 }

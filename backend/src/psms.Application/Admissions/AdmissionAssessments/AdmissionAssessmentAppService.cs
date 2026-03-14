@@ -71,13 +71,16 @@ public class AdmissionAssessmentAppService : ApplicationService, IAdmissionAsses
     }
 
     [AbpAuthorize(PermissionNames.Admissions_Assessments_View)]
-    public async Task<PagedResultDto<AdmissionAssessmentDto>> GetAllAsync(PagedAndSortedResultRequestDto input)
+    public async Task<PagedResultDto<AdmissionAssessmentDto>> GetAllAsync(GetAdmissionAssessmentsInput input)
     {
         var query = _assessmentRepository
             .GetAll()
             .Include(a => a.Application)
                 .ThenInclude(app => app.AppliedGrade)
-            .Include(a => a.AssessedGrade);
+            .Include(a => a.AssessedGrade)
+            .WhereIf(!string.IsNullOrWhiteSpace(input.Keyword),
+                a => a.Application.ProspectiveStudentFirstName.ToLower().Contains(input.Keyword.ToLower())
+                    || a.Application.ProspectiveStudentLastName.ToLower().Contains(input.Keyword.ToLower()));
 
         var totalCount = await query.CountAsync();
 

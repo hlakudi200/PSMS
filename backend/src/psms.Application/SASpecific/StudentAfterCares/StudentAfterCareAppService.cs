@@ -71,7 +71,11 @@ public class StudentAfterCareAppService : ApplicationService, IStudentAfterCareA
             .WhereIf(input.StudentId.HasValue, sac => sac.StudentId == input.StudentId.Value)
             .WhereIf(input.AfterCareId.HasValue, sac => sac.AfterCareId == input.AfterCareId.Value)
             .WhereIf(input.AcademicYearId.HasValue, sac => sac.AcademicYearId == input.AcademicYearId.Value)
-            .WhereIf(input.Status.HasValue, sac => sac.Status == input.Status.Value);
+            .WhereIf(input.Status.HasValue, sac => sac.Status == input.Status.Value)
+            .WhereIf(!string.IsNullOrWhiteSpace(input.Keyword),
+                sac => sac.Student.FirstName.ToLower().Contains(input.Keyword.ToLower())
+                    || sac.Student.LastName.ToLower().Contains(input.Keyword.ToLower())
+                    || sac.AfterCare.ProgramName.ToLower().Contains(input.Keyword.ToLower()));
 
         var totalCount = await query.CountAsync();
 

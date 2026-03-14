@@ -71,7 +71,10 @@ public class MarkAppService : ApplicationService, IMarkAppService
             .WhereIf(input.Status.HasValue, m => m.Status == input.Status.Value)
             .WhereIf(!string.IsNullOrWhiteSpace(input.StudentName),
                 m => (m.Student.FirstName + " " + m.Student.LastName).ToLower()
-                    .Contains(input.StudentName.Trim().ToLower()));
+                    .Contains(input.StudentName.Trim().ToLower()))
+            .WhereIf(!string.IsNullOrWhiteSpace(input.Keyword),
+                m => m.Student.FirstName.ToLower().Contains(input.Keyword.ToLower())
+                    || m.Student.LastName.ToLower().Contains(input.Keyword.ToLower()));
 
         var totalCount = await query.CountAsync();
 
