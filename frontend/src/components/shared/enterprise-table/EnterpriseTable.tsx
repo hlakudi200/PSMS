@@ -21,6 +21,7 @@ import { useTableTelemetry } from './hooks/useTableTelemetry';
 import { useResponsive } from './hooks/useResponsive';
 import { applyRenderer } from './renderers';
 import { TableToolbar } from './TableToolbar';
+import { TableFilters } from './TableFilters';
 
 // Resizable header cell for column dragging
 const ResizableTitle = (
@@ -183,7 +184,7 @@ export function EnterpriseTable<T extends Record<string, any>>(
     pageSize: defaultPageSize = 10,
     virtualizeThreshold = 200,
     telemetry: telemetryConfig,
-    searchable = false,
+    searchable = true,
     searchPlaceholder,
     searchFilterKey = 'keyword',
     size = 'small',
@@ -426,18 +427,27 @@ export function EnterpriseTable<T extends Record<string, any>>(
     );
   }, [tableState.state.filters]);
 
+  // --- Track current sort to avoid redundant dispatches ---
+  const currentSortRef = React.useRef<string | undefined>(tableState.state.sorting);
+  currentSortRef.current = tableState.state.sorting;
+
   // --- Ant Design Table onChange handler ---
   const handleTableChange: TableProps<T>['onChange'] = useCallback(
     (pagination: any, _filters: any, sorter: any) => {
+      // Handle sorting — only dispatch if sort actually changed
+      if (sorter && !Array.isArray(sorter)) {
+        const field = Array.isArray(sorter.field) ? sorter.field.join('.') : sorter.field;
+        const order = sorter.order ?? null;
+        const newSorting = order ? `${field} ${order === 'ascend' ? 'asc' : 'desc'}` : undefined;
+        if (newSorting !== currentSortRef.current) {
+          tableState.handleSortChange(field as string, order);
+          return; // sort change resets page to 1, skip pagination handling
+        }
+      }
+
       // Handle pagination
       if (pagination?.current && pagination?.pageSize) {
         tableState.handlePageChange(pagination.current, pagination.pageSize);
-      }
-
-      // Handle sorting
-      if (sorter && !Array.isArray(sorter)) {
-        const field = Array.isArray(sorter.field) ? sorter.field.join('.') : sorter.field;
-        tableState.handleSortChange(field as string, sorter.order ?? null);
       }
     },
     [tableState],
@@ -530,6 +540,13 @@ export function EnterpriseTable<T extends Record<string, any>>(
           showLastUpdated={showLastUpdated}
         />
 
+        <TableFilters
+          columns={columns}
+          filters={tableState.state.filters}
+          onFilterChange={tableState.handleFilterChange}
+          onFiltersReset={tableState.handleFiltersReset}
+        />
+
         {error && (
           <div style={{ background: '#FFF7E6', borderBottom: '1px solid #FFD591', padding: '4px 16px', fontSize: 12, color: '#D46B08' }}>
             <WarningOutlined /> Data may be incomplete due to an error.
@@ -611,32 +628,19 @@ export function EnterpriseTable<T extends Record<string, any>>(
         showLastUpdated={showLastUpdated}
       />
 
+      <TableFilters
+        columns={columns}
+        filters={tableState.state.filters}
+        onFilterChange={tableState.handleFilterChange}
+        onFiltersReset={tableState.handleFiltersReset}
+      />
+
       {/* Error warning banner (when data exists but error occurred) */}
       {error && data.length > 0 && (
         <div style={{ background: '#FFF7E6', borderBottom: '1px solid #FFD591', padding: '4px 16px', fontSize: 12, color: '#D46B08' }}>
           <WarningOutlined /> Data may be incomplete due to an error.{' '}
           <Button type="link" size="small" onClick={tableState.handleRefresh} style={{ padding: 0, fontSize: 12 }}>
             Retry
-          </Button>
-        </div>
-      )}
-
-      {/* Active filter summary */}
-      {activeFilters.length > 0 && (
-        <div className="psms-filter-summary">
-          <span>Filters:</span>
-          {activeFilters.map(([key, value]) => (
-            <Tag
-              key={key}
-              closable
-              onClose={() => tableState.handleFilterChange(key, undefined)}
-              className="psms-filter-tag"
-            >
-              {key}: {String(value)}
-            </Tag>
-          ))}
-          <Button type="link" size="small" onClick={tableState.handleFiltersReset} style={{ padding: 0, fontSize: 12 }}>
-            Clear all
           </Button>
         </div>
       )}

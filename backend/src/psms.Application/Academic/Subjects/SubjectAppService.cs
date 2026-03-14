@@ -46,11 +46,18 @@ public class SubjectAppService : ApplicationService, ISubjectAppService
     }
 
     [AbpAuthorize(PermissionNames.Academic_Subjects_View)]
-    public async Task<PagedResultDto<SubjectListDto>> GetAllAsync(PagedAndSortedResultRequestDto input)
+    public async Task<PagedResultDto<SubjectListDto>> GetAllAsync(GetAcademicEntityInput input)
     {
         var query = _subjectRepository
             .GetAll()
-            .Include(s => s.GradeSubjects);
+            .Include(s => s.GradeSubjects)
+            .WhereIf(!string.IsNullOrWhiteSpace(input.Keyword),
+                s => s.SubjectName.ToLower().Contains(input.Keyword.ToLower())
+                  || s.SubjectCode.ToLower().Contains(input.Keyword.ToLower()))
+            .WhereIf(input.IsActive.HasValue,
+                s => s.IsActive == input.IsActive.Value)
+            .WhereIf(input.IsCore.HasValue,
+                s => s.IsCore == input.IsCore.Value);
 
         var totalCount = await query.CountAsync();
 

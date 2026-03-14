@@ -1,6 +1,7 @@
 using Abp.Application.Services;
 using Abp.Application.Services.Dto;
 using psms.Academic.AcademicYears.Dto;
+using psms.Academic.Shared;
 using System;
 using System.Threading.Tasks;
 
@@ -12,7 +13,7 @@ namespace psms.Academic.AcademicYears;
 public interface IAcademicYearAppService : IApplicationService
 {
     Task<AcademicYearDto> GetAsync(Guid id);
-    Task<PagedResultDto<AcademicYearListDto>> GetAllAsync(PagedAndSortedResultRequestDto input);
+    Task<PagedResultDto<AcademicYearListDto>> GetAllAsync(GetAcademicEntityInput input);
     Task<AcademicYearDto> CreateAsync(CreateAcademicYearDto input);
     Task<AcademicYearDto> UpdateAsync(Guid id, UpdateAcademicYearDto input);
     Task DeleteAsync(Guid id);

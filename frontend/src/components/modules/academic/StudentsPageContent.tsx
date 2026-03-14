@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { EyeOutlined } from '@ant-design/icons';
 import { EnterpriseTable } from '@/components/shared/enterprise-table';
 import type { ColumnConfig, TableQuery, RowAction } from '@/components/shared/enterprise-table';
@@ -12,6 +13,7 @@ function StudentsContent() {
   const { students, totalCount, isPending, isError } = useStudentState();
   const { getAllAsync } = useStudentActions();
   const { currentRole } = useAuthState();
+  const router = useRouter();
   const [lastQuery, setLastQuery] = useState<TableQuery | null>(null);
 
   const handleQueryChange = useCallback((query: TableQuery) => {
@@ -20,15 +22,22 @@ function StudentsContent() {
       maxResultCount: query.maxResultCount,
       skipCount: query.skipCount,
       sorting: query.sorting,
+      ...query.filters,
     });
   }, [getAllAsync]);
 
   const columns: ColumnConfig<IStudentList>[] = [
     { key: 'admissionNumber', title: 'Admission #', dataIndex: 'admissionNumber', sortable: true, width: 120 },
-    { key: 'fullName', title: 'Full Name', dataIndex: 'fullName', sortable: true, filterable: true },
-    { key: 'currentGradeName', title: 'Grade', dataIndex: 'currentGradeName', sortable: true, filterable: true },
-    { key: 'currentClassName', title: 'Class', dataIndex: 'currentClassName', sortable: true, filterable: true },
+    { key: 'fullName', title: 'Full Name', dataIndex: 'fullName', sortable: true },
+    { key: 'currentGradeName', title: 'Grade', dataIndex: 'currentGradeName', sortable: true },
+    { key: 'currentClassName', title: 'Class', dataIndex: 'currentClassName', sortable: true },
     { key: 'gender', title: 'Gender', dataIndex: 'gender', hideOnMobile: true,
+      filterable: true, filterType: 'enum',
+      filterOptions: [
+        { label: 'Male', value: 0 },
+        { label: 'Female', value: 1 },
+        { label: 'Other', value: 2 },
+      ],
       renderType: 'status',
       renderConfig: {
         statusMap: {
@@ -41,6 +50,11 @@ function StudentsContent() {
     { key: 'age', title: 'Age', dataIndex: 'age', sortable: true, hideOnMobile: true, width: 70 },
     {
       key: 'isActive', title: 'Status', dataIndex: 'isActive',
+      filterable: true, filterType: 'enum',
+      filterOptions: [
+        { label: 'Active', value: true },
+        { label: 'Inactive', value: false },
+      ],
       renderType: 'status',
       renderConfig: {
         statusMap: {
@@ -57,8 +71,7 @@ function StudentsContent() {
       label: 'View Profile',
       icon: <EyeOutlined />,
       onClick: (record) => {
-        // TODO: Navigate to student profile page when implemented
-        console.log('View student profile:', record.id);
+        router.push(`/principal/students/${record.id}`);
       },
     },
   ];

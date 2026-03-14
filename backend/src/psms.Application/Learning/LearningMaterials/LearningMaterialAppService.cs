@@ -64,7 +64,9 @@ public class LearningMaterialAppService : ApplicationService, ILearningMaterialA
             .WhereIf(input.ClassSubjectId.HasValue, lm => lm.ClassSubjectId == input.ClassSubjectId.Value)
             .WhereIf(input.TermId.HasValue, lm => lm.TermId == input.TermId.Value)
             .WhereIf(input.MaterialType.HasValue, lm => lm.MaterialType == input.MaterialType.Value)
-            .WhereIf(input.IsPublished.HasValue, lm => lm.IsPublished == input.IsPublished.Value);
+            .WhereIf(input.IsPublished.HasValue, lm => lm.IsPublished == input.IsPublished.Value)
+            .WhereIf(!string.IsNullOrWhiteSpace(input.Keyword),
+                lm => lm.Title.ToLower().Contains(input.Keyword.ToLower()));
 
         var totalCount = await query.CountAsync();
 

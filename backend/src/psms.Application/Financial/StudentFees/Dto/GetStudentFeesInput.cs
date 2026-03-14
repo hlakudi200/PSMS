@@ -15,4 +15,5 @@ public class GetStudentFeesInput : PagedAndSortedResultRequestDto
     public Guid? AcademicYearId { get; set; }
     public FeeStatus? Status { get; set; }
     public string StudentName { get; set; }
+    public string Keyword { get; set; }
 }

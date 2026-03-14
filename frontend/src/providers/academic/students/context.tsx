@@ -4,7 +4,7 @@ import {
   IStudent,
   ICreateStudent,
   IUpdateStudent,
-  IPagedAndSortedResultRequest
+  IGetStudentsInput,
 } from "../shared/interfaces";
 
 export interface IStudentStateContext {
@@ -18,7 +18,7 @@ export interface IStudentStateContext {
 
 export interface IStudentActionContext {
   getAsync: (id: string) => void;
-  getAllAsync: (input?: IPagedAndSortedResultRequest) => void;
+  getAllAsync: (input?: IGetStudentsInput) => void;
   createAsync: (input: ICreateStudent) => void;
   updateAsync: (id: string, input: IUpdateStudent) => void;
   deleteAsync: (id: string) => void;

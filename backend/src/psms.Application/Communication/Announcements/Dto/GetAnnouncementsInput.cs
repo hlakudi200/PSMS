@@ -11,4 +11,5 @@ public class GetAnnouncementsInput : PagedAndSortedResultRequestDto
     public bool? IsPublished { get; set; }
     public bool? IsPinned { get; set; }
     public string Search { get; set; }
+    public string Keyword { get; set; }
 }

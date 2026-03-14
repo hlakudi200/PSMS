@@ -12,4 +12,5 @@ public class GetDocumentsInput : PagedAndSortedResultRequestDto
     public bool? IsPublished { get; set; }
     public Guid? AcademicYearId { get; set; }
     public string Search { get; set; }
+    public string Keyword { get; set; }
 }

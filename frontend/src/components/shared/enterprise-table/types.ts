@@ -17,7 +17,7 @@ export type ColumnFilterType = 'text' | 'number' | 'date' | 'dateRange' | 'enum'
 
 export interface EnumOption {
   label: string;
-  value: string | number;
+  value: string | number | boolean;
 }
 
 export interface StatusRenderConfig {

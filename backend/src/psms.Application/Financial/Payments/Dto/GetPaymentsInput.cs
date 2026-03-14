@@ -17,4 +17,5 @@ public class GetPaymentsInput : PagedAndSortedResultRequestDto
     public DateTime? ToDate { get; set; }
     public string ReceiptNumber { get; set; }
     public string StudentName { get; set; }
+    public string Keyword { get; set; }
 }

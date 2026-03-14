@@ -56,7 +56,9 @@ public class AnnouncementAppService : ApplicationService, IAnnouncementAppServic
             .WhereIf(input.IsPublished.HasValue, a => a.IsPublished == input.IsPublished.Value)
             .WhereIf(input.IsPinned.HasValue, a => a.IsPinned == input.IsPinned.Value)
             .WhereIf(!string.IsNullOrWhiteSpace(input.Search),
-                a => a.Title.ToLower().Contains(input.Search.Trim().ToLower()));
+                a => a.Title.ToLower().Contains(input.Search.Trim().ToLower()))
+            .WhereIf(!string.IsNullOrWhiteSpace(input.Keyword),
+                a => a.Title.ToLower().Contains(input.Keyword.ToLower()));
 
         var totalCount = await query.CountAsync();
 

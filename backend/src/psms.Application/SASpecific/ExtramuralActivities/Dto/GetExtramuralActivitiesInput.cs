@@ -15,4 +15,5 @@ public class GetExtramuralActivitiesInput : PagedAndSortedResultRequestDto
     public bool? IsActive { get; set; }
     public bool? IsRegistrationOpen { get; set; }
     public string ActivityName { get; set; }
+    public string Keyword { get; set; }
 }

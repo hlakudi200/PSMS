@@ -58,7 +58,9 @@ public class NotificationAppService : ApplicationService, INotificationAppServic
             .WhereIf(input.Priority.HasValue, n => n.Priority == input.Priority.Value)
             .WhereIf(input.IsRead.HasValue, n => n.IsRead == input.IsRead.Value)
             .WhereIf(!string.IsNullOrWhiteSpace(input.Search),
-                n => n.Title.ToLower().Contains(input.Search.Trim().ToLower()));
+                n => n.Title.ToLower().Contains(input.Search.Trim().ToLower()))
+            .WhereIf(!string.IsNullOrWhiteSpace(input.Keyword),
+                n => n.Title.ToLower().Contains(input.Keyword.ToLower()));
 
         var totalCount = await query.CountAsync();
 

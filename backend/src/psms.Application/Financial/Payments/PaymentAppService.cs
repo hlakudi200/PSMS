@@ -75,7 +75,11 @@ public class PaymentAppService : ApplicationService, IPaymentAppService
                 p => p.ReceiptNumber == input.ReceiptNumber.Trim())
             .WhereIf(!string.IsNullOrWhiteSpace(input.StudentName),
                 p => (p.Student.FirstName + " " + p.Student.LastName).ToLower()
-                    .Contains(input.StudentName.Trim().ToLower()));
+                    .Contains(input.StudentName.Trim().ToLower()))
+            .WhereIf(!string.IsNullOrWhiteSpace(input.Keyword),
+                p => p.ReceiptNumber.ToLower().Contains(input.Keyword.Trim().ToLower())
+                    || p.Student.FirstName.ToLower().Contains(input.Keyword.Trim().ToLower())
+                    || p.Student.LastName.ToLower().Contains(input.Keyword.Trim().ToLower()));
 
         var totalCount = await query.CountAsync();
 

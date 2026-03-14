@@ -79,7 +79,9 @@ public class AssessmentAppService : ApplicationService, IAssessmentAppService
             .WhereIf(input.AssessmentType.HasValue, a => a.AssessmentType == input.AssessmentType.Value)
             .WhereIf(input.IsPublished.HasValue, a => a.IsPublished == input.IsPublished.Value)
             .WhereIf(!string.IsNullOrWhiteSpace(input.Name),
-                a => a.Name.ToLower().Contains(input.Name.Trim().ToLower()));
+                a => a.Name.ToLower().Contains(input.Name.Trim().ToLower()))
+            .WhereIf(!string.IsNullOrWhiteSpace(input.Keyword),
+                a => a.Name.ToLower().Contains(input.Keyword.ToLower()));
 
         var totalCount = await query.CountAsync();
 

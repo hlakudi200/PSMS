@@ -58,21 +58,27 @@ function FinanceContent() {
 
   const handleFeeQueryChange = useCallback((query: TableQuery) => {
     setLastFeeQuery(query);
+    const { keyword, ...columnFilters } = query.filters ?? {};
     getAllFees({
       maxResultCount: query.maxResultCount,
       skipCount: query.skipCount,
       sorting: query.sorting,
+      feeName: keyword as string | undefined,
+      ...columnFilters,
     });
   }, [getAllFees]);
 
   const handlePaymentQueryChange = useCallback((query: TableQuery) => {
     setLastPaymentQuery(query);
+    const { keyword, ...columnFilters } = query.filters ?? {};
     getAllPayments({
       maxResultCount: query.maxResultCount,
       skipCount: query.skipCount,
       sorting: query.sorting,
       fromDate: paymentDateRange?.[0]?.format('YYYY-MM-DD'),
       toDate: paymentDateRange?.[1]?.format('YYYY-MM-DD'),
+      studentName: keyword as string | undefined,
+      ...columnFilters,
     });
   }, [getAllPayments, paymentDateRange]);
 
@@ -97,19 +103,33 @@ function FinanceContent() {
 
   // --- Fee Structures Tab ---
   const feeColumns: ColumnConfig<IFeeStructureList>[] = [
-    { key: 'feeName', title: 'Fee Name', dataIndex: 'feeName', sortable: true, filterable: true },
+    { key: 'feeName', title: 'Fee Name', dataIndex: 'feeName', sortable: true },
     {
       key: 'feeType', title: 'Type', dataIndex: 'feeType', width: 110,
+      filterable: true, filterType: 'enum',
+      filterOptions: [
+        { label: 'Tuition', value: 0 },
+        { label: 'Registration', value: 1 },
+        { label: 'Uniform', value: 2 },
+        { label: 'Transport', value: 3 },
+        { label: 'Stationery', value: 4 },
+        { label: 'Other', value: 5 },
+      ],
       renderType: 'status',
       renderConfig: { statusMap: feeTypeMap },
     },
-    { key: 'gradeName', title: 'Grade', dataIndex: 'gradeName', sortable: true, filterable: true },
+    { key: 'gradeName', title: 'Grade', dataIndex: 'gradeName', sortable: true },
     { key: 'academicYearName', title: 'Year', dataIndex: 'academicYearName', sortable: true, hideOnMobile: true },
     { key: 'formattedAmount', title: 'Amount', dataIndex: 'formattedAmount', sortable: true, width: 120 },
     { key: 'billingFrequency', title: 'Frequency', dataIndex: 'billingFrequency', hideOnMobile: true, width: 100 },
     { key: 'studentFeeCount', title: 'Students', dataIndex: 'studentFeeCount', sortable: true, width: 90 },
     {
       key: 'isActive', title: 'Status', dataIndex: 'isActive',
+      filterable: true, filterType: 'enum',
+      filterOptions: [
+        { label: 'Active', value: 'true' },
+        { label: 'Inactive', value: 'false' },
+      ],
       renderType: 'status',
       renderConfig: {
         statusMap: {
@@ -134,17 +154,33 @@ function FinanceContent() {
   // --- Payments Tab ---
   const paymentColumns: ColumnConfig<IPaymentList>[] = [
     { key: 'receiptNumber', title: 'Receipt #', dataIndex: 'receiptNumber', sortable: true, width: 110 },
-    { key: 'studentName', title: 'Student', dataIndex: 'studentName', sortable: true, filterable: true },
+    { key: 'studentName', title: 'Student', dataIndex: 'studentName', sortable: true },
     { key: 'parentName', title: 'Parent', dataIndex: 'parentName', sortable: true, hideOnMobile: true },
     { key: 'formattedAmount', title: 'Amount', dataIndex: 'formattedAmount', sortable: true, width: 120 },
     {
       key: 'paymentMethod', title: 'Method', dataIndex: 'paymentMethod', width: 110, hideOnMobile: true,
+      filterable: true, filterType: 'enum',
+      filterOptions: [
+        { label: 'Cash', value: 0 },
+        { label: 'EFT', value: 1 },
+        { label: 'Card', value: 2 },
+        { label: 'Debit Order', value: 3 },
+        { label: 'Other', value: 4 },
+      ],
       renderType: 'status',
       renderConfig: { statusMap: paymentMethodMap },
     },
-    { key: 'paymentDate', title: 'Date', dataIndex: 'paymentDate', sortable: true, renderType: 'date', width: 110 },
+    { key: 'paymentDate', title: 'Date', dataIndex: 'paymentDate', sortable: true, filterable: true, filterType: 'date', renderType: 'date', width: 110 },
     {
       key: 'status', title: 'Status', dataIndex: 'status',
+      filterable: true, filterType: 'enum',
+      filterOptions: [
+        { label: 'Pending', value: 0 },
+        { label: 'Completed', value: 1 },
+        { label: 'Failed', value: 2 },
+        { label: 'Refunded', value: 3 },
+        { label: 'Cancelled', value: 4 },
+      ],
       renderType: 'status',
       renderConfig: { statusMap: paymentStatusMap },
     },

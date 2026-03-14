@@ -69,7 +69,9 @@ public class FeeStructureAppService : ApplicationService, IFeeStructureAppServic
             .WhereIf(input.FeeType.HasValue, fs => fs.FeeType == input.FeeType.Value)
             .WhereIf(input.IsActive.HasValue, fs => fs.IsActive == input.IsActive.Value)
             .WhereIf(!string.IsNullOrWhiteSpace(input.FeeName),
-                fs => fs.FeeName.ToLower().Contains(input.FeeName.Trim().ToLower()));
+                fs => fs.FeeName.ToLower().Contains(input.FeeName.Trim().ToLower()))
+            .WhereIf(!string.IsNullOrWhiteSpace(input.Keyword),
+                fs => fs.FeeName.ToLower().Contains(input.Keyword.Trim().ToLower()));
 
         var totalCount = await query.CountAsync();
 

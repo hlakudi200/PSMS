@@ -1,6 +1,7 @@
 using Abp.Application.Services;
 using Abp.Application.Services.Dto;
 using psms.Academic.Classes.Dto;
+using psms.Academic.Shared;
 using System;
 using System.Threading.Tasks;
 
@@ -12,7 +13,7 @@ namespace psms.Academic.Classes;
 public interface IClassAppService : IApplicationService
 {
     Task<ClassDto> GetAsync(Guid id);
-    Task<PagedResultDto<ClassListDto>> GetAllAsync(PagedAndSortedResultRequestDto input);
+    Task<PagedResultDto<ClassListDto>> GetAllAsync(GetAcademicEntityInput input);
     Task<ClassDto> CreateAsync(CreateClassDto input);
     Task<ClassDto> UpdateAsync(Guid id, UpdateClassDto input);
     Task DeleteAsync(Guid id);

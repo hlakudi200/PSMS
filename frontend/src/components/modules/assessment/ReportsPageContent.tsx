@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useCallback, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Card, Col, Row, Select, message } from 'antd';
 import {
   CheckCircleOutlined,
@@ -31,6 +32,7 @@ const reportTypeMap: Record<number, { label: string; color: string }> = {
 };
 
 function ReportsContent() {
+  const router = useRouter();
   const { reports, totalCount, isPending, isError } = useReportState();
   const { getAllAsync, approveAsync, publishAsync } = useReportActions();
   const { academicYears } = useAcademicYearState();
@@ -61,13 +63,16 @@ function ReportsContent() {
 
   const handleQueryChange = useCallback((query: TableQuery) => {
     setLastQuery(query);
+    const { keyword, ...columnFilters } = query.filters ?? {};
     getAllAsync({
       maxResultCount: query.maxResultCount,
       skipCount: query.skipCount,
       sorting: query.sorting,
       academicYearId: selectedAcademicYearId,
       termId: selectedTermId,
-      status: selectedStatus,
+      status: selectedStatus ?? columnFilters.status as number | undefined,
+      studentName: keyword as string | undefined,
+      ...columnFilters,
     });
   }, [getAllAsync, selectedAcademicYearId, selectedTermId, selectedStatus]);
 
@@ -81,13 +86,19 @@ function ReportsContent() {
   }, [selectedAcademicYearId, selectedTermId, selectedStatus]);
 
   const columns: ColumnConfig<IReportList>[] = [
-    { key: 'studentName', title: 'Student', dataIndex: 'studentName', sortable: true, filterable: true },
+    { key: 'studentName', title: 'Student', dataIndex: 'studentName', sortable: true },
     { key: 'studentAdmissionNumber', title: 'Adm #', dataIndex: 'studentAdmissionNumber', sortable: true, width: 100 },
-    { key: 'className', title: 'Class', dataIndex: 'className', sortable: true, filterable: true },
+    { key: 'className', title: 'Class', dataIndex: 'className', sortable: true },
     { key: 'termName', title: 'Term', dataIndex: 'termName', sortable: true },
     { key: 'academicYearName', title: 'Year', dataIndex: 'academicYearName', sortable: true, hideOnMobile: true },
     {
       key: 'reportType', title: 'Type', dataIndex: 'reportType', width: 90,
+      filterable: true, filterType: 'enum',
+      filterOptions: [
+        { label: 'Term', value: 0 },
+        { label: 'Mid-Year', value: 1 },
+        { label: 'Final', value: 2 },
+      ],
       renderType: 'status',
       renderConfig: { statusMap: reportTypeMap },
     },
@@ -96,6 +107,14 @@ function ReportsContent() {
     { key: 'subjectCount', title: 'Subjects', dataIndex: 'subjectCount', hideOnMobile: true, width: 85 },
     {
       key: 'status', title: 'Status', dataIndex: 'status',
+      filterable: true, filterType: 'enum',
+      filterOptions: [
+        { label: 'Draft', value: 0 },
+        { label: 'Submitted', value: 1 },
+        { label: 'Approved', value: 2 },
+        { label: 'Published', value: 3 },
+        { label: 'Acknowledged', value: 4 },
+      ],
       renderType: 'status',
       renderConfig: { statusMap: reportStatusMap },
     },
@@ -107,8 +126,7 @@ function ReportsContent() {
       label: 'View Report',
       icon: <EyeOutlined />,
       onClick: (record) => {
-        // TODO: Navigate to report detail page
-        console.log('View report:', record.id);
+        router.push(`/principal/reports/${record.id}`);
       },
     },
     {

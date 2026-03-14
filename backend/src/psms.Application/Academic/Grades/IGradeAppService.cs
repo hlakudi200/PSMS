@@ -1,6 +1,7 @@
 using Abp.Application.Services;
 using Abp.Application.Services.Dto;
 using psms.Academic.Grades.Dto;
+using psms.Academic.Shared;
 using psms.Domain.Shared.Enums;
 using System;
 using System.Collections.Generic;
@@ -14,7 +15,7 @@ namespace psms.Academic.Grades;
 public interface IGradeAppService : IApplicationService
 {
     Task<GradeDto> GetAsync(Guid id);
-    Task<PagedResultDto<GradeListDto>> GetAllAsync(PagedAndSortedResultRequestDto input);
+    Task<PagedResultDto<GradeListDto>> GetAllAsync(GetAcademicEntityInput input);
     Task<GradeDto> CreateAsync(CreateGradeDto input);
     Task<GradeDto> UpdateAsync(Guid id, UpdateGradeDto input);
     Task DeleteAsync(Guid id);

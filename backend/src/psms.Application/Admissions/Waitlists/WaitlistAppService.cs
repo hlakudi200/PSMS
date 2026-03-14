@@ -84,13 +84,17 @@ public class WaitlistAppService : ApplicationService, IWaitlistAppService
     }
 
     [AbpAuthorize(PermissionNames.Admissions_Waitlist_ViewAll)]
-    public async Task<PagedResultDto<WaitlistDto>> GetAllAsync(PagedAndSortedResultRequestDto input)
+    public async Task<PagedResultDto<WaitlistDto>> GetAllAsync(GetWaitlistsInput input)
     {
         var query = _waitlistRepository
             .GetAll()
             .Include(w => w.Application)
                 .ThenInclude(a => a.AppliedGrade)
-            .Include(w => w.Grade);
+            .Include(w => w.Grade)
+            .WhereIf(!string.IsNullOrWhiteSpace(input.Keyword),
+                w => w.Application.ProspectiveStudentFirstName.ToLower().Contains(input.Keyword.ToLower())
+                    || w.Application.ProspectiveStudentLastName.ToLower().Contains(input.Keyword.ToLower())
+                    || w.Application.ApplicationNumber.ToLower().Contains(input.Keyword.ToLower()));
 
         var totalCount = await query.CountAsync();
 

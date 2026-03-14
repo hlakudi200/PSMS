@@ -16,4 +16,5 @@ public class GetMarksInput : PagedAndSortedResultRequestDto
     public Guid? TermId { get; set; }
     public MarkStatus? Status { get; set; }
     public string StudentName { get; set; }
+    public string Keyword { get; set; }
 }

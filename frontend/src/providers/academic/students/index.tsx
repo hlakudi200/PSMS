@@ -1,18 +1,18 @@
 "use client";
 import { getAxiosInstance } from "@/utils/axios-instance";
+import { buildQueryParams } from "@/utils/query-params";
 import {
   INITIAL_STATE,
   StudentActionContext,
   StudentStateContext,
 } from "./context";
 import {
-  IStudent,
   ICreateStudent,
   IUpdateStudent,
-  IPagedAndSortedResultRequest,
+  IGetStudentsInput,
 } from "../shared/interfaces";
 import { StudentReducer } from "./reducer";
-import { useContext, useReducer } from "react";
+import { useContext, useReducer, useCallback, useMemo } from "react";
 import {
   getStudentsError,
   getStudentsPending,
@@ -37,9 +37,9 @@ export const StudentProvider = ({
   children: React.ReactNode;
 }) => {
   const [state, dispatch] = useReducer(StudentReducer, INITIAL_STATE);
-  const instance = getAxiosInstance();
+  const instance = useMemo(() => getAxiosInstance(), []);
 
-  const getAsync = async (id: string) => {
+  const getAsync = useCallback(async (id: string) => {
     dispatch(getStudentPending());
     const endpoint = `/api/services/app/Student/Get?id=${id}`;
     await instance
@@ -51,16 +51,12 @@ export const StudentProvider = ({
         console.error(error);
         dispatch(getStudentError());
       });
-  };
+  }, [instance]);
 
-  const getAllAsync = async (input?: IPagedAndSortedResultRequest) => {
+  const getAllAsync = useCallback(async (input?: IGetStudentsInput) => {
     dispatch(getStudentsPending());
 
-    const params = new URLSearchParams();
-    if (input?.maxResultCount) params.append('MaxResultCount', input.maxResultCount.toString());
-    if (input?.skipCount) params.append('SkipCount', input.skipCount.toString());
-    if (input?.sorting) params.append('Sorting', input.sorting);
-
+    const params = buildQueryParams(input as Record<string, unknown>);
     const endpoint = `/api/services/app/Student/GetAll?${params.toString()}`;
     await instance
       .get(endpoint)
@@ -74,9 +70,9 @@ export const StudentProvider = ({
         console.error(error);
         dispatch(getStudentsError());
       });
-  };
+  }, [instance]);
 
-  const createAsync = async (input: ICreateStudent) => {
+  const createAsync = useCallback(async (input: ICreateStudent) => {
     dispatch(createStudentPending());
     const endpoint = `/api/services/app/Student/Create`;
 
@@ -89,9 +85,9 @@ export const StudentProvider = ({
         console.error(error);
         dispatch(createStudentError());
       });
-  };
+  }, [instance]);
 
-  const updateAsync = async (id: string, input: IUpdateStudent) => {
+  const updateAsync = useCallback(async (id: string, input: IUpdateStudent) => {
     dispatch(updateStudentPending());
     const endpoint = `/api/services/app/Student/Update`;
     await instance
@@ -103,9 +99,9 @@ export const StudentProvider = ({
         console.error(error);
         dispatch(updateStudentError());
       });
-  };
+  }, [instance]);
 
-  const deleteAsync = async (id: string) => {
+  const deleteAsync = useCallback(async (id: string) => {
     dispatch(deleteStudentPending());
     const endpoint = `/api/services/app/Student/Delete?id=${id}`;
     await instance
@@ -117,19 +113,19 @@ export const StudentProvider = ({
         console.error(error);
         dispatch(deleteStudentError());
       });
-  };
+  }, [instance]);
+
+  const actionValue = useMemo(() => ({
+    getAsync,
+    getAllAsync,
+    createAsync,
+    updateAsync,
+    deleteAsync,
+  }), [getAsync, getAllAsync, createAsync, updateAsync, deleteAsync]);
 
   return (
     <StudentStateContext.Provider value={state}>
-      <StudentActionContext.Provider
-        value={{
-          getAsync,
-          getAllAsync,
-          createAsync,
-          updateAsync,
-          deleteAsync,
-        }}
-      >
+      <StudentActionContext.Provider value={actionValue}>
         {children}
       </StudentActionContext.Provider>
     </StudentStateContext.Provider>

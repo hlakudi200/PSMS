@@ -47,12 +47,19 @@ public class TeacherAppService : ApplicationService, ITeacherAppService
     }
 
     [AbpAuthorize(PermissionNames.Academic_Teachers_View)]
-    public async Task<PagedResultDto<TeacherListDto>> GetAllAsync(PagedAndSortedResultRequestDto input)
+    public async Task<PagedResultDto<TeacherListDto>> GetAllAsync(GetAcademicEntityInput input)
     {
         var query = _teacherRepository
             .GetAll()
             .Include(t => t.SubjectAssignments)
-            .Include(t => t.ClassAssignments);
+            .Include(t => t.ClassAssignments)
+            .WhereIf(!string.IsNullOrWhiteSpace(input.Keyword),
+                t => t.FirstName.ToLower().Contains(input.Keyword.ToLower())
+                  || t.LastName.ToLower().Contains(input.Keyword.ToLower())
+                  || t.EmployeeNumber.ToLower().Contains(input.Keyword.ToLower())
+                  || t.Email.ToLower().Contains(input.Keyword.ToLower()))
+            .WhereIf(input.IsActive.HasValue,
+                t => t.IsActive == input.IsActive.Value);
 
         var totalCount = await query.CountAsync();
 

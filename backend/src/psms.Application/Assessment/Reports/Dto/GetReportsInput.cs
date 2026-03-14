@@ -16,4 +16,5 @@ public class GetReportsInput : PagedAndSortedResultRequestDto
     public ReportType? ReportType { get; set; }
     public ReportStatus? Status { get; set; }
     public string StudentName { get; set; }
+    public string Keyword { get; set; }
 }

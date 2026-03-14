@@ -26,7 +26,7 @@ public interface IAdmissionInterviewAppService : IApplicationService
     /// <summary>
     /// Gets all interviews with filters.
     /// </summary>
-    Task<PagedResultDto<AdmissionInterviewDto>> GetAllAsync(PagedAndSortedResultRequestDto input);
+    Task<PagedResultDto<AdmissionInterviewDto>> GetAllAsync(GetAdmissionInterviewsInput input);
 
     /// <summary>
     /// Schedules an interview for an application.

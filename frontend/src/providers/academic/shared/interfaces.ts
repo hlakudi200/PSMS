@@ -3,6 +3,8 @@ export interface IPagedAndSortedResultRequest {
   maxResultCount?: number;
   skipCount?: number;
   sorting?: string;
+  keyword?: string;
+  [key: string]: unknown;
 }
 
 export interface IPagedResult<T> {
@@ -462,6 +464,11 @@ export interface IBulkCaptureAttendance {
   attendanceDate: string;
   subjectId?: string;
   entries: IStudentAttendanceEntry[];
+}
+
+export interface IGetStudentsInput extends IPagedAndSortedResultRequest {
+  isActive?: boolean;
+  gender?: number;
 }
 
 export interface IGetAttendanceInput extends IPagedAndSortedResultRequest {

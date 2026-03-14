@@ -14,4 +14,5 @@ public class GetStudentTransportsInput : PagedAndSortedResultRequestDto
     public Guid? AcademicYearId { get; set; }
     public EnrollmentStatus? Status { get; set; }
     public TransportDirection? Direction { get; set; }
+    public string Keyword { get; set; }
 }

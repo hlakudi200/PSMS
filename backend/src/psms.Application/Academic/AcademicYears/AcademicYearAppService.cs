@@ -51,12 +51,14 @@ public class AcademicYearAppService : ApplicationService, IAcademicYearAppServic
     }
 
     [AbpAuthorize(PermissionNames.Academic_Calendar_View)]
-    public async Task<PagedResultDto<AcademicYearListDto>> GetAllAsync(PagedAndSortedResultRequestDto input)
+    public async Task<PagedResultDto<AcademicYearListDto>> GetAllAsync(GetAcademicEntityInput input)
     {
         var query = _academicYearRepository
             .GetAll()
             .Include(ay => ay.Terms)
-            .Include(ay => ay.Classes);
+            .Include(ay => ay.Classes)
+            .WhereIf(!string.IsNullOrWhiteSpace(input.Keyword),
+                ay => ay.YearName.ToLower().Contains(input.Keyword.ToLower()));
 
         var totalCount = await query.CountAsync();
 

@@ -44,12 +44,17 @@ function UsersContent() {
   };
 
   const columns: ColumnConfig<IAdminUser>[] = [
-    { key: 'userName', title: 'Username', dataIndex: 'userName', sortable: true, filterable: true },
+    { key: 'userName', title: 'Username', dataIndex: 'userName', sortable: true },
     { key: 'name', title: 'First Name', dataIndex: 'name', sortable: true },
     { key: 'surname', title: 'Surname', dataIndex: 'surname', sortable: true, hideOnMobile: true },
     { key: 'emailAddress', title: 'Email', dataIndex: 'emailAddress', hideOnMobile: true },
     {
       key: 'isActive', title: 'Status', dataIndex: 'isActive',
+      filterable: true, filterType: 'enum',
+      filterOptions: [
+        { label: 'Active', value: 'true' },
+        { label: 'Inactive', value: 'false' },
+      ],
       renderType: 'status',
       renderConfig: {
         statusMap: {

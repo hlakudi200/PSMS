@@ -63,6 +63,10 @@ public class AttendanceAppService : ApplicationService, IAttendanceAppService
             .Include(a => a.Student)
             .Include(a => a.Class)
             .Where(a => a.TenantId == AbpSession.TenantId)
+            .WhereIf(!string.IsNullOrWhiteSpace(input.Keyword),
+                a => a.Student.FirstName.ToLower().Contains(input.Keyword.ToLower())
+                  || a.Student.LastName.ToLower().Contains(input.Keyword.ToLower())
+                  || a.Class.ClassName.ToLower().Contains(input.Keyword.ToLower()))
             .WhereIf(input.ClassId.HasValue, a => a.ClassId == input.ClassId.Value)
             .WhereIf(input.StudentId.HasValue, a => a.StudentId == input.StudentId.Value)
             .WhereIf(input.TeacherId.HasValue, a => a.TeacherId == input.TeacherId.Value)

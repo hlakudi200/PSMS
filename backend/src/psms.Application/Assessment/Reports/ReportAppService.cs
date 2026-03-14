@@ -100,7 +100,10 @@ public class ReportAppService : ApplicationService, IReportAppService
             .WhereIf(input.Status.HasValue, r => r.Status == input.Status.Value)
             .WhereIf(!string.IsNullOrWhiteSpace(input.StudentName),
                 r => (r.Student.FirstName + " " + r.Student.LastName).ToLower()
-                    .Contains(input.StudentName.Trim().ToLower()));
+                    .Contains(input.StudentName.Trim().ToLower()))
+            .WhereIf(!string.IsNullOrWhiteSpace(input.Keyword),
+                r => r.Student.FirstName.ToLower().Contains(input.Keyword.ToLower())
+                    || r.Student.LastName.ToLower().Contains(input.Keyword.ToLower()));
 
         var totalCount = await query.CountAsync();
 

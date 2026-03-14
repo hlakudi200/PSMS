@@ -1,5 +1,6 @@
 using Abp.Application.Services;
 using Abp.Application.Services.Dto;
+using psms.Academic.Shared;
 using psms.Academic.Timetables.Dto;
 using System;
 using System.Threading.Tasks;
@@ -9,7 +10,7 @@ namespace psms.Academic.Timetables;
 public interface ITimetableAppService : IApplicationService
 {
     Task<TimetableDto> GetAsync(Guid id);
-    Task<PagedResultDto<TimetableListDto>> GetAllAsync(PagedAndSortedResultRequestDto input);
+    Task<PagedResultDto<TimetableListDto>> GetAllAsync(GetAcademicEntityInput input);
 
     /// <summary>Gets the active timetable for a class.</summary>
     Task<TimetableDto> GetByClassAsync(Guid classId);

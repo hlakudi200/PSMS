@@ -8,6 +8,7 @@ namespace psms.Academic.ClassSubjects.Dto;
 /// </summary>
 public class GetClassSubjectsInput : PagedAndSortedResultRequestDto
 {
+    public string Keyword { get; set; }
     public Guid? ClassId { get; set; }
     public Guid? SubjectId { get; set; }
     public Guid? TeacherId { get; set; }

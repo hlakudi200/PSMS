@@ -72,7 +72,11 @@ public class StudentTransportAppService : ApplicationService, IStudentTransportA
             .WhereIf(input.SchoolTransportId.HasValue, st => st.SchoolTransportId == input.SchoolTransportId.Value)
             .WhereIf(input.AcademicYearId.HasValue, st => st.AcademicYearId == input.AcademicYearId.Value)
             .WhereIf(input.Status.HasValue, st => st.Status == input.Status.Value)
-            .WhereIf(input.Direction.HasValue, st => st.Direction == input.Direction.Value);
+            .WhereIf(input.Direction.HasValue, st => st.Direction == input.Direction.Value)
+            .WhereIf(!string.IsNullOrWhiteSpace(input.Keyword),
+                st => st.Student.FirstName.ToLower().Contains(input.Keyword.ToLower())
+                    || st.Student.LastName.ToLower().Contains(input.Keyword.ToLower())
+                    || st.SchoolTransport.RouteName.ToLower().Contains(input.Keyword.ToLower()));
 
         var totalCount = await query.CountAsync();
 

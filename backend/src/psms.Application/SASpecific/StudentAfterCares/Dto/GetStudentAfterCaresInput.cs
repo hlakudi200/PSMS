@@ -13,4 +13,5 @@ public class GetStudentAfterCaresInput : PagedAndSortedResultRequestDto
     public Guid? AfterCareId { get; set; }
     public Guid? AcademicYearId { get; set; }
     public EnrollmentStatus? Status { get; set; }
+    public string Keyword { get; set; }
 }

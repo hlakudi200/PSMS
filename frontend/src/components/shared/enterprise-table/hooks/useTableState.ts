@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import { useReducer, useCallback, useRef, useEffect } from 'react';
 import type { TableQuery, PersonalizationConfig } from '../types';
 
 interface TableInternalState {
@@ -29,6 +29,50 @@ interface UseTableStateOptions {
   defaultSorting?: string;
 }
 
+// Action types for reducer
+type TableAction =
+  | { type: 'PAGE_CHANGE'; page: number; pageSize: number }
+  | { type: 'SORT_CHANGE'; sorting?: string }
+  | { type: 'FILTER_CHANGE'; key: string; value: unknown }
+  | { type: 'FILTERS_RESET' }
+  | { type: 'PAGE_SIZE_CHANGE'; pageSize: number }
+  | { type: 'MARK_FETCHED' };
+
+function tableReducer(state: TableInternalState, action: TableAction): TableInternalState {
+  switch (action.type) {
+    case 'PAGE_CHANGE':
+      return { ...state, currentPage: action.page, pageSize: action.pageSize };
+    case 'SORT_CHANGE':
+      return { ...state, currentPage: 1, sorting: action.sorting };
+    case 'FILTER_CHANGE': {
+      const newFilters = { ...state.filters };
+      if (action.value === undefined || action.value === null || action.value === '') {
+        delete newFilters[action.key];
+      } else {
+        newFilters[action.key] = action.value;
+      }
+      return { ...state, currentPage: 1, filters: newFilters };
+    }
+    case 'FILTERS_RESET':
+      return { ...state, currentPage: 1, filters: {} };
+    case 'PAGE_SIZE_CHANGE':
+      return { ...state, currentPage: 1, pageSize: action.pageSize };
+    case 'MARK_FETCHED':
+      return { ...state, lastFetchedAt: new Date() };
+    default:
+      return state;
+  }
+}
+
+function buildQuery(state: TableInternalState): TableQuery {
+  return {
+    maxResultCount: state.pageSize,
+    skipCount: (state.currentPage - 1) * state.pageSize,
+    sorting: state.sorting,
+    filters: state.filters,
+  };
+}
+
 export function useTableState(options: UseTableStateOptions): UseTableStateReturn {
   const { defaultPageSize, onQueryChange, personalization, defaultSorting } = options;
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -39,7 +83,7 @@ export function useTableState(options: UseTableStateOptions): UseTableStateRetur
   const initialSorting = personalization?.defaultView?.sorting ?? defaultSorting;
   const initialFilters = personalization?.defaultView?.filters ?? {};
 
-  const [state, setState] = useState<TableInternalState>({
+  const [state, dispatch] = useReducer(tableReducer, {
     currentPage: 1,
     pageSize: initialPageSize,
     sorting: initialSorting,
@@ -47,59 +91,34 @@ export function useTableState(options: UseTableStateOptions): UseTableStateRetur
     lastFetchedAt: undefined,
   });
 
-  const query = useMemo<TableQuery>(() => ({
-    maxResultCount: state.pageSize,
-    skipCount: (state.currentPage - 1) * state.pageSize,
-    sorting: state.sorting,
-    filters: state.filters,
-  }), [state.currentPage, state.pageSize, state.sorting, state.filters]);
+  const query = buildQuery(state);
+  const filtersKey = JSON.stringify(state.filters);
 
-  // Fire onQueryChange whenever query changes
-  const isInitialMount = useRef(true);
+  // Fire onQueryChange whenever query values change
   useEffect(() => {
-    if (isInitialMount.current) {
-      isInitialMount.current = false;
-      // Fire initial query
-      onQueryChangeRef.current(query);
-      setState(prev => ({ ...prev, lastFetchedAt: new Date() }));
-      return;
-    }
-    onQueryChangeRef.current(query);
-    setState(prev => ({ ...prev, lastFetchedAt: new Date() }));
-  }, [query]);
+    onQueryChangeRef.current(buildQuery(state));
+    dispatch({ type: 'MARK_FETCHED' });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.currentPage, state.pageSize, state.sorting, filtersKey]);
 
   const handlePageChange = useCallback((page: number, pageSize: number) => {
-    setState(prev => ({
-      ...prev,
-      currentPage: page,
-      pageSize,
-    }));
+    dispatch({ type: 'PAGE_CHANGE', page, pageSize });
   }, []);
 
   const handleSortChange = useCallback((field: string, order: 'ascend' | 'descend' | null) => {
-    setState(prev => ({
-      ...prev,
-      currentPage: 1,
+    dispatch({
+      type: 'SORT_CHANGE',
       sorting: order ? `${field} ${order === 'ascend' ? 'asc' : 'desc'}` : undefined,
-    }));
+    });
   }, []);
 
   const handleFilterChange = useCallback((key: string, value: unknown) => {
     clearTimeout(debounceRef.current);
 
     const applyFilter = () => {
-      setState(prev => {
-        const newFilters = { ...prev.filters };
-        if (value === undefined || value === null || value === '') {
-          delete newFilters[key];
-        } else {
-          newFilters[key] = value;
-        }
-        return { ...prev, currentPage: 1, filters: newFilters };
-      });
+      dispatch({ type: 'FILTER_CHANGE', key, value });
     };
 
-    // Debounce text-like filter changes
     if (typeof value === 'string') {
       debounceRef.current = setTimeout(applyFilter, 400);
     } else {
@@ -108,25 +127,17 @@ export function useTableState(options: UseTableStateOptions): UseTableStateRetur
   }, []);
 
   const handleFiltersReset = useCallback(() => {
-    setState(prev => ({
-      ...prev,
-      currentPage: 1,
-      filters: {},
-    }));
+    dispatch({ type: 'FILTERS_RESET' });
   }, []);
 
   const handleRefresh = useCallback(() => {
-    // Re-trigger same query by updating lastFetchedAt
     onQueryChangeRef.current(query);
-    setState(prev => ({ ...prev, lastFetchedAt: new Date() }));
-  }, [query]);
+    dispatch({ type: 'MARK_FETCHED' });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.currentPage, state.pageSize, state.sorting, filtersKey]);
 
   const setPageSize = useCallback((size: number) => {
-    setState(prev => ({
-      ...prev,
-      currentPage: 1,
-      pageSize: size,
-    }));
+    dispatch({ type: 'PAGE_SIZE_CHANGE', pageSize: size });
   }, []);
 
   // Cleanup debounce on unmount

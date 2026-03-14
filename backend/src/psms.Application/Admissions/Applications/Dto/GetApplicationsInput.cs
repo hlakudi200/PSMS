@@ -45,6 +45,11 @@ public class GetApplicationsInput : PagedAndSortedResultRequestDto
     public DateTime? SubmittedDateTo { get; set; }
 
     /// <summary>
+    /// General keyword search across applicant name and application number.
+    /// </summary>
+    public string Keyword { get; set; }
+
+    /// <summary>
     /// Filter by fee payment status.
     /// </summary>
     public bool? IsFeePaid { get; set; }

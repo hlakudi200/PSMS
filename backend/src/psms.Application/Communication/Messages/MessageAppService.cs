@@ -64,7 +64,10 @@ public class MessageAppService : ApplicationService, IMessageAppService
             .WhereIf(input.IsRead.HasValue, m => m.IsRead == input.IsRead.Value)
             .WhereIf(!string.IsNullOrWhiteSpace(input.Search),
                 m => (m.Subject != null && m.Subject.ToLower().Contains(input.Search.Trim().ToLower()))
-                    || m.Content.ToLower().Contains(input.Search.Trim().ToLower()));
+                    || m.Content.ToLower().Contains(input.Search.Trim().ToLower()))
+            .WhereIf(!string.IsNullOrWhiteSpace(input.Keyword),
+                m => (m.Subject != null && m.Subject.ToLower().Contains(input.Keyword.ToLower()))
+                    || m.Content.ToLower().Contains(input.Keyword.ToLower()));
 
         var totalCount = await query.CountAsync();
 
@@ -91,7 +94,10 @@ public class MessageAppService : ApplicationService, IMessageAppService
             .WhereIf(input.IsRead.HasValue, m => m.IsRead == input.IsRead.Value)
             .WhereIf(!string.IsNullOrWhiteSpace(input.Search),
                 m => (m.Subject != null && m.Subject.ToLower().Contains(input.Search.Trim().ToLower()))
-                    || m.Content.ToLower().Contains(input.Search.Trim().ToLower()));
+                    || m.Content.ToLower().Contains(input.Search.Trim().ToLower()))
+            .WhereIf(!string.IsNullOrWhiteSpace(input.Keyword),
+                m => (m.Subject != null && m.Subject.ToLower().Contains(input.Keyword.ToLower()))
+                    || m.Content.ToLower().Contains(input.Keyword.ToLower()));
 
         var totalCount = await query.CountAsync();
 

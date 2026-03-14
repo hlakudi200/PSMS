@@ -70,12 +70,15 @@ public class AdmissionInterviewAppService : ApplicationService, IAdmissionInterv
     }
 
     [AbpAuthorize(PermissionNames.Admissions_Interviews_View)]
-    public async Task<PagedResultDto<AdmissionInterviewDto>> GetAllAsync(PagedAndSortedResultRequestDto input)
+    public async Task<PagedResultDto<AdmissionInterviewDto>> GetAllAsync(GetAdmissionInterviewsInput input)
     {
         var query = _interviewRepository
             .GetAll()
             .Include(i => i.Application)
-                .ThenInclude(a => a.AppliedGrade);
+                .ThenInclude(a => a.AppliedGrade)
+            .WhereIf(!string.IsNullOrWhiteSpace(input.Keyword),
+                i => i.Application.ProspectiveStudentFirstName.ToLower().Contains(input.Keyword.ToLower())
+                    || i.Application.ProspectiveStudentLastName.ToLower().Contains(input.Keyword.ToLower()));
 
         var totalCount = await query.CountAsync();
 

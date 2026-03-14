@@ -14,4 +14,5 @@ public class GetFeeStructuresInput : PagedAndSortedResultRequestDto
     public SouthAfricanFeeType? FeeType { get; set; }
     public bool? IsActive { get; set; }
     public string FeeName { get; set; }
+    public string Keyword { get; set; }
 }

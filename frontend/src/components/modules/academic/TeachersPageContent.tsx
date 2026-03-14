@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useState, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { message } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
+import { PlusOutlined, EditOutlined, DeleteOutlined, EyeOutlined } from '@ant-design/icons';
 import { EnterpriseTable } from '@/components/shared/enterprise-table';
 import type { ColumnConfig, TableQuery, RowAction, BulkAction, ToolbarAction } from '@/components/shared/enterprise-table';
 import { TeacherProvider, useTeacherState, useTeacherActions } from '@/providers/academic/teachers';
@@ -11,6 +12,7 @@ import { TeacherFormModal } from '@/components/modals/academic/TeacherFormModal'
 import type { ITeacher } from '@/providers/academic/shared/interfaces';
 
 function TeachersContent() {
+  const router = useRouter();
   const { teachers, totalCount, isPending, isError } = useTeacherState();
   const { getAllAsync, deleteAsync, activateAsync, deactivateAsync } = useTeacherActions();
   const { currentRole } = useAuthState();
@@ -24,6 +26,7 @@ function TeachersContent() {
       maxResultCount: query.maxResultCount,
       skipCount: query.skipCount,
       sorting: query.sorting,
+      ...query.filters,
     });
   }, [getAllAsync]);
 
@@ -39,13 +42,18 @@ function TeachersContent() {
 
   const columns: ColumnConfig<ITeacher>[] = [
     { key: 'employeeNumber', title: 'Emp #', dataIndex: 'employeeNumber', sortable: true, width: 100 },
-    { key: 'fullName', title: 'Name', dataIndex: 'fullName', sortable: true, filterable: true },
+    { key: 'fullName', title: 'Name', dataIndex: 'fullName', sortable: true },
     { key: 'email', title: 'Email', dataIndex: 'email', hideOnMobile: true },
     { key: 'phone', title: 'Phone', dataIndex: 'phone', hideOnMobile: true },
     { key: 'subjectAssignmentCount', title: 'Subjects', dataIndex: 'subjectAssignmentCount' },
     { key: 'classAssignmentCount', title: 'Classes', dataIndex: 'classAssignmentCount' },
     {
       key: 'isActive', title: 'Status', dataIndex: 'isActive',
+      filterable: true, filterType: 'enum',
+      filterOptions: [
+        { label: 'Active', value: 'true' },
+        { label: 'Inactive', value: 'false' },
+      ],
       renderType: 'status',
       renderConfig: {
         statusMap: {
@@ -67,6 +75,12 @@ function TeachersContent() {
   ];
 
   const rowActions: RowAction<ITeacher>[] = [
+    {
+      key: 'view',
+      label: 'View',
+      icon: <EyeOutlined />,
+      onClick: (record) => { router.push(`/principal/teachers/${record.id}`); },
+    },
     {
       key: 'edit',
       label: 'Edit',

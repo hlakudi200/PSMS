@@ -56,6 +56,9 @@ public class POPIAConsentAppService : ApplicationService, IPOPIAConsentAppServic
             .GetAll()
             .Include(pc => pc.Student)
             .Where(pc => pc.TenantId == AbpSession.TenantId)
+            .WhereIf(!string.IsNullOrWhiteSpace(input.Keyword),
+                pc => pc.Student.FirstName.ToLower().Contains(input.Keyword.ToLower())
+                  || pc.Student.LastName.ToLower().Contains(input.Keyword.ToLower()))
             .WhereIf(input.StudentId.HasValue, pc => pc.StudentId == input.StudentId.Value)
             .WhereIf(input.AllowPhotography.HasValue, pc => pc.AllowPhotography == input.AllowPhotography.Value)
             .WhereIf(input.AllowDataSharing.HasValue, pc => pc.AllowDataSharing == input.AllowDataSharing.Value)

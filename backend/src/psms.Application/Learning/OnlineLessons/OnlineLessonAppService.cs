@@ -64,7 +64,11 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
             .WhereIf(input.Status.HasValue, ol => ol.Status == input.Status.Value)
             .WhereIf(input.StartDate.HasValue, ol => ol.ScheduledStartTime >= input.StartDate.Value)
             .WhereIf(input.EndDate.HasValue, ol => ol.ScheduledEndTime <= input.EndDate.Value)
-            .WhereIf(input.HostTeacherUserId.HasValue, ol => ol.HostTeacherUserId == input.HostTeacherUserId.Value);
+            .WhereIf(input.HostTeacherUserId.HasValue, ol => ol.HostTeacherUserId == input.HostTeacherUserId.Value)
+            .WhereIf(!string.IsNullOrWhiteSpace(input.Keyword),
+                ol => ol.Title.ToLower().Contains(input.Keyword.ToLower())
+                    || ol.ClassSubject.Class.ClassName.ToLower().Contains(input.Keyword.ToLower())
+                    || ol.ClassSubject.Subject.SubjectName.ToLower().Contains(input.Keyword.ToLower()));
 
         var totalCount = await query.CountAsync();
 

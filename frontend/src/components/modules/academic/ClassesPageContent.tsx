@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useState, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { message } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, UserSwitchOutlined } from '@ant-design/icons';
+import { PlusOutlined, EditOutlined, DeleteOutlined, UserSwitchOutlined, EyeOutlined } from '@ant-design/icons';
 import { EnterpriseTable } from '@/components/shared/enterprise-table';
 import type { ColumnConfig, TableQuery, RowAction, BulkAction, ToolbarAction } from '@/components/shared/enterprise-table';
 import { ClassProvider, useClassState, useClassActions } from '@/providers/academic/classes';
@@ -18,6 +19,7 @@ function ClassesContent() {
   const { classes, totalCount, isPending, isError } = useClassState();
   const { getAllAsync, deleteAsync, activateAsync, deactivateAsync } = useClassActions();
   const { currentRole } = useAuthState();
+  const router = useRouter();
   const [modalOpen, setModalOpen] = useState(false);
   const [assignTeacherOpen, setAssignTeacherOpen] = useState(false);
   const [editRecord, setEditRecord] = useState<IClass | null>(null);
@@ -30,6 +32,7 @@ function ClassesContent() {
       maxResultCount: query.maxResultCount,
       skipCount: query.skipCount,
       sorting: query.sorting,
+      ...query.filters,
     });
   }, [getAllAsync]);
 
@@ -50,7 +53,7 @@ function ClassesContent() {
   };
 
   const columns: ColumnConfig<IClass>[] = [
-    { key: 'className', title: 'Class', dataIndex: 'className', sortable: true, filterable: true },
+    { key: 'className', title: 'Class', dataIndex: 'className', sortable: true },
     { key: 'gradeName', title: 'Grade', dataIndex: 'gradeName', sortable: true },
     { key: 'academicYearName', title: 'Year', dataIndex: 'academicYearName' },
     { key: 'classTeacherName', title: 'Class Teacher', dataIndex: 'classTeacherName' },
@@ -59,6 +62,11 @@ function ClassesContent() {
     { key: 'availableCapacity', title: 'Available', dataIndex: 'availableCapacity' },
     {
       key: 'isActive', title: 'Status', dataIndex: 'isActive',
+      filterable: true, filterType: 'enum',
+      filterOptions: [
+        { label: 'Active', value: 'true' },
+        { label: 'Inactive', value: 'false' },
+      ],
       renderType: 'status',
       renderConfig: {
         statusMap: {
@@ -80,6 +88,12 @@ function ClassesContent() {
   ];
 
   const rowActions: RowAction<IClass>[] = [
+    {
+      key: 'view',
+      label: 'View Details',
+      icon: <EyeOutlined />,
+      onClick: (record) => { router.push(`/principal/classes/${record.id}`); },
+    },
     {
       key: 'edit',
       label: 'Edit',

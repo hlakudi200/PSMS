@@ -47,11 +47,15 @@ public class ParentAppService : ApplicationService, IParentAppService
     }
 
     [AbpAuthorize(PermissionNames.Academic_Parents_View)]
-    public async Task<PagedResultDto<ParentListDto>> GetAllAsync(PagedAndSortedResultRequestDto input)
+    public async Task<PagedResultDto<ParentListDto>> GetAllAsync(GetAcademicEntityInput input)
     {
         var query = _parentRepository
             .GetAll()
-            .Include(p => p.StudentLinks);
+            .Include(p => p.StudentLinks)
+            .WhereIf(!string.IsNullOrWhiteSpace(input.Keyword),
+                p => p.FirstName.ToLower().Contains(input.Keyword.ToLower())
+                  || p.LastName.ToLower().Contains(input.Keyword.ToLower())
+                  || p.Email.ToLower().Contains(input.Keyword.ToLower()));
 
         var totalCount = await query.CountAsync();
 

@@ -9,4 +9,5 @@ public class GetNotificationsInput : PagedAndSortedResultRequestDto
     public NotificationPriority? Priority { get; set; }
     public bool? IsRead { get; set; }
     public string Search { get; set; }
+    public string Keyword { get; set; }
 }

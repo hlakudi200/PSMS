@@ -1,5 +1,6 @@
 using Abp.Application.Services;
 using Abp.Application.Services.Dto;
+using psms.Academic.Shared;
 using psms.Academic.Subjects.Dto;
 using System;
 using System.Threading.Tasks;
@@ -12,7 +13,7 @@ namespace psms.Academic.Subjects;
 public interface ISubjectAppService : IApplicationService
 {
     Task<SubjectDto> GetAsync(Guid id);
-    Task<PagedResultDto<SubjectListDto>> GetAllAsync(PagedAndSortedResultRequestDto input);
+    Task<PagedResultDto<SubjectListDto>> GetAllAsync(GetAcademicEntityInput input);
     Task<SubjectDto> CreateAsync(CreateSubjectDto input);
     Task<SubjectDto> UpdateAsync(Guid id, UpdateSubjectDto input);
     Task DeleteAsync(Guid id);
