@@ -427,18 +427,27 @@ export function EnterpriseTable<T extends Record<string, any>>(
     );
   }, [tableState.state.filters]);
 
+  // --- Track current sort to avoid redundant dispatches ---
+  const currentSortRef = React.useRef<string | undefined>(tableState.state.sorting);
+  currentSortRef.current = tableState.state.sorting;
+
   // --- Ant Design Table onChange handler ---
   const handleTableChange: TableProps<T>['onChange'] = useCallback(
     (pagination: any, _filters: any, sorter: any) => {
+      // Handle sorting — only dispatch if sort actually changed
+      if (sorter && !Array.isArray(sorter)) {
+        const field = Array.isArray(sorter.field) ? sorter.field.join('.') : sorter.field;
+        const order = sorter.order ?? null;
+        const newSorting = order ? `${field} ${order === 'ascend' ? 'asc' : 'desc'}` : undefined;
+        if (newSorting !== currentSortRef.current) {
+          tableState.handleSortChange(field as string, order);
+          return; // sort change resets page to 1, skip pagination handling
+        }
+      }
+
       // Handle pagination
       if (pagination?.current && pagination?.pageSize) {
         tableState.handlePageChange(pagination.current, pagination.pageSize);
-      }
-
-      // Handle sorting
-      if (sorter && !Array.isArray(sorter)) {
-        const field = Array.isArray(sorter.field) ? sorter.field.join('.') : sorter.field;
-        tableState.handleSortChange(field as string, sorter.order ?? null);
       }
     },
     [tableState],

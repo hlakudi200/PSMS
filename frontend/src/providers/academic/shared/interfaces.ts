@@ -466,6 +466,11 @@ export interface IBulkCaptureAttendance {
   entries: IStudentAttendanceEntry[];
 }
 
+export interface IGetStudentsInput extends IPagedAndSortedResultRequest {
+  isActive?: boolean;
+  gender?: number;
+}
+
 export interface IGetAttendanceInput extends IPagedAndSortedResultRequest {
   classId?: string;
   studentId?: string;
