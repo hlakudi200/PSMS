@@ -99,9 +99,9 @@ export const GradeProvider = ({
 
   const updateAsync = async (id: string, input: IUpdateGrade) => {
     dispatch(updateGradePending());
-    const endpoint = `/api/services/app/Grade/Update`;
+    const endpoint = `/api/services/app/Grade/Update?id=${id}`;
     await instance
-      .put(endpoint, { id, ...input })
+      .put(endpoint, input)
       .then((response) => {
         dispatch(updateGradeSuccess(response.data.result));
       })
@@ -159,9 +159,9 @@ export const GradeProvider = ({
 
   const activateAsync = async (id: string) => {
     dispatch(activatePending());
-    const endpoint = `/api/services/app/Grade/Activate`;
+    const endpoint = `/api/services/app/Grade/Activate?id=${id}`;
     await instance
-      .post(endpoint, { id })
+      .post(endpoint)
       .then(() => {
         dispatch(activateSuccess());
       })
@@ -173,9 +173,9 @@ export const GradeProvider = ({
 
   const deactivateAsync = async (id: string) => {
     dispatch(deactivatePending());
-    const endpoint = `/api/services/app/Grade/Deactivate`;
+    const endpoint = `/api/services/app/Grade/Deactivate?id=${id}`;
     await instance
-      .post(endpoint, { id })
+      .post(endpoint)
       .then(() => {
         dispatch(deactivateSuccess());
       })

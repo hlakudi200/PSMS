@@ -124,9 +124,9 @@ export const LearningMaterialProvider = ({
 
   const updateAsync = async (id: string, input: IUpdateLearningMaterial) => {
     dispatch(updateLearningMaterialPending());
-    const endpoint = `/api/services/app/LearningMaterial/Update`;
+    const endpoint = `/api/services/app/LearningMaterial/Update?id=${id}`;
     await instance
-      .put(endpoint, { id, ...input })
+      .put(endpoint, input)
       .then((response) => {
         dispatch(updateLearningMaterialSuccess(response.data.result));
       })

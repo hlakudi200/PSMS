@@ -139,9 +139,9 @@ export const MessageProvider = ({
 
   const markAsReadAsync = async (id: string) => {
     dispatch(markAsReadPending());
-    const endpoint = `/api/services/app/Message/MarkAsRead`;
+    const endpoint = `/api/services/app/Message/MarkAsRead?id=${id}`;
     await instance
-      .post(endpoint, { id })
+      .post(endpoint)
       .then(() => {
         dispatch(markAsReadSuccess());
       })

@@ -139,9 +139,9 @@ export const ClassSubjectProvider = ({
 
   const updateAsync = async (id: string, input: IUpdateClassSubject) => {
     dispatch(updateClassSubjectPending());
-    const endpoint = `/api/services/app/ClassSubject/Update`;
+    const endpoint = `/api/services/app/ClassSubject/Update?id=${id}`;
     await instance
-      .put(endpoint, { id, ...input })
+      .put(endpoint, input)
       .then((response) => {
         dispatch(updateClassSubjectSuccess(response.data.result));
       })
@@ -167,9 +167,9 @@ export const ClassSubjectProvider = ({
 
   const assignTeacherAsync = async (id: string, teacherId: string) => {
     dispatch(assignTeacherPending());
-    const endpoint = `/api/services/app/ClassSubject/AssignTeacher`;
+    const endpoint = `/api/services/app/ClassSubject/AssignTeacher?id=${id}`;
     await instance
-      .put(endpoint, { id, teacherId })
+      .put(endpoint, { teacherId })
       .then((response) => {
         dispatch(assignTeacherSuccess(response.data.result));
       })
@@ -181,9 +181,9 @@ export const ClassSubjectProvider = ({
 
   const removeTeacherAsync = async (id: string) => {
     dispatch(removeTeacherPending());
-    const endpoint = `/api/services/app/ClassSubject/RemoveTeacher`;
+    const endpoint = `/api/services/app/ClassSubject/RemoveTeacher?id=${id}`;
     await instance
-      .put(endpoint, { id })
+      .put(endpoint)
       .then((response) => {
         dispatch(removeTeacherSuccess(response.data.result));
       })

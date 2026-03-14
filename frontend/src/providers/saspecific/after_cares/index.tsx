@@ -118,9 +118,9 @@ export const AfterCareProvider = ({
 
   const updateAsync = async (id: string, input: IUpdateAfterCare) => {
     dispatch(updateAfterCarePending());
-    const endpoint = `/api/services/app/AfterCare/Update`;
+    const endpoint = `/api/services/app/AfterCare/Update?id=${id}`;
     await instance
-      .put(endpoint, { id, ...input })
+      .put(endpoint, input)
       .then((response) => {
         dispatch(updateAfterCareSuccess(response.data.result));
       })
@@ -146,9 +146,9 @@ export const AfterCareProvider = ({
 
   const activateAsync = async (id: string) => {
     dispatch(activatePending());
-    const endpoint = `/api/services/app/AfterCare/Activate`;
+    const endpoint = `/api/services/app/AfterCare/Activate?id=${id}`;
     await instance
-      .post(endpoint, { id })
+      .post(endpoint)
       .then(() => {
         dispatch(activateSuccess());
       })
@@ -160,9 +160,9 @@ export const AfterCareProvider = ({
 
   const deactivateAsync = async (id: string) => {
     dispatch(deactivatePending());
-    const endpoint = `/api/services/app/AfterCare/Deactivate`;
+    const endpoint = `/api/services/app/AfterCare/Deactivate?id=${id}`;
     await instance
-      .post(endpoint, { id })
+      .post(endpoint)
       .then(() => {
         dispatch(deactivateSuccess());
       })

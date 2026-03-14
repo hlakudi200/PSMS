@@ -93,9 +93,9 @@ export const POPIAConsentProvider = ({
 
   const updateAsync = async (id: string, input: IUpdatePOPIAConsent) => {
     dispatch(updatePending());
-    const endpoint = `/api/services/app/POPIAConsent/Update`;
+    const endpoint = `/api/services/app/POPIAConsent/Update?id=${id}`;
     await instance
-      .put(endpoint, { id, ...input })
+      .put(endpoint, input)
       .then((response) => {
         dispatch(updateSuccess(response.data.result));
       })

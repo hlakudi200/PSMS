@@ -97,9 +97,9 @@ export const NotificationProvider = ({
 
   const markAsReadAsync = async (id: string) => {
     dispatch(markAsReadPending());
-    const endpoint = `/api/services/app/Notification/MarkAsRead`;
+    const endpoint = `/api/services/app/Notification/MarkAsRead?id=${id}`;
     await instance
-      .post(endpoint, { id })
+      .post(endpoint)
       .then(() => {
         dispatch(markAsReadSuccess());
       })

@@ -128,9 +128,9 @@ export const ExtramuralActivityProvider = ({
 
   const updateAsync = async (id: string, input: IUpdateExtramuralActivity) => {
     dispatch(updateExtramuralActivityPending());
-    const endpoint = `/api/services/app/ExtramuralActivity/Update`;
+    const endpoint = `/api/services/app/ExtramuralActivity/Update?id=${id}`;
     await instance
-      .put(endpoint, { id, ...input })
+      .put(endpoint, input)
       .then((response) => {
         dispatch(updateExtramuralActivitySuccess(response.data.result));
       })
@@ -156,9 +156,9 @@ export const ExtramuralActivityProvider = ({
 
   const activateAsync = async (id: string) => {
     dispatch(activateExtramuralActivityPending());
-    const endpoint = `/api/services/app/ExtramuralActivity/Activate`;
+    const endpoint = `/api/services/app/ExtramuralActivity/Activate?id=${id}`;
     await instance
-      .post(endpoint, { id })
+      .post(endpoint)
       .then((response) => {
         dispatch(activateExtramuralActivitySuccess(response.data.result));
       })
@@ -170,9 +170,9 @@ export const ExtramuralActivityProvider = ({
 
   const deactivateAsync = async (id: string) => {
     dispatch(deactivateExtramuralActivityPending());
-    const endpoint = `/api/services/app/ExtramuralActivity/Deactivate`;
+    const endpoint = `/api/services/app/ExtramuralActivity/Deactivate?id=${id}`;
     await instance
-      .post(endpoint, { id })
+      .post(endpoint)
       .then((response) => {
         dispatch(deactivateExtramuralActivitySuccess(response.data.result));
       })
@@ -184,9 +184,9 @@ export const ExtramuralActivityProvider = ({
 
   const openRegistrationAsync = async (id: string) => {
     dispatch(openRegistrationPending());
-    const endpoint = `/api/services/app/ExtramuralActivity/OpenRegistration`;
+    const endpoint = `/api/services/app/ExtramuralActivity/OpenRegistration?id=${id}`;
     await instance
-      .post(endpoint, { id })
+      .post(endpoint)
       .then((response) => {
         dispatch(openRegistrationSuccess(response.data.result));
       })
@@ -198,9 +198,9 @@ export const ExtramuralActivityProvider = ({
 
   const closeRegistrationAsync = async (id: string) => {
     dispatch(closeRegistrationPending());
-    const endpoint = `/api/services/app/ExtramuralActivity/CloseRegistration`;
+    const endpoint = `/api/services/app/ExtramuralActivity/CloseRegistration?id=${id}`;
     await instance
-      .post(endpoint, { id })
+      .post(endpoint)
       .then((response) => {
         dispatch(closeRegistrationSuccess(response.data.result));
       })

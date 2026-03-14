@@ -106,9 +106,9 @@ export const DocumentProvider = ({
 
   const updateAsync = async (id: string, input: IUpdateDocument) => {
     dispatch(updateDocumentPending());
-    const endpoint = `/api/services/app/Document/Update`;
+    const endpoint = `/api/services/app/Document/Update?id=${id}`;
     await instance
-      .put(endpoint, { id, ...input })
+      .put(endpoint, input)
       .then((response) => {
         dispatch(updateDocumentSuccess(response.data.result));
       })
@@ -134,9 +134,9 @@ export const DocumentProvider = ({
 
   const publishAsync = async (id: string) => {
     dispatch(publishDocumentPending());
-    const endpoint = `/api/services/app/Document/Publish`;
+    const endpoint = `/api/services/app/Document/Publish?id=${id}`;
     await instance
-      .post(endpoint, { id })
+      .post(endpoint)
       .then((response) => {
         dispatch(publishDocumentSuccess(response.data.result));
       })
@@ -148,9 +148,9 @@ export const DocumentProvider = ({
 
   const unpublishAsync = async (id: string) => {
     dispatch(unpublishDocumentPending());
-    const endpoint = `/api/services/app/Document/Unpublish`;
+    const endpoint = `/api/services/app/Document/Unpublish?id=${id}`;
     await instance
-      .post(endpoint, { id })
+      .post(endpoint)
       .then((response) => {
         dispatch(unpublishDocumentSuccess(response.data.result));
       })
@@ -162,9 +162,9 @@ export const DocumentProvider = ({
 
   const recordDownloadAsync = async (id: string) => {
     dispatch(recordDownloadPending());
-    const endpoint = `/api/services/app/Document/RecordDownload`;
+    const endpoint = `/api/services/app/Document/RecordDownload?id=${id}`;
     await instance
-      .post(endpoint, { id })
+      .post(endpoint)
       .then((response) => {
         dispatch(recordDownloadSuccess(response.data.result));
       })

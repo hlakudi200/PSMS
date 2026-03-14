@@ -112,9 +112,9 @@ export const TimetableProvider = ({
 
   const updateAsync = async (id: string, input: IUpdateTimetable) => {
     dispatch(updateTimetablePending());
-    const endpoint = `/api/services/app/Timetable/Update`;
+    const endpoint = `/api/services/app/Timetable/Update?id=${id}`;
     await instance
-      .put(endpoint, { id, ...input })
+      .put(endpoint, input)
       .then((response) => {
         dispatch(updateTimetableSuccess(response.data.result));
       })
@@ -140,9 +140,9 @@ export const TimetableProvider = ({
 
   const activateAsync = async (id: string) => {
     dispatch(activateTimetablePending());
-    const endpoint = `/api/services/app/Timetable/Activate`;
+    const endpoint = `/api/services/app/Timetable/Activate?id=${id}`;
     await instance
-      .put(endpoint, { id })
+      .put(endpoint)
       .then((response) => {
         dispatch(activateTimetableSuccess(response.data.result));
       })
@@ -154,9 +154,9 @@ export const TimetableProvider = ({
 
   const deactivateAsync = async (id: string) => {
     dispatch(deactivateTimetablePending());
-    const endpoint = `/api/services/app/Timetable/Deactivate`;
+    const endpoint = `/api/services/app/Timetable/Deactivate?id=${id}`;
     await instance
-      .put(endpoint, { id })
+      .put(endpoint)
       .then((response) => {
         dispatch(deactivateTimetableSuccess(response.data.result));
       })

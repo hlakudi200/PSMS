@@ -125,9 +125,9 @@ export const TimetableSlotProvider = ({
 
   const updateAsync = async (id: string, input: IUpdateTimetableSlot) => {
     dispatch(updateTimetableSlotPending());
-    const endpoint = `/api/services/app/TimetableSlot/Update`;
+    const endpoint = `/api/services/app/TimetableSlot/Update?id=${id}`;
     await instance
-      .put(endpoint, { id, ...input })
+      .put(endpoint, input)
       .then((response) => {
         dispatch(updateTimetableSlotSuccess(response.data.result));
       })

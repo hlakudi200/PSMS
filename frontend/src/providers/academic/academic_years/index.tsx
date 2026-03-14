@@ -111,9 +111,9 @@ export const AcademicYearProvider = ({
 
   const updateAsync = async (id: string, input: IUpdateAcademicYear) => {
     dispatch(updateAcademicYearPending());
-    const endpoint = `/api/services/app/AcademicYear/Update`;
+    const endpoint = `/api/services/app/AcademicYear/Update?id=${id}`;
     await instance
-      .put(endpoint, { id, ...input })
+      .put(endpoint, input)
       .then((response) => {
         dispatch(updateAcademicYearSuccess(response.data.result));
       })

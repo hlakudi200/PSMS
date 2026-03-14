@@ -122,9 +122,9 @@ export const FeeStructureProvider = ({
 
   const updateAsync = async (id: string, input: IUpdateFeeStructure) => {
     dispatch(updateFeeStructurePending());
-    const endpoint = `/api/services/app/FeeStructure/Update`;
+    const endpoint = `/api/services/app/FeeStructure/Update?id=${id}`;
     await instance
-      .put(endpoint, { id, ...input })
+      .put(endpoint, input)
       .then((response) => {
         dispatch(updateFeeStructureSuccess(response.data.result));
       })

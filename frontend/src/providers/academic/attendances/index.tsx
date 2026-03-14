@@ -172,9 +172,9 @@ export const AttendanceProvider = ({
 
   const updateAsync = async (id: string, input: IUpdateAttendance) => {
     dispatch(updateAttendancePending());
-    const endpoint = `/api/services/app/Attendance/Update`;
+    const endpoint = `/api/services/app/Attendance/Update?id=${id}`;
     await instance
-      .put(endpoint, { id, ...input })
+      .put(endpoint, input)
       .then((response) => {
         dispatch(updateAttendanceSuccess(response.data.result));
       })

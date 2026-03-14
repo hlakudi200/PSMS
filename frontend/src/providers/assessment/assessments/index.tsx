@@ -107,9 +107,9 @@ export const AssessmentProvider = ({
 
   const updateAsync = async (id: string, input: IUpdateAssessment) => {
     dispatch(updateAssessmentPending());
-    const endpoint = `/api/services/app/Assessment/Update`;
+    const endpoint = `/api/services/app/Assessment/Update?id=${id}`;
     await instance
-      .put(endpoint, { id, ...input })
+      .put(endpoint, input)
       .then((response) => {
         dispatch(updateAssessmentSuccess(response.data.result));
       })
@@ -135,9 +135,9 @@ export const AssessmentProvider = ({
 
   const publishAsync = async (id: string) => {
     dispatch(publishAssessmentPending());
-    const endpoint = `/api/services/app/Assessment/Publish`;
+    const endpoint = `/api/services/app/Assessment/Publish?id=${id}`;
     await instance
-      .post(endpoint, { id })
+      .post(endpoint)
       .then((response) => {
         dispatch(publishAssessmentSuccess(response.data.result));
       })
@@ -149,9 +149,9 @@ export const AssessmentProvider = ({
 
   const unpublishAsync = async (id: string) => {
     dispatch(unpublishAssessmentPending());
-    const endpoint = `/api/services/app/Assessment/Unpublish`;
+    const endpoint = `/api/services/app/Assessment/Unpublish?id=${id}`;
     await instance
-      .post(endpoint, { id })
+      .post(endpoint)
       .then((response) => {
         dispatch(unpublishAssessmentSuccess(response.data.result));
       })
@@ -163,9 +163,9 @@ export const AssessmentProvider = ({
 
   const releaseMarksAsync = async (id: string) => {
     dispatch(releaseMarksPending());
-    const endpoint = `/api/services/app/Assessment/ReleaseMarks`;
+    const endpoint = `/api/services/app/Assessment/ReleaseMarks?id=${id}`;
     await instance
-      .post(endpoint, { id })
+      .post(endpoint)
       .then((response) => {
         dispatch(releaseMarksSuccess(response.data.result));
       })

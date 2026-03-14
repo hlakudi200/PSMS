@@ -101,9 +101,9 @@ export const SchoolTransportProvider = ({
 
   const updateAsync = async (id: string, input: IUpdateSchoolTransport) => {
     dispatch(updateSchoolTransportPending());
-    const endpoint = `/api/services/app/SchoolTransport/Update`;
+    const endpoint = `/api/services/app/SchoolTransport/Update?id=${id}`;
     await instance
-      .put(endpoint, { id, ...input })
+      .put(endpoint, input)
       .then((response) => {
         dispatch(updateSchoolTransportSuccess(response.data.result));
       })
@@ -129,9 +129,9 @@ export const SchoolTransportProvider = ({
 
   const activateAsync = async (id: string) => {
     dispatch(activateSchoolTransportPending());
-    const endpoint = `/api/services/app/SchoolTransport/Activate`;
+    const endpoint = `/api/services/app/SchoolTransport/Activate?id=${id}`;
     await instance
-      .post(endpoint, { id })
+      .post(endpoint)
       .then(() => {
         dispatch(activateSchoolTransportSuccess());
       })
@@ -143,9 +143,9 @@ export const SchoolTransportProvider = ({
 
   const deactivateAsync = async (id: string) => {
     dispatch(deactivateSchoolTransportPending());
-    const endpoint = `/api/services/app/SchoolTransport/Deactivate`;
+    const endpoint = `/api/services/app/SchoolTransport/Deactivate?id=${id}`;
     await instance
-      .post(endpoint, { id })
+      .post(endpoint)
       .then(() => {
         dispatch(deactivateSchoolTransportSuccess());
       })

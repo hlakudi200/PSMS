@@ -143,9 +143,9 @@ export const StudentExtramuralProvider = ({
 
   const updateAsync = async (id: string, input: IUpdateStudentExtramural) => {
     dispatch(updateStudentExtramuralPending());
-    const endpoint = `/api/services/app/StudentExtramural/Update`;
+    const endpoint = `/api/services/app/StudentExtramural/Update?id=${id}`;
     await instance
-      .put(endpoint, { id, ...input })
+      .put(endpoint, input)
       .then((response) => {
         dispatch(updateStudentExtramuralSuccess(response.data.result));
       })
@@ -171,9 +171,9 @@ export const StudentExtramuralProvider = ({
 
   const suspendAsync = async (id: string) => {
     dispatch(suspendPending());
-    const endpoint = `/api/services/app/StudentExtramural/Suspend`;
+    const endpoint = `/api/services/app/StudentExtramural/Suspend?id=${id}`;
     await instance
-      .post(endpoint, { id })
+      .post(endpoint)
       .then(() => {
         dispatch(suspendSuccess());
       })
@@ -185,9 +185,9 @@ export const StudentExtramuralProvider = ({
 
   const reactivateAsync = async (id: string) => {
     dispatch(reactivatePending());
-    const endpoint = `/api/services/app/StudentExtramural/Reactivate`;
+    const endpoint = `/api/services/app/StudentExtramural/Reactivate?id=${id}`;
     await instance
-      .post(endpoint, { id })
+      .post(endpoint)
       .then(() => {
         dispatch(reactivateSuccess());
       })
@@ -199,9 +199,9 @@ export const StudentExtramuralProvider = ({
 
   const terminateAsync = async (id: string) => {
     dispatch(terminatePending());
-    const endpoint = `/api/services/app/StudentExtramural/Terminate`;
+    const endpoint = `/api/services/app/StudentExtramural/Terminate?id=${id}`;
     await instance
-      .post(endpoint, { id })
+      .post(endpoint)
       .then(() => {
         dispatch(terminateSuccess());
       })
@@ -213,9 +213,9 @@ export const StudentExtramuralProvider = ({
 
   const signConsentFormAsync = async (id: string) => {
     dispatch(signConsentFormPending());
-    const endpoint = `/api/services/app/StudentExtramural/SignConsentForm`;
+    const endpoint = `/api/services/app/StudentExtramural/SignConsentForm?id=${id}`;
     await instance
-      .post(endpoint, { id })
+      .post(endpoint)
       .then(() => {
         dispatch(signConsentFormSuccess());
       })

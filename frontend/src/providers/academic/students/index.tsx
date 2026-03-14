@@ -89,9 +89,9 @@ export const StudentProvider = ({
 
   const updateAsync = useCallback(async (id: string, input: IUpdateStudent) => {
     dispatch(updateStudentPending());
-    const endpoint = `/api/services/app/Student/Update`;
+    const endpoint = `/api/services/app/Student/Update?id=${id}`;
     await instance
-      .put(endpoint, { id, ...input })
+      .put(endpoint, input)
       .then((response) => {
         dispatch(updateStudentSuccess(response.data.result));
       })

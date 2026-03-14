@@ -85,9 +85,9 @@ export const StudentParentProvider = ({
 
   const updateLinkAsync = async (id: string, input: ILinkStudentParent) => {
     dispatch(updateLinkPending());
-    const endpoint = `/api/services/app/StudentParent/UpdateLink`;
+    const endpoint = `/api/services/app/StudentParent/UpdateLink?id=${id}`;
     await instance
-      .put(endpoint, { id, ...input })
+      .put(endpoint, input)
       .then((response) => {
         dispatch(updateLinkSuccess(response.data.result));
       })

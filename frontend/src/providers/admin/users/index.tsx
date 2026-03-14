@@ -104,9 +104,9 @@ export const UserProvider = ({
 
   const updateAsync = async (id: number, input: IUpdateUser) => {
     dispatch(updateUserPending());
-    const endpoint = `/api/services/app/User/Update`;
+    const endpoint = `/api/services/app/User/Update?id=${id}`;
     await instance
-      .put(endpoint, { id, ...input })
+      .put(endpoint, input)
       .then((response) => {
         dispatch(updateUserSuccess(response.data.result));
       })
@@ -132,9 +132,9 @@ export const UserProvider = ({
 
   const activateAsync = async (id: number) => {
     dispatch(activateUserPending());
-    const endpoint = `/api/services/app/User/Activate`;
+    const endpoint = `/api/services/app/User/Activate?id=${id}`;
     await instance
-      .post(endpoint, { id })
+      .post(endpoint)
       .then(() => {
         dispatch(activateUserSuccess());
       })
@@ -146,9 +146,9 @@ export const UserProvider = ({
 
   const deactivateAsync = async (id: number) => {
     dispatch(deactivateUserPending());
-    const endpoint = `/api/services/app/User/DeActivate`;
+    const endpoint = `/api/services/app/User/DeActivate?id=${id}`;
     await instance
-      .post(endpoint, { id })
+      .post(endpoint)
       .then(() => {
         dispatch(deactivateUserSuccess());
       })
