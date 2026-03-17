@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { Card, Col, Row, Select, DatePicker, Statistic, Tabs, Empty, Table, Tag, Progress, Typography, Alert } from 'antd';
 import {
   CheckCircleOutlined,
@@ -174,6 +175,7 @@ function AttendanceContent() {
   const { classes } = useClassState();
   const { getActiveClassesAsync } = useClassActions();
   const { currentRole } = useAuthState();
+  const router = useRouter();
 
   const [selectedClassId, setSelectedClassId] = useState<string | undefined>(undefined);
   const [dateRange, setDateRange] = useState<[Dayjs, Dayjs]>([
@@ -199,13 +201,26 @@ function AttendanceContent() {
 
   const handleQueryChange = useCallback((query: TableQuery) => {
     setLastQuery(query);
+    const filters = query.filters ?? {};
+
+    // Column-level text filters (studentName, className) map to keyword search
+    const keyword = (filters.keyword as string)
+      || (filters.studentName as string)
+      || (filters.className as string)
+      || undefined;
+
+    // Column-level date filter overrides the page-level date range
+    const filterDate = filters.attendanceDate as string | undefined;
+
     getAllAsync({
       maxResultCount: query.maxResultCount,
       skipCount: query.skipCount,
       sorting: query.sorting,
+      keyword,
       classId: selectedClassId,
-      startDate: dateRange[0].format('YYYY-MM-DD'),
-      endDate: dateRange[1].format('YYYY-MM-DD'),
+      startDate: filterDate || dateRange[0].format('YYYY-MM-DD'),
+      endDate: filterDate || dateRange[1].format('YYYY-MM-DD'),
+      status: filters.status as number | undefined,
     });
   }, [getAllAsync, selectedClassId, dateRange]);
 
@@ -257,7 +272,7 @@ function AttendanceContent() {
       label: 'View Details',
       icon: <EyeOutlined />,
       onClick: (record) => {
-        console.log('View attendance detail:', record.id);
+        router.push(`/principal/attendance/${record.id}`);
       },
     },
   ];

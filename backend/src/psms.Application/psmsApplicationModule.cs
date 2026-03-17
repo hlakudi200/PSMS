@@ -2,6 +2,8 @@
 using Abp.Modules;
 using Abp.Reflection.Extensions;
 using psms.Authorization;
+using psms.Domain.Shared.Storage;
+using psms.Infrastructure.Storage;
 
 namespace psms;
 
@@ -20,6 +22,8 @@ public class psmsApplicationModule : AbpModule
         var thisAssembly = typeof(psmsApplicationModule).GetAssembly();
 
         IocManager.RegisterAssemblyByConvention(thisAssembly);
+
+        IocManager.Register<IFileStorageService, SupabaseStorageService>(Abp.Dependency.DependencyLifeStyle.Transient);
 
         Configuration.Modules.AbpAutoMapper().Configurators.Add(
             // Scan the assembly for classes which inherit from AutoMapper.Profile

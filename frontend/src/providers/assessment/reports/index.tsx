@@ -6,6 +6,7 @@ import {
   ReportStateContext,
 } from "./context";
 import {
+  IBulkGenerateReportPdfsInput,
   IGenerateReport,
   IGetReportsInput,
   IReportComment,
@@ -49,6 +50,12 @@ import {
   deleteReportPending,
   deleteReportSuccess,
   deleteReportError,
+  generatePdfPending,
+  generatePdfSuccess,
+  generatePdfError,
+  bulkGeneratePdfsPending,
+  bulkGeneratePdfsSuccess,
+  bulkGeneratePdfsError,
 } from "./actions";
 
 export const ReportProvider = ({
@@ -235,6 +242,34 @@ export const ReportProvider = ({
       });
   };
 
+  const generatePdfAsync = async (id: string) => {
+    dispatch(generatePdfPending());
+    const endpoint = `/api/services/app/Report/GenerateReportPdf?id=${id}`;
+    await instance
+      .post(endpoint)
+      .then(() => {
+        dispatch(generatePdfSuccess());
+      })
+      .catch((error) => {
+        console.error(error);
+        dispatch(generatePdfError());
+      });
+  };
+
+  const bulkGeneratePdfsAsync = async (input: IBulkGenerateReportPdfsInput) => {
+    dispatch(bulkGeneratePdfsPending());
+    const endpoint = `/api/services/app/Report/BulkGenerateReportPdfs`;
+    await instance
+      .post(endpoint, input)
+      .then(() => {
+        dispatch(bulkGeneratePdfsSuccess());
+      })
+      .catch((error) => {
+        console.error(error);
+        dispatch(bulkGeneratePdfsError());
+      });
+  };
+
   const deleteAsync = async (id: string) => {
     dispatch(deleteReportPending());
     const endpoint = `/api/services/app/Report/Delete?id=${id}`;
@@ -265,6 +300,8 @@ export const ReportProvider = ({
           acknowledgeByParentAsync,
           recordPromotionAsync,
           deleteAsync,
+          generatePdfAsync,
+          bulkGeneratePdfsAsync,
         }}
       >
         {children}

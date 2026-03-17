@@ -49,4 +49,9 @@ public static class AssessmentExceptionCodes
     // ReportSubject
     public const string ReportSubjectNotFound = "ASM_REPORT_SUBJECT_NOT_FOUND";
     public const string DuplicateReportSubject = "ASM_DUPLICATE_REPORT_SUBJECT";
+
+    // Report PDF
+    public const string PdfNotGenerated = "ASM_PDF_NOT_GENERATED";
+    public const string PdfGenerationFailed = "ASM_PDF_GENERATION_FAILED";
+    public const string ReportNotGeneratedForPdf = "ASM_REPORT_NOT_GENERATED_FOR_PDF";
 }

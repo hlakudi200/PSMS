@@ -55,7 +55,7 @@ const menuItems = [
     label: 'Assessments',
     children: [
       { key: '/principal/reports', icon: <BarChartOutlined />, label: 'Reports' },
-      { key: 'mark-sheets', icon: <FileTextOutlined />, label: 'Mark Sheets', disabled: true },
+      { key: '/principal/mark-sheets', icon: <FileTextOutlined />, label: 'Mark Sheets' },
     ],
   },
   {
@@ -71,8 +71,8 @@ const menuItems = [
     label: 'More',
     children: [
       { key: '/principal/timetables', icon: <ClockCircleOutlined />, label: 'Timetable' },
-      { key: 'transport', icon: <CarOutlined />, label: 'Transport', disabled: true },
-      { key: 'extramurals', icon: <TrophyOutlined />, label: 'Extramurals', disabled: true },
+      { key: '/principal/transport', icon: <CarOutlined />, label: 'Transport' },
+      { key: '/principal/extramurals', icon: <TrophyOutlined />, label: 'Extramurals' },
       { key: '/principal/finance', icon: <DollarOutlined />, label: 'Finance Overview' },
       { key: '/principal/admissions', icon: <FormOutlined />, label: 'Admissions' },
     ],

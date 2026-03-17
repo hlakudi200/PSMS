@@ -148,6 +148,12 @@ namespace psms.Domain.Assessment.Entities
         /// </summary>
         public DateTime? ApprovedDate { get; set; }
 
+        /// <summary>
+        /// URL to the generated PDF stored in Supabase Storage
+        /// </summary>
+        [StringLength(2048)]
+        public string PdfUrl { get; set; }
+
         // Navigation Properties
         [ForeignKey(nameof(StudentId))]
         public virtual Student Student { get; set; }
@@ -249,6 +255,14 @@ namespace psms.Domain.Assessment.Entities
         {
             ParentAcknowledgedDate = DateTime.UtcNow;
             ParentComment = comment;
+        }
+
+        /// <summary>
+        /// Sets the URL to the generated PDF
+        /// </summary>
+        public void SetPdfUrl(string url)
+        {
+            PdfUrl = url;
         }
 
         /// <summary>

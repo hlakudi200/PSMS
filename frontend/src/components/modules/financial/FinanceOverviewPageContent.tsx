@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useCallback, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Card, Col, Row, Select, DatePicker, Statistic, Tabs } from 'antd';
 import {
   DollarOutlined,
@@ -56,6 +57,7 @@ const paymentMethodMap: Record<number, { label: string; color: string }> = {
 };
 
 function FinanceContent() {
+  const router = useRouter();
   const { feeStructures, totalCount: feeTotal, isPending: feePending, isError: feeError } = useFeeStructureState();
   const { getAllAsync: getAllFees } = useFeeStructureActions();
   const { payments, totalCount: paymentTotal, isPending: paymentPending, isError: paymentError } = usePaymentState();
@@ -160,7 +162,7 @@ function FinanceContent() {
       label: 'View Details',
       icon: <EyeOutlined />,
       onClick: (record) => {
-        console.log('View fee structure:', record.id);
+        router.push(`/principal/finance/${record.id}`);
       },
     },
   ];
@@ -214,7 +216,7 @@ function FinanceContent() {
       label: 'View Details',
       icon: <EyeOutlined />,
       onClick: (record) => {
-        console.log('View payment:', record.id);
+        router.push(`/principal/payments/${record.id}`);
       },
     },
   ];

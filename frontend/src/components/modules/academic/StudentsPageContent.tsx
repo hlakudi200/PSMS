@@ -41,6 +41,7 @@ function StudentsContent() {
       renderType: 'status',
       renderConfig: {
         statusMap: {
+          0: { label: 'Not Set', color: 'default' },
           1: { label: 'Male', color: 'blue' },
           2: { label: 'Female', color: 'pink' },
           3: { label: 'Other', color: 'default' },

@@ -34,6 +34,7 @@ public class ReportDto : FullAuditedEntityDto<Guid>
     public DateTime? PublishedDate { get; set; }
     public long? ApprovedByUserId { get; set; }
     public DateTime? ApprovedDate { get; set; }
+    public string PdfUrl { get; set; }
 
     // Flattened
     public string StudentName { get; set; }

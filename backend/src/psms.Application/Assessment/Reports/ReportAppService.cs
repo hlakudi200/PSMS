@@ -1,11 +1,13 @@
 using Abp.Application.Services;
 using Abp.Application.Services.Dto;
 using Abp.Authorization;
+using Abp.BackgroundJobs;
 using Abp.Domain.Repositories;
 using Abp.Linq.Extensions;
 using Abp.UI;
 using Microsoft.EntityFrameworkCore;
 using psms.Assessment.Reports.Dto;
+using psms.Assessment.Reports.Pdf;
 using psms.Assessment.ReportSubjects.Dto;
 using psms.Assessment.Shared;
 using psms.Authorization;
@@ -36,6 +38,7 @@ public class ReportAppService : ApplicationService, IReportAppService
     private readonly IRepository<Mark, Guid> _markRepository;
     private readonly IRepository<ClassSubject, Guid> _classSubjectRepository;
     private readonly IRepository<AssessmentEntity, Guid> _assessmentRepository;
+    private readonly IBackgroundJobManager _backgroundJobManager;
 
     public ReportAppService(
         IRepository<Report, Guid> reportRepository,
@@ -46,7 +49,8 @@ public class ReportAppService : ApplicationService, IReportAppService
         IRepository<Term, Guid> termRepository,
         IRepository<Mark, Guid> markRepository,
         IRepository<ClassSubject, Guid> classSubjectRepository,
-        IRepository<AssessmentEntity, Guid> assessmentRepository)
+        IRepository<AssessmentEntity, Guid> assessmentRepository,
+        IBackgroundJobManager backgroundJobManager)
     {
         _reportRepository = reportRepository;
         _reportSubjectRepository = reportSubjectRepository;
@@ -57,6 +61,7 @@ public class ReportAppService : ApplicationService, IReportAppService
         _markRepository = markRepository;
         _classSubjectRepository = classSubjectRepository;
         _assessmentRepository = assessmentRepository;
+        _backgroundJobManager = backgroundJobManager;
     }
 
     [AbpAuthorize(PermissionNames.Assessment_ReportCards_View)]
@@ -472,6 +477,66 @@ public class ReportAppService : ApplicationService, IReportAppService
         }
 
         await _reportRepository.DeleteAsync(report);
+    }
+
+    [AbpAuthorize(PermissionNames.Assessment_ReportCards_Generate)]
+    public async Task GenerateReportPdfAsync(Guid id)
+    {
+        var report = await _reportRepository
+            .FirstOrDefaultAsync(r => r.Id == id && r.TenantId == AbpSession.TenantId);
+
+        if (report == null)
+            throw new UserFriendlyException(AssessmentExceptionCodes.ReportNotFound, "Report not found.");
+
+        if (report.Status < ReportStatus.Generated)
+            throw new UserFriendlyException(AssessmentExceptionCodes.ReportNotGeneratedForPdf,
+                "Report must be generated before a PDF can be created.");
+
+        await _backgroundJobManager.EnqueueAsync<GenerateReportPdfJob, GenerateReportPdfJobArgs>(
+            new GenerateReportPdfJobArgs
+            {
+                ReportId = id,
+                TenantId = AbpSession.TenantId,
+                UserId = AbpSession.UserId.Value,
+            });
+    }
+
+    [AbpAuthorize(PermissionNames.Assessment_ReportCards_Generate)]
+    public async Task<int> BulkGenerateReportPdfsAsync(BulkGenerateReportPdfsInput input)
+    {
+        var reportIds = await _reportRepository
+            .GetAll()
+            .Where(r => r.TenantId == AbpSession.TenantId)
+            .Where(r => r.ClassId == input.ClassId)
+            .WhereIf(input.TermId.HasValue, r => r.TermId == input.TermId.Value)
+            .Where(r => r.Status >= ReportStatus.Generated)
+            .Select(r => r.Id)
+            .ToListAsync();
+
+        if (reportIds.Count == 0)
+            return 0;
+
+        await _backgroundJobManager.EnqueueAsync<BulkGenerateReportPdfsJob, BulkGenerateReportPdfsJobArgs>(
+            new BulkGenerateReportPdfsJobArgs
+            {
+                ReportIds = reportIds,
+                TenantId = AbpSession.TenantId,
+                UserId = AbpSession.UserId.Value,
+            });
+
+        return reportIds.Count;
+    }
+
+    [AbpAuthorize(PermissionNames.Assessment_ReportCards_View)]
+    public async Task<string> GetReportPdfUrlAsync(Guid id)
+    {
+        var report = await _reportRepository
+            .FirstOrDefaultAsync(r => r.Id == id && r.TenantId == AbpSession.TenantId);
+
+        if (report == null)
+            throw new UserFriendlyException(AssessmentExceptionCodes.ReportNotFound, "Report not found.");
+
+        return report.PdfUrl;
     }
 
     private static CapsAchievementLevel CalculateAchievementLevel(decimal percentage)

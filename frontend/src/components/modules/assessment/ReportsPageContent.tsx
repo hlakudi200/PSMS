@@ -7,6 +7,8 @@ import {
   CheckCircleOutlined,
   SendOutlined,
   EyeOutlined,
+  FilePdfOutlined,
+  DownloadOutlined,
 } from '@ant-design/icons';
 import { EnterpriseTable } from '@/components/shared/enterprise-table';
 import type { ColumnConfig, TableQuery, RowAction, BulkAction } from '@/components/shared/enterprise-table';
@@ -38,7 +40,7 @@ const reportTypeMap: Record<number, { label: string; color: string }> = {
 function ReportsContent() {
   const router = useRouter();
   const { reports, totalCount, isPending, isError } = useReportState();
-  const { getAllAsync, approveAsync, publishAsync } = useReportActions();
+  const { getAllAsync, approveAsync, publishAsync, generatePdfAsync, bulkGeneratePdfsAsync } = useReportActions();
   const { academicYears } = useAcademicYearState();
   const { getAllAsync: getAllAcademicYears } = useAcademicYearActions();
   const { terms } = useTermState();
@@ -161,6 +163,25 @@ function ReportsContent() {
         refreshData();
       },
     },
+    {
+      key: 'downloadPdf',
+      label: 'Download PDF',
+      icon: <DownloadOutlined />,
+      visible: (record) => !!record.pdfUrl,
+      onClick: (record) => {
+        window.open(record.pdfUrl, '_blank');
+      },
+    },
+    {
+      key: 'generatePdf',
+      label: 'Generate PDF',
+      icon: <FilePdfOutlined />,
+      visible: (record) => !record.pdfUrl && record.status >= 2,
+      onClick: async (record) => {
+        await generatePdfAsync(record.id);
+        message.success('PDF generation started');
+      },
+    },
   ];
 
   const bulkActions: BulkAction<IReportList>[] = [
@@ -192,6 +213,32 @@ function ReportsContent() {
         for (const row of approved) await publishAsync(row.id);
         message.success(`${approved.length} report(s) published`);
         refreshData();
+      },
+    },
+    {
+      key: 'bulkGeneratePdfs',
+      label: 'Generate All PDFs',
+      confirm: { title: 'Generate PDFs for all reports matching current filters?' },
+      onClick: async () => {
+        if (!selectedAcademicYearId) {
+          message.warning('Please select an academic year first');
+          return;
+        }
+        // Use the first report's classId or require class filter
+        const classIds = [...new Set(reports?.map(r => r.classId) ?? [])];
+        if (classIds.length === 0) {
+          message.warning('No reports found to generate PDFs for');
+          return;
+        }
+        let totalQueued = 0;
+        for (const classId of classIds) {
+          await bulkGeneratePdfsAsync({
+            classId,
+            termId: selectedTermId,
+          });
+          totalQueued++;
+        }
+        message.success(`PDF generation started for ${totalQueued} class(es)`);
       },
     },
   ];

@@ -43,12 +43,12 @@ const relationshipLabels: Record<number, string> = {
   0: 'Father', 1: 'Mother', 2: 'Guardian', 3: 'Grandparent', 4: 'Sibling', 5: 'Other',
 };
 const feeStatusLabels: Record<number, { label: string; color: string }> = {
-  0: { label: 'Pending', color: 'orange' },
-  1: { label: 'Partially Paid', color: 'blue' },
+  1: { label: 'Pending', color: 'orange' },
   2: { label: 'Paid', color: 'green' },
-  3: { label: 'Overdue', color: 'red' },
-  4: { label: 'Waived', color: 'default' },
-  5: { label: 'Cancelled', color: 'default' },
+  3: { label: 'Partially Paid', color: 'blue' },
+  4: { label: 'Overdue', color: 'red' },
+  5: { label: 'Waived', color: 'default' },
+  6: { label: 'Cancelled', color: 'default' },
 };
 
 function formatAddress(addr?: { streetAddress?: string; suburb?: string; city?: string; province?: string; postalCode?: string }) {
