@@ -112,6 +112,7 @@ public class AdmissionSettingsAppService : ApplicationService, IAdmissionSetting
 
         var settings = ObjectMapper.Map<Domain.Admissions.Entities.AdmissionSettings>(input);
         settings.Id = Guid.NewGuid();
+        settings.TenantId = AbpSession.TenantId;
 
         await _settingsRepository.InsertAsync(settings);
         await CurrentUnitOfWork.SaveChangesAsync();

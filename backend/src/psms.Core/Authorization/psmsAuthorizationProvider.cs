@@ -25,6 +25,7 @@ public class psmsAuthorizationProvider : AuthorizationProvider
         SetLearningPermissions(context);
         SetSASpecificPermissions(context);
         SetAdministrationPermissions(context);
+        SetWorkflowPermissions(context);
     }
 
     #region System Permissions
@@ -443,6 +444,40 @@ public class psmsAuthorizationProvider : AuthorizationProvider
         backups.CreateChildPermission(PermissionNames.Administration_Backups_View, L("ViewBackups"), multiTenancySides: MultiTenancySides.Host);
         backups.CreateChildPermission(PermissionNames.Administration_Backups_Create, L("CreateBackup"), multiTenancySides: MultiTenancySides.Host);
         backups.CreateChildPermission(PermissionNames.Administration_Backups_Restore, L("RestoreBackup"), multiTenancySides: MultiTenancySides.Host);
+    }
+
+    #endregion
+
+    #region Workflow Module
+
+    private void SetWorkflowPermissions(IPermissionDefinitionContext context)
+    {
+        var workflow = context.CreatePermission(PermissionNames.Workflow, L("Workflow"));
+
+        // Definitions (templates)
+        var definitions = workflow.CreateChildPermission(PermissionNames.Workflow_Definitions, L("WorkflowDefinitions"));
+        definitions.CreateChildPermission(PermissionNames.Workflow_Definitions_View, L("ViewWorkflowDefinitions"));
+        definitions.CreateChildPermission(PermissionNames.Workflow_Definitions_Create, L("CreateWorkflowDefinition"));
+        definitions.CreateChildPermission(PermissionNames.Workflow_Definitions_Edit, L("EditWorkflowDefinition"));
+        definitions.CreateChildPermission(PermissionNames.Workflow_Definitions_Delete, L("DeleteWorkflowDefinition"));
+        definitions.CreateChildPermission(PermissionNames.Workflow_Definitions_Activate, L("ActivateWorkflowDefinition"));
+
+        // Instances (running workflows)
+        var instances = workflow.CreateChildPermission(PermissionNames.Workflow_Instances, L("WorkflowInstances"));
+        instances.CreateChildPermission(PermissionNames.Workflow_Instances_View, L("ViewWorkflowInstances"));
+        instances.CreateChildPermission(PermissionNames.Workflow_Instances_ViewAll, L("ViewAllWorkflowInstances"));
+        instances.CreateChildPermission(PermissionNames.Workflow_Instances_Start, L("StartWorkflow"));
+        instances.CreateChildPermission(PermissionNames.Workflow_Instances_Advance, L("AdvanceWorkflow"));
+        instances.CreateChildPermission(PermissionNames.Workflow_Instances_Cancel, L("CancelWorkflow"));
+        instances.CreateChildPermission(PermissionNames.Workflow_Instances_ViewHistory, L("ViewWorkflowHistory"));
+        instances.CreateChildPermission(PermissionNames.Workflow_Instances_Recall, L("RecallWorkflow"));
+        instances.CreateChildPermission(PermissionNames.Workflow_Instances_BatchAdvance, L("BatchAdvanceWorkflow"));
+
+        // Delegations
+        var delegations = workflow.CreateChildPermission(PermissionNames.Workflow_Delegations, L("WorkflowDelegations"));
+        delegations.CreateChildPermission(PermissionNames.Workflow_Delegations_View, L("ViewWorkflowDelegations"));
+        delegations.CreateChildPermission(PermissionNames.Workflow_Delegations_Create, L("CreateWorkflowDelegation"));
+        delegations.CreateChildPermission(PermissionNames.Workflow_Delegations_Revoke, L("RevokeWorkflowDelegation"));
     }
 
     #endregion

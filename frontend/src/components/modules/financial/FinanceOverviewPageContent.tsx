@@ -216,7 +216,7 @@ function FinanceContent() {
       label: 'View Details',
       icon: <EyeOutlined />,
       onClick: (record) => {
-        router.push(`/principal/payments/${record.id}`);
+        console.log('View payment:', record.id); // TODO: payment detail page
       },
     },
   ];

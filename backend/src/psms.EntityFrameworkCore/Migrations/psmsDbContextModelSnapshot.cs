@@ -3788,6 +3788,10 @@ namespace psms.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
 
+                    b.Property<string>("PdfUrl")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
+
                     b.Property<string>("PrincipalComment")
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
@@ -5282,6 +5286,365 @@ namespace psms.Migrations
                     b.ToTable("StudentTransports");
                 });
 
+            modelBuilder.Entity("psms.Domain.Workflow.Entities.WorkflowDefinition", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("CreatorUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("DeleterUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime?>("DeletionTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<int>("EntityType")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("LastModificationTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("LastModifierUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int?>("TenantId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "Name")
+                        .IsUnique()
+                        .HasDatabaseName("IX_WorkflowDefinitions_TenantId_Name")
+                        .HasFilter("\"IsDeleted\" = false");
+
+                    b.ToTable("WorkflowDefinitions");
+                });
+
+            modelBuilder.Entity("psms.Domain.Workflow.Entities.WorkflowDelegation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("AssignedRole")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("CreatorUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("DelegateUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("DelegateUserName")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<long>("DelegatorUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("DelegatorUserName")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<long?>("DeleterUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime?>("DeletionTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("EndDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("EntityType")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("LastModificationTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("LastModifierUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTime>("StartDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("TenantId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "DelegateUserId", "IsActive")
+                        .HasDatabaseName("IX_WorkflowDelegations_TenantId_DelegateUserId_Active");
+
+                    b.HasIndex("TenantId", "DelegatorUserId", "IsActive")
+                        .HasDatabaseName("IX_WorkflowDelegations_TenantId_DelegatorUserId_Active");
+
+                    b.ToTable("WorkflowDelegations");
+                });
+
+            modelBuilder.Entity("psms.Domain.Workflow.Entities.WorkflowInstance", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<long?>("CompletedByUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime?>("CompletedDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CompletionComment")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("CreatorUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime?>("CurrentStepDueDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CurrentStepId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("CurrentStepOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<long?>("DeleterUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime?>("DeletionTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("EntityId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("EntityType")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("LastModificationTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("LastModifierUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime?>("StartedDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("TenantId")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("WorkflowDefinitionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("WorkflowDefinitionVersion")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CurrentStepId");
+
+                    b.HasIndex("WorkflowDefinitionId");
+
+                    b.HasIndex("TenantId", "EntityType", "EntityId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_WorkflowInstances_TenantId_EntityType_EntityId_Active")
+                        .HasFilter("\"Status\" IN (1, 2)");
+
+                    b.HasIndex("TenantId", "Status", "CurrentStepDueDate")
+                        .HasDatabaseName("IX_WorkflowInstances_TenantId_Status_DueDate");
+
+                    b.HasIndex("TenantId", "Status", "CurrentStepId")
+                        .HasDatabaseName("IX_WorkflowInstances_TenantId_Status_CurrentStepId");
+
+                    b.ToTable("WorkflowInstances");
+                });
+
+            modelBuilder.Entity("psms.Domain.Workflow.Entities.WorkflowStep", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("ActionType")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("AssignedRole")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<long?>("AssignedUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("CreatorUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("DeleterUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime?>("DeletionTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("GuardExpression")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<bool>("IsCommentRequired")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsTerminal")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("LastModificationTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("LastModifierUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int?>("NextStepOnApprove")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("NextStepOnReject")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("SlaHours")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("StepOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("WorkflowDefinitionId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("WorkflowDefinitionId", "StepOrder")
+                        .IsUnique()
+                        .HasDatabaseName("IX_WorkflowSteps_DefinitionId_StepOrder");
+
+                    b.ToTable("WorkflowSteps");
+                });
+
+            modelBuilder.Entity("psms.Domain.Workflow.Entities.WorkflowTransition", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Action")
+                        .HasColumnType("integer");
+
+                    b.Property<long>("ActorUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("ActorUserName")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("AttachmentUrl")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
+
+                    b.Property<string>("Comment")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("CreatorUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("FromStepId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int?>("TenantId")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("ToStepId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("TransitionDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("WorkflowInstanceId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FromStepId");
+
+                    b.HasIndex("ToStepId");
+
+                    b.HasIndex("WorkflowInstanceId");
+
+                    b.ToTable("WorkflowTransitions");
+                });
+
             modelBuilder.Entity("psms.MultiTenancy.Tenant", b =>
                 {
                     b.Property<int>("Id")
@@ -6504,6 +6867,59 @@ namespace psms.Migrations
                     b.Navigation("Student");
                 });
 
+            modelBuilder.Entity("psms.Domain.Workflow.Entities.WorkflowInstance", b =>
+                {
+                    b.HasOne("psms.Domain.Workflow.Entities.WorkflowStep", "CurrentStep")
+                        .WithMany()
+                        .HasForeignKey("CurrentStepId");
+
+                    b.HasOne("psms.Domain.Workflow.Entities.WorkflowDefinition", "WorkflowDefinition")
+                        .WithMany()
+                        .HasForeignKey("WorkflowDefinitionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("CurrentStep");
+
+                    b.Navigation("WorkflowDefinition");
+                });
+
+            modelBuilder.Entity("psms.Domain.Workflow.Entities.WorkflowStep", b =>
+                {
+                    b.HasOne("psms.Domain.Workflow.Entities.WorkflowDefinition", "WorkflowDefinition")
+                        .WithMany("Steps")
+                        .HasForeignKey("WorkflowDefinitionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("WorkflowDefinition");
+                });
+
+            modelBuilder.Entity("psms.Domain.Workflow.Entities.WorkflowTransition", b =>
+                {
+                    b.HasOne("psms.Domain.Workflow.Entities.WorkflowStep", "FromStep")
+                        .WithMany()
+                        .HasForeignKey("FromStepId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("psms.Domain.Workflow.Entities.WorkflowStep", "ToStep")
+                        .WithMany()
+                        .HasForeignKey("ToStepId");
+
+                    b.HasOne("psms.Domain.Workflow.Entities.WorkflowInstance", "WorkflowInstance")
+                        .WithMany("Transitions")
+                        .HasForeignKey("WorkflowInstanceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("FromStep");
+
+                    b.Navigation("ToStep");
+
+                    b.Navigation("WorkflowInstance");
+                });
+
             modelBuilder.Entity("psms.MultiTenancy.Tenant", b =>
                 {
                     b.HasOne("psms.Authorization.Users.User", "CreatorUser")
@@ -6739,6 +7155,16 @@ namespace psms.Migrations
             modelBuilder.Entity("psms.Domain.SASpecific.Entities.SchoolTransport", b =>
                 {
                     b.Navigation("StudentEnrollments");
+                });
+
+            modelBuilder.Entity("psms.Domain.Workflow.Entities.WorkflowDefinition", b =>
+                {
+                    b.Navigation("Steps");
+                });
+
+            modelBuilder.Entity("psms.Domain.Workflow.Entities.WorkflowInstance", b =>
+                {
+                    b.Navigation("Transitions");
                 });
 #pragma warning restore 612, 618
         }

@@ -122,6 +122,7 @@ public class AdmissionInterviewAppService : ApplicationService, IAdmissionInterv
             input.InterviewerUserId,
             input.InterviewerName)
         {
+            TenantId = AbpSession.TenantId,
             Location = input.Location,
             MeetingLink = input.MeetingLink,
             Notes = input.Notes

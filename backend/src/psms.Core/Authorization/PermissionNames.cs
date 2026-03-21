@@ -399,4 +399,35 @@ public static class PermissionNames
     public const string Administration_Backups_Restore = "Administration.Backups.Restore";
 
     #endregion
+
+    #region Workflow Module
+
+    public const string Workflow = "Workflow";
+
+    // Definitions
+    public const string Workflow_Definitions = "Workflow.Definitions";
+    public const string Workflow_Definitions_View = "Workflow.Definitions.View";
+    public const string Workflow_Definitions_Create = "Workflow.Definitions.Create";
+    public const string Workflow_Definitions_Edit = "Workflow.Definitions.Edit";
+    public const string Workflow_Definitions_Delete = "Workflow.Definitions.Delete";
+    public const string Workflow_Definitions_Activate = "Workflow.Definitions.Activate";
+
+    // Instances
+    public const string Workflow_Instances = "Workflow.Instances";
+    public const string Workflow_Instances_View = "Workflow.Instances.View";
+    public const string Workflow_Instances_ViewAll = "Workflow.Instances.ViewAll";
+    public const string Workflow_Instances_Start = "Workflow.Instances.Start";
+    public const string Workflow_Instances_Advance = "Workflow.Instances.Advance";
+    public const string Workflow_Instances_Cancel = "Workflow.Instances.Cancel";
+    public const string Workflow_Instances_ViewHistory = "Workflow.Instances.ViewHistory";
+    public const string Workflow_Instances_Recall = "Workflow.Instances.Recall";
+    public const string Workflow_Instances_BatchAdvance = "Workflow.Instances.BatchAdvance";
+
+    // Delegations
+    public const string Workflow_Delegations = "Workflow.Delegations";
+    public const string Workflow_Delegations_View = "Workflow.Delegations.View";
+    public const string Workflow_Delegations_Create = "Workflow.Delegations.Create";
+    public const string Workflow_Delegations_Revoke = "Workflow.Delegations.Revoke";
+
+    #endregion
 }
