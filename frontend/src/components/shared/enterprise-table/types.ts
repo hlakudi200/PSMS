@@ -60,7 +60,7 @@ export interface ColumnConfig<T> {
 
   // Rendering
   render?: (value: any, record: T, index: number) => React.ReactNode;
-  renderType?: 'status' | 'date' | 'datetime' | 'money' | 'boolean' | 'masked';
+  renderType?: 'status' | 'date' | 'datetime' | 'money' | 'boolean' | 'masked'|'custom';
   renderConfig?: StatusRenderConfig | MoneyRenderConfig | MaskedRenderConfig;
   conditionalStyle?: (value: any, record: T) => React.CSSProperties | undefined;
 

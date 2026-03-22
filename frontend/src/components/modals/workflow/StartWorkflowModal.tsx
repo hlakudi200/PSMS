@@ -11,9 +11,9 @@ import { getAxiosInstance } from '@/utils/axios-instance';
 const { Text } = Typography;
 
 const startSchema = z.object({
-  entityType: z.number({ required_error: 'Entity type is required' }).min(1, 'Entity type is required'),
-  entityId: z.string({ required_error: 'Please select an entity' }).min(1, 'Please select an entity'),
-  workflowDefinitionId: z.string().nullish(),
+  entityType: z.number({ error: 'Entity type is required' }).min(1, 'Entity type is required'),
+  entityId: z.string({ error: 'Please select an entity' }).min(1, 'Please select an entity'),
+  workflowDefinitionId: z.string().optional(),
 });
 
 interface StartWorkflowModalProps {
