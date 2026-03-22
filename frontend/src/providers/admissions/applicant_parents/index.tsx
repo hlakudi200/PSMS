@@ -89,9 +89,9 @@ export const ApplicantParentProvider = ({
 
   const updateAsync = async (id: string, input: IUpdateApplicantParent) => {
     dispatch(updateApplicantParentPending());
-    const endpoint = `/api/services/app/ApplicantParent/Update`;
+    const endpoint = `/api/services/app/ApplicantParent/Update?id=${id}`;
     await instance
-      .put(endpoint, { id, ...input })
+      .put(endpoint, input)
       .then((response) => {
         dispatch(updateApplicantParentSuccess(response.data.result));
       })

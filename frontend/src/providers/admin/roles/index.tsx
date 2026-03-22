@@ -96,9 +96,9 @@ export const RoleProvider = ({
 
   const updateAsync = async (id: number, input: IUpdateRole) => {
     dispatch(updateRolePending());
-    const endpoint = `/api/services/app/Role/Update`;
+    const endpoint = `/api/services/app/Role/Update?id=${id}`;
     await instance
-      .put(endpoint, { id, ...input })
+      .put(endpoint, input)
       .then((response) => {
         dispatch(updateRoleSuccess(response.data.result));
       })

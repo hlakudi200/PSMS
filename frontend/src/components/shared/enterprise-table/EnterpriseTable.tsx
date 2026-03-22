@@ -66,7 +66,8 @@ const ResizableTitle = (
 function hasPermission(requiredPermissions: string[] | undefined, role?: string): boolean {
   if (!requiredPermissions || requiredPermissions.length === 0) return true;
   if (!role) return false;
-  return requiredPermissions.includes(role);
+  const roleLower = role.toLowerCase();
+  return requiredPermissions.some(p => p.toLowerCase() === roleLower);
 }
 
 function getNestedValue(record: any, dataIndex: string | string[]): any {

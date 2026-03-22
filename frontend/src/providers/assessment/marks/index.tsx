@@ -169,9 +169,9 @@ export const MarkProvider = ({
 
   const updateMarkAsync = async (id: string, input: IRecordMark) => {
     dispatch(updateMarkPending());
-    const endpoint = `/api/services/app/Mark/UpdateMark`;
+    const endpoint = `/api/services/app/Mark/UpdateMark?id=${id}`;
     await instance
-      .put(endpoint, { id, ...input })
+      .put(endpoint, input)
       .then((response) => {
         dispatch(updateMarkSuccess(response.data.result));
       })
@@ -183,9 +183,9 @@ export const MarkProvider = ({
 
   const markAsAbsentAsync = async (id: string) => {
     dispatch(markAsAbsentPending());
-    const endpoint = `/api/services/app/Mark/MarkAsAbsent`;
+    const endpoint = `/api/services/app/Mark/MarkAsAbsent?id=${id}`;
     await instance
-      .post(endpoint, { id })
+      .post(endpoint)
       .then((response) => {
         dispatch(markAsAbsentSuccess(response.data.result));
       })
@@ -197,9 +197,9 @@ export const MarkProvider = ({
 
   const applyModerationAsync = async (id: string, adjustment: number) => {
     dispatch(applyModerationPending());
-    const endpoint = `/api/services/app/Mark/ApplyModeration`;
+    const endpoint = `/api/services/app/Mark/ApplyModeration?id=${id}`;
     await instance
-      .post(endpoint, { id, adjustment })
+      .post(endpoint, { adjustment })
       .then((response) => {
         dispatch(applyModerationSuccess(response.data.result));
       })
@@ -211,9 +211,9 @@ export const MarkProvider = ({
 
   const unlockMarkAsync = async (id: string) => {
     dispatch(unlockMarkPending());
-    const endpoint = `/api/services/app/Mark/UnlockMark`;
+    const endpoint = `/api/services/app/Mark/UnlockMark?id=${id}`;
     await instance
-      .post(endpoint, { id })
+      .post(endpoint)
       .then((response) => {
         dispatch(unlockMarkSuccess(response.data.result));
       })

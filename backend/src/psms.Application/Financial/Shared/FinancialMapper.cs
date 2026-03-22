@@ -1,6 +1,8 @@
 using AutoMapper;
 using psms.Domain.Financial.Entities;
+using psms.Financial.ExpenseRequests.Dto;
 using psms.Financial.FeeStructures.Dto;
+using psms.Financial.FeeWaivers.Dto;
 using psms.Financial.PaymentAllocations.Dto;
 using psms.Financial.Payments.Dto;
 using psms.Financial.StudentFees.Dto;
@@ -19,6 +21,8 @@ public class FinancialMapper : Profile
         CreateStudentFeeMappings();
         CreatePaymentMappings();
         CreatePaymentAllocationMappings();
+        CreateFeeWaiverMappings();
+        CreateExpenseRequestMappings();
     }
 
     private void CreateFeeStructureMappings()
@@ -155,5 +159,33 @@ public class FinancialMapper : Profile
             .ForMember(dest => dest.StudentName,
                 opt => opt.MapFrom(src => src.StudentFee != null && src.StudentFee.Student != null
                     ? src.StudentFee.Student.FirstName + " " + src.StudentFee.Student.LastName : null));
+    }
+
+    private void CreateFeeWaiverMappings()
+    {
+        // Entity to DTO (full)
+        CreateMap<FeeWaiver, FeeWaiverDto>()
+            .ForMember(dest => dest.StudentName,
+                opt => opt.MapFrom(src => src.Student != null
+                    ? src.Student.FirstName + " " + src.Student.LastName : null))
+            .ForMember(dest => dest.AcademicYearName,
+                opt => opt.MapFrom(src => src.AcademicYear != null ? src.AcademicYear.YearName : null));
+
+        // Entity to ListDto (lightweight)
+        CreateMap<FeeWaiver, FeeWaiverListDto>()
+            .ForMember(dest => dest.StudentName,
+                opt => opt.MapFrom(src => src.Student != null
+                    ? src.Student.FirstName + " " + src.Student.LastName : null));
+    }
+
+    private void CreateExpenseRequestMappings()
+    {
+        // Entity to DTO (full)
+        CreateMap<ExpenseRequest, ExpenseRequestDto>()
+            .ForMember(dest => dest.AcademicYearName,
+                opt => opt.MapFrom(src => src.AcademicYear != null ? src.AcademicYear.YearName : null));
+
+        // Entity to ListDto (lightweight)
+        CreateMap<ExpenseRequest, ExpenseRequestListDto>();
     }
 }

@@ -267,6 +267,7 @@ export interface IReport {
   termName?: string;
   academicYearName?: string;
   promotedToGradeName?: string;
+  pdfUrl?: string;
   subjectReports: IReportSubject[];
 }
 
@@ -288,6 +289,7 @@ export interface IReportList {
   className?: string;
   termName?: string;
   academicYearName?: string;
+  pdfUrl?: string;
   subjectCount: number;
 }
 
@@ -315,6 +317,11 @@ export interface IGetReportsInput extends IPagedAndSortedResultRequest {
 
 export interface IReportComment {
   comment: string;
+}
+
+export interface IBulkGenerateReportPdfsInput {
+  classId: string;
+  termId?: string;
 }
 
 // ============================================================

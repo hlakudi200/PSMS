@@ -109,9 +109,9 @@ export const AnnouncementProvider = ({
 
   const updateAsync = async (id: string, input: IUpdateAnnouncement) => {
     dispatch(updateAnnouncementPending());
-    const endpoint = `/api/services/app/Announcement/Update`;
+    const endpoint = `/api/services/app/Announcement/Update?id=${id}`;
     await instance
-      .put(endpoint, { id, ...input })
+      .put(endpoint, input)
       .then((response) => {
         dispatch(updateAnnouncementSuccess(response.data.result));
       })
@@ -137,9 +137,9 @@ export const AnnouncementProvider = ({
 
   const publishAsync = async (id: string) => {
     dispatch(publishAnnouncementPending());
-    const endpoint = `/api/services/app/Announcement/Publish`;
+    const endpoint = `/api/services/app/Announcement/Publish?id=${id}`;
     await instance
-      .post(endpoint, { id })
+      .post(endpoint)
       .then(() => {
         dispatch(publishAnnouncementSuccess());
       })
@@ -151,9 +151,9 @@ export const AnnouncementProvider = ({
 
   const unpublishAsync = async (id: string) => {
     dispatch(unpublishAnnouncementPending());
-    const endpoint = `/api/services/app/Announcement/Unpublish`;
+    const endpoint = `/api/services/app/Announcement/Unpublish?id=${id}`;
     await instance
-      .post(endpoint, { id })
+      .post(endpoint)
       .then(() => {
         dispatch(unpublishAnnouncementSuccess());
       })
@@ -165,9 +165,9 @@ export const AnnouncementProvider = ({
 
   const pinAsync = async (id: string) => {
     dispatch(pinAnnouncementPending());
-    const endpoint = `/api/services/app/Announcement/Pin`;
+    const endpoint = `/api/services/app/Announcement/Pin?id=${id}`;
     await instance
-      .post(endpoint, { id })
+      .post(endpoint)
       .then(() => {
         dispatch(pinAnnouncementSuccess());
       })
@@ -179,9 +179,9 @@ export const AnnouncementProvider = ({
 
   const unpinAsync = async (id: string) => {
     dispatch(unpinAnnouncementPending());
-    const endpoint = `/api/services/app/Announcement/Unpin`;
+    const endpoint = `/api/services/app/Announcement/Unpin?id=${id}`;
     await instance
-      .post(endpoint, { id })
+      .post(endpoint)
       .then(() => {
         dispatch(unpinAnnouncementSuccess());
       })

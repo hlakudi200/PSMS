@@ -87,9 +87,9 @@ export const AssessmentQuestionProvider = ({
 
   const updateAsync = async (id: string, input: IUpdateAssessmentQuestion) => {
     dispatch(updateQuestionPending());
-    const endpoint = `/api/services/app/AssessmentQuestion/Update`;
+    const endpoint = `/api/services/app/AssessmentQuestion/Update?id=${id}`;
     await instance
-      .put(endpoint, { id, ...input })
+      .put(endpoint, input)
       .then((response) => {
         dispatch(updateQuestionSuccess(response.data.result));
       })

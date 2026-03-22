@@ -6,6 +6,7 @@ import {
   ReportStateContext,
 } from "./context";
 import {
+  IBulkGenerateReportPdfsInput,
   IGenerateReport,
   IGetReportsInput,
   IReportComment,
@@ -49,6 +50,12 @@ import {
   deleteReportPending,
   deleteReportSuccess,
   deleteReportError,
+  generatePdfPending,
+  generatePdfSuccess,
+  generatePdfError,
+  bulkGeneratePdfsPending,
+  bulkGeneratePdfsSuccess,
+  bulkGeneratePdfsError,
 } from "./actions";
 
 export const ReportProvider = ({
@@ -139,9 +146,9 @@ export const ReportProvider = ({
 
   const submitForApprovalAsync = async (id: string) => {
     dispatch(submitForApprovalPending());
-    const endpoint = `/api/services/app/Report/SubmitForApproval`;
+    const endpoint = `/api/services/app/Report/SubmitForApproval?id=${id}`;
     await instance
-      .post(endpoint, { id })
+      .post(endpoint)
       .then((response) => {
         dispatch(submitForApprovalSuccess(response.data.result));
       })
@@ -153,9 +160,9 @@ export const ReportProvider = ({
 
   const approveAsync = async (id: string) => {
     dispatch(approveReportPending());
-    const endpoint = `/api/services/app/Report/Approve`;
+    const endpoint = `/api/services/app/Report/Approve?id=${id}`;
     await instance
-      .post(endpoint, { id })
+      .post(endpoint)
       .then((response) => {
         dispatch(approveReportSuccess(response.data.result));
       })
@@ -167,9 +174,9 @@ export const ReportProvider = ({
 
   const publishAsync = async (id: string) => {
     dispatch(publishReportPending());
-    const endpoint = `/api/services/app/Report/Publish`;
+    const endpoint = `/api/services/app/Report/Publish?id=${id}`;
     await instance
-      .post(endpoint, { id })
+      .post(endpoint)
       .then((response) => {
         dispatch(publishReportSuccess(response.data.result));
       })
@@ -181,9 +188,9 @@ export const ReportProvider = ({
 
   const addTeacherCommentAsync = async (id: string, input: IReportComment) => {
     dispatch(addTeacherCommentPending());
-    const endpoint = `/api/services/app/Report/AddTeacherComment`;
+    const endpoint = `/api/services/app/Report/AddTeacherComment?id=${id}`;
     await instance
-      .post(endpoint, { id, ...input })
+      .post(endpoint, input)
       .then((response) => {
         dispatch(addTeacherCommentSuccess(response.data.result));
       })
@@ -195,9 +202,9 @@ export const ReportProvider = ({
 
   const addPrincipalCommentAsync = async (id: string, input: IReportComment) => {
     dispatch(addPrincipalCommentPending());
-    const endpoint = `/api/services/app/Report/AddPrincipalComment`;
+    const endpoint = `/api/services/app/Report/AddPrincipalComment?id=${id}`;
     await instance
-      .post(endpoint, { id, ...input })
+      .post(endpoint, input)
       .then((response) => {
         dispatch(addPrincipalCommentSuccess(response.data.result));
       })
@@ -209,9 +216,9 @@ export const ReportProvider = ({
 
   const acknowledgeByParentAsync = async (id: string, input: IReportComment) => {
     dispatch(acknowledgeByParentPending());
-    const endpoint = `/api/services/app/Report/AcknowledgeByParent`;
+    const endpoint = `/api/services/app/Report/AcknowledgeByParent?id=${id}`;
     await instance
-      .post(endpoint, { id, ...input })
+      .post(endpoint, input)
       .then((response) => {
         dispatch(acknowledgeByParentSuccess(response.data.result));
       })
@@ -223,15 +230,43 @@ export const ReportProvider = ({
 
   const recordPromotionAsync = async (id: string, decision: number, promotedToGradeId?: string) => {
     dispatch(recordPromotionPending());
-    const endpoint = `/api/services/app/Report/RecordPromotion`;
+    const endpoint = `/api/services/app/Report/RecordPromotion?id=${id}`;
     await instance
-      .post(endpoint, { id, decision, promotedToGradeId })
+      .post(endpoint, { decision, promotedToGradeId })
       .then((response) => {
         dispatch(recordPromotionSuccess(response.data.result));
       })
       .catch((error) => {
         console.error(error);
         dispatch(recordPromotionError());
+      });
+  };
+
+  const generatePdfAsync = async (id: string) => {
+    dispatch(generatePdfPending());
+    const endpoint = `/api/services/app/Report/GenerateReportPdf?id=${id}`;
+    await instance
+      .post(endpoint)
+      .then(() => {
+        dispatch(generatePdfSuccess());
+      })
+      .catch((error) => {
+        console.error(error);
+        dispatch(generatePdfError());
+      });
+  };
+
+  const bulkGeneratePdfsAsync = async (input: IBulkGenerateReportPdfsInput) => {
+    dispatch(bulkGeneratePdfsPending());
+    const endpoint = `/api/services/app/Report/BulkGenerateReportPdfs`;
+    await instance
+      .post(endpoint, input)
+      .then(() => {
+        dispatch(bulkGeneratePdfsSuccess());
+      })
+      .catch((error) => {
+        console.error(error);
+        dispatch(bulkGeneratePdfsError());
       });
   };
 
@@ -265,6 +300,8 @@ export const ReportProvider = ({
           acknowledgeByParentAsync,
           recordPromotionAsync,
           deleteAsync,
+          generatePdfAsync,
+          bulkGeneratePdfsAsync,
         }}
       >
         {children}

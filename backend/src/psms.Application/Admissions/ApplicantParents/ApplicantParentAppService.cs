@@ -75,6 +75,7 @@ public class ApplicantParentAppService : ApplicationService, IApplicantParentApp
 
         var parent = ObjectMapper.Map<ApplicantParent>(input);
         parent.Id = Guid.NewGuid();
+        parent.TenantId = AbpSession.TenantId;
 
         // If this is the first parent, make them primary and financially responsible
         if (currentCount == 0)

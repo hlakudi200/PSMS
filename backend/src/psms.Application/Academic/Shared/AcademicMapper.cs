@@ -11,6 +11,7 @@ using psms.Academic.POPIAConsents.Dto;
 using psms.Academic.Attendances.Dto;
 using psms.Academic.StudentClasses.Dto;
 using psms.Academic.StudentParents.Dto;
+using psms.Academic.StudentTransfers.Dto;
 using psms.Academic.TermEvents.Dto;
 using psms.Academic.Timetables.Dto;
 using psms.Academic.TimetableSlots.Dto;
@@ -59,6 +60,7 @@ public class AcademicMapper : Profile
         CreateAttendanceMappings();
         CreateTimetableMappings();
         CreateTimetableSlotMappings();
+        CreateStudentTransferMappings();
     }
 
     private void CreateGradeMappings()
@@ -447,5 +449,22 @@ public class AcademicMapper : Profile
                 opt => opt.MapFrom(src => src.Subject != null ? src.Subject.SubjectName : null))
             .ForMember(dest => dest.TeacherName,
                 opt => opt.MapFrom(src => src.Teacher != null ? src.Teacher.GetFullName() : null));
+    }
+
+    private void CreateStudentTransferMappings()
+    {
+        // Entity to DTO (full)
+        CreateMap<StudentTransferRequest, StudentTransferDto>()
+            .ForMember(dest => dest.StudentName,
+                opt => opt.MapFrom(src => src.Student != null ? src.Student.GetFullName() : null))
+            .ForMember(dest => dest.AcademicYearName,
+                opt => opt.MapFrom(src => src.AcademicYear != null ? src.AcademicYear.YearName : null))
+            .ForMember(dest => dest.TransferGradeName,
+                opt => opt.MapFrom(src => src.TransferGrade != null ? src.TransferGrade.GradeName : null));
+
+        // Entity to ListDto (lightweight)
+        CreateMap<StudentTransferRequest, StudentTransferListDto>()
+            .ForMember(dest => dest.StudentName,
+                opt => opt.MapFrom(src => src.Student != null ? src.Student.GetFullName() : null));
     }
 }

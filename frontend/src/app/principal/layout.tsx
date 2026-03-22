@@ -20,6 +20,10 @@ import {
   TrophyOutlined,
   DollarOutlined,
   FormOutlined,
+  WarningOutlined,
+  SwapOutlined,
+  EnvironmentOutlined,
+  ShoppingOutlined,
 } from '@ant-design/icons';
 import LayoutShell from '@/components/shared/LayoutShell';
 import { roleColors } from '@/utils/theme-config';
@@ -55,7 +59,7 @@ const menuItems = [
     label: 'Assessments',
     children: [
       { key: '/principal/reports', icon: <BarChartOutlined />, label: 'Reports' },
-      { key: 'mark-sheets', icon: <FileTextOutlined />, label: 'Mark Sheets', disabled: true },
+      { key: '/principal/mark-sheets', icon: <FileTextOutlined />, label: 'Mark Sheets' },
     ],
   },
   {
@@ -71,10 +75,22 @@ const menuItems = [
     label: 'More',
     children: [
       { key: '/principal/timetables', icon: <ClockCircleOutlined />, label: 'Timetable' },
-      { key: 'transport', icon: <CarOutlined />, label: 'Transport', disabled: true },
-      { key: 'extramurals', icon: <TrophyOutlined />, label: 'Extramurals', disabled: true },
+      { key: '/principal/transport', icon: <CarOutlined />, label: 'Transport' },
+      { key: '/principal/extramurals', icon: <TrophyOutlined />, label: 'Extramurals' },
       { key: '/principal/finance', icon: <DollarOutlined />, label: 'Finance Overview' },
       { key: '/principal/admissions', icon: <FormOutlined />, label: 'Admissions' },
+    ],
+  },
+  {
+    type: 'group' as const,
+    label: 'Operations',
+    children: [
+      { key: '/principal/disciplinary', icon: <WarningOutlined />, label: 'Disciplinary' },
+      { key: '/principal/student-transfers', icon: <SwapOutlined />, label: 'Transfers' },
+      { key: '/principal/staff-leave', icon: <CalendarOutlined />, label: 'Staff Leave' },
+      { key: '/principal/field-trips', icon: <EnvironmentOutlined />, label: 'Field Trips' },
+      { key: '/principal/fee-waivers', icon: <DollarOutlined />, label: 'Fee Waivers' },
+      { key: '/principal/expenses', icon: <ShoppingOutlined />, label: 'Expenses' },
     ],
   },
 ];

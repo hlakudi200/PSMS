@@ -25,6 +25,10 @@ public class psmsAuthorizationProvider : AuthorizationProvider
         SetLearningPermissions(context);
         SetSASpecificPermissions(context);
         SetAdministrationPermissions(context);
+        SetWorkflowPermissions(context);
+        SetDisciplinePermissions(context);
+        SetHRPermissions(context);
+        SetActivitiesPermissions(context);
     }
 
     #region System Permissions
@@ -203,6 +207,12 @@ public class psmsAuthorizationProvider : AuthorizationProvider
         calendar.CreateChildPermission(PermissionNames.Academic_Calendar_Manage, L("ManageCalendar"));
         calendar.CreateChildPermission(PermissionNames.Academic_AcademicYears_Manage, L("ManageAcademicYears"));
         calendar.CreateChildPermission(PermissionNames.Academic_Terms_Manage, L("ManageTerms"));
+
+        // Student Transfers
+        var transfers = academic.CreateChildPermission(PermissionNames.Academic_Transfers, L("StudentTransfers"));
+        transfers.CreateChildPermission(PermissionNames.Academic_Transfers_View, L("ViewStudentTransfers"));
+        transfers.CreateChildPermission(PermissionNames.Academic_Transfers_Create, L("CreateStudentTransfer"));
+        transfers.CreateChildPermission(PermissionNames.Academic_Transfers_Approve, L("ApproveStudentTransfer"));
     }
 
     #endregion
@@ -248,6 +258,18 @@ public class psmsAuthorizationProvider : AuthorizationProvider
         var statements = financial.CreateChildPermission(PermissionNames.Financial_Statements, L("Statements"));
         statements.CreateChildPermission(PermissionNames.Financial_Statements_View, L("ViewStatements"));
         statements.CreateChildPermission(PermissionNames.Financial_Statements_Generate, L("GenerateStatement"));
+
+        // Fee Waivers
+        var feeWaivers = financial.CreateChildPermission(PermissionNames.Financial_FeeWaivers, L("FeeWaivers"));
+        feeWaivers.CreateChildPermission(PermissionNames.Financial_FeeWaivers_View, L("ViewFeeWaivers"));
+        feeWaivers.CreateChildPermission(PermissionNames.Financial_FeeWaivers_Create, L("CreateFeeWaiver"));
+        feeWaivers.CreateChildPermission(PermissionNames.Financial_FeeWaivers_Approve, L("ApproveFeeWaiver"));
+
+        // Expenses
+        var expenses = financial.CreateChildPermission(PermissionNames.Financial_Expenses, L("Expenses"));
+        expenses.CreateChildPermission(PermissionNames.Financial_Expenses_View, L("ViewExpenses"));
+        expenses.CreateChildPermission(PermissionNames.Financial_Expenses_Create, L("CreateExpense"));
+        expenses.CreateChildPermission(PermissionNames.Financial_Expenses_Approve, L("ApproveExpense"));
     }
 
     #endregion
@@ -443,6 +465,86 @@ public class psmsAuthorizationProvider : AuthorizationProvider
         backups.CreateChildPermission(PermissionNames.Administration_Backups_View, L("ViewBackups"), multiTenancySides: MultiTenancySides.Host);
         backups.CreateChildPermission(PermissionNames.Administration_Backups_Create, L("CreateBackup"), multiTenancySides: MultiTenancySides.Host);
         backups.CreateChildPermission(PermissionNames.Administration_Backups_Restore, L("RestoreBackup"), multiTenancySides: MultiTenancySides.Host);
+    }
+
+    #endregion
+
+    #region Workflow Module
+
+    private void SetWorkflowPermissions(IPermissionDefinitionContext context)
+    {
+        var workflow = context.CreatePermission(PermissionNames.Workflow, L("Workflow"));
+
+        // Definitions (templates)
+        var definitions = workflow.CreateChildPermission(PermissionNames.Workflow_Definitions, L("WorkflowDefinitions"));
+        definitions.CreateChildPermission(PermissionNames.Workflow_Definitions_View, L("ViewWorkflowDefinitions"));
+        definitions.CreateChildPermission(PermissionNames.Workflow_Definitions_Create, L("CreateWorkflowDefinition"));
+        definitions.CreateChildPermission(PermissionNames.Workflow_Definitions_Edit, L("EditWorkflowDefinition"));
+        definitions.CreateChildPermission(PermissionNames.Workflow_Definitions_Delete, L("DeleteWorkflowDefinition"));
+        definitions.CreateChildPermission(PermissionNames.Workflow_Definitions_Activate, L("ActivateWorkflowDefinition"));
+
+        // Instances (running workflows)
+        var instances = workflow.CreateChildPermission(PermissionNames.Workflow_Instances, L("WorkflowInstances"));
+        instances.CreateChildPermission(PermissionNames.Workflow_Instances_View, L("ViewWorkflowInstances"));
+        instances.CreateChildPermission(PermissionNames.Workflow_Instances_ViewAll, L("ViewAllWorkflowInstances"));
+        instances.CreateChildPermission(PermissionNames.Workflow_Instances_Start, L("StartWorkflow"));
+        instances.CreateChildPermission(PermissionNames.Workflow_Instances_Advance, L("AdvanceWorkflow"));
+        instances.CreateChildPermission(PermissionNames.Workflow_Instances_Cancel, L("CancelWorkflow"));
+        instances.CreateChildPermission(PermissionNames.Workflow_Instances_ViewHistory, L("ViewWorkflowHistory"));
+        instances.CreateChildPermission(PermissionNames.Workflow_Instances_Recall, L("RecallWorkflow"));
+        instances.CreateChildPermission(PermissionNames.Workflow_Instances_BatchAdvance, L("BatchAdvanceWorkflow"));
+
+        // Delegations
+        var delegations = workflow.CreateChildPermission(PermissionNames.Workflow_Delegations, L("WorkflowDelegations"));
+        delegations.CreateChildPermission(PermissionNames.Workflow_Delegations_View, L("ViewWorkflowDelegations"));
+        delegations.CreateChildPermission(PermissionNames.Workflow_Delegations_Create, L("CreateWorkflowDelegation"));
+        delegations.CreateChildPermission(PermissionNames.Workflow_Delegations_Revoke, L("RevokeWorkflowDelegation"));
+    }
+
+    #endregion
+
+    #region Discipline Module
+
+    private void SetDisciplinePermissions(IPermissionDefinitionContext context)
+    {
+        var discipline = context.CreatePermission(PermissionNames.Discipline, L("Discipline"));
+
+        var cases = discipline.CreateChildPermission(PermissionNames.Discipline_Cases, L("DisciplinaryCases"));
+        cases.CreateChildPermission(PermissionNames.Discipline_Cases_View, L("ViewDisciplinaryCases"));
+        cases.CreateChildPermission(PermissionNames.Discipline_Cases_Create, L("CreateDisciplinaryCase"));
+        cases.CreateChildPermission(PermissionNames.Discipline_Cases_Edit, L("EditDisciplinaryCase"));
+        cases.CreateChildPermission(PermissionNames.Discipline_Cases_Delete, L("DeleteDisciplinaryCase"));
+        cases.CreateChildPermission(PermissionNames.Discipline_Cases_Manage, L("ManageDisciplinaryCases"));
+    }
+
+    #endregion
+
+    #region HR Module
+
+    private void SetHRPermissions(IPermissionDefinitionContext context)
+    {
+        var hr = context.CreatePermission(PermissionNames.HR, L("HR"));
+
+        var leave = hr.CreateChildPermission(PermissionNames.HR_Leave, L("StaffLeave"));
+        leave.CreateChildPermission(PermissionNames.HR_Leave_View, L("ViewStaffLeave"));
+        leave.CreateChildPermission(PermissionNames.HR_Leave_Create, L("CreateStaffLeave"));
+        leave.CreateChildPermission(PermissionNames.HR_Leave_Approve, L("ApproveStaffLeave"));
+        leave.CreateChildPermission(PermissionNames.HR_Leave_ViewAll, L("ViewAllStaffLeave"));
+    }
+
+    #endregion
+
+    #region Activities Module
+
+    private void SetActivitiesPermissions(IPermissionDefinitionContext context)
+    {
+        var activities = context.CreatePermission(PermissionNames.Activities, L("Activities"));
+
+        var fieldTrips = activities.CreateChildPermission(PermissionNames.Activities_FieldTrips, L("FieldTrips"));
+        fieldTrips.CreateChildPermission(PermissionNames.Activities_FieldTrips_View, L("ViewFieldTrips"));
+        fieldTrips.CreateChildPermission(PermissionNames.Activities_FieldTrips_Create, L("CreateFieldTrip"));
+        fieldTrips.CreateChildPermission(PermissionNames.Activities_FieldTrips_Edit, L("EditFieldTrip"));
+        fieldTrips.CreateChildPermission(PermissionNames.Activities_FieldTrips_Approve, L("ApproveFieldTrip"));
     }
 
     #endregion

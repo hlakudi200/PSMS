@@ -84,9 +84,9 @@ export const EmergencyContactProvider = ({
 
   const updateAsync = async (id: string, input: IUpdateEmergencyContact) => {
     dispatch(updateEmergencyContactPending());
-    const endpoint = `/api/services/app/EmergencyContact/Update`;
+    const endpoint = `/api/services/app/EmergencyContact/Update?id=${id}`;
     await instance
-      .put(endpoint, { id, ...input })
+      .put(endpoint, input)
       .then((response) => {
         dispatch(updateEmergencyContactSuccess(response.data.result));
       })

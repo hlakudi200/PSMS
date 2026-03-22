@@ -123,9 +123,9 @@ export const PaymentAllocationProvider = ({
 
   const updateAsync = async (id: string, input: IUpdatePaymentAllocation) => {
     dispatch(updatePaymentAllocationPending());
-    const endpoint = `/api/services/app/PaymentAllocation/Update`;
+    const endpoint = `/api/services/app/PaymentAllocation/Update?id=${id}`;
     await instance
-      .put(endpoint, { id, ...input })
+      .put(endpoint, input)
       .then((response) => {
         dispatch(updatePaymentAllocationSuccess(response.data.result));
       })

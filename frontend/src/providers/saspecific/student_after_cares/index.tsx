@@ -142,9 +142,9 @@ export const StudentAfterCareProvider = ({
 
   const updateAsync = async (id: string, input: IUpdateStudentAfterCare) => {
     dispatch(updateStudentAfterCarePending());
-    const endpoint = `/api/services/app/StudentAfterCare/Update`;
+    const endpoint = `/api/services/app/StudentAfterCare/Update?id=${id}`;
     await instance
-      .put(endpoint, { id, ...input })
+      .put(endpoint, input)
       .then((response) => {
         dispatch(updateStudentAfterCareSuccess(response.data.result));
       })
@@ -170,9 +170,9 @@ export const StudentAfterCareProvider = ({
 
   const suspendAsync = async (id: string) => {
     dispatch(suspendStudentAfterCarePending());
-    const endpoint = `/api/services/app/StudentAfterCare/Suspend`;
+    const endpoint = `/api/services/app/StudentAfterCare/Suspend?id=${id}`;
     await instance
-      .post(endpoint, { id })
+      .post(endpoint)
       .then((response) => {
         dispatch(suspendStudentAfterCareSuccess(response.data.result));
       })
@@ -184,9 +184,9 @@ export const StudentAfterCareProvider = ({
 
   const reactivateAsync = async (id: string) => {
     dispatch(reactivateStudentAfterCarePending());
-    const endpoint = `/api/services/app/StudentAfterCare/Reactivate`;
+    const endpoint = `/api/services/app/StudentAfterCare/Reactivate?id=${id}`;
     await instance
-      .post(endpoint, { id })
+      .post(endpoint)
       .then((response) => {
         dispatch(reactivateStudentAfterCareSuccess(response.data.result));
       })
@@ -198,9 +198,9 @@ export const StudentAfterCareProvider = ({
 
   const terminateAsync = async (id: string) => {
     dispatch(terminateStudentAfterCarePending());
-    const endpoint = `/api/services/app/StudentAfterCare/Terminate`;
+    const endpoint = `/api/services/app/StudentAfterCare/Terminate?id=${id}`;
     await instance
-      .post(endpoint, { id })
+      .post(endpoint)
       .then((response) => {
         dispatch(terminateStudentAfterCareSuccess(response.data.result));
       })

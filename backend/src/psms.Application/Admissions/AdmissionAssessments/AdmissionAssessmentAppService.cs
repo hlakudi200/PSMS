@@ -124,6 +124,7 @@ public class AdmissionAssessmentAppService : ApplicationService, IAdmissionAsses
             input.AssessedGradeId,
             input.AssessorUserId)
         {
+            TenantId = AbpSession.TenantId,
             Subjects = input.Subjects,
             MaxScore = input.MaxScore
         };

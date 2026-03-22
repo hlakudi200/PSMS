@@ -25,7 +25,6 @@ import {
   NotificationOutlined,
   CalendarOutlined,
   BarChartOutlined,
-  MinusOutlined,
   DollarOutlined,
   MessageOutlined,
 } from '@ant-design/icons';
@@ -68,9 +67,16 @@ import { getAxiosInstance } from '@/utils/axios-instance';
 import { IGradeList } from '@/providers/academic/shared/interfaces';
 import { IAnnouncementList } from '@/providers/communication/shared/interfaces';
 
+interface GradePerformance {
+  gradeId: string;
+  avgPercentage: number | null;
+  passRate: number | null;
+  reportCount: number;
+}
+
 const { Text } = Typography;
 
-const ATTENDANCE_PRESENT = 0;
+const ATTENDANCE_PRESENT = 1; // AttendanceStatus.Present = 1 in backend enum
 
 interface WeeklyAttendanceDay {
   label: string;
@@ -156,6 +162,8 @@ function PrincipalDashboardContent() {
   const [attendanceTodayPct, setAttendanceTodayPct] = useState<number>(0);
   const [weeklyAttendance, setWeeklyAttendance] = useState<WeeklyAttendanceDay[]>([]);
   const [weeklyLoading, setWeeklyLoading] = useState(true);
+  const [gradePerformance, setGradePerformance] = useState<Record<string, GradePerformance>>({});
+  const [gradePerformanceLoading, setGradePerformanceLoading] = useState(true);
 
   const today = formatDate(new Date());
 
@@ -215,6 +223,61 @@ function PrincipalDashboardContent() {
     fetchWeeklyAttendance();
   }, [fetchWeeklyAttendance]);
 
+  // Fetch grade performance from reports
+  const fetchGradePerformance = useCallback(async () => {
+    const instance = getAxiosInstance();
+    setGradePerformanceLoading(true);
+    try {
+      // Fetch reports with status >= Generated (2) for the current year
+      const res = await instance.get(
+        `/api/services/app/Report/GetAll?MaxResultCount=1000&Status=2`
+      );
+      const reports: { classId: string; overallPercentage?: number }[] =
+        res.data.result.items ?? [];
+
+      // We need class→grade mapping — fetch classes
+      const classRes = await instance.get(
+        `/api/services/app/Class/GetAll?MaxResultCount=200`
+      );
+      const classes: { id: string; gradeId: string }[] =
+        classRes.data.result.items ?? [];
+      const classToGrade: Record<string, string> = {};
+      classes.forEach((c) => {
+        classToGrade[c.id] = c.gradeId;
+      });
+
+      // Aggregate by grade
+      const gradeMap: Record<string, { total: number; sum: number; passCount: number }> = {};
+      reports.forEach((r) => {
+        const gradeId = classToGrade[r.classId];
+        if (!gradeId || r.overallPercentage == null) return;
+        if (!gradeMap[gradeId]) gradeMap[gradeId] = { total: 0, sum: 0, passCount: 0 };
+        gradeMap[gradeId].total++;
+        gradeMap[gradeId].sum += r.overallPercentage;
+        if (r.overallPercentage >= 50) gradeMap[gradeId].passCount++;
+      });
+
+      const result: Record<string, GradePerformance> = {};
+      Object.entries(gradeMap).forEach(([gradeId, data]) => {
+        result[gradeId] = {
+          gradeId,
+          avgPercentage: data.total > 0 ? Math.round((data.sum / data.total) * 10) / 10 : null,
+          passRate: data.total > 0 ? Math.round((data.passCount / data.total) * 100) : null,
+          reportCount: data.total,
+        };
+      });
+      setGradePerformance(result);
+    } catch (err) {
+      console.error('Failed to fetch grade performance:', err);
+    } finally {
+      setGradePerformanceLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchGradePerformance();
+  }, [fetchGradePerformance]);
+
   const gradeColumns = [
     {
       title: 'Grade',
@@ -230,21 +293,31 @@ function PrincipalDashboardContent() {
     {
       title: 'Avg %',
       key: 'avgPct',
-      render: () => <Text type="secondary">—</Text>,
+      render: (_: unknown, record: IGradeList) => {
+        const perf = gradePerformance[record.id];
+        if (!perf || perf.avgPercentage == null) return <Text type="secondary">—</Text>;
+        const color = perf.avgPercentage >= 50 ? '#3f8600' : '#cf1322';
+        return <Text strong style={{ color }}>{perf.avgPercentage}%</Text>;
+      },
     },
     {
       title: 'Pass Rate',
       key: 'passRate',
-      render: () => <Text type="secondary">—</Text>,
+      render: (_: unknown, record: IGradeList) => {
+        const perf = gradePerformance[record.id];
+        if (!perf || perf.passRate == null) return <Text type="secondary">—</Text>;
+        const color = perf.passRate >= 80 ? '#3f8600' : perf.passRate >= 60 ? '#FAAD14' : '#cf1322';
+        return <Text strong style={{ color }}>{perf.passRate}%</Text>;
+      },
     },
     {
-      title: 'Trend',
-      key: 'trend',
-      render: () => (
-        <Tag icon={<MinusOutlined />} color="default">
-          N/A
-        </Tag>
-      ),
+      title: 'Reports',
+      key: 'reportCount',
+      render: (_: unknown, record: IGradeList) => {
+        const perf = gradePerformance[record.id];
+        if (!perf || perf.reportCount === 0) return <Text type="secondary">—</Text>;
+        return <Tag color="blue">{perf.reportCount}</Tag>;
+      },
     },
   ];
 
@@ -411,7 +484,7 @@ function PrincipalDashboardContent() {
               dataSource={grades ?? []}
               columns={gradeColumns}
               rowKey="id"
-              loading={gradesPending}
+              loading={gradesPending || gradePerformanceLoading}
               pagination={false}
               size="small"
               locale={{ emptyText: 'No grades configured' }}
@@ -516,7 +589,7 @@ function PrincipalDashboardContent() {
               block
               icon={<DollarOutlined />}
               style={{ marginBottom: '8px', textAlign: 'left' }}
-              onClick={() => router.push('/principal/fees')}
+              onClick={() => router.push('/principal/finance')}
             >
               Fee Management
             </Button>

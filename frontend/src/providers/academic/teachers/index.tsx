@@ -96,9 +96,9 @@ export const TeacherProvider = ({
 
   const updateAsync = async (id: string, input: IUpdateTeacher) => {
     dispatch(updateTeacherPending());
-    const endpoint = `/api/services/app/Teacher/Update`;
+    const endpoint = `/api/services/app/Teacher/Update?id=${id}`;
     await instance
-      .put(endpoint, { id, ...input })
+      .put(endpoint, input)
       .then((response) => {
         dispatch(updateTeacherSuccess(response.data.result));
       })
@@ -124,9 +124,9 @@ export const TeacherProvider = ({
 
   const activateAsync = async (id: string) => {
     dispatch(activateTeacherPending());
-    const endpoint = `/api/services/app/Teacher/Update`;
+    const endpoint = `/api/services/app/Teacher/Update?id=${id}`;
     await instance
-      .put(endpoint, { id, isActive: true })
+      .put(endpoint, { isActive: true })
       .then(() => {
         dispatch(activateTeacherSuccess());
       })
@@ -138,9 +138,9 @@ export const TeacherProvider = ({
 
   const deactivateAsync = async (id: string) => {
     dispatch(deactivateTeacherPending());
-    const endpoint = `/api/services/app/Teacher/Update`;
+    const endpoint = `/api/services/app/Teacher/Update?id=${id}`;
     await instance
-      .put(endpoint, { id, isActive: false })
+      .put(endpoint, { isActive: false })
       .then(() => {
         dispatch(deactivateTeacherSuccess());
       })

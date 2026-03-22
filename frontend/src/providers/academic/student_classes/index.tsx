@@ -126,9 +126,9 @@ export const StudentClassProvider = ({
 
   const updateAsync = async (id: string, input: IUpdateStudentClass) => {
     dispatch(updatePending());
-    const endpoint = `/api/services/app/StudentClass/Update`;
+    const endpoint = `/api/services/app/StudentClass/Update?id=${id}`;
     await instance
-      .put(endpoint, { id, ...input })
+      .put(endpoint, input)
       .then((response) => {
         dispatch(updateSuccess(response.data.result));
       })
@@ -140,9 +140,9 @@ export const StudentClassProvider = ({
 
   const endEnrollmentAsync = async (id: string, endDate: string) => {
     dispatch(endEnrollmentPending());
-    const endpoint = `/api/services/app/StudentClass/EndEnrollment`;
+    const endpoint = `/api/services/app/StudentClass/EndEnrollment?id=${id}`;
     await instance
-      .put(endpoint, { id, endDate })
+      .put(endpoint, { endDate })
       .then((response) => {
         dispatch(endEnrollmentSuccess(response.data.result));
       })
@@ -154,9 +154,9 @@ export const StudentClassProvider = ({
 
   const setAsCurrentAsync = async (id: string) => {
     dispatch(setAsCurrentPending());
-    const endpoint = `/api/services/app/StudentClass/SetAsCurrent`;
+    const endpoint = `/api/services/app/StudentClass/SetAsCurrent?id=${id}`;
     await instance
-      .put(endpoint, { id })
+      .put(endpoint)
       .then((response) => {
         dispatch(setAsCurrentSuccess(response.data.result));
       })

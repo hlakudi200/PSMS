@@ -99,9 +99,9 @@ export const ReportSubjectProvider = ({
 
   const addTeacherCommentAsync = async (id: string, comment: string) => {
     dispatch(addTeacherCommentPending());
-    const endpoint = `/api/services/app/ReportSubject/AddTeacherComment`;
+    const endpoint = `/api/services/app/ReportSubject/AddTeacherComment?id=${id}`;
     await instance
-      .post(endpoint, { id, comment })
+      .post(endpoint, { comment })
       .then((response) => {
         dispatch(addTeacherCommentSuccess(response.data.result));
       })

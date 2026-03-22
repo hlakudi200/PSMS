@@ -164,6 +164,7 @@ public class ApplicationDocumentAppService : ApplicationService, IApplicationDoc
             fileUrl,
             input.File.Length)
         {
+            TenantId = AbpSession.TenantId,
             ContentType = input.File.ContentType,
             IsRequired = true // Determined by category
         };

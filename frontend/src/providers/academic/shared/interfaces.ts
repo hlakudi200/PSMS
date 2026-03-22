@@ -472,6 +472,7 @@ export interface IGetStudentsInput extends IPagedAndSortedResultRequest {
 }
 
 export interface IGetAttendanceInput extends IPagedAndSortedResultRequest {
+  keyword?: string;
   classId?: string;
   studentId?: string;
   teacherId?: string;

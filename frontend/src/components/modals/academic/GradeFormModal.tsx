@@ -9,7 +9,7 @@ import type { IGradeList } from '@/providers/academic/shared/interfaces';
 const gradeSchema = z.object({
   gradeName: z.string().min(1, 'Grade name is required').max(100),
   gradeLevel: z.number().min(0, 'Level must be 0-12').max(12, 'Level must be 0-12'),
-  schoolPhase: z.number().min(0).max(3),
+  schoolPhase: z.number().min(1).max(4),
   description: z.string().max(500).optional(),
 });
 
@@ -20,10 +20,10 @@ interface GradeFormModalProps {
 }
 
 const phaseOptions = [
-  { value: 0, label: 'Foundation' },
-  { value: 1, label: 'Intermediate' },
-  { value: 2, label: 'Senior' },
-  { value: 3, label: 'FET' },
+  { value: 1, label: 'Foundation' },
+  { value: 2, label: 'Intermediate' },
+  { value: 3, label: 'Senior' },
+  { value: 4, label: 'FET' },
 ];
 
 export const GradeFormModal: React.FC<GradeFormModalProps> = ({

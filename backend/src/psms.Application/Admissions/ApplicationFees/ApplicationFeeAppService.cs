@@ -8,6 +8,8 @@ using psms.Admissions.Shared;
 using psms.Authorization;
 using psms.Domain.Admissions.Entities;
 using psms.Domain.Shared.Enums;
+using psms.Domain.Workflow.Enums;
+using psms.Workflow.Shared;
 using System;
 using System.Threading.Tasks;
 
@@ -23,15 +25,18 @@ public class ApplicationFeeAppService : ApplicationService, IApplicationFeeAppSe
     private readonly IRepository<ApplicationFee, Guid> _feeRepository;
     private readonly IRepository<Application, Guid> _applicationRepository;
     private readonly IRepository<Domain.Admissions.Entities.AdmissionSettings, Guid> _settingsRepository;
+    private readonly WorkflowStarterService _workflowStarter;
 
     public ApplicationFeeAppService(
         IRepository<ApplicationFee, Guid> feeRepository,
         IRepository<Application, Guid> applicationRepository,
-        IRepository<Domain.Admissions.Entities.AdmissionSettings, Guid> settingsRepository)
+        IRepository<Domain.Admissions.Entities.AdmissionSettings, Guid> settingsRepository,
+        WorkflowStarterService workflowStarter)
     {
         _feeRepository = feeRepository;
         _applicationRepository = applicationRepository;
         _settingsRepository = settingsRepository;
+        _workflowStarter = workflowStarter;
     }
 
     [AbpAuthorize(PermissionNames.Admissions_Applications_View)]
@@ -60,8 +65,9 @@ public class ApplicationFeeAppService : ApplicationService, IApplicationFeeAppSe
                 "Application is not in payment pending status.");
 
         var fee = await _feeRepository.FirstOrDefaultAsync(f => f.ApplicationId == applicationId);
+        var isNewFee = fee == null;
 
-        if (fee == null)
+        if (isNewFee)
         {
             // Create fee record
             var settings = await GetAdmissionSettingsAsync(application.AcademicYearId, application.AppliedGradeId);
@@ -69,8 +75,7 @@ public class ApplicationFeeAppService : ApplicationService, IApplicationFeeAppSe
                 Guid.NewGuid(),
                 applicationId,
                 settings.ApplicationFeeAmount,
-                "ZAR");
-            await _feeRepository.InsertAsync(fee);
+                "ZAR") { TenantId = AbpSession.TenantId };
         }
 
         // Record payment
@@ -80,13 +85,33 @@ public class ApplicationFeeAppService : ApplicationService, IApplicationFeeAppSe
         fee.PaymentDate = DateTime.UtcNow;
         fee.ReceiptNumber = input.ReceiptNumber ?? GenerateReceiptNumber();
 
-        await _feeRepository.UpdateAsync(fee);
+        if (isNewFee)
+            await _feeRepository.InsertAsync(fee);
+        else
+            await _feeRepository.UpdateAsync(fee);
 
-        // Update application status
+        // Update application status: PaymentPending → UnderReview
+        // Backfill TenantId if NULL (pre-fix records)
+        if (application.TenantId == null) application.TenantId = AbpSession.TenantId;
         application.MarkPaymentReceived();
         await _applicationRepository.UpdateAsync(application);
 
         await CurrentUnitOfWork.SaveChangesAsync();
+
+        // Auto-start admissions workflow (silently skips if no definition configured)
+        try
+        {
+            await _workflowStarter.TryStartWorkflowAsync(
+                AbpSession.TenantId,
+                WorkflowEntityType.Application,
+                applicationId,
+                AbpSession.UserId.Value,
+                AbpSession.UserId.Value.ToString());
+        }
+        catch (Exception ex)
+        {
+            Logger.Warn($"Could not auto-start workflow for application {applicationId}: {ex.Message}");
+        }
 
         return new PaymentResultDto
         {
@@ -126,7 +151,7 @@ public class ApplicationFeeAppService : ApplicationService, IApplicationFeeAppSe
             fee.PaymentDate = DateTime.UtcNow;
             fee.ReceiptNumber = GenerateReceiptNumber();
 
-            // Update application status
+            // Update application status: PaymentPending → UnderReview
             if (application.Status == ApplicationStatus.PaymentPending)
             {
                 application.MarkPaymentReceived();
@@ -140,6 +165,17 @@ public class ApplicationFeeAppService : ApplicationService, IApplicationFeeAppSe
 
         await _feeRepository.UpdateAsync(fee);
         await CurrentUnitOfWork.SaveChangesAsync();
+
+        // Auto-start admissions workflow on successful payment
+        if (isSuccess && application.Status == ApplicationStatus.UnderReview)
+        {
+            await _workflowStarter.TryStartWorkflowAsync(
+                application.TenantId,
+                WorkflowEntityType.Application,
+                application.Id,
+                AbpSession.UserId ?? 0,
+                "System");
+        }
 
         return new PaymentResultDto
         {
@@ -192,11 +228,13 @@ public class ApplicationFeeAppService : ApplicationService, IApplicationFeeAppSe
     private async Task<Domain.Admissions.Entities.AdmissionSettings> GetAdmissionSettingsAsync(Guid academicYearId, Guid gradeId)
     {
         var settings = await _settingsRepository
+            .GetAll().AsNoTracking()
             .FirstOrDefaultAsync(s => s.AcademicYearId == academicYearId && s.GradeId == gradeId);
 
         if (settings == null)
         {
             settings = await _settingsRepository
+                .GetAll().AsNoTracking()
                 .FirstOrDefaultAsync(s => s.AcademicYearId == academicYearId && s.GradeId == null);
         }
 

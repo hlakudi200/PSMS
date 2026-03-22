@@ -20,6 +20,7 @@ public class ReportListDto : EntityDto<Guid>
     public ReportStatus Status { get; set; }
     public DateTime? GeneratedDate { get; set; }
     public DateTime? PublishedDate { get; set; }
+    public string PdfUrl { get; set; }
 
     // Flattened
     public string StudentName { get; set; }

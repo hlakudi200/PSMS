@@ -6,6 +6,7 @@ import {
   IGenerateReport,
   IGetReportsInput,
   IReportComment,
+  IBulkGenerateReportPdfsInput,
 } from "../shared/interfaces";
 
 export interface IReportStateContext {
@@ -30,6 +31,8 @@ export interface IReportActionContext {
   acknowledgeByParentAsync: (id: string, input: IReportComment) => void;
   recordPromotionAsync: (id: string, decision: number, promotedToGradeId?: string) => void;
   deleteAsync: (id: string) => void;
+  generatePdfAsync: (id: string) => void;
+  bulkGeneratePdfsAsync: (input: IBulkGenerateReportPdfsInput) => void;
 }
 
 export const INITIAL_STATE: IReportStateContext = {

@@ -73,12 +73,14 @@ export const AttendanceProvider = ({
 
     const params = new URLSearchParams();
     if (input?.maxResultCount) params.append('MaxResultCount', input.maxResultCount.toString());
-    if (input?.skipCount) params.append('SkipCount', input.skipCount.toString());
+    if (input?.skipCount != null) params.append('SkipCount', input.skipCount.toString());
     if (input?.sorting) params.append('Sorting', input.sorting);
+    if (input?.keyword) params.append('Keyword', input.keyword);
     if (input?.studentId) params.append('StudentId', input.studentId);
     if (input?.classId) params.append('ClassId', input.classId);
     if (input?.startDate) params.append('StartDate', input.startDate);
     if (input?.endDate) params.append('EndDate', input.endDate);
+    if (input?.status != null) params.append('Status', input.status.toString());
 
     const endpoint = `/api/services/app/Attendance/GetAll?${params.toString()}`;
     await instance
@@ -172,9 +174,9 @@ export const AttendanceProvider = ({
 
   const updateAsync = async (id: string, input: IUpdateAttendance) => {
     dispatch(updateAttendancePending());
-    const endpoint = `/api/services/app/Attendance/Update`;
+    const endpoint = `/api/services/app/Attendance/Update?id=${id}`;
     await instance
-      .put(endpoint, { id, ...input })
+      .put(endpoint, input)
       .then((response) => {
         dispatch(updateAttendanceSuccess(response.data.result));
       })

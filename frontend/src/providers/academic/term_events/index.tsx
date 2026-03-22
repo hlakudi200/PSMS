@@ -103,9 +103,9 @@ export const TermEventProvider = ({
 
   const updateAsync = async (id: string, input: IUpdateTermEvent) => {
     dispatch(updateTermEventPending());
-    const endpoint = `/api/services/app/TermEvent/Update`;
+    const endpoint = `/api/services/app/TermEvent/Update?id=${id}`;
     await instance
-      .put(endpoint, { id, ...input })
+      .put(endpoint, input)
       .then((response) => {
         dispatch(updateTermEventSuccess(response.data.result));
       })

@@ -24,4 +24,7 @@ public interface IReportAppService : IApplicationService
     Task<ReportDto> AcknowledgeByParentAsync(Guid id, ReportCommentDto input);
     Task<ReportDto> RecordPromotionAsync(Guid id, PromotionDecision decision, Guid? promotedToGradeId);
     Task DeleteAsync(Guid id);
+    Task GenerateReportPdfAsync(Guid id);
+    Task<int> BulkGenerateReportPdfsAsync(BulkGenerateReportPdfsInput input);
+    Task<string> GetReportPdfUrlAsync(Guid id);
 }

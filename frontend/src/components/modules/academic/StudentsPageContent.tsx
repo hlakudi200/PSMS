@@ -34,16 +34,17 @@ function StudentsContent() {
     { key: 'gender', title: 'Gender', dataIndex: 'gender', hideOnMobile: true,
       filterable: true, filterType: 'enum',
       filterOptions: [
-        { label: 'Male', value: 0 },
-        { label: 'Female', value: 1 },
-        { label: 'Other', value: 2 },
+        { label: 'Male', value: 1 },
+        { label: 'Female', value: 2 },
+        { label: 'Other', value: 3 },
       ],
       renderType: 'status',
       renderConfig: {
         statusMap: {
-          0: { label: 'Male', color: 'blue' },
-          1: { label: 'Female', color: 'pink' },
-          2: { label: 'Other', color: 'default' },
+          0: { label: 'Not Set', color: 'default' },
+          1: { label: 'Male', color: 'blue' },
+          2: { label: 'Female', color: 'pink' },
+          3: { label: 'Other', color: 'default' },
         },
       },
     },

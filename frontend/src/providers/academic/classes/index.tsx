@@ -110,9 +110,9 @@ export const ClassProvider = ({
 
   const updateAsync = async (id: string, input: IUpdateClass) => {
     dispatch(updateClassPending());
-    const endpoint = `/api/services/app/Class/Update`;
+    const endpoint = `/api/services/app/Class/Update?id=${id}`;
     await instance
-      .put(endpoint, { id, ...input })
+      .put(endpoint, input)
       .then((response) => {
         dispatch(updateClassSuccess(response.data.result));
       })

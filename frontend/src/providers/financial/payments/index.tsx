@@ -150,9 +150,9 @@ export const PaymentProvider = ({
 
   const updateAsync = async (id: string, input: IUpdatePayment) => {
     dispatch(updatePaymentPending());
-    const endpoint = `/api/services/app/Payment/Update`;
+    const endpoint = `/api/services/app/Payment/Update?id=${id}`;
     await instance
-      .put(endpoint, { id, ...input })
+      .put(endpoint, input)
       .then((response) => {
         dispatch(updatePaymentSuccess(response.data.result));
       })

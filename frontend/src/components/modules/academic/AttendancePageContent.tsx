@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { Card, Col, Row, Select, DatePicker, Statistic, Tabs, Empty, Table, Tag, Progress, Typography, Alert } from 'antd';
 import {
   CheckCircleOutlined,
@@ -24,11 +25,11 @@ const { Text } = Typography;
 const AT_RISK_THRESHOLD = 80;
 
 const statusMap: Record<number, { label: string; color: string }> = {
-  0: { label: 'Present', color: 'green' },
-  1: { label: 'Absent', color: 'red' },
-  2: { label: 'Late', color: 'orange' },
-  3: { label: 'Excused', color: 'blue' },
-  4: { label: 'Sick Leave', color: 'purple' },
+  1: { label: 'Present', color: 'green' },
+  2: { label: 'Absent', color: 'red' },
+  3: { label: 'Late', color: 'orange' },
+  4: { label: 'Excused', color: 'blue' },
+  5: { label: 'Sick Leave', color: 'purple' },
 };
 
 // ─── Analytics Tab Content ─────────────────────────────────────
@@ -174,6 +175,7 @@ function AttendanceContent() {
   const { classes } = useClassState();
   const { getActiveClassesAsync } = useClassActions();
   const { currentRole } = useAuthState();
+  const router = useRouter();
 
   const [selectedClassId, setSelectedClassId] = useState<string | undefined>(undefined);
   const [dateRange, setDateRange] = useState<[Dayjs, Dayjs]>([
@@ -199,13 +201,26 @@ function AttendanceContent() {
 
   const handleQueryChange = useCallback((query: TableQuery) => {
     setLastQuery(query);
+    const filters = query.filters ?? {};
+
+    // Column-level text filters (studentName, className) map to keyword search
+    const keyword = (filters.keyword as string)
+      || (filters.studentName as string)
+      || (filters.className as string)
+      || undefined;
+
+    // Column-level date filter overrides the page-level date range
+    const filterDate = filters.attendanceDate as string | undefined;
+
     getAllAsync({
       maxResultCount: query.maxResultCount,
       skipCount: query.skipCount,
       sorting: query.sorting,
+      keyword,
       classId: selectedClassId,
-      startDate: dateRange[0].format('YYYY-MM-DD'),
-      endDate: dateRange[1].format('YYYY-MM-DD'),
+      startDate: filterDate || dateRange[0].format('YYYY-MM-DD'),
+      endDate: filterDate || dateRange[1].format('YYYY-MM-DD'),
+      status: filters.status as number | undefined,
     });
   }, [getAllAsync, selectedClassId, dateRange]);
 
@@ -225,10 +240,10 @@ function AttendanceContent() {
 
   const stats = {
     total: attendances?.length ?? 0,
-    present: attendances?.filter(a => a.status === 0).length ?? 0,
-    absent: attendances?.filter(a => a.status === 1).length ?? 0,
-    late: attendances?.filter(a => a.status === 2).length ?? 0,
-    sickLeave: attendances?.filter(a => a.status === 4).length ?? 0,
+    present: attendances?.filter(a => a.status === 1).length ?? 0,
+    absent: attendances?.filter(a => a.status === 2).length ?? 0,
+    late: attendances?.filter(a => a.status === 3).length ?? 0,
+    sickLeave: attendances?.filter(a => a.status === 5).length ?? 0,
   };
 
   const recordColumns: ColumnConfig<IAttendanceList>[] = [
@@ -239,11 +254,11 @@ function AttendanceContent() {
       key: 'status', title: 'Status', dataIndex: 'status',
       filterable: true, filterType: 'enum',
       filterOptions: [
-        { label: 'Present', value: 0 },
-        { label: 'Absent', value: 1 },
-        { label: 'Late', value: 2 },
-        { label: 'Excused', value: 3 },
-        { label: 'Sick Leave', value: 4 },
+        { label: 'Present', value: 1 },
+        { label: 'Absent', value: 2 },
+        { label: 'Late', value: 3 },
+        { label: 'Excused', value: 4 },
+        { label: 'Sick Leave', value: 5 },
       ],
       renderType: 'status',
       renderConfig: { statusMap },
@@ -257,7 +272,7 @@ function AttendanceContent() {
       label: 'View Details',
       icon: <EyeOutlined />,
       onClick: (record) => {
-        console.log('View attendance detail:', record.id);
+        router.push(`/principal/attendance/${record.id}`);
       },
     },
   ];

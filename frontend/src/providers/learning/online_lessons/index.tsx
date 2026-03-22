@@ -152,9 +152,9 @@ export const OnlineLessonProvider = ({
 
   const updateAsync = async (id: string, input: IUpdateOnlineLesson) => {
     dispatch(updateOnlineLessonPending());
-    const endpoint = `/api/services/app/OnlineLesson/Update`;
+    const endpoint = `/api/services/app/OnlineLesson/Update?id=${id}`;
     await instance
-      .put(endpoint, { id, ...input })
+      .put(endpoint, input)
       .then((response) => {
         dispatch(updateOnlineLessonSuccess(response.data.result));
       })

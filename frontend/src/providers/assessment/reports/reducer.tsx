@@ -151,6 +151,30 @@ export const ReportReducer = handleActions<
       ...state,
       ...action.payload,
     }),
+    [ReportActionEnums.generatePdfPending]: (state, action) => ({
+      ...state,
+      ...action.payload,
+    }),
+    [ReportActionEnums.generatePdfSuccess]: (state, action) => ({
+      ...state,
+      ...action.payload,
+    }),
+    [ReportActionEnums.generatePdfError]: (state, action) => ({
+      ...state,
+      ...action.payload,
+    }),
+    [ReportActionEnums.bulkGeneratePdfsPending]: (state, action) => ({
+      ...state,
+      ...action.payload,
+    }),
+    [ReportActionEnums.bulkGeneratePdfsSuccess]: (state, action) => ({
+      ...state,
+      ...action.payload,
+    }),
+    [ReportActionEnums.bulkGeneratePdfsError]: (state, action) => ({
+      ...state,
+      ...action.payload,
+    }),
   },
   INITIAL_STATE
 );

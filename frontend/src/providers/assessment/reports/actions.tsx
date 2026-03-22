@@ -50,6 +50,14 @@ export enum ReportActionEnums {
   deleteReportPending = "DELETE_REPORT_PENDING",
   deleteReportSuccess = "DELETE_REPORT_SUCCESS",
   deleteReportError = "DELETE_REPORT_ERROR",
+
+  generatePdfPending = "GENERATE_PDF_PENDING",
+  generatePdfSuccess = "GENERATE_PDF_SUCCESS",
+  generatePdfError = "GENERATE_PDF_ERROR",
+
+  bulkGeneratePdfsPending = "BULK_GENERATE_PDFS_PENDING",
+  bulkGeneratePdfsSuccess = "BULK_GENERATE_PDFS_SUCCESS",
+  bulkGeneratePdfsError = "BULK_GENERATE_PDFS_ERROR",
 }
 
 // Get Single Report Actions
@@ -304,5 +312,37 @@ export const deleteReportSuccess = createAction<IReportStateContext>(
 
 export const deleteReportError = createAction<IReportStateContext>(
   ReportActionEnums.deleteReportError,
+  () => ({ isPending: false, isSuccess: false, isError: true })
+);
+
+// Generate PDF Actions
+export const generatePdfPending = createAction<IReportStateContext>(
+  ReportActionEnums.generatePdfPending,
+  () => ({ isPending: true, isSuccess: false, isError: false })
+);
+
+export const generatePdfSuccess = createAction<IReportStateContext>(
+  ReportActionEnums.generatePdfSuccess,
+  () => ({ isPending: false, isSuccess: true, isError: false })
+);
+
+export const generatePdfError = createAction<IReportStateContext>(
+  ReportActionEnums.generatePdfError,
+  () => ({ isPending: false, isSuccess: false, isError: true })
+);
+
+// Bulk Generate PDFs Actions
+export const bulkGeneratePdfsPending = createAction<IReportStateContext>(
+  ReportActionEnums.bulkGeneratePdfsPending,
+  () => ({ isPending: true, isSuccess: false, isError: false })
+);
+
+export const bulkGeneratePdfsSuccess = createAction<IReportStateContext>(
+  ReportActionEnums.bulkGeneratePdfsSuccess,
+  () => ({ isPending: false, isSuccess: true, isError: false })
+);
+
+export const bulkGeneratePdfsError = createAction<IReportStateContext>(
+  ReportActionEnums.bulkGeneratePdfsError,
   () => ({ isPending: false, isSuccess: false, isError: true })
 );

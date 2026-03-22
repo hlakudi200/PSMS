@@ -46,4 +46,13 @@ public static class FinancialExceptionCodes
     public const string InvalidAllocationAmount = "FIN_INVALID_ALLOCATION_AMOUNT";
     public const string CannotAllocateToSettledFee = "FIN_CANNOT_ALLOCATE_TO_SETTLED_FEE";
     public const string DuplicateStudentFeeInBatch = "FIN_DUPLICATE_STUDENT_FEE_IN_BATCH";
+
+    // FeeWaiver
+    public const string FeeWaiverNotFound = "FIN_FEE_WAIVER_NOT_FOUND";
+    public const string InvalidFeeWaiverStatusTransition = "FIN_INVALID_FEE_WAIVER_STATUS";
+
+    // ExpenseRequest
+    public const string ExpenseNotFound = "EXP_NOT_FOUND";
+    public const string ExpenseNumberDuplicate = "EXP_NUMBER_DUPLICATE";
+    public const string ExpenseInvalidStatus = "EXP_INVALID_STATUS";
 }

@@ -149,9 +149,9 @@ export const StudentFeeProvider = ({
 
   const updateAsync = async (id: string, input: IUpdateStudentFee) => {
     dispatch(updateStudentFeePending());
-    const endpoint = `/api/services/app/StudentFee/Update`;
+    const endpoint = `/api/services/app/StudentFee/Update?id=${id}`;
     await instance
-      .put(endpoint, { id, ...input })
+      .put(endpoint, input)
       .then((response) => {
         dispatch(updateStudentFeeSuccess(response.data.result));
       })

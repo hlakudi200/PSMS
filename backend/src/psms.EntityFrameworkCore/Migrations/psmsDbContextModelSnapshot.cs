@@ -2473,6 +2473,109 @@ namespace psms.Migrations
                     b.ToTable("StudentSubjects");
                 });
 
+            modelBuilder.Entity("psms.Domain.Academic.Entities.StudentTransferRequest", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("AcademicYearId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long?>("ApprovedByUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime?>("ApprovedDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("CreatorUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("DeleterUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime?>("DeletionTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("EffectiveDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("FromSchoolName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("LastModificationTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("LastModifierUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("PreviousReportUrl")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTime>("RequestedDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("StudentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int?>("TenantId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ToSchoolName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("TransferCertificateUrl")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
+
+                    b.Property<Guid?>("TransferGradeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("TransferNumber")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<int>("TransferType")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AcademicYearId");
+
+                    b.HasIndex("StudentId");
+
+                    b.HasIndex("TransferGradeId");
+
+                    b.HasIndex("TenantId", "TransferNumber")
+                        .IsUnique()
+                        .HasDatabaseName("IX_StudentTransferRequests_TenantId_TransferNumber")
+                        .HasFilter("\"IsDeleted\" = false");
+
+                    b.ToTable("StudentTransferRequests");
+                });
+
             modelBuilder.Entity("psms.Domain.Academic.Entities.Subject", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2865,6 +2968,130 @@ namespace psms.Migrations
                     b.HasIndex("TimetableId");
 
                     b.ToTable("TimetableSlots");
+                });
+
+            modelBuilder.Entity("psms.Domain.Activities.Entities.FieldTrip", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("AcademicYearId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal?>("ApprovedBudget")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<long?>("ApprovedByUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime?>("ApprovedDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CancellationReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<Guid?>("ClassId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("CreatorUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("DeleterUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime?>("DeletionTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("Destination")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("EmergencyPlan")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<decimal>("EstimatedCost")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<Guid?>("GradeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("LastModificationTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("LastModifierUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("NumberOfChaperones")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("NumberOfStudents")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("OrganizingTeacherId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("RejectionReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTime?>("ReturnDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("RiskAssessmentNotes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("TenantId")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("TermId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("TransportArrangement")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTime>("TripDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("TripName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AcademicYearId");
+
+                    b.HasIndex("ClassId");
+
+                    b.HasIndex("GradeId");
+
+                    b.HasIndex("OrganizingTeacherId");
+
+                    b.HasIndex("TermId");
+
+                    b.HasIndex("TenantId", "AcademicYearId", "Status")
+                        .HasDatabaseName("IX_FieldTrips_TenantId_AcademicYearId_Status");
+
+                    b.ToTable("FieldTrips");
                 });
 
             modelBuilder.Entity("psms.Domain.Admissions.Entities.AdmissionAssessment", b =>
@@ -3788,6 +4015,10 @@ namespace psms.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
 
+                    b.Property<string>("PdfUrl")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
+
                     b.Property<string>("PrincipalComment")
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
@@ -4286,6 +4517,259 @@ namespace psms.Migrations
                     b.ToTable("Notifications");
                 });
 
+            modelBuilder.Entity("psms.Domain.Discipline.Entities.DisciplinaryCase", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("AcademicYearId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("AppealNotes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("CaseNumber")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("CreatorUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("DeleterUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime?>("DeletionTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("HearingDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("HearingNotes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<int>("IncidentCategory")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("IncidentDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("IncidentDescription")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("InvestigationNotes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("LastModificationTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("LastModifierUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Location")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int?>("Outcome")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("OutcomeDescription")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<bool>("ParentNotified")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("ParentNotifiedDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ReportedByName")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<long>("ReportedByUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("ResolvedByUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime?>("ResolvedDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("SanctionEndDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("SanctionStartDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Severity")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("StudentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int?>("TenantId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("WitnessNames")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AcademicYearId");
+
+                    b.HasIndex("StudentId");
+
+                    b.HasIndex("TenantId", "CaseNumber")
+                        .IsUnique()
+                        .HasDatabaseName("IX_DisciplinaryCases_TenantId_CaseNumber")
+                        .HasFilter("\"IsDeleted\" = false");
+
+                    b.HasIndex("TenantId", "StudentId", "Status")
+                        .HasDatabaseName("IX_DisciplinaryCases_TenantId_StudentId_Status");
+
+                    b.ToTable("DisciplinaryCases");
+                });
+
+            modelBuilder.Entity("psms.Domain.Financial.Entities.ExpenseRequest", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("AcademicYearId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal?>("ApprovedAmount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<long?>("ApprovedByUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime?>("ApprovedDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Category")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("CreatorUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<long?>("DeleterUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime?>("DeletionTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Department")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("InvoiceUrl")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("LastModificationTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("LastModifierUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime?>("PaymentDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("PaymentReference")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<int>("Priority")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("QuotationUrl")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
+
+                    b.Property<string>("ReceiptUrl")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
+
+                    b.Property<string>("RejectionReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("RequestNumber")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("RequestedByName")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<long>("RequestedByUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime?>("RequiredByDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("TenantId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Vendor")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AcademicYearId");
+
+                    b.HasIndex("TenantId", "RequestNumber")
+                        .IsUnique()
+                        .HasDatabaseName("IX_ExpenseRequests_TenantId_RequestNumber")
+                        .HasFilter("\"IsDeleted\" = false");
+
+                    b.ToTable("ExpenseRequests");
+                });
+
             modelBuilder.Entity("psms.Domain.Financial.Entities.FeeStructure", b =>
                 {
                     b.Property<Guid>("Id")
@@ -4355,6 +4839,88 @@ namespace psms.Migrations
                     b.HasIndex("GradeId");
 
                     b.ToTable("FeeStructures");
+                });
+
+            modelBuilder.Entity("psms.Domain.Financial.Entities.FeeWaiver", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("AcademicYearId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal?>("ApprovedAmount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("CreatorUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("DeleterUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime?>("DeletionTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("LastModificationTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("LastModifierUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<decimal>("RequestedAmount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("ReviewNotes")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<long?>("ReviewedByUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime?>("ReviewedDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("StudentFeeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("StudentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("SupportingDocumentUrl")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
+
+                    b.Property<int?>("TenantId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("WaiverType")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AcademicYearId");
+
+                    b.HasIndex("StudentId");
+
+                    b.HasIndex("TenantId", "StudentId", "AcademicYearId")
+                        .HasDatabaseName("IX_FeeWaivers_TenantId_StudentId_AcademicYearId");
+
+                    b.ToTable("FeeWaivers");
                 });
 
             modelBuilder.Entity("psms.Domain.Financial.Entities.Payment", b =>
@@ -4536,6 +5102,102 @@ namespace psms.Migrations
                         .HasDatabaseName("IX_StudentFees_StudentId_FeeStructureId");
 
                     b.ToTable("StudentFees");
+                });
+
+            modelBuilder.Entity("psms.Domain.HR.Entities.StaffLeaveRequest", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<long?>("ApprovedByUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime?>("ApprovedDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("CreatorUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("DeleterUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime?>("DeletionTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("EndDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("LastModificationTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("LastModifierUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("LeaveNumber")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<int>("LeaveType")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("RejectionReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTime>("StartDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("SubstituteTeacherId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("SubstituteTeacherName")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("SupportingDocumentUrl")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
+
+                    b.Property<int?>("TenantId")
+                        .HasColumnType("integer");
+
+                    b.Property<long>("UserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("UserName")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SubstituteTeacherId");
+
+                    b.HasIndex("TenantId", "LeaveNumber")
+                        .IsUnique()
+                        .HasDatabaseName("IX_StaffLeaveRequests_TenantId_LeaveNumber")
+                        .HasFilter("\"IsDeleted\" = false");
+
+                    b.HasIndex("TenantId", "UserId", "Status")
+                        .HasDatabaseName("IX_StaffLeaveRequests_TenantId_UserId_Status");
+
+                    b.ToTable("StaffLeaveRequests");
                 });
 
             modelBuilder.Entity("psms.Domain.Learning.Entities.LearningMaterial", b =>
@@ -5282,6 +5944,365 @@ namespace psms.Migrations
                     b.ToTable("StudentTransports");
                 });
 
+            modelBuilder.Entity("psms.Domain.Workflow.Entities.WorkflowDefinition", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("CreatorUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("DeleterUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime?>("DeletionTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<int>("EntityType")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("LastModificationTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("LastModifierUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int?>("TenantId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "Name")
+                        .IsUnique()
+                        .HasDatabaseName("IX_WorkflowDefinitions_TenantId_Name")
+                        .HasFilter("\"IsDeleted\" = false");
+
+                    b.ToTable("WorkflowDefinitions");
+                });
+
+            modelBuilder.Entity("psms.Domain.Workflow.Entities.WorkflowDelegation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("AssignedRole")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("CreatorUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("DelegateUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("DelegateUserName")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<long>("DelegatorUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("DelegatorUserName")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<long?>("DeleterUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime?>("DeletionTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("EndDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("EntityType")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("LastModificationTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("LastModifierUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTime>("StartDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("TenantId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "DelegateUserId", "IsActive")
+                        .HasDatabaseName("IX_WorkflowDelegations_TenantId_DelegateUserId_Active");
+
+                    b.HasIndex("TenantId", "DelegatorUserId", "IsActive")
+                        .HasDatabaseName("IX_WorkflowDelegations_TenantId_DelegatorUserId_Active");
+
+                    b.ToTable("WorkflowDelegations");
+                });
+
+            modelBuilder.Entity("psms.Domain.Workflow.Entities.WorkflowInstance", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<long?>("CompletedByUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime?>("CompletedDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CompletionComment")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("CreatorUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime?>("CurrentStepDueDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CurrentStepId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("CurrentStepOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<long?>("DeleterUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime?>("DeletionTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("EntityId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("EntityType")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("LastModificationTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("LastModifierUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime?>("StartedDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("TenantId")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("WorkflowDefinitionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("WorkflowDefinitionVersion")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CurrentStepId");
+
+                    b.HasIndex("WorkflowDefinitionId");
+
+                    b.HasIndex("TenantId", "EntityType", "EntityId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_WorkflowInstances_TenantId_EntityType_EntityId_Active")
+                        .HasFilter("\"Status\" IN (1, 2)");
+
+                    b.HasIndex("TenantId", "Status", "CurrentStepDueDate")
+                        .HasDatabaseName("IX_WorkflowInstances_TenantId_Status_DueDate");
+
+                    b.HasIndex("TenantId", "Status", "CurrentStepId")
+                        .HasDatabaseName("IX_WorkflowInstances_TenantId_Status_CurrentStepId");
+
+                    b.ToTable("WorkflowInstances");
+                });
+
+            modelBuilder.Entity("psms.Domain.Workflow.Entities.WorkflowStep", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("ActionType")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("AssignedRole")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<long?>("AssignedUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("CreatorUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("DeleterUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime?>("DeletionTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("GuardExpression")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<bool>("IsCommentRequired")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsTerminal")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("LastModificationTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("LastModifierUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int?>("NextStepOnApprove")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("NextStepOnReject")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("SlaHours")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("StepOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("WorkflowDefinitionId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("WorkflowDefinitionId", "StepOrder")
+                        .IsUnique()
+                        .HasDatabaseName("IX_WorkflowSteps_DefinitionId_StepOrder");
+
+                    b.ToTable("WorkflowSteps");
+                });
+
+            modelBuilder.Entity("psms.Domain.Workflow.Entities.WorkflowTransition", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Action")
+                        .HasColumnType("integer");
+
+                    b.Property<long>("ActorUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("ActorUserName")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("AttachmentUrl")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
+
+                    b.Property<string>("Comment")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("CreatorUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("FromStepId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int?>("TenantId")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("ToStepId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("TransitionDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("WorkflowInstanceId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FromStepId");
+
+                    b.HasIndex("ToStepId");
+
+                    b.HasIndex("WorkflowInstanceId");
+
+                    b.ToTable("WorkflowTransitions");
+                });
+
             modelBuilder.Entity("psms.MultiTenancy.Tenant", b =>
                 {
                     b.Property<int>("Id")
@@ -5893,6 +6914,31 @@ namespace psms.Migrations
                     b.Navigation("Subject");
                 });
 
+            modelBuilder.Entity("psms.Domain.Academic.Entities.StudentTransferRequest", b =>
+                {
+                    b.HasOne("psms.Domain.Academic.Entities.AcademicYear", "AcademicYear")
+                        .WithMany()
+                        .HasForeignKey("AcademicYearId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("psms.Domain.Academic.Entities.Student", "Student")
+                        .WithMany()
+                        .HasForeignKey("StudentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("psms.Domain.Academic.Entities.Grade", "TransferGrade")
+                        .WithMany()
+                        .HasForeignKey("TransferGradeId");
+
+                    b.Navigation("AcademicYear");
+
+                    b.Navigation("Student");
+
+                    b.Navigation("TransferGrade");
+                });
+
             modelBuilder.Entity("psms.Domain.Academic.Entities.Teacher", b =>
                 {
                     b.OwnsOne("psms.Domain.Shared.ValueObjects.Address", "Address", b1 =>
@@ -6041,6 +7087,43 @@ namespace psms.Migrations
                     b.Navigation("Teacher");
 
                     b.Navigation("Timetable");
+                });
+
+            modelBuilder.Entity("psms.Domain.Activities.Entities.FieldTrip", b =>
+                {
+                    b.HasOne("psms.Domain.Academic.Entities.AcademicYear", "AcademicYear")
+                        .WithMany()
+                        .HasForeignKey("AcademicYearId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("psms.Domain.Academic.Entities.Class", "Class")
+                        .WithMany()
+                        .HasForeignKey("ClassId");
+
+                    b.HasOne("psms.Domain.Academic.Entities.Grade", "Grade")
+                        .WithMany()
+                        .HasForeignKey("GradeId");
+
+                    b.HasOne("psms.Domain.Academic.Entities.Teacher", "OrganizingTeacher")
+                        .WithMany()
+                        .HasForeignKey("OrganizingTeacherId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("psms.Domain.Academic.Entities.Term", "Term")
+                        .WithMany()
+                        .HasForeignKey("TermId");
+
+                    b.Navigation("AcademicYear");
+
+                    b.Navigation("Class");
+
+                    b.Navigation("Grade");
+
+                    b.Navigation("OrganizingTeacher");
+
+                    b.Navigation("Term");
                 });
 
             modelBuilder.Entity("psms.Domain.Admissions.Entities.AdmissionAssessment", b =>
@@ -6319,6 +7402,36 @@ namespace psms.Migrations
                     b.Navigation("ParentMessage");
                 });
 
+            modelBuilder.Entity("psms.Domain.Discipline.Entities.DisciplinaryCase", b =>
+                {
+                    b.HasOne("psms.Domain.Academic.Entities.AcademicYear", "AcademicYear")
+                        .WithMany()
+                        .HasForeignKey("AcademicYearId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("psms.Domain.Academic.Entities.Student", "Student")
+                        .WithMany()
+                        .HasForeignKey("StudentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("AcademicYear");
+
+                    b.Navigation("Student");
+                });
+
+            modelBuilder.Entity("psms.Domain.Financial.Entities.ExpenseRequest", b =>
+                {
+                    b.HasOne("psms.Domain.Academic.Entities.AcademicYear", "AcademicYear")
+                        .WithMany()
+                        .HasForeignKey("AcademicYearId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("AcademicYear");
+                });
+
             modelBuilder.Entity("psms.Domain.Financial.Entities.FeeStructure", b =>
                 {
                     b.HasOne("psms.Domain.Academic.Entities.AcademicYear", "AcademicYear")
@@ -6336,6 +7449,25 @@ namespace psms.Migrations
                     b.Navigation("AcademicYear");
 
                     b.Navigation("Grade");
+                });
+
+            modelBuilder.Entity("psms.Domain.Financial.Entities.FeeWaiver", b =>
+                {
+                    b.HasOne("psms.Domain.Academic.Entities.AcademicYear", "AcademicYear")
+                        .WithMany()
+                        .HasForeignKey("AcademicYearId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("psms.Domain.Academic.Entities.Student", "Student")
+                        .WithMany()
+                        .HasForeignKey("StudentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("AcademicYear");
+
+                    b.Navigation("Student");
                 });
 
             modelBuilder.Entity("psms.Domain.Financial.Entities.Payment", b =>
@@ -6393,6 +7525,15 @@ namespace psms.Migrations
                     b.Navigation("FeeStructure");
 
                     b.Navigation("Student");
+                });
+
+            modelBuilder.Entity("psms.Domain.HR.Entities.StaffLeaveRequest", b =>
+                {
+                    b.HasOne("psms.Domain.Academic.Entities.Teacher", "SubstituteTeacher")
+                        .WithMany()
+                        .HasForeignKey("SubstituteTeacherId");
+
+                    b.Navigation("SubstituteTeacher");
                 });
 
             modelBuilder.Entity("psms.Domain.Learning.Entities.LearningMaterial", b =>
@@ -6502,6 +7643,59 @@ namespace psms.Migrations
                     b.Navigation("SchoolTransport");
 
                     b.Navigation("Student");
+                });
+
+            modelBuilder.Entity("psms.Domain.Workflow.Entities.WorkflowInstance", b =>
+                {
+                    b.HasOne("psms.Domain.Workflow.Entities.WorkflowStep", "CurrentStep")
+                        .WithMany()
+                        .HasForeignKey("CurrentStepId");
+
+                    b.HasOne("psms.Domain.Workflow.Entities.WorkflowDefinition", "WorkflowDefinition")
+                        .WithMany()
+                        .HasForeignKey("WorkflowDefinitionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("CurrentStep");
+
+                    b.Navigation("WorkflowDefinition");
+                });
+
+            modelBuilder.Entity("psms.Domain.Workflow.Entities.WorkflowStep", b =>
+                {
+                    b.HasOne("psms.Domain.Workflow.Entities.WorkflowDefinition", "WorkflowDefinition")
+                        .WithMany("Steps")
+                        .HasForeignKey("WorkflowDefinitionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("WorkflowDefinition");
+                });
+
+            modelBuilder.Entity("psms.Domain.Workflow.Entities.WorkflowTransition", b =>
+                {
+                    b.HasOne("psms.Domain.Workflow.Entities.WorkflowStep", "FromStep")
+                        .WithMany()
+                        .HasForeignKey("FromStepId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("psms.Domain.Workflow.Entities.WorkflowStep", "ToStep")
+                        .WithMany()
+                        .HasForeignKey("ToStepId");
+
+                    b.HasOne("psms.Domain.Workflow.Entities.WorkflowInstance", "WorkflowInstance")
+                        .WithMany("Transitions")
+                        .HasForeignKey("WorkflowInstanceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("FromStep");
+
+                    b.Navigation("ToStep");
+
+                    b.Navigation("WorkflowInstance");
                 });
 
             modelBuilder.Entity("psms.MultiTenancy.Tenant", b =>
@@ -6739,6 +7933,16 @@ namespace psms.Migrations
             modelBuilder.Entity("psms.Domain.SASpecific.Entities.SchoolTransport", b =>
                 {
                     b.Navigation("StudentEnrollments");
+                });
+
+            modelBuilder.Entity("psms.Domain.Workflow.Entities.WorkflowDefinition", b =>
+                {
+                    b.Navigation("Steps");
+                });
+
+            modelBuilder.Entity("psms.Domain.Workflow.Entities.WorkflowInstance", b =>
+                {
+                    b.Navigation("Transitions");
                 });
 #pragma warning restore 612, 618
         }

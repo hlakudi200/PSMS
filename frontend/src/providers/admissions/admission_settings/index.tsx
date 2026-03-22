@@ -112,9 +112,9 @@ export const AdmissionSettingsProvider = ({
 
   const updateAsync = async (id: string, input: IUpdateAdmissionSettings) => {
     dispatch(updateAdmissionSettingsPending());
-    const endpoint = `/api/services/app/AdmissionSettings/Update`;
+    const endpoint = `/api/services/app/AdmissionSettings/Update?id=${id}`;
     await instance
-      .put(endpoint, { id, ...input })
+      .put(endpoint, input)
       .then((response) => {
         dispatch(updateAdmissionSettingsSuccess(response.data.result));
       })

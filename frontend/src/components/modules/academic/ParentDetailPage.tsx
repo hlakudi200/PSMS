@@ -34,12 +34,14 @@ import type { IStudentParent } from '@/providers/academic/shared/interfaces';
 const { Title, Text } = Typography;
 
 const relationshipTypeMap: Record<number, string> = {
-  0: 'Father',
-  1: 'Mother',
-  2: 'Guardian',
-  3: 'Grandparent',
-  4: 'Sibling',
-  5: 'Other',
+  1: 'Father',
+  2: 'Mother',
+  3: 'Guardian',
+  4: 'Stepfather',
+  5: 'Stepmother',
+  6: 'Grandparent',
+  7: 'Sibling',
+  8: 'Other',
 };
 
 // ─── Children Tab ─────────────────────────────────────────────

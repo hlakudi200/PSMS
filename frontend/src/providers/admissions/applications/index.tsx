@@ -127,9 +127,9 @@ export const ApplicationProvider = ({
 
   const updateAsync = async (id: string, input: IUpdateApplication) => {
     dispatch(updateApplicationPending());
-    const endpoint = `/api/services/app/Application/Update`;
+    const endpoint = `/api/services/app/Application/Update?id=${id}`;
     await instance
-      .put(endpoint, { id, ...input })
+      .put(endpoint, input)
       .then((response) => {
         dispatch(updateApplicationSuccess(response.data.result));
       })
