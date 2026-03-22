@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "prepare": "cd .. && git config core.hooksPath .husky || true"
   },
   "dependencies": {
     "@ant-design/icons": "^6.1.0",
@@ -30,6 +31,7 @@
     "babel-plugin-react-compiler": "1.0.0",
     "eslint": "^9",
     "eslint-config-next": "16.1.5",
+    "husky": "^9.1.7",
     "typescript": "^5"
   }
 }

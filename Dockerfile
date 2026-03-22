@@ -2,8 +2,8 @@ FROM mcr.microsoft.com/dotnet/sdk:9.0.201 AS build
 
 WORKDIR /app
 
-COPY aspnet-core/psms.sln ./
-COPY aspnet-core/src/ ./src/
+COPY backend/psms.sln ./
+COPY backend/src/ ./src/
 
 RUN dotnet restore ./src/psms.Web.Host/psms.Web.Host.csproj
 RUN dotnet publish ./src/psms.Web.Host/psms.Web.Host.csproj -c Release -o /app/publish
