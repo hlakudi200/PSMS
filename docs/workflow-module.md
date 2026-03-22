@@ -68,11 +68,14 @@ Workflows can be attached to these entity types:
 |-------|-------------|-----------------|
 | 1 | Application | Student admissions approval |
 | 2 | Report | Report card approval before publishing |
-| 3 | Fee Waiver | Fee discount approval |
+| 3 | Fee Waiver | Fee discount/bursary approval |
 | 4 | Attendance | Attendance dispute review |
 | 5 | Learning Material | Content review before publishing |
-| 6 | Student Transfer | Transfer request approval |
-| 7 | Disciplinary | Disciplinary action approval |
+| 6 | Student Transfer | Transfer in/out request approval |
+| 7 | Disciplinary | Disciplinary case: report → investigate → hearing → decision |
+| 8 | Staff Leave | Teacher/staff leave request approval |
+| 9 | Field Trip | Trip planning, budget, and safety approval |
+| 10 | Expense Request | School purchase/procurement approval |
 
 ---
 

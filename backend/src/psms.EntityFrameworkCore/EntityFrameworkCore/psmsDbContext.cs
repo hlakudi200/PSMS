@@ -17,6 +17,9 @@ using psms.Domain.Communication.Entities;
 using psms.Domain.SASpecific.Entities;
 using psms.Domain.Shared.ValueObjects;
 using psms.Domain.Workflow.Entities;
+using psms.Domain.Discipline.Entities;
+using psms.Domain.HR.Entities;
+using psms.Domain.Activities.Entities;
 
 namespace psms.EntityFrameworkCore;
 
@@ -324,6 +327,14 @@ public class psmsDbContext : AbpZeroDbContext<Tenant, Role, User, psmsDbContext>
     public DbSet<WorkflowTransition> WorkflowTransitions { get; set; }
     public DbSet<WorkflowDelegation> WorkflowDelegations { get; set; }
 
+    /* ==================== New Workflow Entities ==================== */
+    public DbSet<FeeWaiver> FeeWaivers { get; set; }
+    public DbSet<DisciplinaryCase> DisciplinaryCases { get; set; }
+    public DbSet<StudentTransferRequest> StudentTransferRequests { get; set; }
+    public DbSet<StaffLeaveRequest> StaffLeaveRequests { get; set; }
+    public DbSet<FieldTrip> FieldTrips { get; set; }
+    public DbSet<ExpenseRequest> ExpenseRequests { get; set; }
+
     public psmsDbContext(DbContextOptions<psmsDbContext> options)
         : base(options)
     {
@@ -619,5 +630,55 @@ public class psmsDbContext : AbpZeroDbContext<Tenant, Role, User, psmsDbContext>
         modelBuilder.Entity<WorkflowDelegation>()
             .HasIndex(d => new { d.TenantId, d.DelegatorUserId, d.IsActive })
             .HasDatabaseName("IX_WorkflowDelegations_TenantId_DelegatorUserId_Active");
+
+        /* ==================== New Entity Indexes ==================== */
+
+        // DisciplinaryCase - unique case number per tenant
+        modelBuilder.Entity<DisciplinaryCase>()
+            .HasIndex(c => new { c.TenantId, c.CaseNumber })
+            .IsUnique()
+            .HasFilter("\"IsDeleted\" = false")
+            .HasDatabaseName("IX_DisciplinaryCases_TenantId_CaseNumber");
+
+        // DisciplinaryCase - student lookup
+        modelBuilder.Entity<DisciplinaryCase>()
+            .HasIndex(c => new { c.TenantId, c.StudentId, c.Status })
+            .HasDatabaseName("IX_DisciplinaryCases_TenantId_StudentId_Status");
+
+        // StudentTransferRequest - unique transfer number per tenant
+        modelBuilder.Entity<StudentTransferRequest>()
+            .HasIndex(t => new { t.TenantId, t.TransferNumber })
+            .IsUnique()
+            .HasFilter("\"IsDeleted\" = false")
+            .HasDatabaseName("IX_StudentTransferRequests_TenantId_TransferNumber");
+
+        // StaffLeaveRequest - unique leave number per tenant
+        modelBuilder.Entity<StaffLeaveRequest>()
+            .HasIndex(l => new { l.TenantId, l.LeaveNumber })
+            .IsUnique()
+            .HasFilter("\"IsDeleted\" = false")
+            .HasDatabaseName("IX_StaffLeaveRequests_TenantId_LeaveNumber");
+
+        // StaffLeaveRequest - user leave lookup
+        modelBuilder.Entity<StaffLeaveRequest>()
+            .HasIndex(l => new { l.TenantId, l.UserId, l.Status })
+            .HasDatabaseName("IX_StaffLeaveRequests_TenantId_UserId_Status");
+
+        // FeeWaiver - student waiver lookup
+        modelBuilder.Entity<FeeWaiver>()
+            .HasIndex(w => new { w.TenantId, w.StudentId, w.AcademicYearId })
+            .HasDatabaseName("IX_FeeWaivers_TenantId_StudentId_AcademicYearId");
+
+        // ExpenseRequest - unique request number per tenant
+        modelBuilder.Entity<ExpenseRequest>()
+            .HasIndex(e => new { e.TenantId, e.RequestNumber })
+            .IsUnique()
+            .HasFilter("\"IsDeleted\" = false")
+            .HasDatabaseName("IX_ExpenseRequests_TenantId_RequestNumber");
+
+        // FieldTrip - date lookup
+        modelBuilder.Entity<FieldTrip>()
+            .HasIndex(f => new { f.TenantId, f.AcademicYearId, f.Status })
+            .HasDatabaseName("IX_FieldTrips_TenantId_AcademicYearId_Status");
     }
 }

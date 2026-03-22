@@ -430,4 +430,66 @@ public static class PermissionNames
     public const string Workflow_Delegations_Revoke = "Workflow.Delegations.Revoke";
 
     #endregion
+
+    #region Discipline
+
+    public const string Discipline = "Discipline";
+    public const string Discipline_Cases = "Discipline.Cases";
+    public const string Discipline_Cases_View = "Discipline.Cases.View";
+    public const string Discipline_Cases_Create = "Discipline.Cases.Create";
+    public const string Discipline_Cases_Edit = "Discipline.Cases.Edit";
+    public const string Discipline_Cases_Delete = "Discipline.Cases.Delete";
+    public const string Discipline_Cases_Manage = "Discipline.Cases.Manage";
+
+    #endregion
+
+    #region HR
+
+    public const string HR = "HR";
+    public const string HR_Leave = "HR.Leave";
+    public const string HR_Leave_View = "HR.Leave.View";
+    public const string HR_Leave_Create = "HR.Leave.Create";
+    public const string HR_Leave_Approve = "HR.Leave.Approve";
+    public const string HR_Leave_ViewAll = "HR.Leave.ViewAll";
+
+    #endregion
+
+    #region Activities
+
+    public const string Activities = "Activities";
+    public const string Activities_FieldTrips = "Activities.FieldTrips";
+    public const string Activities_FieldTrips_View = "Activities.FieldTrips.View";
+    public const string Activities_FieldTrips_Create = "Activities.FieldTrips.Create";
+    public const string Activities_FieldTrips_Edit = "Activities.FieldTrips.Edit";
+    public const string Activities_FieldTrips_Approve = "Activities.FieldTrips.Approve";
+
+    #endregion
+
+    #region Financial Extensions
+
+    // Fee Waivers
+    public const string Financial_FeeWaivers = "Financial.FeeWaivers";
+    public const string Financial_FeeWaivers_View = "Financial.FeeWaivers.View";
+    public const string Financial_FeeWaivers_Create = "Financial.FeeWaivers.Create";
+    public const string Financial_FeeWaivers_Edit = "Financial.FeeWaivers.Edit";
+    public const string Financial_FeeWaivers_Delete = "Financial.FeeWaivers.Delete";
+    public const string Financial_FeeWaivers_Approve = "Financial.FeeWaivers.Approve";
+
+    // Expenses
+    public const string Financial_Expenses = "Financial.Expenses";
+    public const string Financial_Expenses_View = "Financial.Expenses.View";
+    public const string Financial_Expenses_Create = "Financial.Expenses.Create";
+    public const string Financial_Expenses_Approve = "Financial.Expenses.Approve";
+
+    #endregion
+
+    #region Academic Extensions
+
+    // Student Transfers
+    public const string Academic_Transfers = "Academic.Transfers";
+    public const string Academic_Transfers_View = "Academic.Transfers.View";
+    public const string Academic_Transfers_Create = "Academic.Transfers.Create";
+    public const string Academic_Transfers_Approve = "Academic.Transfers.Approve";
+
+    #endregion
 }

@@ -46,6 +46,9 @@ export enum WorkflowEntityType {
   LearningMaterial = 5,
   StudentTransfer = 6,
   Disciplinary = 7,
+  StaffLeave = 8,
+  FieldTrip = 9,
+  ExpenseRequest = 10,
 }
 
 export const WorkflowStatusLabels: Record<number, string> = {
@@ -75,6 +78,9 @@ export const WorkflowEntityTypeLabels: Record<number, string> = {
   [WorkflowEntityType.LearningMaterial]: 'Learning Material',
   [WorkflowEntityType.StudentTransfer]: 'Student Transfer',
   [WorkflowEntityType.Disciplinary]: 'Disciplinary',
+  [WorkflowEntityType.StaffLeave]: 'Staff Leave',
+  [WorkflowEntityType.FieldTrip]: 'Field Trip',
+  [WorkflowEntityType.ExpenseRequest]: 'Expense Request',
 };
 
 // ============================================================

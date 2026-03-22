@@ -89,8 +89,8 @@ export const StartWorkflowModal: React.FC<StartWorkflowModalProps> = ({
         labelFn: (item) => item.reportName ?? item.title ?? `Report ${item.id?.substring(0, 8)}`,
       },
       3: {
-        endpoint: '/api/services/app/FeeStructure/GetAll?MaxResultCount=100',
-        labelFn: (item) => item.name ?? `Fee Waiver ${item.id?.substring(0, 8)}`,
+        endpoint: '/api/services/app/FeeWaiver/GetAll?MaxResultCount=100',
+        labelFn: (item) => `${item.studentName ?? 'Student'} — R${item.requestedAmount} (${item.waiverType})`,
       },
       4: {
         endpoint: '/api/services/app/Attendance/GetAll?MaxResultCount=100',
@@ -101,12 +101,24 @@ export const StartWorkflowModal: React.FC<StartWorkflowModalProps> = ({
         labelFn: (item) => item.title ?? item.name ?? `Material ${item.id?.substring(0, 8)}`,
       },
       6: {
-        endpoint: '/api/services/app/Student/GetAll?MaxResultCount=100',
-        labelFn: (item) => `${item.fullName ?? item.firstName ?? ''} ${item.lastName ?? ''} (Transfer)`.trim(),
+        endpoint: '/api/services/app/StudentTransfer/GetAll?MaxResultCount=100',
+        labelFn: (item) => `${item.transferNumber ?? ''} — ${item.studentName ?? 'Student'} (${item.transferType === 1 ? 'In' : 'Out'})`,
       },
       7: {
-        endpoint: '/api/services/app/Student/GetAll?MaxResultCount=100',
-        labelFn: (item) => `${item.fullName ?? item.firstName ?? ''} ${item.lastName ?? ''} (Disciplinary)`.trim(),
+        endpoint: '/api/services/app/DisciplinaryCase/GetAll?MaxResultCount=100',
+        labelFn: (item) => `${item.caseNumber ?? ''} — ${item.studentName ?? 'Student'}`,
+      },
+      8: {
+        endpoint: '/api/services/app/StaffLeaveRequest/GetAll?MaxResultCount=100',
+        labelFn: (item) => `${item.leaveNumber ?? ''} — ${item.userName ?? 'Staff'} (${item.startDate?.substring(0, 10)})`,
+      },
+      9: {
+        endpoint: '/api/services/app/FieldTrip/GetAll?MaxResultCount=100',
+        labelFn: (item) => `${item.tripName ?? 'Trip'} — ${item.destination ?? ''}`,
+      },
+      10: {
+        endpoint: '/api/services/app/ExpenseRequest/GetAll?MaxResultCount=100',
+        labelFn: (item) => `${item.requestNumber ?? ''} — R${item.amount} (${item.description?.substring(0, 30)})`,
       },
     };
 

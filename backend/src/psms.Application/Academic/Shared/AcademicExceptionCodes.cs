@@ -133,6 +133,11 @@ public static class AcademicExceptionCodes
     public const string DuplicateTermEvent = "ACD_DUPLICATE_TERM_EVENT";
     public const string EventDateOutsideTerm = "ACD_EVENT_DATE_OUTSIDE_TERM";
 
+    // StudentTransferRequest
+    public const string TransferNotFound = "TR_NOT_FOUND";
+    public const string TransferNumberDuplicate = "TR_NUMBER_DUPLICATE";
+    public const string TransferInvalidStatus = "TR_INVALID_STATUS";
+
     // Attendance
     public const string AttendanceNotFound = "ACD_ATTENDANCE_NOT_FOUND";
     public const string DuplicateAttendance = "ACD_DUPLICATE_ATTENDANCE";
