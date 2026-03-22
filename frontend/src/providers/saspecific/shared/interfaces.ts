@@ -338,6 +338,7 @@ export interface IGetStudentExtramuralsInput extends IPagedAndSortedResultReques
   extramuralActivityId?: string;
   academicYearId?: string;
   status?: number;
+  studentName?:string
 }
 
 // ============================================================

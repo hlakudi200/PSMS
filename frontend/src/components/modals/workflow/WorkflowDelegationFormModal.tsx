@@ -7,9 +7,9 @@ import { useWorkflowDelegationActions } from '@/providers/workflow/workflow-dele
 import { WorkflowEntityTypeLabels } from '@/providers/workflow/shared/interfaces';
 
 const delegationSchema = z.object({
-  delegateUserId: z.number({ required_error: 'Delegate user ID is required' }).min(1, 'Delegate user ID is required'),
-  startDate: z.string({ required_error: 'Start date is required' }).min(1, 'Start date is required'),
-  endDate: z.string({ required_error: 'End date is required' }).min(1, 'End date is required'),
+  delegateUserId: z.number({ error: 'Delegate user ID is required' }).min(1, 'Delegate user ID is required'),
+  startDate: z.string({ error: 'Start date is required' }).min(1, 'Start date is required'),
+  endDate: z.string({error: 'End date is required' }).min(1, 'End date is required'),
   reason: z.string().max(500).optional(),
   entityType: z.number().optional(),
   assignedRole: z.string().max(100).optional(),
