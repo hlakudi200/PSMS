@@ -21,6 +21,14 @@ public interface ITeacherAppService : IApplicationService
     /// <summary>Gets only active teachers (for dropdowns).</summary>
     Task<ListResultDto<TeacherListDto>> GetActiveTeachersAsync();
 
+    /// <summary>
+    /// Returns the Teacher record linked to the current ABP session user,
+    /// or null if no teacher profile is linked. Returns null rather than
+    /// throwing so callers can render a "no teacher profile" hint without
+    /// going through the global error modal.
+    /// </summary>
+    Task<TeacherDto> GetByCurrentUserAsync();
+
     Task ActivateAsync(Guid id);
     Task DeactivateAsync(Guid id);
 }

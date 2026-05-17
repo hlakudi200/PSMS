@@ -11,6 +11,10 @@ export enum TeacherActionEnums {
   getTeacherSuccess = "GET_TEACHER_SUCCESS",
   getTeacherError = "GET_TEACHER_ERROR",
 
+  getCurrentTeacherPending = "GET_CURRENT_TEACHER_PENDING",
+  getCurrentTeacherSuccess = "GET_CURRENT_TEACHER_SUCCESS",
+  getCurrentTeacherError = "GET_CURRENT_TEACHER_ERROR",
+
   createTeacherPending = "CREATE_TEACHER_PENDING",
   createTeacherSuccess = "CREATE_TEACHER_SUCCESS",
   createTeacherError = "CREATE_TEACHER_ERROR",
@@ -75,6 +79,31 @@ export const getTeacherSuccess = createAction<ITeacherStateContext, ITeacher>(
 
 export const getTeacherError = createAction<ITeacherStateContext>(
   TeacherActionEnums.getTeacherError,
+  () => ({ isPending: false, isSuccess: false, isError: true })
+);
+
+// Get Teacher By Current User (returns null if no teacher record is linked
+// to the active user — see backend Teacher/GetByCurrentUser).
+export const getCurrentTeacherPending = createAction<ITeacherStateContext>(
+  TeacherActionEnums.getCurrentTeacherPending,
+  () => ({ isPending: true, isSuccess: false, isError: false })
+);
+
+export const getCurrentTeacherSuccess = createAction<
+  ITeacherStateContext,
+  ITeacher | null
+>(
+  TeacherActionEnums.getCurrentTeacherSuccess,
+  (teacher: ITeacher | null) => ({
+    isPending: false,
+    isSuccess: true,
+    isError: false,
+    teacher: teacher ?? undefined,
+  })
+);
+
+export const getCurrentTeacherError = createAction<ITeacherStateContext>(
+  TeacherActionEnums.getCurrentTeacherError,
   () => ({ isPending: false, isSuccess: false, isError: true })
 );
 
