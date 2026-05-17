@@ -36,6 +36,9 @@ import {
   deactivateTeacherPending,
   deactivateTeacherSuccess,
   deactivateTeacherError,
+  getCurrentTeacherPending,
+  getCurrentTeacherSuccess,
+  getCurrentTeacherError,
 } from "./actions";
 
 export const TeacherProvider = ({
@@ -142,6 +145,24 @@ export const TeacherProvider = ({
       });
   };
 
+  const getByCurrentUserAsync = async () => {
+    dispatch(getCurrentTeacherPending());
+    const endpoint = `/api/services/app/Teacher/GetByCurrentUser`;
+    await instance
+      .get(endpoint)
+      .then((response) => {
+        // The backend returns null when no teacher profile is linked to the
+        // active user. Pass through as null so the reducer clears `teacher`
+        // without putting the provider into error state.
+        dispatch(getCurrentTeacherSuccess(response.data.result ?? null));
+      })
+      .catch((error) => {
+        console.error(error);
+        dispatch(getCurrentTeacherError());
+        throw error;
+      });
+  };
+
   const deactivateAsync = async (id: string) => {
     dispatch(deactivateTeacherPending());
     const endpoint = `/api/services/app/Teacher/Update?id=${id}`;
@@ -163,6 +184,7 @@ export const TeacherProvider = ({
         value={{
           getAsync,
           getAllAsync,
+          getByCurrentUserAsync,
           createAsync,
           updateAsync,
           deleteAsync,

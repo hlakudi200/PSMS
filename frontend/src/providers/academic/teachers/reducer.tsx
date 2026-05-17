@@ -31,6 +31,18 @@ export const TeacherReducer = handleActions<
       ...state,
       ...action.payload,
     }),
+    [TeacherActionEnums.getCurrentTeacherPending]: (state, action) => ({
+      ...state,
+      ...action.payload,
+    }),
+    [TeacherActionEnums.getCurrentTeacherSuccess]: (state, action) => ({
+      ...state,
+      ...action.payload,
+    }),
+    [TeacherActionEnums.getCurrentTeacherError]: (state, action) => ({
+      ...state,
+      ...action.payload,
+    }),
     [TeacherActionEnums.createTeacherPending]: (state, action) => ({
       ...state,
       ...action.payload,

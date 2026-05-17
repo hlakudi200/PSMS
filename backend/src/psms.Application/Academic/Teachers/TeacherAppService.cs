@@ -47,6 +47,25 @@ public class TeacherAppService : ApplicationService, ITeacherAppService
     }
 
     [AbpAuthorize(PermissionNames.Academic_Teachers_View)]
+    public async Task<TeacherDto> GetByCurrentUserAsync()
+    {
+        // No active user (e.g. host context) — return null so the caller can
+        // surface a friendly "no teacher profile" message instead of an error
+        // modal from the global axios interceptor.
+        if (AbpSession.UserId == null)
+            return null;
+
+        var teacher = await _teacherRepository
+            .GetAll()
+            .Include(t => t.SubjectAssignments)
+            .Include(t => t.ClassAssignments)
+            .FirstOrDefaultAsync(t => t.UserId == AbpSession.UserId.Value
+                                   && t.TenantId == AbpSession.TenantId);
+
+        return teacher == null ? null : ObjectMapper.Map<TeacherDto>(teacher);
+    }
+
+    [AbpAuthorize(PermissionNames.Academic_Teachers_View)]
     public async Task<PagedResultDto<TeacherListDto>> GetAllAsync(GetAcademicEntityInput input)
     {
         var query = _teacherRepository

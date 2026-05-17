@@ -19,6 +19,11 @@ export interface ITeacherStateContext {
 export interface ITeacherActionContext {
   getAsync: (id: string) => void;
   getAllAsync: (input?: IPagedAndSortedResultRequest) => void;
+  // Looks up the teacher record linked to the active session user.
+  // Resolves with no result populated (state.teacher === undefined) when
+  // no teacher profile is linked — the backend returns null in that case
+  // rather than throwing.
+  getByCurrentUserAsync: () => void;
   createAsync: (input: ICreateTeacher) => void;
   updateAsync: (id: string, input: IUpdateTeacher) => void;
   deleteAsync: (id: string) => void;
