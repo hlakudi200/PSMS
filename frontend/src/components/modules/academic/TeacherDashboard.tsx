@@ -1,82 +1,100 @@
-"use client";
+'use client';
 
-import { Card, Row, Col, Statistic, Button } from "antd";
+// NOTE: This is the temporary T-T01 wiring — the dashboard now renders inside
+// the teacher LayoutShell (auth + header + sidebar are provided there).
+// Real metrics, click handlers, and final layout land in T-T02.
+
+import { Alert, Card, Row, Col, Statistic, Button } from 'antd';
 import {
   BookOutlined,
   FileTextOutlined,
   TeamOutlined,
-  LogoutOutlined,
-} from "@ant-design/icons";
-import { ProtectedRoute } from "@/components/shared/ProtectedRoute";
-import { useAuthActions, useAuthState } from "@/providers/auth";
+} from '@ant-design/icons';
 
-function TeacherDashboardContent() {
-  const { signOut } = useAuthActions();
-  const { currentUser } = useAuthState();
+// Until T-T02 wires up live metrics, the dashboard renders "--" placeholders
+// rather than "0", and shows an explicit banner so a teacher can't mistake
+// the stub for an authoritative empty state (e.g. "0 Lessons Today").
+const PLACEHOLDER: string = '--';
 
+export default function TeacherDashboard() {
   return (
-    <div style={{ padding: "24px", background: "#F5F5F5", minHeight: "100vh" }}>
-      <div
-        style={{
-          background: "#003D73",
-          padding: "16px 24px",
-          marginBottom: "24px",
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-        }}
-      >
-        <div>
-          <h1 style={{ color: "#FFFFFF", margin: 0, fontSize: "24px" }}>Teacher Portal</h1>
-          <p style={{ color: "#BAE7FF", margin: "4px 0 0 0", fontSize: "13px" }}>
-            Welcome, {currentUser?.name || "Teacher"}
-          </p>
-        </div>
-        <Button type="primary" danger icon={<LogoutOutlined />} onClick={() => signOut()}>
-          Logout
-        </Button>
-      </div>
-
+    <div>
+      <Alert
+        type="info"
+        showIcon
+        closable
+        message="Dashboard metrics are not yet wired up — values are placeholders. Live metrics land in the next ticket (T-T02)."
+        style={{ marginBottom: 16 }}
+      />
       <Row gutter={[16, 16]}>
         <Col xs={24} sm={12} lg={6}>
-          <Card><Statistic title="My Classes" value={0} prefix={<BookOutlined />} valueStyle={{ color: "#0066CC" }} /></Card>
+          <Card>
+            <Statistic
+              title="My Classes"
+              value={PLACEHOLDER}
+              prefix={<BookOutlined />}
+              valueStyle={{ color: '#0066CC' }}
+            />
+          </Card>
         </Col>
         <Col xs={24} sm={12} lg={6}>
-          <Card><Statistic title="My Students" value={0} prefix={<TeamOutlined />} valueStyle={{ color: "#52C41A" }} /></Card>
+          <Card>
+            <Statistic
+              title="My Students"
+              value={PLACEHOLDER}
+              prefix={<TeamOutlined />}
+              valueStyle={{ color: '#52C41A' }}
+            />
+          </Card>
         </Col>
         <Col xs={24} sm={12} lg={6}>
-          <Card><Statistic title="Assessments Due" value={0} prefix={<FileTextOutlined />} valueStyle={{ color: "#FAAD14" }} /></Card>
+          <Card>
+            <Statistic
+              title="Assessments Due"
+              value={PLACEHOLDER}
+              prefix={<FileTextOutlined />}
+              valueStyle={{ color: '#FAAD14' }}
+            />
+          </Card>
         </Col>
         <Col xs={24} sm={12} lg={6}>
-          <Card><Statistic title="Lessons Today" value={0} prefix={<BookOutlined />} valueStyle={{ color: "#1890FF" }} /></Card>
+          <Card>
+            <Statistic
+              title="Lessons Today"
+              value={PLACEHOLDER}
+              prefix={<BookOutlined />}
+              valueStyle={{ color: '#1890FF' }}
+            />
+          </Card>
         </Col>
       </Row>
 
-      <Row gutter={[16, 16]} style={{ marginTop: "16px" }}>
+      <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
         <Col xs={24} lg={16}>
-          <Card title="Teacher Overview" bordered={false}>
-            <p style={{ fontSize: "13px", color: "#595959" }}>
-              Manage your classes, record assessments, upload learning materials, and schedule online lessons.
+          <Card title="Teacher Overview" variant="borderless">
+            <p style={{ fontSize: 13, color: '#595959', margin: 0 }}>
+              Manage your classes, record assessments, upload learning materials,
+              and schedule online lessons.
             </p>
           </Card>
         </Col>
         <Col xs={24} lg={8}>
-          <Card title="Quick Actions" bordered={false}>
-            <Button block style={{ marginBottom: "8px" }}>My Classes</Button>
-            <Button block style={{ marginBottom: "8px" }}>Record Marks</Button>
-            <Button block style={{ marginBottom: "8px" }}>Upload Material</Button>
-            <Button block>Schedule Lesson</Button>
+          <Card title="Quick Actions" variant="borderless">
+            <Button block disabled style={{ marginBottom: 8 }}>
+              My Classes
+            </Button>
+            <Button block disabled style={{ marginBottom: 8 }}>
+              Record Marks
+            </Button>
+            <Button block disabled style={{ marginBottom: 8 }}>
+              Upload Material
+            </Button>
+            <Button block disabled>
+              Schedule Lesson
+            </Button>
           </Card>
         </Col>
       </Row>
     </div>
-  );
-}
-
-export default function TeacherDashboard() {
-  return (
-    <ProtectedRoute allowedRoles={["Teacher"]}>
-      <TeacherDashboardContent />
-    </ProtectedRoute>
   );
 }
