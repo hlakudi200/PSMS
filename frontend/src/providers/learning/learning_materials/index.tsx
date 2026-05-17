@@ -12,7 +12,7 @@ import {
 } from "../shared/interfaces";
 import { IUploadLearningMaterial } from "./context";
 import { LearningMaterialReducer } from "./reducer";
-import { useContext, useReducer } from "react";
+import { useContext, useReducer, useRef } from "react";
 import {
     getLearningMaterialPending,
     getLearningMaterialSuccess,
@@ -53,6 +53,11 @@ export const LearningMaterialProvider = ({
 }) => {
   const [state, dispatch] = useReducer(LearningMaterialReducer, INITIAL_STATE);
   const instance = getAxiosInstance();
+  // Monotonic request id used by getAllAsync to ignore stale responses.
+  // The library page debounces but still re-fetches when filters change;
+  // without this guard a slow earlier response could land after a faster
+  // newer one and clobber the list state.
+  const getAllRequestIdRef = useRef(0);
 
   const getAsync = async (id: string) => {
     dispatch(getLearningMaterialPending());
@@ -70,6 +75,7 @@ export const LearningMaterialProvider = ({
   };
 
   const getAllAsync = async (input?: IGetLearningMaterialsInput) => {
+    const myReqId = ++getAllRequestIdRef.current;
     dispatch(getAllLearningMaterialsPending());
 
     const params = new URLSearchParams();
@@ -80,11 +86,14 @@ export const LearningMaterialProvider = ({
     if (input?.termId) params.append('TermId', input.termId);
     if (input?.materialType) params.append('MaterialType', input.materialType.toString());
     if (input?.isPublished !== undefined) params.append('IsPublished', input.isPublished.toString());
+    if (input?.keyword) params.append('Keyword', input.keyword);
 
     const endpoint = `/api/services/app/LearningMaterial/GetAll?${params.toString()}`;
     await instance
       .get(endpoint)
       .then((response) => {
+        // Drop stale responses (anything other than the latest request).
+        if (myReqId !== getAllRequestIdRef.current) return;
         dispatch(getAllLearningMaterialsSuccess({
           items: response.data.result.items,
           totalCount: response.data.result.totalCount
@@ -92,6 +101,8 @@ export const LearningMaterialProvider = ({
       })
       .catch((error) => {
         console.error(error);
+        // Same staleness guard for error path.
+        if (myReqId !== getAllRequestIdRef.current) return;
         dispatch(getAllLearningMaterialsError());
         throw error;
       });

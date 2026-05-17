@@ -16,4 +16,9 @@ public class LearningMaterialListDto : EntityDto<Guid>
     public int DisplayOrder { get; set; }
     public int ViewCount { get; set; }
     public string FileName { get; set; }
+    /// <summary>
+    /// File size in bytes; null for ExternalLink-only materials. Used by
+    /// the teacher portal's storage-quota approximation per LM-007.
+    /// </summary>
+    public long? FileSizeBytes { get; set; }
 }

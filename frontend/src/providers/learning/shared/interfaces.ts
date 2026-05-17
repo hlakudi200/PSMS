@@ -46,6 +46,7 @@ export interface IPagedAndSortedResultRequest {
     displayOrder: number;
     viewCount: number;
     fileName?: string;
+    fileSizeBytes?: number;
   }
   
   export interface ICreateLearningMaterial {
@@ -80,6 +81,7 @@ export interface IPagedAndSortedResultRequest {
     termId?: string;
     materialType?: number;
     isPublished?: boolean;
+    keyword?: string;
   }
   
   // OnlineLesson Interfaces
