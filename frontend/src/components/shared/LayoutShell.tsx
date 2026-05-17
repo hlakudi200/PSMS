@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Layout, Menu, Button, Typography, Badge, message } from 'antd';
 import type { ItemType, MenuItemGroupType, MenuItemType } from 'antd/es/menu/interface';
 import {
@@ -107,8 +107,13 @@ function ShellLayout({
     }
   };
 
-  const allKeys = collectMenuKeys(menuItems);
-  const selectedKey = pickSelectedKey(allKeys, basePath, pathname ?? basePath);
+  // Memoize the menu walk so auth state changes (which re-render the shell)
+  // do not retraverse the entire menu tree on every render.
+  const allKeys = useMemo(() => collectMenuKeys(menuItems), [menuItems]);
+  const selectedKey = useMemo(
+    () => pickSelectedKey(allKeys, basePath, pathname ?? basePath),
+    [allKeys, basePath, pathname]
+  );
 
   const handleMenuClick = ({ key }: { key: string }) => {
     if (key.startsWith(basePath)) {
