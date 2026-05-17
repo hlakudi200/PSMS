@@ -19,6 +19,10 @@ export enum LearningMaterialActionEnums {
   createLearningMaterialSuccess = "CREATE_LEARNING_MATERIAL_SUCCESS",
   createLearningMaterialError = "CREATE_LEARNING_MATERIAL_ERROR",
 
+  uploadLearningMaterialPending = "UPLOAD_LEARNING_MATERIAL_PENDING",
+  uploadLearningMaterialSuccess = "UPLOAD_LEARNING_MATERIAL_SUCCESS",
+  uploadLearningMaterialError = "UPLOAD_LEARNING_MATERIAL_ERROR",
+
   updateLearningMaterialPending = "UPDATE_LEARNING_MATERIAL_PENDING",
   updateLearningMaterialSuccess = "UPDATE_LEARNING_MATERIAL_SUCCESS",
   updateLearningMaterialError = "UPDATE_LEARNING_MATERIAL_ERROR",
@@ -129,6 +133,27 @@ export const createLearningMaterialSuccess = createAction<ILearningMaterialState
 
 export const createLearningMaterialError = createAction<ILearningMaterialStateContext>(
   LearningMaterialActionEnums.createLearningMaterialError,
+  () => ({ isPending: false, isSuccess: false, isError: true })
+);
+
+// Upload LearningMaterial Actions (multipart/form-data)
+export const uploadLearningMaterialPending = createAction<ILearningMaterialStateContext>(
+  LearningMaterialActionEnums.uploadLearningMaterialPending,
+  () => ({ isPending: true, isSuccess: false, isError: false })
+);
+
+export const uploadLearningMaterialSuccess = createAction<ILearningMaterialStateContext, ILearningMaterial>(
+  LearningMaterialActionEnums.uploadLearningMaterialSuccess,
+  (learningMaterial: ILearningMaterial) => ({
+    isPending: false,
+    isSuccess: true,
+    isError: false,
+    learningMaterial,
+  })
+);
+
+export const uploadLearningMaterialError = createAction<ILearningMaterialStateContext>(
+  LearningMaterialActionEnums.uploadLearningMaterialError,
   () => ({ isPending: false, isSuccess: false, isError: true })
 );
 

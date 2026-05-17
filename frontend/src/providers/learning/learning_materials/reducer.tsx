@@ -55,6 +55,18 @@ export const LearningMaterialReducer = handleActions<
         ...state,
         ...action.payload,
     }),
+    [LearningMaterialActionEnums.uploadLearningMaterialPending]: (state, action) => ({
+        ...state,
+        ...action.payload,
+    }),
+    [LearningMaterialActionEnums.uploadLearningMaterialSuccess]: (state, action) => ({
+        ...state,
+        ...action.payload,
+    }),
+    [LearningMaterialActionEnums.uploadLearningMaterialError]: (state, action) => ({
+        ...state,
+        ...action.payload,
+    }),
     [LearningMaterialActionEnums.updateLearningMaterialPending]: (state, action) => ({
         ...state,
         ...action.payload,

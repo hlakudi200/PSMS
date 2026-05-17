@@ -17,11 +17,28 @@ export interface ILearningMaterialStateContext {
   totalCount?: number;
 }
 
+// Payload for the multipart upload flow — combines metadata with the raw
+// File object so the provider can hand it to FormData. Mirrors the backend
+// UploadLearningMaterialDto contracts (Description is required, min length
+// 10; File is required unless MaterialType is ExternalLink — the latter
+// is enforced in the modal's submit handler).
+export interface IUploadLearningMaterial {
+  classSubjectId: string;
+  termId?: string;
+  title: string;
+  description: string;
+  materialType: number;
+  file?: File;
+  externalLink?: string;
+  displayOrder?: number;
+}
+
 export interface ILearningMaterialActionContext {
   getAsync: (id: string) => void;
   getAllAsync: (input?: IGetLearningMaterialsInput) => void;
   getByClassSubjectAsync: (classSubjectId: string) => void;
   createAsync: (input: ICreateLearningMaterial) => void;
+  uploadAsync: (input: IUploadLearningMaterial) => Promise<void>;
   updateAsync: (id: string, input: IUpdateLearningMaterial) => void;
   deleteAsync: (id: string) => void;
   publishAsync: (id: string) => void;
