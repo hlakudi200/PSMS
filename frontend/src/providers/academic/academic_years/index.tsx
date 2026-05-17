@@ -57,6 +57,7 @@ export const AcademicYearProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getAcademicYearError());
+        throw error;
       });
   };
 
@@ -77,6 +78,7 @@ export const AcademicYearProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getAcademicYearsError());
+        throw error;
       });
   };
 
@@ -91,6 +93,7 @@ export const AcademicYearProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getCurrentAcademicYearError());
+        throw error;
       });
   };
 
@@ -106,6 +109,7 @@ export const AcademicYearProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(createAcademicYearError());
+        throw error;
       });
   };
 
@@ -120,6 +124,7 @@ export const AcademicYearProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(updateAcademicYearError());
+        throw error;
       });
   };
 
@@ -134,6 +139,7 @@ export const AcademicYearProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(deleteAcademicYearError());
+        throw error;
       });
   };
 
@@ -148,6 +154,7 @@ export const AcademicYearProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(setAsCurrentError());
+        throw error;
       });
   };
 

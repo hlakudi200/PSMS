@@ -55,6 +55,7 @@ export const SchoolTransportProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getSchoolTransportError());
+        throw error;
       });
   };
 
@@ -81,6 +82,7 @@ export const SchoolTransportProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getAllSchoolTransportsError());
+        throw error;
       });
   };
 
@@ -96,6 +98,7 @@ export const SchoolTransportProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(createSchoolTransportError());
+        throw error;
       });
   };
 
@@ -110,6 +113,7 @@ export const SchoolTransportProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(updateSchoolTransportError());
+        throw error;
       });
   };
 
@@ -124,6 +128,7 @@ export const SchoolTransportProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(deleteSchoolTransportError());
+        throw error;
       });
   };
 
@@ -138,6 +143,7 @@ export const SchoolTransportProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(activateSchoolTransportError());
+        throw error;
       });
   };
 
@@ -152,6 +158,7 @@ export const SchoolTransportProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(deactivateSchoolTransportError());
+        throw error;
       });
   };
 

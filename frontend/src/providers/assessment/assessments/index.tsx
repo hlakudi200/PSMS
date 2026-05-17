@@ -58,6 +58,7 @@ export const AssessmentProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getAssessmentError());
+        throw error;
       });
   };
 
@@ -88,6 +89,7 @@ export const AssessmentProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getAllAssessmentsError());
+        throw error;
       });
   };
 
@@ -102,6 +104,7 @@ export const AssessmentProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(createAssessmentError());
+        throw error;
       });
   };
 
@@ -116,6 +119,7 @@ export const AssessmentProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(updateAssessmentError());
+        throw error;
       });
   };
 
@@ -130,6 +134,7 @@ export const AssessmentProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(deleteAssessmentError());
+        throw error;
       });
   };
 
@@ -144,6 +149,7 @@ export const AssessmentProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(publishAssessmentError());
+        throw error;
       });
   };
 
@@ -158,6 +164,7 @@ export const AssessmentProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(unpublishAssessmentError());
+        throw error;
       });
   };
 
@@ -172,6 +179,7 @@ export const AssessmentProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(releaseMarksError());
+        throw error;
       });
   };
 

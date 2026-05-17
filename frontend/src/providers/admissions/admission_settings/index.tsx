@@ -63,6 +63,7 @@ export const AdmissionSettingsProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getAdmissionSettingsError());
+        throw error;
       });
   };
 
@@ -77,6 +78,7 @@ export const AdmissionSettingsProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getAdmissionSettingsByGradeError());
+        throw error;
       });
   };
 
@@ -93,6 +95,7 @@ export const AdmissionSettingsProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getAllByAcademicYearError());
+        throw error;
       });
   };
 
@@ -107,6 +110,7 @@ export const AdmissionSettingsProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(createAdmissionSettingsError());
+        throw error;
       });
   };
 
@@ -121,6 +125,7 @@ export const AdmissionSettingsProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(updateAdmissionSettingsError());
+        throw error;
       });
   };
 
@@ -135,6 +140,7 @@ export const AdmissionSettingsProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(deleteAdmissionSettingsError());
+        throw error;
       });
   };
 
@@ -149,6 +155,7 @@ export const AdmissionSettingsProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getCapacityStatusError());
+        throw error;
       });
   };
 
@@ -166,6 +173,7 @@ export const AdmissionSettingsProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(openApplicationsError());
+        throw error;
       });
   };
 
@@ -183,6 +191,7 @@ export const AdmissionSettingsProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(closeApplicationsError());
+        throw error;
       });
   };
 
@@ -197,6 +206,7 @@ export const AdmissionSettingsProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(updateCapacityError());
+        throw error;
       });
   };
 

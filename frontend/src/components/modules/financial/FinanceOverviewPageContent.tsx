@@ -17,44 +17,73 @@ import { PaymentProvider, usePaymentState, usePaymentActions } from '@/providers
 import { useAuthState } from '@/providers/auth';
 import type { IFeeStructureList } from '@/providers/financial/shared/interfaces';
 import type { IPaymentList } from '@/providers/financial/shared/interfaces';
+import {
+  FeeType,
+  PaymentStatus,
+  PaymentMethod,
+  feeTypeLabels,
+  paymentStatusLabels,
+  paymentMethodLabels,
+} from '@/providers/shared/enums';
 
 const { RangePicker } = DatePicker;
 
-const feeTypeMap: Record<number, { label: string; color: string }> = {
-  1: { label: 'Tuition', color: 'blue' },
-  2: { label: 'Registration', color: 'green' },
-  3: { label: 'Application', color: 'geekblue' },
-  4: { label: 'Transport', color: 'orange' },
-  5: { label: 'After Care', color: 'magenta' },
-  6: { label: 'Extramural', color: 'lime' },
-  7: { label: 'Uniform', color: 'purple' },
-  8: { label: 'Stationery', color: 'cyan' },
-  9: { label: 'Other', color: 'default' },
+const feeTypeColors: Record<FeeType, string> = {
+  [FeeType.Tuition]: 'blue',
+  [FeeType.Registration]: 'green',
+  [FeeType.Application]: 'geekblue',
+  [FeeType.Transport]: 'orange',
+  [FeeType.AfterCare]: 'magenta',
+  [FeeType.Extramural]: 'lime',
+  [FeeType.Uniform]: 'purple',
+  [FeeType.Stationery]: 'cyan',
+  [FeeType.Other]: 'default',
 };
 
-const paymentStatusMap: Record<number, { label: string; color: string }> = {
-  1: { label: 'Pending', color: 'orange' },
-  2: { label: 'Completed', color: 'green' },
-  3: { label: 'Failed', color: 'red' },
-  4: { label: 'Cancelled', color: 'default' },
-  5: { label: 'Refunded', color: 'purple' },
-  6: { label: 'Partially Paid', color: 'gold' },
-  7: { label: 'Overdue', color: 'volcano' },
+const paymentStatusColors: Record<PaymentStatus, string> = {
+  [PaymentStatus.Pending]: 'orange',
+  [PaymentStatus.Completed]: 'green',
+  [PaymentStatus.Failed]: 'red',
+  [PaymentStatus.Cancelled]: 'default',
+  [PaymentStatus.Refunded]: 'purple',
+  [PaymentStatus.PartiallyPaid]: 'gold',
+  [PaymentStatus.Overdue]: 'volcano',
 };
 
-const paymentMethodMap: Record<number, { label: string; color: string }> = {
-  1: { label: 'EFT', color: 'blue' },
-  2: { label: 'Debit Order', color: 'cyan' },
-  3: { label: 'Credit Card', color: 'purple' },
-  4: { label: 'Debit Card', color: 'geekblue' },
-  5: { label: 'Cash', color: 'green' },
-  6: { label: 'Cheque', color: 'default' },
-  7: { label: 'PayFast', color: 'orange' },
-  8: { label: 'SnapScan', color: 'magenta' },
-  9: { label: 'Zapper', color: 'lime' },
-  10: { label: 'Ozow', color: 'gold' },
-  11: { label: 'Bank Deposit', color: 'volcano' },
+const paymentMethodColors: Record<PaymentMethod, string> = {
+  [PaymentMethod.EFT]: 'blue',
+  [PaymentMethod.DebitOrder]: 'cyan',
+  [PaymentMethod.CreditCard]: 'purple',
+  [PaymentMethod.DebitCard]: 'geekblue',
+  [PaymentMethod.Cash]: 'green',
+  [PaymentMethod.Cheque]: 'default',
+  [PaymentMethod.PayFast]: 'orange',
+  [PaymentMethod.SnapScan]: 'magenta',
+  [PaymentMethod.Zapper]: 'lime',
+  [PaymentMethod.Ozow]: 'gold',
+  [PaymentMethod.BankDeposit]: 'volcano',
 };
+
+const feeTypeMap: Record<number, { label: string; color: string }> = Object.fromEntries(
+  Object.entries(feeTypeLabels).map(([k, label]) => [
+    k,
+    { label, color: feeTypeColors[Number(k) as FeeType] },
+  ])
+);
+
+const paymentStatusMap: Record<number, { label: string; color: string }> = Object.fromEntries(
+  Object.entries(paymentStatusLabels).map(([k, label]) => [
+    k,
+    { label, color: paymentStatusColors[Number(k) as PaymentStatus] },
+  ])
+);
+
+const paymentMethodMap: Record<number, { label: string; color: string }> = Object.fromEntries(
+  Object.entries(paymentMethodLabels).map(([k, label]) => [
+    k,
+    { label, color: paymentMethodColors[Number(k) as PaymentMethod] },
+  ])
+);
 
 function FinanceContent() {
   const router = useRouter();
@@ -109,9 +138,9 @@ function FinanceContent() {
   };
 
   // Payment summary stats
-  const completedPayments = payments?.filter(p => p.status === 2) ?? [];
+  const completedPayments = payments?.filter(p => p.status === PaymentStatus.Completed) ?? [];
   const totalCollected = completedPayments.reduce((sum, p) => sum + p.amount, 0);
-  const pendingPayments = payments?.filter(p => p.status === 1) ?? [];
+  const pendingPayments = payments?.filter(p => p.status === PaymentStatus.Pending) ?? [];
   const totalPending = pendingPayments.reduce((sum, p) => sum + p.amount, 0);
 
   // --- Fee Structures Tab ---
@@ -120,17 +149,10 @@ function FinanceContent() {
     {
       key: 'feeType', title: 'Type', dataIndex: 'feeType', width: 110,
       filterable: true, filterType: 'enum',
-      filterOptions: [
-        { label: 'Tuition', value: 1 },
-        { label: 'Registration', value: 2 },
-        { label: 'Application', value: 3 },
-        { label: 'Transport', value: 4 },
-        { label: 'After Care', value: 5 },
-        { label: 'Extramural', value: 6 },
-        { label: 'Uniform', value: 7 },
-        { label: 'Stationery', value: 8 },
-        { label: 'Other', value: 9 },
-      ],
+      filterOptions: Object.entries(feeTypeLabels).map(([value, label]) => ({
+        label,
+        value: Number(value),
+      })),
       renderType: 'status',
       renderConfig: { statusMap: feeTypeMap },
     },
@@ -176,19 +198,10 @@ function FinanceContent() {
     {
       key: 'paymentMethod', title: 'Method', dataIndex: 'paymentMethod', width: 110, hideOnMobile: true,
       filterable: true, filterType: 'enum',
-      filterOptions: [
-        { label: 'EFT', value: 1 },
-        { label: 'Debit Order', value: 2 },
-        { label: 'Credit Card', value: 3 },
-        { label: 'Debit Card', value: 4 },
-        { label: 'Cash', value: 5 },
-        { label: 'Cheque', value: 6 },
-        { label: 'PayFast', value: 7 },
-        { label: 'SnapScan', value: 8 },
-        { label: 'Zapper', value: 9 },
-        { label: 'Ozow', value: 10 },
-        { label: 'Bank Deposit', value: 11 },
-      ],
+      filterOptions: Object.entries(paymentMethodLabels).map(([value, label]) => ({
+        label,
+        value: Number(value),
+      })),
       renderType: 'status',
       renderConfig: { statusMap: paymentMethodMap },
     },
@@ -196,15 +209,10 @@ function FinanceContent() {
     {
       key: 'status', title: 'Status', dataIndex: 'status',
       filterable: true, filterType: 'enum',
-      filterOptions: [
-        { label: 'Pending', value: 1 },
-        { label: 'Completed', value: 2 },
-        { label: 'Failed', value: 3 },
-        { label: 'Cancelled', value: 4 },
-        { label: 'Refunded', value: 5 },
-        { label: 'Partially Paid', value: 6 },
-        { label: 'Overdue', value: 7 },
-      ],
+      filterOptions: Object.entries(paymentStatusLabels).map(([value, label]) => ({
+        label,
+        value: Number(value),
+      })),
       renderType: 'status',
       renderConfig: { statusMap: paymentStatusMap },
     },
@@ -216,7 +224,7 @@ function FinanceContent() {
       label: 'View Details',
       icon: <EyeOutlined />,
       onClick: (record) => {
-        console.log('View payment:', record.id); // TODO: payment detail page
+        router.push(`/principal/payments/${record.id}`);
       },
     },
   ];

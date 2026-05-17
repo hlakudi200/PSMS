@@ -41,6 +41,7 @@ export const DisciplinaryCaseProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getCaseError());
+        throw error;
       });
   };
 
@@ -59,6 +60,7 @@ export const DisciplinaryCaseProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getCasesError());
+        throw error;
       });
   };
 
@@ -73,6 +75,7 @@ export const DisciplinaryCaseProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(createCaseError());
+        throw error;
       });
   };
 
@@ -87,6 +90,7 @@ export const DisciplinaryCaseProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(updateCaseError());
+        throw error;
       });
   };
 
@@ -101,6 +105,7 @@ export const DisciplinaryCaseProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(deleteCaseError());
+        throw error;
       });
   };
 
@@ -115,6 +120,7 @@ export const DisciplinaryCaseProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(submitError());
+        throw error;
       });
   };
 
@@ -129,6 +135,7 @@ export const DisciplinaryCaseProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(startInvestigationError());
+        throw error;
       });
   };
 
@@ -143,6 +150,7 @@ export const DisciplinaryCaseProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(scheduleHearingError());
+        throw error;
       });
   };
 
@@ -157,6 +165,7 @@ export const DisciplinaryCaseProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(recordOutcomeError());
+        throw error;
       });
   };
 
@@ -171,6 +180,7 @@ export const DisciplinaryCaseProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(resolveError());
+        throw error;
       });
   };
 
@@ -185,6 +195,7 @@ export const DisciplinaryCaseProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(cancelError());
+        throw error;
       });
   };
 

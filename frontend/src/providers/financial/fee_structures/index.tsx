@@ -58,6 +58,7 @@ export const FeeStructureProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getFeeStructureError());
+        throw error;
       });
   };
 
@@ -86,6 +87,7 @@ export const FeeStructureProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getAllFeeStructuresError());
+        throw error;
       });
   };
 
@@ -117,6 +119,7 @@ export const FeeStructureProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(createFeeStructureError());
+        throw error;
       });
   };
 
@@ -131,6 +134,7 @@ export const FeeStructureProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(updateFeeStructureError());
+        throw error;
       });
   };
 
@@ -145,6 +149,7 @@ export const FeeStructureProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(deleteFeeStructureError());
+        throw error;
       });
   };
 

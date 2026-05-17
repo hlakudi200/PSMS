@@ -67,6 +67,7 @@ export const StudentExtramuralProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getStudentExtramuralError());
+        throw error;
       });
   };
 
@@ -92,6 +93,7 @@ export const StudentExtramuralProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getStudentExtramuralsError());
+        throw error;
       });
   };
 
@@ -108,6 +110,7 @@ export const StudentExtramuralProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getByActivityError());
+        throw error;
       });
   };
 
@@ -124,6 +127,7 @@ export const StudentExtramuralProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getByStudentError());
+        throw error;
       });
   };
 
@@ -138,6 +142,7 @@ export const StudentExtramuralProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(createStudentExtramuralError());
+        throw error;
       });
   };
 
@@ -152,6 +157,7 @@ export const StudentExtramuralProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(updateStudentExtramuralError());
+        throw error;
       });
   };
 
@@ -166,6 +172,7 @@ export const StudentExtramuralProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(deleteStudentExtramuralError());
+        throw error;
       });
   };
 
@@ -180,6 +187,7 @@ export const StudentExtramuralProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(suspendError());
+        throw error;
       });
   };
 
@@ -194,6 +202,7 @@ export const StudentExtramuralProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(reactivateError());
+        throw error;
       });
   };
 
@@ -208,6 +217,7 @@ export const StudentExtramuralProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(terminateError());
+        throw error;
       });
   };
 
@@ -222,6 +232,7 @@ export const StudentExtramuralProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(signConsentFormError());
+        throw error;
       });
   };
 

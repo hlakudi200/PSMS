@@ -46,15 +46,23 @@ function TermManagementContent({ academicYear, onClose, open }: TermManagementDr
   };
 
   const handleDelete = async (id: string) => {
-    await deleteAsync(id);
-    message.success('Term deleted');
-    refreshTerms();
+    try {
+      await deleteAsync(id);
+      message.success('Term deleted');
+      refreshTerms();
+    } catch {
+      // Server errors are surfaced by the axios response interceptor.
+    }
   };
 
   const handleSetCurrent = async (id: string) => {
-    await setAsCurrentAsync(id);
-    message.success('Term set as current');
-    refreshTerms();
+    try {
+      await setAsCurrentAsync(id);
+      message.success('Term set as current');
+      refreshTerms();
+    } catch {
+      // Server errors are surfaced by the axios response interceptor.
+    }
   };
 
   const existingTermNumbers = (terms ?? []).map(t => t.termNumber);
@@ -206,6 +214,8 @@ function TermManagementContent({ academicYear, onClose, open }: TermManagementDr
           onClose={handleModalClose}
           editRecord={editRecord}
           academicYearId={academicYear.id}
+          academicYearStartDate={academicYear.startDate}
+          academicYearEndDate={academicYear.endDate}
           existingTermNumbers={editRecord
             ? existingTermNumbers.filter(n => n !== editRecord.termNumber)
             : existingTermNumbers

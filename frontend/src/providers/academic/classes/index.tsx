@@ -71,6 +71,7 @@ export const ClassProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getClassError());
+        throw error;
       });
   };
 
@@ -90,6 +91,7 @@ export const ClassProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getClassesError());
+        throw error;
       });
   };
 
@@ -105,6 +107,7 @@ export const ClassProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(createClassError());
+        throw error;
       });
   };
 
@@ -119,6 +122,7 @@ export const ClassProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(updateClassError());
+        throw error;
       });
   };
 
@@ -133,6 +137,7 @@ export const ClassProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(deleteClassError());
+        throw error;
       });
   };
 
@@ -149,6 +154,7 @@ export const ClassProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getActiveClassesError());
+        throw error;
       });
   };
 
@@ -165,6 +171,7 @@ export const ClassProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getClassesByGradeError());
+        throw error;
       });
   };
 
@@ -181,6 +188,7 @@ export const ClassProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getClassesByAcademicYearError());
+        throw error;
       });
   };
 
@@ -195,6 +203,7 @@ export const ClassProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(assignClassTeacherError());
+        throw error;
       });
   };
 
@@ -209,6 +218,7 @@ export const ClassProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(removeClassTeacherError());
+        throw error;
       });
   };
 
@@ -223,6 +233,7 @@ export const ClassProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(activateClassError());
+        throw error;
       });
   };
 
@@ -237,6 +248,7 @@ export const ClassProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(deactivateClassError());
+        throw error;
       });
   };
 

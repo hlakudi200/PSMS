@@ -38,6 +38,7 @@ export const StaffLeaveRequestProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getLeaveError());
+        throw error;
       });
   };
 
@@ -56,6 +57,7 @@ export const StaffLeaveRequestProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getLeavesError());
+        throw error;
       });
   };
 
@@ -70,6 +72,7 @@ export const StaffLeaveRequestProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(createLeaveError());
+        throw error;
       });
   };
 
@@ -84,6 +87,7 @@ export const StaffLeaveRequestProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(updateLeaveError());
+        throw error;
       });
   };
 

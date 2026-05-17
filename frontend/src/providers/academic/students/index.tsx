@@ -50,6 +50,7 @@ export const StudentProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getStudentError());
+        throw error;
       });
   }, [instance]);
 
@@ -69,6 +70,7 @@ export const StudentProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getStudentsError());
+        throw error;
       });
   }, [instance]);
 
@@ -84,6 +86,7 @@ export const StudentProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(createStudentError());
+        throw error;
       });
   }, [instance]);
 
@@ -98,6 +101,7 @@ export const StudentProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(updateStudentError());
+        throw error;
       });
   }, [instance]);
 
@@ -112,6 +116,7 @@ export const StudentProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(deleteStudentError());
+        throw error;
       });
   }, [instance]);
 

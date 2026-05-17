@@ -62,6 +62,7 @@ export const WaitlistProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getWaitlistError());
+        throw error;
       });
   };
 
@@ -76,6 +77,7 @@ export const WaitlistProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getByApplicationError());
+        throw error;
       });
   };
 
@@ -90,6 +92,7 @@ export const WaitlistProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getByGradeError());
+        throw error;
       });
   };
 
@@ -108,6 +111,7 @@ export const WaitlistProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getAllWaitlistError());
+        throw error;
       });
   };
 
@@ -125,6 +129,7 @@ export const WaitlistProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(addToWaitlistError());
+        throw error;
       });
   };
 
@@ -139,6 +144,7 @@ export const WaitlistProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(offerPositionError());
+        throw error;
       });
   };
 
@@ -153,6 +159,7 @@ export const WaitlistProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(acceptOfferError());
+        throw error;
       });
   };
 
@@ -167,6 +174,7 @@ export const WaitlistProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(declineOfferError());
+        throw error;
       });
   };
 
@@ -181,6 +189,7 @@ export const WaitlistProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(withdrawError());
+        throw error;
       });
   };
 
@@ -195,6 +204,7 @@ export const WaitlistProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getPositionError());
+        throw error;
       });
   };
 

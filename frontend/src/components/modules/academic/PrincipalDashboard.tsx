@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo, KeyboardEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Card,
@@ -15,6 +15,7 @@ import {
   List,
   Spin,
   Badge,
+  Alert,
 } from 'antd';
 import {
   TeamOutlined,
@@ -63,9 +64,17 @@ import {
   useAcademicYearActions,
   useAcademicYearState,
 } from '@/providers/academic/academic_years';
-import { getAxiosInstance } from '@/utils/axios-instance';
+import {
+  ReportProvider,
+  useReportActions,
+  useReportState,
+} from '@/providers/assessment/reports';
 import { IGradeList } from '@/providers/academic/shared/interfaces';
 import { IAnnouncementList } from '@/providers/communication/shared/interfaces';
+import {
+  AttendanceStatus,
+  AnnouncementPriority,
+} from '@/providers/shared/enums';
 
 interface GradePerformance {
   gradeId: string;
@@ -74,26 +83,30 @@ interface GradePerformance {
   reportCount: number;
 }
 
-const { Text } = Typography;
-
-const ATTENDANCE_PRESENT = 1; // AttendanceStatus.Present = 1 in backend enum
-
 interface WeeklyAttendanceDay {
   label: string;
   date: string;
   percentage: number;
 }
 
-const priorityColors: Record<number, string> = {
-  0: 'blue',
-  1: 'orange',
-  2: 'red',
+const { Text } = Typography;
+
+const PASS_PERCENTAGE = 50;
+const STRONG_PASS_RATE = 80;
+const MODERATE_PASS_RATE = 60;
+
+const priorityColors: Record<AnnouncementPriority, string> = {
+  [AnnouncementPriority.Low]: 'blue',
+  [AnnouncementPriority.Normal]: 'default',
+  [AnnouncementPriority.High]: 'orange',
+  [AnnouncementPriority.Urgent]: 'red',
 };
 
-const priorityLabels: Record<number, string> = {
-  0: 'Low',
-  1: 'Medium',
-  2: 'High',
+const priorityLabels: Record<AnnouncementPriority, string> = {
+  [AnnouncementPriority.Low]: 'Low',
+  [AnnouncementPriority.Normal]: 'Normal',
+  [AnnouncementPriority.High]: 'High',
+  [AnnouncementPriority.Urgent]: 'Urgent',
 };
 
 function formatDate(date: Date): string {
@@ -103,16 +116,15 @@ function formatDate(date: Date): string {
   return `${y}-${m}-${d}`;
 }
 
-function formatPublishDate(dateStr: string): string {
-  try {
-    return new Date(dateStr).toLocaleDateString('en-ZA', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-    });
-  } catch {
-    return dateStr;
-  }
+function formatDisplayDate(value?: string): string {
+  if (!value) return '—';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return value;
+  return d.toLocaleDateString('en-ZA', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
 }
 
 function getWeekDays(): { label: string; date: string }[] {
@@ -148,7 +160,7 @@ function PrincipalDashboardContent() {
   const { totalCount: teacherCount, isPending: teachersPending } = useTeacherState();
 
   const { getAllAsync: getAllClasses } = useClassActions();
-  const { totalCount: classCount, isPending: classesPending } = useClassState();
+  const { classes, totalCount: classCount, isPending: classesPending } = useClassState();
 
   const { getAllAsync: getAllGrades } = useGradeActions();
   const { grades, isPending: gradesPending } = useGradeState();
@@ -159,124 +171,126 @@ function PrincipalDashboardContent() {
   const { getAllAsync: getAllAnnouncements } = useAnnouncementActions();
   const { announcements, isPending: announcementsPending } = useAnnouncementState();
 
-  const [attendanceTodayPct, setAttendanceTodayPct] = useState<number>(0);
+  const { getAllAsync: getAllReports } = useReportActions();
+  const { reports, isPending: reportsPending } = useReportState();
+
+  const [attendanceTodayPct, setAttendanceTodayPct] = useState<number | null>(null);
   const [weeklyAttendance, setWeeklyAttendance] = useState<WeeklyAttendanceDay[]>([]);
   const [weeklyLoading, setWeeklyLoading] = useState(true);
-  const [gradePerformance, setGradePerformance] = useState<Record<string, GradePerformance>>({});
-  const [gradePerformanceLoading, setGradePerformanceLoading] = useState(true);
+  const [weeklyError, setWeeklyError] = useState<string | null>(null);
 
   const today = formatDate(new Date());
 
+  // Initial single-page loads via providers
   useEffect(() => {
     getCurrentAsync();
     getAllStudents({ maxResultCount: 1, skipCount: 0 });
     getAllTeachers({ maxResultCount: 1, skipCount: 0 });
-    getAllClasses({ maxResultCount: 1, skipCount: 0 });
+    // Classes are needed both for the count card and to map classId -> gradeId
+    // in the performance widget below, so pull a reasonable page once.
+    // Why: the backend ReportListDto exposes ClassId but not GradeId; see
+    // backend ticket T-115 to expose GradeId directly and remove this dependency.
+    getAllClasses({ maxResultCount: 500, skipCount: 0 });
     getAllGrades({ maxResultCount: 100 });
-    getAllAttendance({ startDate: today, endDate: today, maxResultCount: 1000 });
     getAllAnnouncements({ isPublished: true, maxResultCount: 5 });
+    // Reports for grade-performance aggregation (no status filter — pull all
+    // reports for current tenant and aggregate any with an overall percentage).
+    getAllReports({ maxResultCount: 1000 });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => {
-    if (attendances && attendances.length > 0) {
-      const presentCount = attendances.filter(
-        (a) => a.status === ATTENDANCE_PRESENT
-      ).length;
-      setAttendanceTodayPct(Math.round((presentCount / attendances.length) * 100));
-    }
-  }, [attendances]);
-
+  // Single weekly attendance range query, then bucket by date
   const fetchWeeklyAttendance = useCallback(async () => {
-    const instance = getAxiosInstance();
-    const days = getWeekDays();
-
     setWeeklyLoading(true);
+    setWeeklyError(null);
+    const days = getWeekDays();
+    if (days.length === 0) {
+      setWeeklyAttendance([]);
+      setAttendanceTodayPct(null);
+      setWeeklyLoading(false);
+      return;
+    }
+    const startDate = days[0].date;
+    const endDate = days[days.length - 1].date;
     try {
-      const results = await Promise.all(
-        days.map(async ({ label, date }) => {
-          try {
-            const res = await instance.get(
-              `/api/services/app/Attendance/GetAll?StartDate=${date}&EndDate=${date}&MaxResultCount=1000`
-            );
-            const items: { status: number }[] = res.data.result.items ?? [];
-            const presentCount = items.filter(
-              (a) => a.status === ATTENDANCE_PRESENT
-            ).length;
-            const percentage =
-              items.length > 0
-                ? Math.round((presentCount / items.length) * 100)
-                : 0;
-            return { label, date, percentage };
-          } catch {
-            return { label, date, percentage: 0 };
-          }
-        })
-      );
-      setWeeklyAttendance(results);
+      await getAllAttendance({ startDate, endDate, maxResultCount: 5000 });
+    } catch {
+      setWeeklyError('Could not load weekly attendance.');
     } finally {
       setWeeklyLoading(false);
     }
-  }, []);
+  }, [getAllAttendance]);
+
+  // Derive per-day percentages from the loaded attendance set
+  useEffect(() => {
+    const days = getWeekDays();
+    const buckets = new Map<string, { total: number; present: number }>();
+    days.forEach((d) => buckets.set(d.date, { total: 0, present: 0 }));
+    (attendances ?? []).forEach((a) => {
+      const date = (a.attendanceDate ?? '').slice(0, 10);
+      const bucket = buckets.get(date);
+      if (!bucket) return;
+      bucket.total += 1;
+      if (a.status === AttendanceStatus.Present) bucket.present += 1;
+    });
+
+    const next: WeeklyAttendanceDay[] = days.map((d) => {
+      const b = buckets.get(d.date) ?? { total: 0, present: 0 };
+      const percentage = b.total > 0 ? Math.round((b.present / b.total) * 100) : 0;
+      return { label: d.label, date: d.date, percentage };
+    });
+    setWeeklyAttendance(next);
+    const todayBucket = buckets.get(today);
+    if (todayBucket && todayBucket.total > 0) {
+      setAttendanceTodayPct(Math.round((todayBucket.present / todayBucket.total) * 100));
+    } else {
+      setAttendanceTodayPct(null);
+    }
+  }, [attendances, today]);
 
   useEffect(() => {
     fetchWeeklyAttendance();
   }, [fetchWeeklyAttendance]);
 
-  // Fetch grade performance from reports
-  const fetchGradePerformance = useCallback(async () => {
-    const instance = getAxiosInstance();
-    setGradePerformanceLoading(true);
-    try {
-      // Fetch reports with status >= Generated (2) for the current year
-      const res = await instance.get(
-        `/api/services/app/Report/GetAll?MaxResultCount=1000&Status=2`
-      );
-      const reports: { classId: string; overallPercentage?: number }[] =
-        res.data.result.items ?? [];
+  // Aggregate grade performance from reports + classes
+  const gradePerformance = useMemo<Record<string, GradePerformance>>(() => {
+    if (!reports || !classes) return {};
+    const classToGrade = new Map<string, string>();
+    classes.forEach((c) => classToGrade.set(c.id, c.gradeId));
 
-      // We need class→grade mapping — fetch classes
-      const classRes = await instance.get(
-        `/api/services/app/Class/GetAll?MaxResultCount=200`
-      );
-      const classes: { id: string; gradeId: string }[] =
-        classRes.data.result.items ?? [];
-      const classToGrade: Record<string, string> = {};
-      classes.forEach((c) => {
-        classToGrade[c.id] = c.gradeId;
-      });
+    const acc = new Map<string, { total: number; sum: number; passCount: number }>();
+    reports.forEach((r) => {
+      const gradeId = classToGrade.get(r.classId);
+      if (!gradeId || r.overallPercentage == null) return;
+      const pct = Number(r.overallPercentage);
+      if (Number.isNaN(pct)) return;
+      const entry = acc.get(gradeId) ?? { total: 0, sum: 0, passCount: 0 };
+      entry.total += 1;
+      entry.sum += pct;
+      if (pct >= PASS_PERCENTAGE) entry.passCount += 1;
+      acc.set(gradeId, entry);
+    });
 
-      // Aggregate by grade
-      const gradeMap: Record<string, { total: number; sum: number; passCount: number }> = {};
-      reports.forEach((r) => {
-        const gradeId = classToGrade[r.classId];
-        if (!gradeId || r.overallPercentage == null) return;
-        if (!gradeMap[gradeId]) gradeMap[gradeId] = { total: 0, sum: 0, passCount: 0 };
-        gradeMap[gradeId].total++;
-        gradeMap[gradeId].sum += r.overallPercentage;
-        if (r.overallPercentage >= 50) gradeMap[gradeId].passCount++;
-      });
+    const result: Record<string, GradePerformance> = {};
+    acc.forEach((data, gradeId) => {
+      result[gradeId] = {
+        gradeId,
+        avgPercentage:
+          data.total > 0 ? Math.round((data.sum / data.total) * 10) / 10 : null,
+        passRate:
+          data.total > 0 ? Math.round((data.passCount / data.total) * 100) : null,
+        reportCount: data.total,
+      };
+    });
+    return result;
+  }, [reports, classes]);
 
-      const result: Record<string, GradePerformance> = {};
-      Object.entries(gradeMap).forEach(([gradeId, data]) => {
-        result[gradeId] = {
-          gradeId,
-          avgPercentage: data.total > 0 ? Math.round((data.sum / data.total) * 10) / 10 : null,
-          passRate: data.total > 0 ? Math.round((data.passCount / data.total) * 100) : null,
-          reportCount: data.total,
-        };
-      });
-      setGradePerformance(result);
-    } catch (err) {
-      console.error('Failed to fetch grade performance:', err);
-    } finally {
-      setGradePerformanceLoading(false);
+  const handleCardKeyDown = (event: KeyboardEvent<HTMLDivElement>, target: string) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      router.push(target);
     }
-  }, []);
-
-  useEffect(() => {
-    fetchGradePerformance();
-  }, [fetchGradePerformance]);
+  };
 
   const gradeColumns = [
     {
@@ -296,7 +310,7 @@ function PrincipalDashboardContent() {
       render: (_: unknown, record: IGradeList) => {
         const perf = gradePerformance[record.id];
         if (!perf || perf.avgPercentage == null) return <Text type="secondary">—</Text>;
-        const color = perf.avgPercentage >= 50 ? '#3f8600' : '#cf1322';
+        const color = perf.avgPercentage >= PASS_PERCENTAGE ? '#3f8600' : '#cf1322';
         return <Text strong style={{ color }}>{perf.avgPercentage}%</Text>;
       },
     },
@@ -306,7 +320,12 @@ function PrincipalDashboardContent() {
       render: (_: unknown, record: IGradeList) => {
         const perf = gradePerformance[record.id];
         if (!perf || perf.passRate == null) return <Text type="secondary">—</Text>;
-        const color = perf.passRate >= 80 ? '#3f8600' : perf.passRate >= 60 ? '#FAAD14' : '#cf1322';
+        const color =
+          perf.passRate >= STRONG_PASS_RATE
+            ? '#3f8600'
+            : perf.passRate >= MODERATE_PASS_RATE
+            ? '#FAAD14'
+            : '#cf1322';
         return <Text strong style={{ color }}>{perf.passRate}%</Text>;
       },
     },
@@ -321,11 +340,41 @@ function PrincipalDashboardContent() {
     },
   ];
 
+  const renderStatCard = (
+    title: string,
+    value: number | string,
+    icon: React.ReactNode,
+    color: string,
+    target: string,
+    loading: boolean,
+    suffix?: string
+  ) => (
+    <Card
+      variant="borderless"
+      style={{ borderTop: `4px solid ${color}`, cursor: 'pointer' }}
+      onClick={() => router.push(target)}
+      onKeyDown={(e) => handleCardKeyDown(e, target)}
+      role="button"
+      tabIndex={0}
+      aria-label={`${title}, navigate`}
+      hoverable
+    >
+      <Statistic
+        title={title}
+        value={value}
+        prefix={icon}
+        suffix={suffix}
+        valueStyle={{ color }}
+        loading={loading}
+      />
+    </Card>
+  );
+
   return (
     <div>
       {/* Current Academic Year Banner */}
       <Card
-        bordered={false}
+        variant="borderless"
         loading={academicYearPending}
         style={{
           marginBottom: 16,
@@ -356,7 +405,7 @@ function PrincipalDashboardContent() {
                     Start Date
                   </Text>
                   <Text strong style={{ color: '#FFFFFF', fontSize: 14 }}>
-                    {new Date(currentAcademicYear.startDate).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    {formatDisplayDate(currentAcademicYear.startDate)}
                   </Text>
                 </Col>
                 <Col>
@@ -364,7 +413,7 @@ function PrincipalDashboardContent() {
                     End Date
                   </Text>
                   <Text strong style={{ color: '#FFFFFF', fontSize: 14 }}>
-                    {new Date(currentAcademicYear.endDate).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    {formatDisplayDate(currentAcademicYear.endDate)}
                   </Text>
                 </Col>
                 <Col>
@@ -399,63 +448,50 @@ function PrincipalDashboardContent() {
       {/* Stats Grid */}
       <Row gutter={[16, 16]} style={{ marginBottom: '24px' }}>
         <Col xs={24} sm={12} lg={6}>
-          <Card
-            bordered={false}
-            style={{ borderTop: '4px solid #003D73', cursor: 'pointer' }}
-            onClick={() => router.push('/principal/students')}
-            hoverable
-          >
-            <Statistic
-              title="Total Students"
-              value={studentCount ?? 0}
-              prefix={<TeamOutlined />}
-              valueStyle={{ color: '#003D73' }}
-              loading={studentsPending}
-            />
-          </Card>
+          {renderStatCard(
+            'Total Students',
+            studentCount ?? 0,
+            <TeamOutlined />,
+            '#003D73',
+            '/principal/students',
+            studentsPending
+          )}
         </Col>
         <Col xs={24} sm={12} lg={6}>
-          <Card
-            bordered={false}
-            style={{ borderTop: '4px solid #52C41A', cursor: 'pointer' }}
-            onClick={() => router.push('/principal/teachers')}
-            hoverable
-          >
-            <Statistic
-              title="Teachers"
-              value={teacherCount ?? 0}
-              prefix={<UserOutlined />}
-              valueStyle={{ color: '#52C41A' }}
-              loading={teachersPending}
-            />
-          </Card>
+          {renderStatCard(
+            'Teachers',
+            teacherCount ?? 0,
+            <UserOutlined />,
+            '#52C41A',
+            '/principal/teachers',
+            teachersPending
+          )}
         </Col>
         <Col xs={24} sm={12} lg={6}>
-          <Card
-            bordered={false}
-            style={{ borderTop: '4px solid #FAAD14', cursor: 'pointer' }}
-            onClick={() => router.push('/principal/classes')}
-            hoverable
-          >
-            <Statistic
-              title="Classes"
-              value={classCount ?? 0}
-              prefix={<BookOutlined />}
-              valueStyle={{ color: '#FAAD14' }}
-              loading={classesPending}
-            />
-          </Card>
+          {renderStatCard(
+            'Classes',
+            classCount ?? 0,
+            <BookOutlined />,
+            '#FAAD14',
+            '/principal/classes',
+            classesPending
+          )}
         </Col>
         <Col xs={24} sm={12} lg={6}>
-          <Card bordered={false} style={{ borderTop: '4px solid #1890FF' }}>
+          <Card variant="borderless" style={{ borderTop: '4px solid #1890FF' }}>
             <Statistic
               title="Attendance Today"
-              value={attendancePending ? 0 : attendanceTodayPct}
-              suffix="%"
+              value={attendanceTodayPct ?? 0}
+              suffix={attendanceTodayPct == null ? '' : '%'}
               prefix={<CheckCircleOutlined />}
               valueStyle={{ color: '#1890FF' }}
               loading={attendancePending}
             />
+            {!attendancePending && attendanceTodayPct == null && (
+              <Text type="secondary" style={{ fontSize: 12 }}>
+                No attendance captured today
+              </Text>
+            )}
           </Card>
         </Col>
       </Row>
@@ -477,14 +513,14 @@ function PrincipalDashboardContent() {
                 View Full Report
               </Button>
             }
-            bordered={false}
+            variant="borderless"
             style={{ marginBottom: '16px' }}
           >
             <Table<IGradeList>
               dataSource={grades ?? []}
               columns={gradeColumns}
               rowKey="id"
-              loading={gradesPending || gradePerformanceLoading}
+              loading={gradesPending || reportsPending || classesPending}
               pagination={false}
               size="small"
               locale={{ emptyText: 'No grades configured' }}
@@ -504,7 +540,7 @@ function PrincipalDashboardContent() {
                 View All
               </Button>
             }
-            bordered={false}
+            variant="borderless"
           >
             {announcementsPending ? (
               <div style={{ textAlign: 'center', padding: '24px' }}>
@@ -517,19 +553,17 @@ function PrincipalDashboardContent() {
                 renderItem={(item) => (
                   <List.Item
                     extra={
-                      <Tag color={priorityColors[item.priority] ?? 'default'}>
-                        {priorityLabels[item.priority] ?? 'Normal'}
+                      <Tag color={priorityColors[item.priority as AnnouncementPriority] ?? 'default'}>
+                        {priorityLabels[item.priority as AnnouncementPriority] ?? 'Normal'}
                       </Tag>
                     }
                   >
                     <List.Item.Meta
-                      avatar={
-                        <Badge dot color={item.isPinned ? 'gold' : 'blue'} />
-                      }
+                      avatar={<Badge dot color={item.isPinned ? 'gold' : 'blue'} />}
                       title={<Text strong>{item.title}</Text>}
                       description={
                         <Text type="secondary" style={{ fontSize: '12px' }}>
-                          {formatPublishDate(item.publishDate)}
+                          {formatDisplayDate(item.publishDate)}
                         </Text>
                       }
                     />
@@ -550,7 +584,7 @@ function PrincipalDashboardContent() {
                 Quick Actions
               </span>
             }
-            bordered={false}
+            variant="borderless"
             style={{ marginBottom: '16px' }}
           >
             <Button
@@ -611,8 +645,16 @@ function PrincipalDashboardContent() {
                 Attendance This Week
               </span>
             }
-            bordered={false}
+            variant="borderless"
           >
+            {weeklyError && (
+              <Alert
+                type="warning"
+                showIcon
+                message={weeklyError}
+                style={{ marginBottom: 12 }}
+              />
+            )}
             {weeklyLoading ? (
               <div style={{ textAlign: 'center', padding: '24px' }}>
                 <Spin />
@@ -667,7 +709,9 @@ export default function PrincipalDashboard() {
             <GradeProvider>
               <AttendanceProvider>
                 <AnnouncementProvider>
-                  <PrincipalDashboardContent />
+                  <ReportProvider>
+                    <PrincipalDashboardContent />
+                  </ReportProvider>
                 </AnnouncementProvider>
               </AttendanceProvider>
             </GradeProvider>

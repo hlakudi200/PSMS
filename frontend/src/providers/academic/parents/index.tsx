@@ -51,6 +51,7 @@ export const ParentProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getParentError());
+        throw error;
       });
   };
 
@@ -70,6 +71,7 @@ export const ParentProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getParentsError());
+        throw error;
       });
   };
 
@@ -85,6 +87,7 @@ export const ParentProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(createParentError());
+        throw error;
       });
   };
 
@@ -99,6 +102,7 @@ export const ParentProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(updateParentError());
+        throw error;
       });
   };
 
@@ -113,6 +117,7 @@ export const ParentProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(deleteParentError());
+        throw error;
       });
   };
 

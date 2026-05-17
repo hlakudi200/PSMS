@@ -9,15 +9,19 @@ import { FieldTripProvider, useFieldTripState, useFieldTripActions } from '@/pro
 import { useAuthState } from '@/providers/auth';
 import { FieldTripFormModal } from '@/components/modals/activities/FieldTripFormModal';
 import type { IFieldTrip } from '@/providers/activities/field-trips/context';
+import { FieldTripStatus, fieldTripStatusLabels } from '@/providers/shared/enums';
+import { formatZAR } from '@/utils/currency';
 
-const StatusLabels: Record<number, string> = {
-  1: 'Draft', 2: 'Submitted', 3: 'Under Review', 4: 'Approved',
-  5: 'Rejected', 6: 'Completed', 7: 'Cancelled',
-};
+const StatusLabels = fieldTripStatusLabels;
 
 const StatusColors: Record<number, string> = {
-  1: 'default', 2: 'processing', 3: 'warning', 4: 'success',
-  5: 'error', 6: 'success', 7: 'default',
+  [FieldTripStatus.Draft]: 'default',
+  [FieldTripStatus.Submitted]: 'processing',
+  [FieldTripStatus.UnderReview]: 'warning',
+  [FieldTripStatus.Approved]: 'success',
+  [FieldTripStatus.Rejected]: 'error',
+  [FieldTripStatus.Completed]: 'success',
+  [FieldTripStatus.Cancelled]: 'default',
 };
 
 function FieldTripsContent() {
@@ -73,11 +77,11 @@ function FieldTripsContent() {
     {
       key: 'estimatedCost', title: 'Est. Cost', dataIndex: 'estimatedCost',
       sortable: true,
-      render: (value: number) => `R ${value?.toFixed(2) ?? '0.00'}`,
+      render: (value: number) => formatZAR(value),
     },
     {
       key: 'approvedBudget', title: 'Approved Budget', dataIndex: 'approvedBudget',
-      render: (value: number) => value != null ? `R ${value.toFixed(2)}` : '-',
+      render: (value: number) => formatZAR(value),
     },
     { key: 'numberOfStudents', title: 'Students', dataIndex: 'numberOfStudents', width: 90 },
     { key: 'organizingTeacherName', title: 'Organizer', dataIndex: 'organizingTeacherName' },
@@ -100,7 +104,7 @@ function FieldTripsContent() {
       label: 'Edit',
       icon: <EditOutlined />,
       requiredPermissions: ['Admin', 'Principal'],
-      visible: (record) => record.status === 1,
+      visible: (record) => record.status === FieldTripStatus.Draft,
       onClick: (record) => { setEditRecord(record); setModalOpen(true); },
     },
     {
@@ -108,12 +112,16 @@ function FieldTripsContent() {
       label: 'Submit',
       icon: <SendOutlined />,
       requiredPermissions: ['Admin', 'Principal'],
-      visible: (record) => record.status === 1,
+      visible: (record) => record.status === FieldTripStatus.Draft,
       confirm: { title: 'Submit this field trip?', description: 'The trip will be sent for approval.' },
       onClick: async (record) => {
-        await submitAsync(record.id);
-        message.success('Field trip submitted');
-        refreshData();
+        try {
+          await submitAsync(record.id);
+          message.success('Field trip submitted');
+          refreshData();
+        } catch {
+          // Surfaced by axios interceptor
+        }
       },
     },
     {
@@ -122,10 +130,16 @@ function FieldTripsContent() {
       icon: <StopOutlined />,
       danger: true,
       requiredPermissions: ['Admin', 'Principal'],
-      visible: (record) => [1, 2, 3, 4].includes(record.status),
+      visible: (record) =>
+        [
+          FieldTripStatus.Draft,
+          FieldTripStatus.Submitted,
+          FieldTripStatus.UnderReview,
+          FieldTripStatus.Approved,
+        ].includes(record.status),
       confirm: { title: 'Cancel this field trip?', description: 'This action cannot be undone.' },
-      onClick: async (record) => {
-        // For cancel we need a reason - simplified inline for now
+      onClick: async () => {
+        // Cancel requires a reason; route through the detail view.
         message.info('Use the detail view to cancel with a reason');
       },
     },

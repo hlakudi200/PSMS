@@ -83,9 +83,13 @@ function TimetablesContent() {
       visible: (record) => !record.isActive,
       confirm: { title: 'Activate this timetable?', description: 'This will make it the active timetable for its class.' },
       onClick: async (record) => {
-        await activateAsync(record.id);
-        message.success('Timetable activated');
-        refreshData();
+        try {
+          await activateAsync(record.id);
+          message.success('Timetable activated');
+          refreshData();
+        } catch {
+          // Surfaced by axios interceptor
+        }
       },
     },
     {
@@ -96,12 +100,37 @@ function TimetablesContent() {
       danger: true,
       confirm: { title: 'Deactivate this timetable?' },
       onClick: async (record) => {
-        await deactivateAsync(record.id);
-        message.success('Timetable deactivated');
-        refreshData();
+        try {
+          await deactivateAsync(record.id);
+          message.success('Timetable deactivated');
+          refreshData();
+        } catch {
+          // Surfaced by axios interceptor
+        }
       },
     },
   ];
+
+  const runBulkTimetable = async (
+    rows: ITimetableList[],
+    fn: (id: string) => void | Promise<unknown>,
+    okLabel: string,
+    failLabel: string
+  ) => {
+    const results = await Promise.allSettled(
+      rows.map((r) => Promise.resolve(fn(r.id) as unknown))
+    );
+    const ok = results.filter((r) => r.status === 'fulfilled').length;
+    const fail = results.length - ok;
+    if (fail === 0) {
+      message.success(`${ok} timetable(s) ${okLabel}`);
+    } else if (ok === 0) {
+      message.error(`No timetables ${okLabel}. ${fail} ${failLabel}.`);
+    } else {
+      message.warning(`${ok} ${okLabel}; ${fail} ${failLabel}.`);
+    }
+    refreshData();
+  };
 
   const bulkActions: BulkAction<ITimetableList>[] = [
     {
@@ -114,9 +143,7 @@ function TimetablesContent() {
           message.warning('No inactive timetables selected');
           return;
         }
-        for (const row of inactive) await activateAsync(row.id);
-        message.success(`${inactive.length} timetable(s) activated`);
-        refreshData();
+        await runBulkTimetable(inactive, activateAsync, 'activated', 'failed');
       },
     },
     {
@@ -130,9 +157,7 @@ function TimetablesContent() {
           message.warning('No active timetables selected');
           return;
         }
-        for (const row of active) await deactivateAsync(row.id);
-        message.success(`${active.length} timetable(s) deactivated`);
-        refreshData();
+        await runBulkTimetable(active, deactivateAsync, 'deactivated', 'failed');
       },
     },
   ];

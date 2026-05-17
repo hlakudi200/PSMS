@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Layout, Menu, Button, Typography, Badge, message } from 'antd';
-import type { ItemType } from 'antd/es/menu/interface';
+import type { ItemType, MenuItemGroupType, MenuItemType } from 'antd/es/menu/interface';
 import {
   LogoutOutlined,
   MenuFoldOutlined,
@@ -29,6 +29,42 @@ export interface LayoutShellConfig {
   showRoleInHeader?: boolean;
 }
 
+// Recursively collect every menu item key. Type-safe walk that handles
+// flat items, divider/null entries, and group children of arbitrary depth.
+function collectMenuKeys(items: ItemType[]): string[] {
+  const keys: string[] = [];
+  const visit = (item: ItemType | undefined): void => {
+    if (!item || typeof item !== 'object') return;
+    const maybeKey = (item as MenuItemType).key;
+    if (typeof maybeKey === 'string') keys.push(maybeKey);
+    const children = (item as MenuItemGroupType).children;
+    if (Array.isArray(children)) {
+      children.forEach((child) => visit(child as ItemType));
+    }
+  };
+  items.forEach(visit);
+  return keys;
+}
+
+// Pick the longest menu key that is a prefix of the current pathname.
+// Avoids mis-highlighting overlapping routes (e.g. /students vs /students-archive).
+function pickSelectedKey(allKeys: string[], basePath: string, pathname: string): string {
+  let best = basePath;
+  let bestLen = -1;
+  for (const k of allKeys) {
+    if (k === basePath) continue;
+    if (!k.startsWith(basePath)) continue;
+    if (!pathname.startsWith(k)) continue;
+    if (k.length > bestLen) {
+      best = k;
+      bestLen = k.length;
+    }
+  }
+  // Fall through to basePath when the user is on the root of the section
+  if (bestLen < 0 && pathname.startsWith(basePath)) return basePath;
+  return best;
+}
+
 function ShellLayout({
   config,
   children,
@@ -48,27 +84,31 @@ function ShellLayout({
     showRoleInHeader = true,
   } = config;
 
+  const collapseStorageKey = `layoutShell:collapsed:${basePath}`;
+
   const [collapsed, setCollapsed] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
   const { signOut } = useAuthActions();
   const { currentUser, currentRole } = useAuthState();
 
-  // Collect all navigable keys (flat items and children of groups)
-  const allKeys: string[] = [];
-  menuItems.forEach((item: any) => {
-    if (item?.key) allKeys.push(item.key as string);
-    if (item?.children) {
-      item.children.forEach((child: any) => {
-        if (child?.key) allKeys.push(child.key as string);
-      });
-    }
-  });
+  // Restore preference on mount (browser-only)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const stored = window.localStorage.getItem(collapseStorageKey);
+    if (stored === 'true') setCollapsed(true);
+    else if (stored === 'false') setCollapsed(false);
+  }, [collapseStorageKey]);
 
-  const selectedKey =
-    allKeys
-      .filter((k) => k !== basePath && k.startsWith(basePath))
-      .find((k) => pathname.startsWith(k)) ?? basePath;
+  const setCollapsedPersist = (next: boolean) => {
+    setCollapsed(next);
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(collapseStorageKey, String(next));
+    }
+  };
+
+  const allKeys = collectMenuKeys(menuItems);
+  const selectedKey = pickSelectedKey(allKeys, basePath, pathname ?? basePath);
 
   const handleMenuClick = ({ key }: { key: string }) => {
     if (key.startsWith(basePath)) {
@@ -78,17 +118,18 @@ function ShellLayout({
     }
   };
 
-  const initials = [currentUser?.name?.[0], currentUser?.surname?.[0]]
-    .filter(Boolean)
-    .join('')
-    .toUpperCase() || '?';
+  const initials =
+    [currentUser?.name?.[0], currentUser?.surname?.[0]]
+      .filter(Boolean)
+      .join('')
+      .toUpperCase() || '?';
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
       <Sider
         collapsible
         collapsed={collapsed}
-        onCollapse={setCollapsed}
+        onCollapse={setCollapsedPersist}
         width={220}
         trigger={null}
         style={{
@@ -160,6 +201,7 @@ function ShellLayout({
                 fontWeight: 700,
                 flexShrink: 0,
               }}
+              aria-hidden="true"
             >
               {initials}
             </div>
@@ -196,7 +238,8 @@ function ShellLayout({
             <Button
               type="text"
               icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
-              onClick={() => setCollapsed(!collapsed)}
+              onClick={() => setCollapsedPersist(!collapsed)}
+              aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
               style={{ color: '#FFFFFF', fontSize: 16 }}
             />
             <Text style={{ color: '#FFFFFF', fontSize: 18, fontWeight: 600 }}>
@@ -209,6 +252,7 @@ function ShellLayout({
                 <Button
                   type="text"
                   icon={<NotificationOutlined />}
+                  aria-label="Notifications"
                   style={{ color: '#BAE7FF', fontSize: 16 }}
                 />
               </Badge>

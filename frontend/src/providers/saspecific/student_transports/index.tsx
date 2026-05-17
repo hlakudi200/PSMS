@@ -64,6 +64,7 @@ export const StudentTransportProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getStudentTransportError());
+        throw error;
       });
   };
 
@@ -90,6 +91,7 @@ export const StudentTransportProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getStudentTransportsError());
+        throw error;
       });
   };
 
@@ -106,6 +108,7 @@ export const StudentTransportProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getByTransportError());
+        throw error;
       });
   };
 
@@ -122,6 +125,7 @@ export const StudentTransportProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getByStudentError());
+        throw error;
       });
   };
 
@@ -136,6 +140,7 @@ export const StudentTransportProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(createStudentTransportError());
+        throw error;
       });
   };
 
@@ -150,6 +155,7 @@ export const StudentTransportProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(updateStudentTransportError());
+        throw error;
       });
   };
 
@@ -164,6 +170,7 @@ export const StudentTransportProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(deleteStudentTransportError());
+        throw error;
       });
   };
 
@@ -178,6 +185,7 @@ export const StudentTransportProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(suspendError());
+        throw error;
       });
   };
 
@@ -192,6 +200,7 @@ export const StudentTransportProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(reactivateError());
+        throw error;
       });
   };
 
@@ -206,6 +215,7 @@ export const StudentTransportProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(terminateError());
+        throw error;
       });
   };
 

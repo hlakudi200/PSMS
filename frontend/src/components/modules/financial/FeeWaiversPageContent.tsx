@@ -9,32 +9,23 @@ import { FeeWaiverProvider, useFeeWaiverState, useFeeWaiverActions } from '@/pro
 import { useAuthState } from '@/providers/auth';
 import { FeeWaiverFormModal } from '@/components/modals/financial/FeeWaiverFormModal';
 import type { IFeeWaiver } from '@/providers/financial/fee-waivers/context';
+import {
+  FeeWaiverStatus,
+  feeWaiverTypeLabels,
+  feeWaiverStatusLabels,
+} from '@/providers/shared/enums';
+import { formatZAR } from '@/utils/currency';
 
-const WaiverTypeLabels: Record<number, string> = {
-  1: 'Financial Hardship',
-  2: 'Sibling Discount',
-  3: 'Staff Discount',
-  4: 'Bursary',
-  5: 'Scholarship',
-  6: 'Other',
-};
-
-const StatusLabels: Record<number, string> = {
-  1: 'Draft',
-  2: 'Submitted',
-  3: 'Under Review',
-  4: 'Approved',
-  5: 'Rejected',
-  6: 'Cancelled',
-};
+const WaiverTypeLabels = feeWaiverTypeLabels;
+const StatusLabels = feeWaiverStatusLabels;
 
 const StatusColors: Record<number, string> = {
-  1: 'default',
-  2: 'processing',
-  3: 'warning',
-  4: 'success',
-  5: 'error',
-  6: 'default',
+  [FeeWaiverStatus.Draft]: 'default',
+  [FeeWaiverStatus.Submitted]: 'processing',
+  [FeeWaiverStatus.UnderReview]: 'warning',
+  [FeeWaiverStatus.Approved]: 'success',
+  [FeeWaiverStatus.Rejected]: 'error',
+  [FeeWaiverStatus.Cancelled]: 'default',
 };
 
 function FeeWaiversContent() {
@@ -78,11 +69,11 @@ function FeeWaiversContent() {
     {
       key: 'requestedAmount', title: 'Requested Amount', dataIndex: 'requestedAmount',
       sortable: true,
-      render: (value: number) => `R ${value?.toFixed(2) ?? '0.00'}`,
+      render: (value: number) => formatZAR(value),
     },
     {
       key: 'approvedAmount', title: 'Approved Amount', dataIndex: 'approvedAmount',
-      render: (value: number) => value != null ? `R ${value.toFixed(2)}` : '-',
+      render: (value: number) => formatZAR(value),
     },
     {
       key: 'status', title: 'Status', dataIndex: 'status',
@@ -122,7 +113,7 @@ function FeeWaiversContent() {
       label: 'Edit',
       icon: <EditOutlined />,
       requiredPermissions: ['Admin', 'Principal'],
-      visible: (record) => record.status === 1,
+      visible: (record) => record.status === FeeWaiverStatus.Draft,
       onClick: (record) => { setEditRecord(record); setModalOpen(true); },
     },
     {
@@ -130,12 +121,16 @@ function FeeWaiversContent() {
       label: 'Submit',
       icon: <SendOutlined />,
       requiredPermissions: ['Admin', 'Principal'],
-      visible: (record) => record.status === 1,
+      visible: (record) => record.status === FeeWaiverStatus.Draft,
       confirm: { title: 'Submit this fee waiver?', description: 'Once submitted, it will be sent for review.' },
       onClick: async (record) => {
-        await submitAsync(record.id);
-        message.success('Fee waiver submitted');
-        refreshData();
+        try {
+          await submitAsync(record.id);
+          message.success('Fee waiver submitted');
+          refreshData();
+        } catch {
+          // Surfaced by axios interceptor
+        }
       },
     },
     {
@@ -144,12 +139,16 @@ function FeeWaiversContent() {
       icon: <DeleteOutlined />,
       danger: true,
       requiredPermissions: ['Admin', 'Principal'],
-      visible: (record) => record.status === 1,
+      visible: (record) => record.status === FeeWaiverStatus.Draft,
       confirm: { title: 'Delete this fee waiver?', description: 'This cannot be undone.' },
       onClick: async (record) => {
-        await deleteAsync(record.id);
-        message.success('Fee waiver deleted');
-        refreshData();
+        try {
+          await deleteAsync(record.id);
+          message.success('Fee waiver deleted');
+          refreshData();
+        } catch {
+          // Surfaced by axios interceptor
+        }
       },
     },
   ];

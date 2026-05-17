@@ -67,6 +67,7 @@ export const PaymentProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getPaymentError());
+        throw error;
       });
   };
 
@@ -98,6 +99,7 @@ export const PaymentProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getAllPaymentsError());
+        throw error;
       });
   };
 
@@ -145,6 +147,7 @@ export const PaymentProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(createPaymentError());
+        throw error;
       });
   };
 
@@ -159,6 +162,7 @@ export const PaymentProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(updatePaymentError());
+        throw error;
       });
   };
 

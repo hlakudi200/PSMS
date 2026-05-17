@@ -64,6 +64,7 @@ export const ExtramuralActivityProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getExtramuralActivityError());
+        throw error;
       });
   };
 
@@ -93,6 +94,7 @@ export const ExtramuralActivityProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getAllExtramuralActivitiesError());
+        throw error;
       });
   };
 
@@ -109,6 +111,7 @@ export const ExtramuralActivityProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getByAcademicYearError());
+        throw error;
       });
   };
 
@@ -123,6 +126,7 @@ export const ExtramuralActivityProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(createExtramuralActivityError());
+        throw error;
       });
   };
 
@@ -137,6 +141,7 @@ export const ExtramuralActivityProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(updateExtramuralActivityError());
+        throw error;
       });
   };
 
@@ -151,6 +156,7 @@ export const ExtramuralActivityProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(deleteExtramuralActivityError());
+        throw error;
       });
   };
 
@@ -165,6 +171,7 @@ export const ExtramuralActivityProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(activateExtramuralActivityError());
+        throw error;
       });
   };
 
@@ -179,6 +186,7 @@ export const ExtramuralActivityProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(deactivateExtramuralActivityError());
+        throw error;
       });
   };
 
@@ -193,6 +201,7 @@ export const ExtramuralActivityProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(openRegistrationError());
+        throw error;
       });
   };
 
@@ -207,6 +216,7 @@ export const ExtramuralActivityProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(closeRegistrationError());
+        throw error;
       });
   };
 

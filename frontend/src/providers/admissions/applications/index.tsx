@@ -61,6 +61,7 @@ export const ApplicationProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getApplicationError());
+        throw error;
       });
   };
 
@@ -75,6 +76,7 @@ export const ApplicationProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getApplicationByNumberError());
+        throw error;
       });
   };
 
@@ -108,6 +110,7 @@ export const ApplicationProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getApplicationsError());
+        throw error;
       });
   };
 
@@ -122,6 +125,7 @@ export const ApplicationProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(createApplicationError());
+        throw error;
       });
   };
 
@@ -136,6 +140,7 @@ export const ApplicationProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(updateApplicationError());
+        throw error;
       });
   };
 
@@ -150,6 +155,7 @@ export const ApplicationProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(deleteApplicationError());
+        throw error;
       });
   };
 
@@ -164,6 +170,7 @@ export const ApplicationProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(submitApplicationError());
+        throw error;
       });
   };
 
@@ -179,6 +186,7 @@ export const ApplicationProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(withdrawApplicationError());
+        throw error;
       });
   };
 
@@ -194,6 +202,7 @@ export const ApplicationProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getStatisticsError());
+        throw error;
       });
   };
 

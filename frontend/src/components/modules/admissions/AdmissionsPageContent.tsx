@@ -198,16 +198,9 @@ function AdmissionsContent() {
     },
   ];
 
-  const waitlistRowActions: RowAction<IWaitlist>[] = [
-    {
-      key: 'view',
-      label: 'View Details',
-      icon: <EyeOutlined />,
-      onClick: (record) => {
-        console.log('View waitlist entry:', record.id);
-      },
-    },
-  ];
+  // No detail page exists for waitlist entries yet; row actions are intentionally
+  // empty until that route is scaffolded.
+  const waitlistRowActions: RowAction<IWaitlist>[] = [];
 
   const tabItems = [
     {

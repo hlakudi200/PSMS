@@ -7,23 +7,49 @@ import { useTermActions } from '@/providers/academic/terms';
 import type { ITerm } from '@/providers/academic/shared/interfaces';
 import dayjs from 'dayjs';
 
-const termSchema = z.object({
-  termNumber: z.number().min(1).max(4, 'Term number must be 1-4'),
-  termName: z.string().min(2, 'Term name must be at least 2 characters').max(50),
-  startDate: z.string().min(1, 'Start date is required'),
-  endDate: z.string().min(1, 'End date is required'),
-}).refine(data => new Date(data.endDate) > new Date(data.startDate), {
-  message: 'End date must be after start date',
-  path: ['endDate'],
-});
-
 interface TermFormModalProps {
   open: boolean;
   onClose: (refreshData?: boolean) => void;
   editRecord?: ITerm | null;
   academicYearId: string;
   existingTermNumbers: number[];
+  // When provided, term dates are validated to fall within this range.
+  academicYearStartDate?: string;
+  academicYearEndDate?: string;
 }
+
+const buildTermSchema = (yearStart?: string, yearEnd?: string) =>
+  z
+    .object({
+      termNumber: z.number().min(1).max(4, 'Term number must be 1-4'),
+      termName: z.string().min(2, 'Term name must be at least 2 characters').max(50),
+      startDate: z.string().min(1, 'Start date is required'),
+      endDate: z.string().min(1, 'End date is required'),
+    })
+    .refine((data) => new Date(data.endDate) > new Date(data.startDate), {
+      message: 'End date must be after start date',
+      path: ['endDate'],
+    })
+    .refine(
+      (data) => {
+        if (!yearStart) return true;
+        return new Date(data.startDate) >= new Date(yearStart);
+      },
+      {
+        message: 'Term must start on or after the academic year start date',
+        path: ['startDate'],
+      }
+    )
+    .refine(
+      (data) => {
+        if (!yearEnd) return true;
+        return new Date(data.endDate) <= new Date(yearEnd);
+      },
+      {
+        message: 'Term must end on or before the academic year end date',
+        path: ['endDate'],
+      }
+    );
 
 export const TermFormModal: React.FC<TermFormModalProps> = ({
   open,
@@ -31,7 +57,10 @@ export const TermFormModal: React.FC<TermFormModalProps> = ({
   editRecord,
   academicYearId,
   existingTermNumbers,
+  academicYearStartDate,
+  academicYearEndDate,
 }) => {
+  const termSchema = buildTermSchema(academicYearStartDate, academicYearEndDate);
   const [form] = Form.useForm();
   const { createAsync, updateAsync } = useTermActions();
   const [loading, setLoading] = React.useState(false);
@@ -109,7 +138,7 @@ export const TermFormModal: React.FC<TermFormModalProps> = ({
       message.success(`Term ${isEdit ? 'updated' : 'created'} successfully`);
       onClose(true);
     } catch {
-      message.error('An error occurred');
+      // Server errors are surfaced by the axios response interceptor.
     } finally {
       setLoading(false);
     }

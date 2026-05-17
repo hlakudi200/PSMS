@@ -77,6 +77,7 @@ export const ReportProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getReportError());
+        throw error;
       });
   };
 
@@ -107,6 +108,7 @@ export const ReportProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getAllReportsError());
+        throw error;
       });
   };
 
@@ -127,6 +129,7 @@ export const ReportProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getByStudentTermError());
+        throw error;
       });
   };
 
@@ -141,6 +144,7 @@ export const ReportProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(generateReportError());
+        throw error;
       });
   };
 
@@ -155,6 +159,7 @@ export const ReportProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(submitForApprovalError());
+        throw error;
       });
   };
 
@@ -169,6 +174,7 @@ export const ReportProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(approveReportError());
+        throw error;
       });
   };
 
@@ -183,6 +189,7 @@ export const ReportProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(publishReportError());
+        throw error;
       });
   };
 
@@ -197,6 +204,7 @@ export const ReportProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(addTeacherCommentError());
+        throw error;
       });
   };
 
@@ -211,6 +219,7 @@ export const ReportProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(addPrincipalCommentError());
+        throw error;
       });
   };
 
@@ -225,6 +234,7 @@ export const ReportProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(acknowledgeByParentError());
+        throw error;
       });
   };
 
@@ -239,6 +249,7 @@ export const ReportProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(recordPromotionError());
+        throw error;
       });
   };
 
@@ -253,6 +264,7 @@ export const ReportProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(generatePdfError());
+        throw error;
       });
   };
 
@@ -267,6 +279,7 @@ export const ReportProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(bulkGeneratePdfsError());
+        throw error;
       });
   };
 
@@ -281,6 +294,7 @@ export const ReportProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(deleteReportError());
+        throw error;
       });
   };
 

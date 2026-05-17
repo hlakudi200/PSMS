@@ -16,33 +16,68 @@ import { AnnouncementProvider, useAnnouncementState, useAnnouncementActions } fr
 import { useAuthState } from '@/providers/auth';
 import { AnnouncementFormModal } from '@/components/modals/communication/AnnouncementFormModal';
 import type { IAnnouncementList } from '@/providers/communication/shared/interfaces';
+import {
+  AnnouncementType,
+  AnnouncementPriority,
+  AnnouncementAudience,
+  announcementTypeLabels,
+  announcementAudienceLabels,
+} from '@/providers/shared/enums';
 
-const typeMap: Record<number, { label: string; color: string }> = {
-  1: { label: 'General', color: 'default' },
-  2: { label: 'Academic', color: 'blue' },
-  3: { label: 'Sports', color: 'green' },
-  4: { label: 'Event', color: 'purple' },
-  5: { label: 'Emergency', color: 'red' },
-  6: { label: 'Holiday', color: 'orange' },
-  7: { label: 'Administrative', color: 'cyan' },
+const typeColors: Record<AnnouncementType, string> = {
+  [AnnouncementType.General]: 'default',
+  [AnnouncementType.Academic]: 'blue',
+  [AnnouncementType.Sports]: 'green',
+  [AnnouncementType.Event]: 'purple',
+  [AnnouncementType.Emergency]: 'red',
+  [AnnouncementType.Holiday]: 'orange',
+  [AnnouncementType.Administrative]: 'cyan',
 };
 
-const priorityMap: Record<number, { label: string; color: string }> = {
-  1: { label: 'Low', color: 'default' },
-  2: { label: 'Normal', color: 'blue' },
-  3: { label: 'High', color: 'orange' },
-  4: { label: 'Urgent', color: 'red' },
+const priorityColors: Record<AnnouncementPriority, string> = {
+  [AnnouncementPriority.Low]: 'default',
+  [AnnouncementPriority.Normal]: 'blue',
+  [AnnouncementPriority.High]: 'orange',
+  [AnnouncementPriority.Urgent]: 'red',
 };
 
-const audienceMap: Record<number, { label: string; color: string }> = {
-  1: { label: 'All', color: 'green' },
-  2: { label: 'Staff', color: 'geekblue' },
-  3: { label: 'Teachers', color: 'blue' },
-  4: { label: 'Parents', color: 'purple' },
-  5: { label: 'Students', color: 'orange' },
-  6: { label: 'Grade', color: 'cyan' },
-  7: { label: 'Class', color: 'magenta' },
+const audienceColors: Record<AnnouncementAudience, string> = {
+  [AnnouncementAudience.All]: 'green',
+  [AnnouncementAudience.Staff]: 'geekblue',
+  [AnnouncementAudience.Teachers]: 'blue',
+  [AnnouncementAudience.Parents]: 'purple',
+  [AnnouncementAudience.Students]: 'orange',
+  [AnnouncementAudience.Grade]: 'cyan',
+  [AnnouncementAudience.Class]: 'magenta',
 };
+
+const priorityLabels: Record<AnnouncementPriority, string> = {
+  [AnnouncementPriority.Low]: 'Low',
+  [AnnouncementPriority.Normal]: 'Normal',
+  [AnnouncementPriority.High]: 'High',
+  [AnnouncementPriority.Urgent]: 'Urgent',
+};
+
+const typeMap: Record<number, { label: string; color: string }> = Object.fromEntries(
+  Object.entries(announcementTypeLabels).map(([k, label]) => [
+    k,
+    { label, color: typeColors[Number(k) as AnnouncementType] },
+  ])
+);
+
+const priorityMap: Record<number, { label: string; color: string }> = Object.fromEntries(
+  Object.entries(priorityLabels).map(([k, label]) => [
+    k,
+    { label, color: priorityColors[Number(k) as AnnouncementPriority] },
+  ])
+);
+
+const audienceMap: Record<number, { label: string; color: string }> = Object.fromEntries(
+  Object.entries(announcementAudienceLabels).map(([k, label]) => [
+    k,
+    { label, color: audienceColors[Number(k) as AnnouncementAudience] },
+  ])
+);
 
 function AnnouncementsContent() {
   const { announcements, totalCount, isPending, isError } = useAnnouncementState();
@@ -79,42 +114,30 @@ function AnnouncementsContent() {
     {
       key: 'type', title: 'Type', dataIndex: 'type', width: 100,
       filterable: true, filterType: 'enum',
-      filterOptions: [
-        { label: 'General', value: 1 },
-        { label: 'Academic', value: 2 },
-        { label: 'Sports', value: 3 },
-        { label: 'Event', value: 4 },
-        { label: 'Emergency', value: 5 },
-        { label: 'Holiday', value: 6 },
-        { label: 'Administrative', value: 7 },
-      ],
+      filterOptions: Object.entries(announcementTypeLabels).map(([value, label]) => ({
+        label,
+        value: Number(value),
+      })),
       renderType: 'status',
       renderConfig: { statusMap: typeMap },
     },
     {
       key: 'priority', title: 'Priority', dataIndex: 'priority', width: 90,
       filterable: true, filterType: 'enum',
-      filterOptions: [
-        { label: 'Low', value: 1 },
-        { label: 'Normal', value: 2 },
-        { label: 'High', value: 3 },
-        { label: 'Urgent', value: 4 },
-      ],
+      filterOptions: Object.entries(priorityLabels).map(([value, label]) => ({
+        label,
+        value: Number(value),
+      })),
       renderType: 'status',
       renderConfig: { statusMap: priorityMap },
     },
     {
       key: 'targetAudience', title: 'Audience', dataIndex: 'targetAudience', width: 100,
       filterable: true, filterType: 'enum',
-      filterOptions: [
-        { label: 'All', value: 1 },
-        { label: 'Staff', value: 2 },
-        { label: 'Teachers', value: 3 },
-        { label: 'Parents', value: 4 },
-        { label: 'Students', value: 5 },
-        { label: 'Grade', value: 6 },
-        { label: 'Class', value: 7 },
-      ],
+      filterOptions: Object.entries(announcementAudienceLabels).map(([value, label]) => ({
+        label,
+        value: Number(value),
+      })),
       renderType: 'status',
       renderConfig: { statusMap: audienceMap },
     },
@@ -167,9 +190,13 @@ function AnnouncementsContent() {
       visible: (record) => !record.isPublished,
       confirm: { title: 'Publish this announcement?', description: 'It will become visible to the target audience.' },
       onClick: async (record) => {
-        await publishAsync(record.id);
-        message.success('Announcement published');
-        refreshData();
+        try {
+          await publishAsync(record.id);
+          message.success('Announcement published');
+          refreshData();
+        } catch {
+          // Surfaced by axios interceptor
+        }
       },
     },
     {
@@ -179,9 +206,13 @@ function AnnouncementsContent() {
       visible: (record) => record.isPublished,
       confirm: { title: 'Unpublish this announcement?', description: 'It will no longer be visible.' },
       onClick: async (record) => {
-        await unpublishAsync(record.id);
-        message.success('Announcement unpublished');
-        refreshData();
+        try {
+          await unpublishAsync(record.id);
+          message.success('Announcement unpublished');
+          refreshData();
+        } catch {
+          // Surfaced by axios interceptor
+        }
       },
     },
     {
@@ -190,9 +221,13 @@ function AnnouncementsContent() {
       icon: <PushpinOutlined />,
       visible: (record) => !record.isPinned,
       onClick: async (record) => {
-        await pinAsync(record.id);
-        message.success('Announcement pinned');
-        refreshData();
+        try {
+          await pinAsync(record.id);
+          message.success('Announcement pinned');
+          refreshData();
+        } catch {
+          // Surfaced by axios interceptor
+        }
       },
     },
     {
@@ -201,9 +236,13 @@ function AnnouncementsContent() {
       icon: <PushpinOutlined />,
       visible: (record) => record.isPinned,
       onClick: async (record) => {
-        await unpinAsync(record.id);
-        message.success('Announcement unpinned');
-        refreshData();
+        try {
+          await unpinAsync(record.id);
+          message.success('Announcement unpinned');
+          refreshData();
+        } catch {
+          // Surfaced by axios interceptor
+        }
       },
     },
     {
@@ -213,9 +252,13 @@ function AnnouncementsContent() {
       danger: true,
       confirm: { title: 'Delete this announcement?', description: 'This action cannot be undone.' },
       onClick: async (record) => {
-        await deleteAsync(record.id);
-        message.success('Announcement deleted');
-        refreshData();
+        try {
+          await deleteAsync(record.id);
+          message.success('Announcement deleted');
+          refreshData();
+        } catch {
+          // Surfaced by axios interceptor
+        }
       },
     },
   ];

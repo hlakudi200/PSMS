@@ -57,6 +57,7 @@ export const TimetableSlotProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getTimetableSlotError());
+        throw error;
       });
   };
 
@@ -73,6 +74,7 @@ export const TimetableSlotProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getByTimetableError());
+        throw error;
       });
   };
 
@@ -89,6 +91,7 @@ export const TimetableSlotProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getByDayError());
+        throw error;
       });
   };
 
@@ -105,6 +108,7 @@ export const TimetableSlotProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getByTeacherError());
+        throw error;
       });
   };
 
@@ -120,6 +124,7 @@ export const TimetableSlotProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(createTimetableSlotError());
+        throw error;
       });
   };
 
@@ -134,6 +139,7 @@ export const TimetableSlotProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(updateTimetableSlotError());
+        throw error;
       });
   };
 
@@ -148,6 +154,7 @@ export const TimetableSlotProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(deleteTimetableSlotError());
+        throw error;
       });
   };
 
@@ -165,6 +172,7 @@ export const TimetableSlotProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(bulkCreateTimetableSlotError());
+        throw error;
       });
   };
 

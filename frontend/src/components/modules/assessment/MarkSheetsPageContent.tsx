@@ -2,31 +2,31 @@
 
 import React, { useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Card, Col, Row, Select, Tag } from 'antd';
+import { Card, Col, Row, Select } from 'antd';
 import { EyeOutlined } from '@ant-design/icons';
 import { EnterpriseTable } from '@/components/shared/enterprise-table';
 import type { ColumnConfig, TableQuery, RowAction } from '@/components/shared/enterprise-table';
 import { AssessmentProvider, useAssessmentState, useAssessmentActions } from '@/providers/assessment/assessments';
 import { useAuthState } from '@/providers/auth';
 import type { IAssessmentList } from '@/providers/assessment/shared/interfaces';
+import { AssessmentType, assessmentTypeLabels } from '@/providers/shared/enums';
 
-const assessmentTypeMap: Record<number, { label: string; color: string }> = {
-  1: { label: 'Test', color: 'blue' },
-  2: { label: 'Assignment', color: 'cyan' },
-  3: { label: 'Exam', color: 'purple' },
-  4: { label: 'Practical', color: 'green' },
-  5: { label: 'Oral', color: 'orange' },
-  6: { label: 'Project', color: 'magenta' },
-  7: { label: 'Other', color: 'default' },
+const assessmentTypeColors: Record<AssessmentType, string> = {
+  [AssessmentType.Test]: 'blue',
+  [AssessmentType.Assignment]: 'cyan',
+  [AssessmentType.Exam]: 'purple',
+  [AssessmentType.Practical]: 'green',
+  [AssessmentType.Oral]: 'orange',
+  [AssessmentType.Project]: 'magenta',
+  [AssessmentType.Other]: 'default',
 };
 
-const capsCategoryMap: Record<number, string> = {
-  1: 'SBA',
-  2: 'Formal',
-  3: 'Informal',
-  4: 'Mid-Year',
-  5: 'Final Exam',
-};
+const assessmentTypeMap: Record<number, { label: string; color: string }> = Object.fromEntries(
+  Object.entries(assessmentTypeLabels).map(([key, label]) => [
+    key,
+    { label, color: assessmentTypeColors[Number(key) as AssessmentType] },
+  ])
+);
 
 function MarkSheetsContent() {
   const router = useRouter();
@@ -69,15 +69,10 @@ function MarkSheetsContent() {
     {
       key: 'assessmentType', title: 'Type', dataIndex: 'assessmentType', width: 110,
       filterable: true, filterType: 'enum',
-      filterOptions: [
-        { label: 'Test', value: 1 },
-        { label: 'Assignment', value: 2 },
-        { label: 'Exam', value: 3 },
-        { label: 'Practical', value: 4 },
-        { label: 'Oral', value: 5 },
-        { label: 'Project', value: 6 },
-        { label: 'Other', value: 7 },
-      ],
+      filterOptions: Object.entries(assessmentTypeLabels).map(([value, label]) => ({
+        label,
+        value: Number(value),
+      })),
       renderType: 'status',
       renderConfig: { statusMap: assessmentTypeMap },
     },

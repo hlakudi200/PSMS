@@ -59,6 +59,7 @@ export const TimetableProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getTimetableError());
+        throw error;
       });
   };
 
@@ -78,6 +79,7 @@ export const TimetableProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getTimetablesError());
+        throw error;
       });
   };
 
@@ -92,6 +94,7 @@ export const TimetableProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getByClassError());
+        throw error;
       });
   };
 
@@ -107,6 +110,7 @@ export const TimetableProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(createTimetableError());
+        throw error;
       });
   };
 
@@ -121,6 +125,7 @@ export const TimetableProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(updateTimetableError());
+        throw error;
       });
   };
 
@@ -135,6 +140,7 @@ export const TimetableProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(deleteTimetableError());
+        throw error;
       });
   };
 
@@ -149,6 +155,7 @@ export const TimetableProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(activateTimetableError());
+        throw error;
       });
   };
 
@@ -163,6 +170,7 @@ export const TimetableProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(deactivateTimetableError());
+        throw error;
       });
   };
 

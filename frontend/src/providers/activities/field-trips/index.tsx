@@ -39,6 +39,7 @@ export const FieldTripProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getTripError());
+        throw error;
       });
   };
 
@@ -57,6 +58,7 @@ export const FieldTripProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getTripsError());
+        throw error;
       });
   };
 
@@ -71,6 +73,7 @@ export const FieldTripProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(createTripError());
+        throw error;
       });
   };
 
@@ -85,6 +88,7 @@ export const FieldTripProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(updateTripError());
+        throw error;
       });
   };
 

@@ -87,9 +87,13 @@ function MessagesContent() {
   };
 
   const handleMarkAsRead = async (msg: IMessageList) => {
-    await markAsReadAsync(msg.id);
-    message.success('Marked as read');
-    fetchMessages(activeTab, currentPage);
+    try {
+      await markAsReadAsync(msg.id);
+      message.success('Marked as read');
+      fetchMessages(activeTab, currentPage);
+    } catch {
+      // Server errors surfaced by axios interceptor
+    }
   };
 
   const handleReply = async () => {
@@ -114,7 +118,7 @@ function MessagesContent() {
       }
       fetchMessages(activeTab, currentPage);
     } catch {
-      message.error('Failed to send reply');
+      // Server errors surfaced by axios interceptor
     } finally {
       setReplySending(false);
     }

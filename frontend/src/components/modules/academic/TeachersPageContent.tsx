@@ -94,33 +94,50 @@ function TeachersContent() {
       danger: true,
       confirm: { title: 'Delete this teacher?', description: 'This action cannot be undone.' },
       onClick: async (record) => {
-        await deleteAsync(record.id);
-        message.success('Teacher deleted');
-        refreshData();
+        try {
+          await deleteAsync(record.id);
+          message.success('Teacher deleted');
+          refreshData();
+        } catch {
+          // Surfaced by axios interceptor
+        }
       },
     },
   ];
+
+  const runBulk = async (
+    rows: ITeacher[],
+    fn: (id: string) => void | Promise<unknown>,
+    okLabel: string,
+    failLabel: string
+  ) => {
+    const results = await Promise.allSettled(
+      rows.map((r) => Promise.resolve(fn(r.id) as unknown))
+    );
+    const ok = results.filter((r) => r.status === 'fulfilled').length;
+    const fail = results.length - ok;
+    if (fail === 0) {
+      message.success(`${ok} teacher(s) ${okLabel}`);
+    } else if (ok === 0) {
+      message.error(`No teachers ${okLabel}. ${fail} ${failLabel}.`);
+    } else {
+      message.warning(`${ok} ${okLabel}; ${fail} ${failLabel}.`);
+    }
+    refreshData();
+  };
 
   const bulkActions: BulkAction<ITeacher>[] = [
     {
       key: 'activate',
       label: 'Activate',
-      onClick: async (rows) => {
-        for (const row of rows) await activateAsync(row.id);
-        message.success(`${rows.length} teacher(s) activated`);
-        refreshData();
-      },
+      onClick: (rows) => runBulk(rows, activateAsync, 'activated', 'failed'),
     },
     {
       key: 'deactivate',
       label: 'Deactivate',
       danger: true,
       confirm: { title: 'Deactivate selected teachers?' },
-      onClick: async (rows) => {
-        for (const row of rows) await deactivateAsync(row.id);
-        message.success(`${rows.length} teacher(s) deactivated`);
-        refreshData();
-      },
+      onClick: (rows) => runBulk(rows, deactivateAsync, 'deactivated', 'failed'),
     },
   ];
 

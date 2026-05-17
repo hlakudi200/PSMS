@@ -39,6 +39,7 @@ export const StudentTransferProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getTransferError());
+        throw error;
       });
   };
 
@@ -57,6 +58,7 @@ export const StudentTransferProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getTransfersError());
+        throw error;
       });
   };
 
@@ -71,6 +73,7 @@ export const StudentTransferProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(createTransferError());
+        throw error;
       });
   };
 
@@ -85,6 +88,7 @@ export const StudentTransferProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(updateTransferError());
+        throw error;
       });
   };
 

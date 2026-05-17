@@ -54,6 +54,7 @@ export const MessageProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getMessageError());
+        throw error;
       });
   };
 
@@ -79,6 +80,7 @@ export const MessageProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getInboxError());
+        throw error;
       });
   };
 
@@ -104,6 +106,7 @@ export const MessageProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getSentError());
+        throw error;
       });
   };
 
@@ -120,6 +123,7 @@ export const MessageProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getThreadError());
+        throw error;
       });
   };
 
@@ -134,6 +138,7 @@ export const MessageProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(sendMessageError());
+        throw error;
       });
   };
 
@@ -148,6 +153,7 @@ export const MessageProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(markAsReadError());
+        throw error;
       });
   };
 
@@ -162,6 +168,7 @@ export const MessageProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(deleteMessageError());
+        throw error;
       });
   };
 

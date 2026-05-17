@@ -98,7 +98,7 @@ export const TeacherFormModal: React.FC<TeacherFormModalProps> = ({
       message.success(`Teacher ${isEdit ? 'updated' : 'created'} successfully`);
       onClose(true);
     } catch {
-      message.error('An error occurred');
+      // Server errors are surfaced by the axios response interceptor.
     } finally {
       setLoading(false);
     }

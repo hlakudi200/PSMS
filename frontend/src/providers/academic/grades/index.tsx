@@ -62,6 +62,7 @@ export const GradeProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getGradeError());
+        throw error;
       });
   };
 
@@ -80,6 +81,7 @@ export const GradeProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getGradesError());
+        throw error;
       });
   };
 
@@ -94,6 +96,7 @@ export const GradeProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(createGradeError());
+        throw error;
       });
   };
 
@@ -108,6 +111,7 @@ export const GradeProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(updateGradeError());
+        throw error;
       });
   };
 
@@ -122,6 +126,7 @@ export const GradeProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(deleteGradeError());
+        throw error;
       });
   };
 
@@ -138,6 +143,7 @@ export const GradeProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getActiveGradesError());
+        throw error;
       });
   };
 
@@ -154,6 +160,7 @@ export const GradeProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getByPhaseError());
+        throw error;
       });
   };
 
@@ -168,6 +175,7 @@ export const GradeProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(activateError());
+        throw error;
       });
   };
 
@@ -182,6 +190,7 @@ export const GradeProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(deactivateError());
+        throw error;
       });
   };
 

@@ -61,6 +61,7 @@ export const AnnouncementProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getAnnouncementError());
+        throw error;
       });
   };
 
@@ -90,6 +91,7 @@ export const AnnouncementProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getAllAnnouncementsError());
+        throw error;
       });
   };
 
@@ -104,6 +106,7 @@ export const AnnouncementProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(createAnnouncementError());
+        throw error;
       });
   };
 
@@ -118,6 +121,7 @@ export const AnnouncementProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(updateAnnouncementError());
+        throw error;
       });
   };
 
@@ -132,6 +136,7 @@ export const AnnouncementProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(deleteAnnouncementError());
+        throw error;
       });
   };
 
@@ -146,6 +151,7 @@ export const AnnouncementProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(publishAnnouncementError());
+        throw error;
       });
   };
 
@@ -160,6 +166,7 @@ export const AnnouncementProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(unpublishAnnouncementError());
+        throw error;
       });
   };
 
@@ -174,6 +181,7 @@ export const AnnouncementProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(pinAnnouncementError());
+        throw error;
       });
   };
 
@@ -188,6 +196,7 @@ export const AnnouncementProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(unpinAnnouncementError());
+        throw error;
       });
   };
 

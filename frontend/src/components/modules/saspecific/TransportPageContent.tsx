@@ -10,6 +10,7 @@ import { SchoolTransportProvider, useSchoolTransportState, useSchoolTransportAct
 import { StudentTransportProvider, useStudentTransportState, useStudentTransportActions } from '@/providers/saspecific/student_transports';
 import { useAuthState } from '@/providers/auth';
 import type { ISchoolTransportList, IStudentTransportList } from '@/providers/saspecific/shared/interfaces';
+import { formatZAR } from '@/utils/currency';
 
 const transportTypeMap: Record<number, { label: string; color: string }> = {
   1: { label: 'Bus', color: 'blue' },
@@ -73,7 +74,7 @@ function RoutesTab() {
     { key: 'driverName', title: 'Driver', dataIndex: 'driverName', hideOnMobile: true },
     {
       key: 'monthlyFee', title: 'Monthly Fee', dataIndex: 'monthlyFee', sortable: true, width: 120,
-      render: (value: number) => `R ${value.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+      render: (value: number) => formatZAR(value),
     },
     {
       key: 'isActive', title: 'Status', dataIndex: 'isActive', width: 100,

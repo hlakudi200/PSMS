@@ -88,10 +88,18 @@ function AcademicYearsContent() {
       label: 'Set as Current',
       icon: <CheckCircleOutlined />,
       visible: (record) => !record.isCurrent,
+      confirm: {
+        title: 'Set as current academic year?',
+        description: 'Only one academic year can be current at a time.',
+      },
       onClick: async (record) => {
-        await setAsCurrentAsync(record.id);
-        message.success('Academic year set as current');
-        refreshData();
+        try {
+          await setAsCurrentAsync(record.id);
+          message.success('Academic year set as current');
+          refreshData();
+        } catch {
+          // Surfaced by axios interceptor
+        }
       },
     },
     {
@@ -101,9 +109,13 @@ function AcademicYearsContent() {
       danger: true,
       confirm: { title: 'Delete this academic year?', description: 'This action cannot be undone.' },
       onClick: async (record) => {
-        await deleteAsync(record.id);
-        message.success('Academic year deleted');
-        refreshData();
+        try {
+          await deleteAsync(record.id);
+          message.success('Academic year deleted');
+          refreshData();
+        } catch {
+          // Surfaced by axios interceptor
+        }
       },
     },
   ];

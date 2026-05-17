@@ -18,6 +18,7 @@ import { AttendanceProvider, useAttendanceState, useAttendanceActions } from '@/
 import { ClassProvider, useClassState, useClassActions } from '@/providers/academic/classes';
 import { useAuthState } from '@/providers/auth';
 import type { IAttendanceList, IAttendanceSummary } from '@/providers/academic/shared/interfaces';
+import { AttendanceStatus, attendanceStatusLabels } from '@/providers/shared/enums';
 
 const { RangePicker } = DatePicker;
 const { Text } = Typography;
@@ -25,11 +26,12 @@ const { Text } = Typography;
 const AT_RISK_THRESHOLD = 80;
 
 const statusMap: Record<number, { label: string; color: string }> = {
-  1: { label: 'Present', color: 'green' },
-  2: { label: 'Absent', color: 'red' },
-  3: { label: 'Late', color: 'orange' },
-  4: { label: 'Excused', color: 'blue' },
-  5: { label: 'Sick Leave', color: 'purple' },
+  [AttendanceStatus.Present]: { label: attendanceStatusLabels[AttendanceStatus.Present], color: 'green' },
+  [AttendanceStatus.Absent]: { label: attendanceStatusLabels[AttendanceStatus.Absent], color: 'red' },
+  [AttendanceStatus.Late]: { label: attendanceStatusLabels[AttendanceStatus.Late], color: 'orange' },
+  [AttendanceStatus.Excused]: { label: attendanceStatusLabels[AttendanceStatus.Excused], color: 'blue' },
+  [AttendanceStatus.SickLeave]: { label: attendanceStatusLabels[AttendanceStatus.SickLeave], color: 'purple' },
+  [AttendanceStatus.Holiday]: { label: attendanceStatusLabels[AttendanceStatus.Holiday], color: 'default' },
 };
 
 // ─── Analytics Tab Content ─────────────────────────────────────
@@ -240,10 +242,10 @@ function AttendanceContent() {
 
   const stats = {
     total: attendances?.length ?? 0,
-    present: attendances?.filter(a => a.status === 1).length ?? 0,
-    absent: attendances?.filter(a => a.status === 2).length ?? 0,
-    late: attendances?.filter(a => a.status === 3).length ?? 0,
-    sickLeave: attendances?.filter(a => a.status === 5).length ?? 0,
+    present: attendances?.filter(a => a.status === AttendanceStatus.Present).length ?? 0,
+    absent: attendances?.filter(a => a.status === AttendanceStatus.Absent).length ?? 0,
+    late: attendances?.filter(a => a.status === AttendanceStatus.Late).length ?? 0,
+    sickLeave: attendances?.filter(a => a.status === AttendanceStatus.SickLeave).length ?? 0,
   };
 
   const recordColumns: ColumnConfig<IAttendanceList>[] = [
@@ -253,13 +255,10 @@ function AttendanceContent() {
     {
       key: 'status', title: 'Status', dataIndex: 'status',
       filterable: true, filterType: 'enum',
-      filterOptions: [
-        { label: 'Present', value: 1 },
-        { label: 'Absent', value: 2 },
-        { label: 'Late', value: 3 },
-        { label: 'Excused', value: 4 },
-        { label: 'Sick Leave', value: 5 },
-      ],
+      filterOptions: Object.entries(attendanceStatusLabels).map(([value, label]) => ({
+        label,
+        value: Number(value),
+      })),
       renderType: 'status',
       renderConfig: { statusMap },
     },

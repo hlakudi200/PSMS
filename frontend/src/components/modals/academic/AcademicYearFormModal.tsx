@@ -7,24 +7,59 @@ import { useAcademicYearActions } from '@/providers/academic/academic_years';
 import type { IAcademicYear } from '@/providers/academic/shared/interfaces';
 import dayjs from 'dayjs';
 
-const createSchema = z.object({
-  year: z.number().min(2020, 'Year must be 2020+').max(2099, 'Year must be before 2100'),
-  startDate: z.string().min(1, 'Start date is required'),
-  endDate: z.string().min(1, 'End date is required'),
-  createDefaultTerms: z.boolean(),
-}).refine(data => new Date(data.endDate) > new Date(data.startDate), {
-  message: 'End date must be after start date',
-  path: ['endDate'],
-});
+// SA academic-year rule AR-002: start month must be January or February,
+// end month must be December, total duration roughly 12 months.
+const isValidSAStart = (iso: string): boolean => {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return false;
+  const month = d.getMonth() + 1;
+  return month === 1 || month === 2;
+};
 
-const updateSchema = z.object({
-  yearName: z.string().min(1, 'Year name is required').max(100),
-  startDate: z.string().min(1, 'Start date is required'),
-  endDate: z.string().min(1, 'End date is required'),
-}).refine(data => new Date(data.endDate) > new Date(data.startDate), {
-  message: 'End date must be after start date',
-  path: ['endDate'],
-});
+const isValidSAEnd = (iso: string): boolean => {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return false;
+  return d.getMonth() + 1 === 12;
+};
+
+const createSchema = z
+  .object({
+    year: z.number().min(2020, 'Year must be 2020+').max(2099, 'Year must be before 2100'),
+    startDate: z.string().min(1, 'Start date is required'),
+    endDate: z.string().min(1, 'End date is required'),
+    createDefaultTerms: z.boolean(),
+  })
+  .refine((data) => new Date(data.endDate) > new Date(data.startDate), {
+    message: 'End date must be after start date',
+    path: ['endDate'],
+  })
+  .refine((data) => isValidSAStart(data.startDate), {
+    message: 'SA academic year must start in January or February',
+    path: ['startDate'],
+  })
+  .refine((data) => isValidSAEnd(data.endDate), {
+    message: 'SA academic year must end in December',
+    path: ['endDate'],
+  });
+
+const updateSchema = z
+  .object({
+    yearName: z.string().min(1, 'Year name is required').max(100),
+    startDate: z.string().min(1, 'Start date is required'),
+    endDate: z.string().min(1, 'End date is required'),
+  })
+  .refine((data) => new Date(data.endDate) > new Date(data.startDate), {
+    message: 'End date must be after start date',
+    path: ['endDate'],
+  })
+  .refine((data) => isValidSAStart(data.startDate), {
+    message: 'SA academic year must start in January or February',
+    path: ['startDate'],
+  })
+  .refine((data) => isValidSAEnd(data.endDate), {
+    message: 'SA academic year must end in December',
+    path: ['endDate'],
+  });
 
 interface AcademicYearFormModalProps {
   open: boolean;
@@ -103,7 +138,8 @@ export const AcademicYearFormModal: React.FC<AcademicYearFormModalProps> = ({
       message.success(`Academic year ${isEdit ? 'updated' : 'created'} successfully`);
       onClose(true);
     } catch {
-      message.error('An error occurred');
+      // Server errors are surfaced by the axios response interceptor.
+      // Keep the modal open so the user can fix and retry.
     } finally {
       setLoading(false);
     }

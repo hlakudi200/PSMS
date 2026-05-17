@@ -56,6 +56,7 @@ export const TermProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getTermError());
+        throw error;
       });
   };
 
@@ -79,6 +80,7 @@ export const TermProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getTermsError());
+        throw error;
       });
   };
 
@@ -97,6 +99,7 @@ export const TermProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getTermsError());
+        throw error;
       });
   };
 
@@ -111,6 +114,7 @@ export const TermProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getCurrentTermError());
+        throw error;
       });
   };
 
@@ -126,6 +130,7 @@ export const TermProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(createTermError());
+        throw error;
       });
   };
 
@@ -140,6 +145,7 @@ export const TermProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(updateTermError());
+        throw error;
       });
   };
 
@@ -154,6 +160,7 @@ export const TermProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(deleteTermError());
+        throw error;
       });
   };
 
@@ -168,6 +175,7 @@ export const TermProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(setAsCurrentError());
+        throw error;
       });
   };
 

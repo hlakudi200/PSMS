@@ -23,7 +23,7 @@ export const SubjectProvider = ({ children }: { children: React.ReactNode }) => 
     dispatch(getSubjectPending());
     await instance.get(`/api/services/app/Subject/Get?id=${id}`)
       .then((response) => dispatch(getSubjectSuccess(response.data.result)))
-      .catch((error) => { console.error(error); dispatch(getSubjectError()); });
+      .catch((error) => { console.error(error); dispatch(getSubjectError()); throw error; });
   };
 
   const getAllAsync = async (input?: IPagedAndSortedResultRequest) => {
@@ -31,42 +31,42 @@ export const SubjectProvider = ({ children }: { children: React.ReactNode }) => 
     const params = buildQueryParams(input as Record<string, unknown>);
     await instance.get(`/api/services/app/Subject/GetAll?${params.toString()}`)
       .then((response) => dispatch(getSubjectsSuccess({ items: response.data.result.items, totalCount: response.data.result.totalCount })))
-      .catch((error) => { console.error(error); dispatch(getSubjectsError()); });
+      .catch((error) => { console.error(error); dispatch(getSubjectsError()); throw error; });
   };
 
   const createAsync = async (input: ICreateSubject) => {
     dispatch(createSubjectPending());
     await instance.post(`/api/services/app/Subject/Create`, input)
       .then((response) => dispatch(createSubjectSuccess(response.data.result)))
-      .catch((error) => { console.error(error); dispatch(createSubjectError()); });
+      .catch((error) => { console.error(error); dispatch(createSubjectError()); throw error; });
   };
 
   const updateAsync = async (id: string, input: IUpdateSubject) => {
     dispatch(updateSubjectPending());
     await instance.put(`/api/services/app/Subject/Update`, { id, ...input })
       .then((response) => dispatch(updateSubjectSuccess(response.data.result)))
-      .catch((error) => { console.error(error); dispatch(updateSubjectError()); });
+      .catch((error) => { console.error(error); dispatch(updateSubjectError()); throw error; });
   };
 
   const deleteAsync = async (id: string) => {
     dispatch(deleteSubjectPending());
     await instance.delete(`/api/services/app/Subject/Delete?id=${id}`)
       .then(() => dispatch(deleteSubjectSuccess()))
-      .catch((error) => { console.error(error); dispatch(deleteSubjectError()); });
+      .catch((error) => { console.error(error); dispatch(deleteSubjectError()); throw error; });
   };
 
   const activateAsync = async (id: string) => {
     dispatch(activateSubjectPending());
     await instance.post(`/api/services/app/Subject/Activate`, { id })
       .then(() => dispatch(activateSubjectSuccess()))
-      .catch((error) => { console.error(error); dispatch(activateSubjectError()); });
+      .catch((error) => { console.error(error); dispatch(activateSubjectError()); throw error; });
   };
 
   const deactivateAsync = async (id: string) => {
     dispatch(deactivateSubjectPending());
     await instance.post(`/api/services/app/Subject/Deactivate`, { id })
       .then(() => dispatch(deactivateSubjectSuccess()))
-      .catch((error) => { console.error(error); dispatch(deactivateSubjectError()); });
+      .catch((error) => { console.error(error); dispatch(deactivateSubjectError()); throw error; });
   };
 
   return (

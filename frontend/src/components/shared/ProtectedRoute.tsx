@@ -19,33 +19,37 @@ export const ProtectedRoute = ({
   const router = useRouter();
   const { currentUser, jwtToken, currentRole, isPending } = useAuthState();
 
+  const isAuthenticated = !isPending && !!jwtToken;
+  const roleRequired = !!(allowedRoles && allowedRoles.length > 0);
+  const hasAllowedRole =
+    roleRequired
+      ? !!currentRole &&
+        allowedRoles!.some(
+          (role) => role.toLowerCase() === currentRole.toLowerCase()
+        )
+      : true;
+
   useEffect(() => {
-    // Check if user is authenticated
-    if (!isPending && !jwtToken) {
+    if (isPending) return;
+    if (!jwtToken) {
       router.push(redirectTo);
       return;
     }
-
-    // Check if user has required role
-    if (
-      !isPending &&
-      currentRole &&
-      allowedRoles &&
-      allowedRoles.length > 0
-    ) {
-      const hasRole = allowedRoles.some(
-        (role) => role.toLowerCase() === currentRole.toLowerCase()
-      );
-
-      if (!hasRole) {
-        // Redirect to unauthorized page or back to login
-        router.push("/unauthorized");
-      }
+    if (roleRequired && currentRole && !hasAllowedRole) {
+      router.push("/unauthorized");
     }
-  }, [jwtToken, currentRole, allowedRoles, isPending, router, redirectTo]);
+  }, [
+    jwtToken,
+    currentRole,
+    isPending,
+    router,
+    redirectTo,
+    roleRequired,
+    hasAllowedRole,
+  ]);
 
-  // Show loading while checking auth
-  if (isPending || (!currentUser && jwtToken)) {
+  // Show loading while auth state resolves
+  if (isPending || (jwtToken && !currentUser)) {
     return (
       <div
         style={{
@@ -56,16 +60,21 @@ export const ProtectedRoute = ({
           background: "#f5f5f5",
         }}
       >
-        <Spin size="large" tip="Loading..." />
+        <Spin size="large">
+          <div style={{ padding: 40 }} />
+        </Spin>
       </div>
     );
   }
 
-  // Not authenticated
-  if (!jwtToken) {
-    return null;
-  }
+  // Not authenticated — block render, redirect runs from the effect
+  if (!isAuthenticated) return null;
 
-  // Authenticated - render children
+  // Authenticated but role check pending (no role yet) — block render
+  if (roleRequired && !currentRole) return null;
+
+  // Authenticated but lacks required role — block render, redirect runs from the effect
+  if (roleRequired && !hasAllowedRole) return null;
+
   return <>{children}</>;
 };

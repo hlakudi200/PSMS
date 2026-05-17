@@ -18,24 +18,44 @@ import { TermProvider, useTermState, useTermActions } from '@/providers/academic
 import { GradeProvider, useGradeState, useGradeActions } from '@/providers/academic/grades';
 import { useAuthState } from '@/providers/auth';
 import type { IReportList } from '@/providers/assessment/shared/interfaces';
+import {
+  ReportStatus,
+  ReportType,
+  reportStatusLabels,
+  reportTypeLabels,
+} from '@/providers/shared/enums';
 
-const reportStatusMap: Record<number, { label: string; color: string }> = {
-  1: { label: 'Draft', color: 'default' },
-  2: { label: 'Generated', color: 'blue' },
-  3: { label: 'Pending Approval', color: 'orange' },
-  4: { label: 'Approved', color: 'green' },
-  5: { label: 'Published', color: 'purple' },
+const reportStatusColors: Record<ReportStatus, string> = {
+  [ReportStatus.Draft]: 'default',
+  [ReportStatus.Generated]: 'blue',
+  [ReportStatus.PendingApproval]: 'orange',
+  [ReportStatus.Approved]: 'green',
+  [ReportStatus.Published]: 'purple',
 };
 
-const reportTypeMap: Record<number, { label: string; color: string }> = {
-  1: { label: 'Term 1', color: 'blue' },
-  2: { label: 'Term 2', color: 'blue' },
-  3: { label: 'Term 3', color: 'blue' },
-  4: { label: 'Term 4', color: 'blue' },
-  5: { label: 'Mid-Year', color: 'orange' },
-  6: { label: 'Year-End', color: 'green' },
-  7: { label: 'Progress', color: 'cyan' },
+const reportTypeColors: Record<ReportType, string> = {
+  [ReportType.Term1]: 'blue',
+  [ReportType.Term2]: 'blue',
+  [ReportType.Term3]: 'blue',
+  [ReportType.Term4]: 'blue',
+  [ReportType.MidYear]: 'orange',
+  [ReportType.YearEnd]: 'green',
+  [ReportType.Progress]: 'cyan',
 };
+
+const reportStatusMap: Record<number, { label: string; color: string }> = Object.fromEntries(
+  Object.entries(reportStatusLabels).map(([k, label]) => [
+    k,
+    { label, color: reportStatusColors[Number(k) as ReportStatus] },
+  ])
+);
+
+const reportTypeMap: Record<number, { label: string; color: string }> = Object.fromEntries(
+  Object.entries(reportTypeLabels).map(([k, label]) => [
+    k,
+    { label, color: reportTypeColors[Number(k) as ReportType] },
+  ])
+);
 
 function ReportsContent() {
   const router = useRouter();
@@ -44,7 +64,7 @@ function ReportsContent() {
   const { academicYears } = useAcademicYearState();
   const { getAllAsync: getAllAcademicYears } = useAcademicYearActions();
   const { terms } = useTermState();
-  const { getAllAsync: getAllTerms } = useTermActions();
+  const { getByAcademicYearAsync: getTermsByYear } = useTermActions();
   const { activeGrades } = useGradeState();
   const { getActiveGradesAsync } = useGradeActions();
   const { currentRole } = useAuthState();
@@ -60,11 +80,12 @@ function ReportsContent() {
     getActiveGradesAsync();
   }, []);
 
-  // Load terms when academic year changes
+  // Load terms scoped to the selected academic year
   useEffect(() => {
     if (selectedAcademicYearId) {
-      getAllTerms({ maxResultCount: 10 });
+      getTermsByYear(selectedAcademicYearId);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedAcademicYearId]);
 
   const handleQueryChange = useCallback((query: TableQuery) => {
@@ -100,15 +121,10 @@ function ReportsContent() {
     {
       key: 'reportType', title: 'Type', dataIndex: 'reportType', width: 90,
       filterable: true, filterType: 'enum',
-      filterOptions: [
-        { label: 'Term 1', value: 1 },
-        { label: 'Term 2', value: 2 },
-        { label: 'Term 3', value: 3 },
-        { label: 'Term 4', value: 4 },
-        { label: 'Mid-Year', value: 5 },
-        { label: 'Year-End', value: 6 },
-        { label: 'Progress', value: 7 },
-      ],
+      filterOptions: Object.entries(reportTypeLabels).map(([value, label]) => ({
+        label,
+        value: Number(value),
+      })),
       renderType: 'status',
       renderConfig: { statusMap: reportTypeMap },
     },
@@ -118,13 +134,10 @@ function ReportsContent() {
     {
       key: 'status', title: 'Status', dataIndex: 'status',
       filterable: true, filterType: 'enum',
-      filterOptions: [
-        { label: 'Draft', value: 1 },
-        { label: 'Generated', value: 2 },
-        { label: 'Pending Approval', value: 3 },
-        { label: 'Approved', value: 4 },
-        { label: 'Published', value: 5 },
-      ],
+      filterOptions: Object.entries(reportStatusLabels).map(([value, label]) => ({
+        label,
+        value: Number(value),
+      })),
       renderType: 'status',
       renderConfig: { statusMap: reportStatusMap },
     },
@@ -143,24 +156,32 @@ function ReportsContent() {
       key: 'approve',
       label: 'Approve',
       icon: <CheckCircleOutlined />,
-      visible: (record) => record.status === 3, // Pending Approval
+      visible: (record) => record.status === ReportStatus.PendingApproval,
       confirm: { title: 'Approve this report card?', description: 'The report will be ready for publication.' },
       onClick: async (record) => {
-        await approveAsync(record.id);
-        message.success('Report approved');
-        refreshData();
+        try {
+          await approveAsync(record.id);
+          message.success('Report approved');
+          refreshData();
+        } catch {
+          // Surfaced by axios interceptor
+        }
       },
     },
     {
       key: 'publish',
       label: 'Publish',
       icon: <SendOutlined />,
-      visible: (record) => record.status === 4, // Approved
+      visible: (record) => record.status === ReportStatus.Approved,
       confirm: { title: 'Publish this report card?', description: 'Parents and students will be able to view it.' },
       onClick: async (record) => {
-        await publishAsync(record.id);
-        message.success('Report published');
-        refreshData();
+        try {
+          await publishAsync(record.id);
+          message.success('Report published');
+          refreshData();
+        } catch {
+          // Surfaced by axios interceptor
+        }
       },
     },
     {
@@ -169,20 +190,45 @@ function ReportsContent() {
       icon: <DownloadOutlined />,
       visible: (record) => !!record.pdfUrl,
       onClick: (record) => {
-        window.open(record.pdfUrl, '_blank');
+        if (record.pdfUrl) window.open(record.pdfUrl, '_blank', 'noopener,noreferrer');
       },
     },
     {
       key: 'generatePdf',
       label: 'Generate PDF',
       icon: <FilePdfOutlined />,
-      visible: (record) => !record.pdfUrl && record.status >= 2,
+      visible: (record) => !record.pdfUrl && record.status >= ReportStatus.Generated,
       onClick: async (record) => {
-        await generatePdfAsync(record.id);
-        message.success('PDF generation started');
+        try {
+          await generatePdfAsync(record.id);
+          message.success('PDF generation started');
+        } catch {
+          // Surfaced by axios interceptor
+        }
       },
     },
   ];
+
+  const runParallel = async (
+    rows: IReportList[],
+    fn: (id: string) => void | Promise<unknown>,
+    okLabel: string,
+    failLabel: string
+  ) => {
+    const results = await Promise.allSettled(
+      rows.map((r) => Promise.resolve(fn(r.id) as unknown))
+    );
+    const ok = results.filter((r) => r.status === 'fulfilled').length;
+    const fail = results.length - ok;
+    if (fail === 0) {
+      message.success(`${ok} report(s) ${okLabel}`);
+    } else if (ok === 0) {
+      message.error(`No reports ${okLabel}. ${fail} ${failLabel}.`);
+    } else {
+      message.warning(`${ok} ${okLabel}; ${fail} ${failLabel}.`);
+    }
+    refreshData();
+  };
 
   const bulkActions: BulkAction<IReportList>[] = [
     {
@@ -190,14 +236,12 @@ function ReportsContent() {
       label: 'Approve Selected',
       confirm: { title: 'Approve all selected reports?' },
       onClick: async (rows) => {
-        const submitted = rows.filter(r => r.status === 3);
-        if (submitted.length === 0) {
+        const eligible = rows.filter((r) => r.status === ReportStatus.PendingApproval);
+        if (eligible.length === 0) {
           message.warning('No reports in "Pending Approval" status selected');
           return;
         }
-        for (const row of submitted) await approveAsync(row.id);
-        message.success(`${submitted.length} report(s) approved`);
-        refreshData();
+        await runParallel(eligible, approveAsync, 'approved', 'failed');
       },
     },
     {
@@ -205,14 +249,12 @@ function ReportsContent() {
       label: 'Publish Selected',
       confirm: { title: 'Publish all selected reports?' },
       onClick: async (rows) => {
-        const approved = rows.filter(r => r.status === 4);
-        if (approved.length === 0) {
+        const eligible = rows.filter((r) => r.status === ReportStatus.Approved);
+        if (eligible.length === 0) {
           message.warning('No reports in "Approved" status selected');
           return;
         }
-        for (const row of approved) await publishAsync(row.id);
-        message.success(`${approved.length} report(s) published`);
-        refreshData();
+        await runParallel(eligible, publishAsync, 'published', 'failed');
       },
     },
     {
@@ -224,21 +266,25 @@ function ReportsContent() {
           message.warning('Please select an academic year first');
           return;
         }
-        // Use the first report's classId or require class filter
-        const classIds = [...new Set(reports?.map(r => r.classId) ?? [])];
+        const classIds = [...new Set(reports?.map((r) => r.classId) ?? [])];
         if (classIds.length === 0) {
           message.warning('No reports found to generate PDFs for');
           return;
         }
-        let totalQueued = 0;
-        for (const classId of classIds) {
-          await bulkGeneratePdfsAsync({
-            classId,
-            termId: selectedTermId,
-          });
-          totalQueued++;
+        const results = await Promise.allSettled(
+          classIds.map((classId) =>
+            Promise.resolve(
+              bulkGeneratePdfsAsync({ classId, termId: selectedTermId }) as unknown
+            )
+          )
+        );
+        const ok = results.filter((r) => r.status === 'fulfilled').length;
+        const fail = results.length - ok;
+        if (fail === 0) {
+          message.success(`PDF generation started for ${ok} class(es)`);
+        } else {
+          message.warning(`PDF generation: ${ok} class(es) started; ${fail} failed.`);
         }
-        message.success(`PDF generation started for ${totalQueued} class(es)`);
       },
     },
   ];

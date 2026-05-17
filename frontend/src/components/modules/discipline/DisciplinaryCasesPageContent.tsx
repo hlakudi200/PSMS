@@ -2,32 +2,33 @@
 
 import React, { useState, useCallback } from 'react';
 import { message } from 'antd';
-import { PlusOutlined, EditOutlined, EyeOutlined, SendOutlined, StopOutlined } from '@ant-design/icons';
+import { PlusOutlined, EditOutlined, SendOutlined, StopOutlined } from '@ant-design/icons';
 import { EnterpriseTable } from '@/components/shared/enterprise-table';
 import type { ColumnConfig, TableQuery, RowAction, ToolbarAction } from '@/components/shared/enterprise-table';
 import { DisciplinaryCaseProvider, useDisciplinaryCaseState, useDisciplinaryCaseActions } from '@/providers/discipline/disciplinary-cases';
 import { useAuthState } from '@/providers/auth';
 import { DisciplinaryCaseFormModal } from '@/components/modals/discipline/DisciplinaryCaseFormModal';
 import type { IDisciplinaryCase } from '@/providers/discipline/disciplinary-cases/context';
+import {
+  DisciplinaryCaseStatus,
+  disciplinaryCaseStatusLabels,
+  disciplinaryCategoryLabels,
+  disciplinarySeverityLabels,
+} from '@/providers/shared/enums';
 
-const CategoryLabels: Record<number, string> = {
-  1: 'Misconduct', 2: 'Bullying', 3: 'Violence', 4: 'Substance Abuse',
-  5: 'Property Damage', 6: 'Truancy', 7: 'Academic Dishonesty',
-  8: 'Harassment', 9: 'Dress Code', 10: 'Other',
-};
-
-const SeverityLabels: Record<number, string> = {
-  1: 'Minor', 2: 'Moderate', 3: 'Serious', 4: 'Very Serious',
-};
-
-const StatusLabels: Record<number, string> = {
-  1: 'Draft', 2: 'Reported', 3: 'Under Investigation', 4: 'Hearing Scheduled',
-  5: 'Hearing Completed', 6: 'Resolved', 7: 'Appealed', 8: 'Cancelled',
-};
+const CategoryLabels = disciplinaryCategoryLabels;
+const SeverityLabels = disciplinarySeverityLabels;
+const StatusLabels = disciplinaryCaseStatusLabels;
 
 const StatusColors: Record<number, string> = {
-  1: 'default', 2: 'processing', 3: 'warning', 4: 'processing',
-  5: 'warning', 6: 'success', 7: 'error', 8: 'default',
+  [DisciplinaryCaseStatus.Draft]: 'default',
+  [DisciplinaryCaseStatus.Reported]: 'processing',
+  [DisciplinaryCaseStatus.UnderInvestigation]: 'warning',
+  [DisciplinaryCaseStatus.HearingScheduled]: 'processing',
+  [DisciplinaryCaseStatus.HearingCompleted]: 'warning',
+  [DisciplinaryCaseStatus.Resolved]: 'success',
+  [DisciplinaryCaseStatus.Appealed]: 'error',
+  [DisciplinaryCaseStatus.Cancelled]: 'default',
 };
 
 function DisciplinaryCasesContent() {
@@ -114,19 +115,19 @@ function DisciplinaryCasesContent() {
     },
   ];
 
+  const cancellableStatuses = new Set<number>([
+    DisciplinaryCaseStatus.Draft,
+    DisciplinaryCaseStatus.Reported,
+    DisciplinaryCaseStatus.UnderInvestigation,
+  ]);
+
   const rowActions: RowAction<IDisciplinaryCase>[] = [
-    {
-      key: 'view',
-      label: 'View Details',
-      icon: <EyeOutlined />,
-      onClick: () => { /* navigate to detail page if needed */ },
-    },
     {
       key: 'edit',
       label: 'Edit',
       icon: <EditOutlined />,
       requiredPermissions: ['Admin', 'Principal'],
-      visible: (record) => record.status === 1,
+      visible: (record) => record.status === DisciplinaryCaseStatus.Draft,
       onClick: (record) => { setEditRecord(record); setModalOpen(true); },
     },
     {
@@ -134,12 +135,16 @@ function DisciplinaryCasesContent() {
       label: 'Submit',
       icon: <SendOutlined />,
       requiredPermissions: ['Admin', 'Principal'],
-      visible: (record) => record.status === 1,
+      visible: (record) => record.status === DisciplinaryCaseStatus.Draft,
       confirm: { title: 'Submit this case?', description: 'The case will be formally reported.' },
       onClick: async (record) => {
-        await submitAsync(record.id);
-        message.success('Case submitted');
-        refreshData();
+        try {
+          await submitAsync(record.id);
+          message.success('Case submitted');
+          refreshData();
+        } catch {
+          // Surfaced by axios interceptor
+        }
       },
     },
     {
@@ -148,12 +153,16 @@ function DisciplinaryCasesContent() {
       icon: <StopOutlined />,
       danger: true,
       requiredPermissions: ['Admin', 'Principal'],
-      visible: (record) => [1, 2, 3].includes(record.status),
+      visible: (record) => cancellableStatuses.has(record.status),
       confirm: { title: 'Cancel this case?', description: 'This action cannot be undone.' },
       onClick: async (record) => {
-        await cancelAsync(record.id);
-        message.success('Case cancelled');
-        refreshData();
+        try {
+          await cancelAsync(record.id);
+          message.success('Case cancelled');
+          refreshData();
+        } catch {
+          // Surfaced by axios interceptor
+        }
       },
     },
   ];

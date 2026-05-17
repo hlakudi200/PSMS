@@ -9,29 +9,34 @@ import { ExpenseRequestProvider, useExpenseRequestState, useExpenseRequestAction
 import { useAuthState } from '@/providers/auth';
 import { ExpenseRequestFormModal } from '@/components/modals/financial/ExpenseRequestFormModal';
 import type { IExpenseRequest } from '@/providers/financial/expense-requests/context';
+import {
+  ExpensePriority,
+  ExpenseRequestStatus,
+  expenseCategoryLabels,
+  expensePriorityLabels,
+  expenseRequestStatusLabels,
+} from '@/providers/shared/enums';
+import { formatZAR } from '@/utils/currency';
 
-const CategoryLabels: Record<number, string> = {
-  1: 'Stationery', 2: 'Textbooks', 3: 'Equipment', 4: 'Maintenance',
-  5: 'Technology', 6: 'Sports', 7: 'Cultural', 8: 'Transport',
-  9: 'Catering', 10: 'Training', 11: 'Other',
-};
-
-const PriorityLabels: Record<number, string> = {
-  1: 'Low', 2: 'Medium', 3: 'High', 4: 'Urgent',
-};
+const CategoryLabels = expenseCategoryLabels;
+const PriorityLabels = expensePriorityLabels;
+const StatusLabels = expenseRequestStatusLabels;
 
 const PriorityColors: Record<number, string> = {
-  1: 'default', 2: 'processing', 3: 'warning', 4: 'error',
-};
-
-const StatusLabels: Record<number, string> = {
-  1: 'Draft', 2: 'Submitted', 3: 'Under Review', 4: 'Approved',
-  5: 'Rejected', 6: 'Paid', 7: 'Cancelled',
+  [ExpensePriority.Low]: 'default',
+  [ExpensePriority.Medium]: 'processing',
+  [ExpensePriority.High]: 'warning',
+  [ExpensePriority.Urgent]: 'error',
 };
 
 const StatusColors: Record<number, string> = {
-  1: 'default', 2: 'processing', 3: 'warning', 4: 'success',
-  5: 'error', 6: 'success', 7: 'default',
+  [ExpenseRequestStatus.Draft]: 'default',
+  [ExpenseRequestStatus.Submitted]: 'processing',
+  [ExpenseRequestStatus.UnderReview]: 'warning',
+  [ExpenseRequestStatus.Approved]: 'success',
+  [ExpenseRequestStatus.Rejected]: 'error',
+  [ExpenseRequestStatus.Paid]: 'success',
+  [ExpenseRequestStatus.Cancelled]: 'default',
 };
 
 function ExpenseRequestsContent() {
@@ -77,7 +82,7 @@ function ExpenseRequestsContent() {
     {
       key: 'amount', title: 'Amount', dataIndex: 'amount',
       sortable: true,
-      render: (value: number) => `R ${value?.toFixed(2) ?? '0.00'}`,
+      render: (value: number) => formatZAR(value),
     },
     {
       key: 'status', title: 'Status', dataIndex: 'status',
@@ -132,7 +137,7 @@ function ExpenseRequestsContent() {
       label: 'Edit',
       icon: <EditOutlined />,
       requiredPermissions: ['Admin', 'Principal'],
-      visible: (record) => record.status === 1,
+      visible: (record) => record.status === ExpenseRequestStatus.Draft,
       onClick: (record) => { setEditRecord(record); setModalOpen(true); },
     },
     {
@@ -140,12 +145,16 @@ function ExpenseRequestsContent() {
       label: 'Submit',
       icon: <SendOutlined />,
       requiredPermissions: ['Admin', 'Principal'],
-      visible: (record) => record.status === 1,
+      visible: (record) => record.status === ExpenseRequestStatus.Draft,
       confirm: { title: 'Submit this expense request?', description: 'The request will be sent for approval.' },
       onClick: async (record) => {
-        await submitAsync(record.id);
-        message.success('Expense request submitted');
-        refreshData();
+        try {
+          await submitAsync(record.id);
+          message.success('Expense request submitted');
+          refreshData();
+        } catch {
+          // Surfaced by axios interceptor
+        }
       },
     },
     {
@@ -154,12 +163,17 @@ function ExpenseRequestsContent() {
       icon: <StopOutlined />,
       danger: true,
       requiredPermissions: ['Admin', 'Principal'],
-      visible: (record) => [1, 2].includes(record.status),
+      visible: (record) =>
+        [ExpenseRequestStatus.Draft, ExpenseRequestStatus.Submitted].includes(record.status),
       confirm: { title: 'Cancel this expense request?', description: 'This action cannot be undone.' },
       onClick: async (record) => {
-        await cancelAsync(record.id);
-        message.success('Expense request cancelled');
-        refreshData();
+        try {
+          await cancelAsync(record.id);
+          message.success('Expense request cancelled');
+          refreshData();
+        } catch {
+          // Surfaced by axios interceptor
+        }
       },
     },
   ];

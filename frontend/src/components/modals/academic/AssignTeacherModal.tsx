@@ -30,7 +30,9 @@ export const AssignTeacherModal: React.FC<AssignTeacherModalProps> = ({
 
   useEffect(() => {
     if (open) {
-      getAllTeachersAsync({ maxResultCount: 100 });
+      // Raised from 100 to 500 to accommodate larger schools.
+      // For >500 staff use the remote-search variant (see ticket T-212).
+      getAllTeachersAsync({ maxResultCount: 500 });
       form.setFieldsValue({
         teacherId: classRecord?.classTeacherId || undefined,
       });
@@ -76,7 +78,7 @@ export const AssignTeacherModal: React.FC<AssignTeacherModalProps> = ({
         onClose(true);
       }
     } catch {
-      message.error('An error occurred');
+      // Server errors are surfaced by the axios response interceptor.
     } finally {
       setLoading(false);
     }

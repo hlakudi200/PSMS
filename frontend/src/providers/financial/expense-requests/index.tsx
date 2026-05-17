@@ -39,6 +39,7 @@ export const ExpenseRequestProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getExpenseError());
+        throw error;
       });
   };
 
@@ -57,6 +58,7 @@ export const ExpenseRequestProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getExpensesError());
+        throw error;
       });
   };
 
@@ -71,6 +73,7 @@ export const ExpenseRequestProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(createExpenseError());
+        throw error;
       });
   };
 
@@ -85,6 +88,7 @@ export const ExpenseRequestProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(updateExpenseError());
+        throw error;
       });
   };
 

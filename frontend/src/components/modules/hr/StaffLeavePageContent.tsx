@@ -9,20 +9,22 @@ import { StaffLeaveRequestProvider, useStaffLeaveRequestState, useStaffLeaveRequ
 import { useAuthState } from '@/providers/auth';
 import { StaffLeaveFormModal } from '@/components/modals/hr/StaffLeaveFormModal';
 import type { IStaffLeaveRequest } from '@/providers/hr/staff-leave/context';
+import {
+  LeaveStatus,
+  leaveTypeLabels,
+  leaveStatusLabels,
+} from '@/providers/shared/enums';
 
-const LeaveTypeLabels: Record<number, string> = {
-  1: 'Annual', 2: 'Sick', 3: 'Family', 4: 'Maternity',
-  5: 'Paternity', 6: 'Study', 7: 'Compassionate', 8: 'Unpaid', 9: 'Other',
-};
-
-const StatusLabels: Record<number, string> = {
-  1: 'Draft', 2: 'Submitted', 3: 'HOD Approved', 4: 'Approved',
-  5: 'Rejected', 6: 'Cancelled',
-};
+const LeaveTypeLabels = leaveTypeLabels;
+const StatusLabels = leaveStatusLabels;
 
 const StatusColors: Record<number, string> = {
-  1: 'default', 2: 'processing', 3: 'warning', 4: 'success',
-  5: 'error', 6: 'default',
+  [LeaveStatus.Draft]: 'default',
+  [LeaveStatus.Submitted]: 'processing',
+  [LeaveStatus.HODApproved]: 'warning',
+  [LeaveStatus.Approved]: 'success',
+  [LeaveStatus.Rejected]: 'error',
+  [LeaveStatus.Cancelled]: 'default',
 };
 
 function StaffLeaveContent() {
@@ -107,7 +109,7 @@ function StaffLeaveContent() {
       label: 'Edit',
       icon: <EditOutlined />,
       requiredPermissions: ['Admin', 'Principal'],
-      visible: (record) => record.status === 1,
+      visible: (record) => record.status === LeaveStatus.Draft,
       onClick: (record) => { setEditRecord(record); setModalOpen(true); },
     },
     {
@@ -115,12 +117,16 @@ function StaffLeaveContent() {
       label: 'Submit',
       icon: <SendOutlined />,
       requiredPermissions: ['Admin', 'Principal'],
-      visible: (record) => record.status === 1,
+      visible: (record) => record.status === LeaveStatus.Draft,
       confirm: { title: 'Submit this leave request?', description: 'The request will be sent for approval.' },
       onClick: async (record) => {
-        await submitAsync(record.id);
-        message.success('Leave request submitted');
-        refreshData();
+        try {
+          await submitAsync(record.id);
+          message.success('Leave request submitted');
+          refreshData();
+        } catch {
+          // Surfaced by axios interceptor
+        }
       },
     },
     {
@@ -129,12 +135,17 @@ function StaffLeaveContent() {
       icon: <StopOutlined />,
       danger: true,
       requiredPermissions: ['Admin', 'Principal'],
-      visible: (record) => [1, 2].includes(record.status),
+      visible: (record) =>
+        [LeaveStatus.Draft, LeaveStatus.Submitted].includes(record.status),
       confirm: { title: 'Cancel this leave request?', description: 'This action cannot be undone.' },
       onClick: async (record) => {
-        await cancelAsync(record.id);
-        message.success('Leave request cancelled');
-        refreshData();
+        try {
+          await cancelAsync(record.id);
+          message.success('Leave request cancelled');
+          refreshData();
+        } catch {
+          // Surfaced by axios interceptor
+        }
       },
     },
   ];

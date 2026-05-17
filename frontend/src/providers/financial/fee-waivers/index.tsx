@@ -54,6 +54,7 @@ export const FeeWaiverProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getFeeWaiverError());
+        throw error;
       });
   };
 
@@ -72,6 +73,7 @@ export const FeeWaiverProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getFeeWaiversError());
+        throw error;
       });
   };
 
@@ -86,6 +88,7 @@ export const FeeWaiverProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(createFeeWaiverError());
+        throw error;
       });
   };
 
@@ -100,6 +103,7 @@ export const FeeWaiverProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(updateFeeWaiverError());
+        throw error;
       });
   };
 
@@ -114,6 +118,7 @@ export const FeeWaiverProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(deleteFeeWaiverError());
+        throw error;
       });
   };
 
@@ -128,6 +133,7 @@ export const FeeWaiverProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(submitError());
+        throw error;
       });
   };
 
@@ -142,6 +148,7 @@ export const FeeWaiverProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(approveError());
+        throw error;
       });
   };
 
@@ -156,6 +163,7 @@ export const FeeWaiverProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(rejectError());
+        throw error;
       });
   };
 

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { EyeOutlined } from '@ant-design/icons';
 import { EnterpriseTable } from '@/components/shared/enterprise-table';
@@ -14,10 +14,8 @@ function ParentsContent() {
   const { parents, totalCount, isPending, isError } = useParentState();
   const { getAllAsync } = useParentActions();
   const { currentRole } = useAuthState();
-  const [lastQuery, setLastQuery] = useState<TableQuery | null>(null);
 
   const handleQueryChange = useCallback((query: TableQuery) => {
-    setLastQuery(query);
     getAllAsync({
       maxResultCount: query.maxResultCount,
       skipCount: query.skipCount,

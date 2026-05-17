@@ -65,6 +65,7 @@ export const AttendanceProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getAttendanceError());
+        throw error;
       });
   };
 
@@ -94,6 +95,7 @@ export const AttendanceProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getAttendancesError());
+        throw error;
       });
   };
 
@@ -116,6 +118,7 @@ export const AttendanceProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getByStudentError());
+        throw error;
       });
   };
 
@@ -137,6 +140,7 @@ export const AttendanceProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getByClassAndDateError());
+        throw error;
       });
   };
 
@@ -152,6 +156,7 @@ export const AttendanceProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(captureAttendanceError());
+        throw error;
       });
   };
 
@@ -169,6 +174,7 @@ export const AttendanceProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(bulkCaptureAttendanceError());
+        throw error;
       });
   };
 
@@ -183,6 +189,7 @@ export const AttendanceProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(updateAttendanceError());
+        throw error;
       });
   };
 
@@ -197,6 +204,7 @@ export const AttendanceProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(deleteAttendanceError());
+        throw error;
       });
   };
 
@@ -217,6 +225,7 @@ export const AttendanceProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getStudentSummaryError());
+        throw error;
       });
   };
 
@@ -239,6 +248,7 @@ export const AttendanceProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getClassSummaryError());
+        throw error;
       });
   };
 

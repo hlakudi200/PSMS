@@ -57,6 +57,7 @@ export const TeacherProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getTeacherError());
+        throw error;
       });
   };
 
@@ -76,6 +77,7 @@ export const TeacherProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getTeachersError());
+        throw error;
       });
   };
 
@@ -91,6 +93,7 @@ export const TeacherProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(createTeacherError());
+        throw error;
       });
   };
 
@@ -105,6 +108,7 @@ export const TeacherProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(updateTeacherError());
+        throw error;
       });
   };
 
@@ -119,6 +123,7 @@ export const TeacherProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(deleteTeacherError());
+        throw error;
       });
   };
 
@@ -133,6 +138,7 @@ export const TeacherProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(activateTeacherError());
+        throw error;
       });
   };
 
@@ -147,6 +153,7 @@ export const TeacherProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(deactivateTeacherError());
+        throw error;
       });
   };
 

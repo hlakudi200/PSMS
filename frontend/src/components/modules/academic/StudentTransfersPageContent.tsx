@@ -9,20 +9,23 @@ import { StudentTransferProvider, useStudentTransferState, useStudentTransferAct
 import { useAuthState } from '@/providers/auth';
 import { StudentTransferFormModal } from '@/components/modals/academic/StudentTransferFormModal';
 import type { IStudentTransfer } from '@/providers/academic/student-transfers/context';
+import {
+  StudentTransferStatus,
+  studentTransferStatusLabels,
+  transferTypeLabels,
+} from '@/providers/shared/enums';
 
-const TransferTypeLabels: Record<number, string> = {
-  1: 'Transfer In',
-  2: 'Transfer Out',
-};
-
-const StatusLabels: Record<number, string> = {
-  1: 'Draft', 2: 'Submitted', 3: 'Under Review', 4: 'Approved',
-  5: 'Rejected', 6: 'Completed', 7: 'Cancelled',
-};
+const TransferTypeLabels = transferTypeLabels;
+const StatusLabels = studentTransferStatusLabels;
 
 const StatusColors: Record<number, string> = {
-  1: 'default', 2: 'processing', 3: 'warning', 4: 'success',
-  5: 'error', 6: 'success', 7: 'default',
+  [StudentTransferStatus.Draft]: 'default',
+  [StudentTransferStatus.Submitted]: 'processing',
+  [StudentTransferStatus.UnderReview]: 'warning',
+  [StudentTransferStatus.Approved]: 'success',
+  [StudentTransferStatus.Rejected]: 'error',
+  [StudentTransferStatus.Completed]: 'success',
+  [StudentTransferStatus.Cancelled]: 'default',
 };
 
 function StudentTransfersContent() {
@@ -108,7 +111,7 @@ function StudentTransfersContent() {
       label: 'Edit',
       icon: <EditOutlined />,
       requiredPermissions: ['Admin', 'Principal'],
-      visible: (record) => record.status === 1,
+      visible: (record) => record.status === StudentTransferStatus.Draft,
       onClick: (record) => { setEditRecord(record); setModalOpen(true); },
     },
     {
@@ -116,12 +119,16 @@ function StudentTransfersContent() {
       label: 'Submit',
       icon: <SendOutlined />,
       requiredPermissions: ['Admin', 'Principal'],
-      visible: (record) => record.status === 1,
+      visible: (record) => record.status === StudentTransferStatus.Draft,
       confirm: { title: 'Submit this transfer?', description: 'The transfer request will be sent for review.' },
       onClick: async (record) => {
-        await submitAsync(record.id);
-        message.success('Transfer submitted');
-        refreshData();
+        try {
+          await submitAsync(record.id);
+          message.success('Transfer submitted');
+          refreshData();
+        } catch {
+          // Surfaced by axios interceptor
+        }
       },
     },
     {
@@ -130,12 +137,21 @@ function StudentTransfersContent() {
       icon: <StopOutlined />,
       danger: true,
       requiredPermissions: ['Admin', 'Principal'],
-      visible: (record) => [1, 2, 3].includes(record.status),
+      visible: (record) =>
+        [
+          StudentTransferStatus.Draft,
+          StudentTransferStatus.Submitted,
+          StudentTransferStatus.UnderReview,
+        ].includes(record.status),
       confirm: { title: 'Cancel this transfer?', description: 'This action cannot be undone.' },
       onClick: async (record) => {
-        await cancelAsync(record.id);
-        message.success('Transfer cancelled');
-        refreshData();
+        try {
+          await cancelAsync(record.id);
+          message.success('Transfer cancelled');
+          refreshData();
+        } catch {
+          // Surfaced by axios interceptor
+        }
       },
     },
   ];

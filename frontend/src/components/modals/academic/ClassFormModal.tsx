@@ -1,23 +1,34 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Modal, Form, Input, InputNumber, Select, message } from 'antd';
+import { Modal, Form, Input, InputNumber, Select, Alert, message } from 'antd';
 import { z } from 'zod';
 import { useClassActions } from '@/providers/academic/classes';
 import { useGradeState, useGradeActions } from '@/providers/academic/grades';
 import { useAcademicYearState, useAcademicYearActions } from '@/providers/academic/academic_years';
 import type { IClass } from '@/providers/academic/shared/interfaces';
 
+// SA classroom capacity norm: ≤35 for primary, ≤40 for secondary. We allow up
+// to 100 (hard ceiling for unusual setups) but warn the user above 40.
+const SOFT_CAPACITY_WARNING = 40;
+const HARD_CAPACITY_LIMIT = 100;
+
 const classSchema = z.object({
   className: z.string().min(1, 'Class name is required').max(100),
   gradeId: z.string().min(1, 'Grade is required'),
   academicYearId: z.string().min(1, 'Academic year is required'),
-  maxCapacity: z.number().min(1, 'Capacity must be at least 1').max(100),
+  maxCapacity: z
+    .number()
+    .min(1, 'Capacity must be at least 1')
+    .max(HARD_CAPACITY_LIMIT, `Capacity cannot exceed ${HARD_CAPACITY_LIMIT}`),
 });
 
 const editSchema = z.object({
   className: z.string().min(1, 'Class name is required').max(100),
-  maxCapacity: z.number().min(1, 'Capacity must be at least 1').max(100),
+  maxCapacity: z
+    .number()
+    .min(1, 'Capacity must be at least 1')
+    .max(HARD_CAPACITY_LIMIT, `Capacity cannot exceed ${HARD_CAPACITY_LIMIT}`),
 });
 
 interface ClassFormModalProps {
@@ -38,6 +49,7 @@ export const ClassFormModal: React.FC<ClassFormModalProps> = ({
   const { academicYears } = useAcademicYearState();
   const { getAllAsync: getAllAcademicYearsAsync } = useAcademicYearActions();
   const [loading, setLoading] = useState(false);
+  const [capacityWarning, setCapacityWarning] = useState<string | null>(null);
   const isEdit = !!editRecord;
 
   useEffect(() => {
@@ -93,7 +105,7 @@ export const ClassFormModal: React.FC<ClassFormModalProps> = ({
       message.success(`Class ${isEdit ? 'updated' : 'created'} successfully`);
       onClose(true);
     } catch {
-      message.error('An error occurred');
+      // Server errors are surfaced by the axios response interceptor.
     } finally {
       setLoading(false);
     }
@@ -143,8 +155,25 @@ export const ClassFormModal: React.FC<ClassFormModalProps> = ({
           </>
         )}
         <Form.Item label="Max Capacity" name="maxCapacity" rules={[{ required: true }]}>
-          <InputNumber min={1} max={100} style={{ width: '100%' }} placeholder="e.g. 35" />
+          <InputNumber
+            min={1}
+            max={HARD_CAPACITY_LIMIT}
+            style={{ width: '100%' }}
+            placeholder="e.g. 35"
+            onChange={(value) => {
+              if (typeof value === 'number' && value > SOFT_CAPACITY_WARNING) {
+                setCapacityWarning(
+                  `SA classrooms typically hold no more than ${SOFT_CAPACITY_WARNING} learners. Confirm this is intentional.`
+                );
+              } else {
+                setCapacityWarning(null);
+              }
+            }}
+          />
         </Form.Item>
+        {capacityWarning && (
+          <Alert type="warning" showIcon message={capacityWarning} style={{ marginBottom: 12 }} />
+        )}
       </Form>
     </Modal>
   );
