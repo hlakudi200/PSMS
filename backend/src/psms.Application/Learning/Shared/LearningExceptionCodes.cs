@@ -12,6 +12,8 @@ public static class LearningExceptionCodes
     public const string MaterialNotPublished = "LRN_MATERIAL_NOT_PUBLISHED";
     public const string ClassSubjectNotFound = "LRN_CLASS_SUBJECT_NOT_FOUND";
     public const string TermNotFound = "LRN_TERM_NOT_FOUND";
+    public const string InvalidLearningMaterialUpload = "LRN_INVALID_LEARNING_MATERIAL_UPLOAD";
+    public const string LearningMaterialTooLarge = "LRN_LEARNING_MATERIAL_TOO_LARGE";
 
     // OnlineLesson
     public const string OnlineLessonNotFound = "LRN_ONLINE_LESSON_NOT_FOUND";

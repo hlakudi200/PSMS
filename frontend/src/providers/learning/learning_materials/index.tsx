@@ -10,6 +10,7 @@ import {
   IUpdateLearningMaterial,
   IGetLearningMaterialsInput,
 } from "../shared/interfaces";
+import { IUploadLearningMaterial } from "./context";
 import { LearningMaterialReducer } from "./reducer";
 import { useContext, useReducer } from "react";
 import {
@@ -40,6 +41,9 @@ import {
     incrementViewCountPending,
     incrementViewCountSuccess,
     incrementViewCountError,
+    uploadLearningMaterialPending,
+    uploadLearningMaterialSuccess,
+    uploadLearningMaterialError,
 } from "./actions";
 
 export const LearningMaterialProvider = ({
@@ -61,6 +65,7 @@ export const LearningMaterialProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getLearningMaterialError());
+        throw error;
       });
   };
 
@@ -88,6 +93,7 @@ export const LearningMaterialProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getAllLearningMaterialsError());
+        throw error;
       });
   };
 
@@ -104,6 +110,7 @@ export const LearningMaterialProvider = ({
         .catch((error) => {
             console.error(error);
             dispatch(getByClassSubjectError());
+            throw error;
         });
     };
 
@@ -119,6 +126,40 @@ export const LearningMaterialProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(createLearningMaterialError());
+        throw error;
+      });
+  };
+
+  const uploadAsync = async (input: IUploadLearningMaterial) => {
+    dispatch(uploadLearningMaterialPending());
+    const endpoint = `/api/services/app/LearningMaterial/Upload`;
+
+    // ABP MVC binds the IFormFile from a multipart "File" field; the
+    // sibling primitive fields are bound directly off the form. Sending
+    // null/undefined values would break the binder, so we only set the
+    // ones the caller actually provided.
+    const formData = new FormData();
+    formData.append('ClassSubjectId', input.classSubjectId);
+    formData.append('Title', input.title);
+    formData.append('MaterialType', input.materialType.toString());
+    if (input.termId) formData.append('TermId', input.termId);
+    if (input.description) formData.append('Description', input.description);
+    if (input.externalLink) formData.append('ExternalLink', input.externalLink);
+    if (input.displayOrder != null)
+      formData.append('DisplayOrder', input.displayOrder.toString());
+    if (input.file) formData.append('File', input.file);
+
+    await instance
+      .post(endpoint, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
+      .then((response) => {
+        dispatch(uploadLearningMaterialSuccess(response.data.result));
+      })
+      .catch((error) => {
+        console.error(error);
+        dispatch(uploadLearningMaterialError());
+        throw error;
       });
   };
 
@@ -133,6 +174,7 @@ export const LearningMaterialProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(updateLearningMaterialError());
+        throw error;
       });
   };
 
@@ -147,6 +189,7 @@ export const LearningMaterialProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(deleteLearningMaterialError());
+        throw error;
       });
   };
 
@@ -161,6 +204,7 @@ export const LearningMaterialProvider = ({
         .catch((error) => {
             console.error(error);
             dispatch(publishLearningMaterialError());
+            throw error;
         });
     };
 
@@ -175,6 +219,7 @@ export const LearningMaterialProvider = ({
         .catch((error) => {
             console.error(error);
             dispatch(unpublishLearningMaterialError());
+            throw error;
         });
     };
 
@@ -189,6 +234,7 @@ export const LearningMaterialProvider = ({
         .catch((error) => {
             console.error(error);
             dispatch(incrementViewCountError());
+            throw error;
         });
     };
 
@@ -200,6 +246,7 @@ export const LearningMaterialProvider = ({
           getAllAsync,
           getByClassSubjectAsync,
           createAsync,
+          uploadAsync,
           updateAsync,
           deleteAsync,
           publishAsync,
