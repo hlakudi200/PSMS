@@ -245,3 +245,9 @@ Thumbs.db
 *.swp
 *.swo
 *~
+
+# Roslyn / dotnet build cache
+*.lscache
+
+# Local Claude Code settings (per-user overrides)
+.claude/settings.local.json
