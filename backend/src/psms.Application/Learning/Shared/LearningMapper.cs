@@ -32,6 +32,9 @@ public class LearningMapper : Profile
 
         // Entity to ListDto (lightweight)
         CreateMap<LearningMaterial, LearningMaterialListDto>();
+
+        // Version row -> DTO (1:1, convention covers everything).
+        CreateMap<LearningMaterialVersion, LearningMaterialVersionDto>();
     }
 
     private void CreateOnlineLessonMappings()

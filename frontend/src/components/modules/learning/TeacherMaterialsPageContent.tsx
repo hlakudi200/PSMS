@@ -25,6 +25,7 @@ import {
   DatabaseOutlined,
   EditOutlined,
   EyeOutlined,
+  HistoryOutlined,
   InboxOutlined,
   LinkOutlined,
   ReloadOutlined,
@@ -52,6 +53,7 @@ import type { IClassSubjectList } from '@/providers/academic/shared/interfaces';
 import type { ILearningMaterialList } from '@/providers/learning/shared/interfaces';
 import { MaterialUploadModal } from '@/components/modals/learning/MaterialUploadModal';
 import { MaterialEditModal } from '@/components/modals/learning/MaterialEditModal';
+import { MaterialVersionHistoryDrawer } from '@/components/modules/learning/MaterialVersionHistoryDrawer';
 
 const { Title, Text } = Typography;
 
@@ -95,6 +97,8 @@ function TeacherMaterialsContent() {
   const [uploadOpen, setUploadOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [editRecord, setEditRecord] = useState<ILearningMaterialList | null>(null);
+  const [versionsOpen, setVersionsOpen] = useState(false);
+  const [versionsRecord, setVersionsRecord] = useState<ILearningMaterialList | null>(null);
 
   // Server-side filter state.
   const [filterClassSubjectId, setFilterClassSubjectId] = useState<string | undefined>(undefined);
@@ -324,7 +328,7 @@ function TeacherMaterialsContent() {
     {
       title: 'Actions',
       key: 'actions',
-      width: 200,
+      width: 240,
       render: (_: unknown, record: ILearningMaterialList) => (
         <Space size="small">
           <Tooltip title="Edit metadata">
@@ -335,6 +339,17 @@ function TeacherMaterialsContent() {
               onClick={() => {
                 setEditRecord(record);
                 setEditOpen(true);
+              }}
+            />
+          </Tooltip>
+          <Tooltip title="Version history">
+            <Button
+              size="small"
+              icon={<HistoryOutlined />}
+              aria-label={`Version history for ${record.title}`}
+              onClick={() => {
+                setVersionsRecord(record);
+                setVersionsOpen(true);
               }}
             />
           </Tooltip>
@@ -588,6 +603,19 @@ function TeacherMaterialsContent() {
           if (refresh) refreshMaterials();
         }}
         editRecord={editRecord}
+      />
+
+      <MaterialVersionHistoryDrawer
+        open={versionsOpen}
+        material={versionsRecord}
+        onClose={() => {
+          setVersionsOpen(false);
+          setVersionsRecord(null);
+          // A new version replaces the current file pointer on the
+          // material, so refresh the table once the drawer closes — that
+          // way the FileName/FileSizeBytes columns show the latest data.
+          refreshMaterials();
+        }}
       />
     </div>
   );

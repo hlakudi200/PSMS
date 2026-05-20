@@ -127,6 +127,43 @@ export const LearningMaterialReducer = handleActions<
         ...state,
         ...action.payload,
     }),
+    // T-T07 versioning — same passthrough spread pattern.
+    [LearningMaterialActionEnums.getVersionsPending]: (state, action) => ({
+        ...state,
+        ...action.payload,
+    }),
+    [LearningMaterialActionEnums.getVersionsSuccess]: (state, action) => ({
+        ...state,
+        ...action.payload,
+    }),
+    [LearningMaterialActionEnums.getVersionsError]: (state, action) => ({
+        ...state,
+        ...action.payload,
+    }),
+    [LearningMaterialActionEnums.uploadNewVersionPending]: (state, action) => ({
+        ...state,
+        ...action.payload,
+    }),
+    [LearningMaterialActionEnums.uploadNewVersionSuccess]: (state, action) => ({
+        ...state,
+        ...action.payload,
+    }),
+    [LearningMaterialActionEnums.uploadNewVersionError]: (state, action) => ({
+        ...state,
+        ...action.payload,
+    }),
+    [LearningMaterialActionEnums.restoreVersionPending]: (state, action) => ({
+        ...state,
+        ...action.payload,
+    }),
+    [LearningMaterialActionEnums.restoreVersionSuccess]: (state, action) => ({
+        ...state,
+        ...action.payload,
+    }),
+    [LearningMaterialActionEnums.restoreVersionError]: (state, action) => ({
+        ...state,
+        ...action.payload,
+    }),
   },
   INITIAL_STATE
 );

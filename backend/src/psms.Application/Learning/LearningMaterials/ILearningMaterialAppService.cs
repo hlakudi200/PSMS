@@ -30,4 +30,27 @@ public interface ILearningMaterialAppService : IApplicationService
     Task<LearningMaterialDto> PublishAsync(Guid id);
     Task<LearningMaterialDto> UnpublishAsync(Guid id);
     Task IncrementViewCountAsync(Guid id);
+
+    /// <summary>
+    /// Lists the version history for a single learning material, newest
+    /// first. Used by the teacher portal's version-history drawer.
+    /// </summary>
+    Task<ListResultDto<LearningMaterialVersionDto>> GetVersionsAsync(Guid learningMaterialId);
+
+    /// <summary>
+    /// Upload a new version of an existing material. Creates a new
+    /// LearningMaterialVersion row (next sequential VersionNumber), then
+    /// replaces the file pointer on the parent material so the "current"
+    /// file is always the latest version. Retains up to 10 versions
+    /// per LM-003 — older versions beyond that are pruned.
+    /// </summary>
+    Task<LearningMaterialDto> UploadNewVersionAsync(UploadNewVersionDto input);
+
+    /// <summary>
+    /// Restore the parent material's current file pointer to an older
+    /// version by COPYING that version's data into a new
+    /// LearningMaterialVersion row — history is never overwritten in
+    /// place.
+    /// </summary>
+    Task<LearningMaterialDto> RestoreVersionAsync(Guid learningMaterialId, Guid versionId);
 }

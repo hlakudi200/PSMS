@@ -1,6 +1,12 @@
 import { createAction } from "redux-actions";
 import { ILearningMaterialStateContext } from "./context";
-import { ILearningMaterial, ILearningMaterialList, IPagedResult, IListResult } from "../shared/interfaces";
+import {
+  ILearningMaterial,
+  ILearningMaterialList,
+  ILearningMaterialVersion,
+  IPagedResult,
+  IListResult,
+} from "../shared/interfaces";
 
 export enum LearningMaterialActionEnums {
   getLearningMaterialPending = "GET_LEARNING_MATERIAL_PENDING",
@@ -42,6 +48,19 @@ export enum LearningMaterialActionEnums {
   incrementViewCountPending = "INCREMENT_VIEW_COUNT_PENDING",
   incrementViewCountSuccess = "INCREMENT_VIEW_COUNT_SUCCESS",
   incrementViewCountError = "INCREMENT_VIEW_COUNT_ERROR",
+
+  // T-T07 versioning
+  getVersionsPending = "GET_LEARNING_MATERIAL_VERSIONS_PENDING",
+  getVersionsSuccess = "GET_LEARNING_MATERIAL_VERSIONS_SUCCESS",
+  getVersionsError = "GET_LEARNING_MATERIAL_VERSIONS_ERROR",
+
+  uploadNewVersionPending = "UPLOAD_NEW_VERSION_PENDING",
+  uploadNewVersionSuccess = "UPLOAD_NEW_VERSION_SUCCESS",
+  uploadNewVersionError = "UPLOAD_NEW_VERSION_ERROR",
+
+  restoreVersionPending = "RESTORE_VERSION_PENDING",
+  restoreVersionSuccess = "RESTORE_VERSION_SUCCESS",
+  restoreVersionError = "RESTORE_VERSION_ERROR",
 }
 
 // Get Single LearningMaterial Actions
@@ -259,3 +278,75 @@ export const incrementViewCountError = createAction<ILearningMaterialStateContex
     LearningMaterialActionEnums.incrementViewCountError,
     () => ({ isPending: false, isSuccess: false, isError: true })
     );
+
+// ── T-T07 Versioning ────────────────────────────────────────────
+// Versioning maintains its OWN `versionsLoading` / `versionsError`
+// flags and intentionally DOES NOT touch the shared
+// `isPending` / `isSuccess` / `isError` slots — those drive the
+// table's loading spinner on TeacherMaterialsPageContent, and we don't
+// want opening the drawer or uploading a new version to flicker the
+// underlying table. The action payloads below use a Partial cast so
+// TypeScript accepts the smaller shape; the reducer's spread merges
+// only the fields we set.
+
+type VersionsPayload = Partial<ILearningMaterialStateContext>;
+
+export const getVersionsPending = createAction<ILearningMaterialStateContext>(
+  LearningMaterialActionEnums.getVersionsPending,
+  // Clear the previous `versions` list explicitly so a drawer opened
+  // for material B never briefly renders material A's history.
+  () => ({ versionsLoading: true, versionsError: false, versions: undefined } as VersionsPayload as ILearningMaterialStateContext)
+);
+export const getVersionsSuccess = createAction<
+  ILearningMaterialStateContext,
+  IListResult<ILearningMaterialVersion>
+>(
+  LearningMaterialActionEnums.getVersionsSuccess,
+  (result: IListResult<ILearningMaterialVersion>) => ({
+    versionsLoading: false,
+    versionsError: false,
+    versions: result.items,
+  } as VersionsPayload as ILearningMaterialStateContext)
+);
+export const getVersionsError = createAction<ILearningMaterialStateContext>(
+  LearningMaterialActionEnums.getVersionsError,
+  () => ({ versionsLoading: false, versionsError: true } as VersionsPayload as ILearningMaterialStateContext)
+);
+
+// Upload / restore touch the parent material too (its file pointer
+// moves to the new version), so we DO update `learningMaterial` here.
+// But we still avoid the shared spinner flags so the table doesn't
+// flash a loading state during these drawer-driven flows.
+export const uploadNewVersionPending = createAction<ILearningMaterialStateContext>(
+  LearningMaterialActionEnums.uploadNewVersionPending,
+  () => ({ versionsLoading: true, versionsError: false } as VersionsPayload as ILearningMaterialStateContext)
+);
+export const uploadNewVersionSuccess = createAction<ILearningMaterialStateContext, ILearningMaterial>(
+  LearningMaterialActionEnums.uploadNewVersionSuccess,
+  (learningMaterial: ILearningMaterial) => ({
+    versionsLoading: false,
+    versionsError: false,
+    learningMaterial,
+  } as VersionsPayload as ILearningMaterialStateContext)
+);
+export const uploadNewVersionError = createAction<ILearningMaterialStateContext>(
+  LearningMaterialActionEnums.uploadNewVersionError,
+  () => ({ versionsLoading: false, versionsError: true } as VersionsPayload as ILearningMaterialStateContext)
+);
+
+export const restoreVersionPending = createAction<ILearningMaterialStateContext>(
+  LearningMaterialActionEnums.restoreVersionPending,
+  () => ({ versionsLoading: true, versionsError: false } as VersionsPayload as ILearningMaterialStateContext)
+);
+export const restoreVersionSuccess = createAction<ILearningMaterialStateContext, ILearningMaterial>(
+  LearningMaterialActionEnums.restoreVersionSuccess,
+  (learningMaterial: ILearningMaterial) => ({
+    versionsLoading: false,
+    versionsError: false,
+    learningMaterial,
+  } as VersionsPayload as ILearningMaterialStateContext)
+);
+export const restoreVersionError = createAction<ILearningMaterialStateContext>(
+  LearningMaterialActionEnums.restoreVersionError,
+  () => ({ versionsLoading: false, versionsError: true } as VersionsPayload as ILearningMaterialStateContext)
+);
