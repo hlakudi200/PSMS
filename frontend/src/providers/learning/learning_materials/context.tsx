@@ -5,7 +5,9 @@ import {
   ILearningMaterialList,
   ICreateLearningMaterial,
   IUpdateLearningMaterial,
-  IGetLearningMaterialsInput
+  IGetLearningMaterialsInput,
+  ILearningMaterialVersion,
+  IUploadNewVersion
 } from "../shared/interfaces";
 
 export interface ILearningMaterialStateContext {
@@ -15,6 +17,11 @@ export interface ILearningMaterialStateContext {
   learningMaterial?: ILearningMaterial;
   learningMaterials?: ILearningMaterialList[];
   totalCount?: number;
+  // Version history for whichever material the drawer is currently
+  // showing. Replaced wholesale on each GetVersions call.
+  versions?: ILearningMaterialVersion[];
+  versionsLoading?: boolean;
+  versionsError?: boolean;
 }
 
 // Payload for the multipart upload flow — combines metadata with the raw
@@ -44,6 +51,12 @@ export interface ILearningMaterialActionContext {
   publishAsync: (id: string) => void;
   unpublishAsync: (id: string) => void;
   incrementViewCountAsync: (id: string) => void;
+  // T-T07 Versioning. `getVersionsAsync` populates `versions` in state;
+  // `uploadNewVersionAsync` returns Promise<void> so the modal can await
+  // it and only fire the success toast on actual success.
+  getVersionsAsync: (learningMaterialId: string) => void;
+  uploadNewVersionAsync: (input: IUploadNewVersion) => Promise<void>;
+  restoreVersionAsync: (learningMaterialId: string, versionId: string) => Promise<void>;
 }
 
 export const INITIAL_STATE: ILearningMaterialStateContext = {

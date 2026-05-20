@@ -241,6 +241,12 @@ public class psmsDbContext : AbpZeroDbContext<Tenant, Role, User, psmsDbContext>
     public DbSet<LearningMaterial> LearningMaterials { get; set; }
 
     /// <summary>
+    /// Historical versions of learning materials (one row per "Upload new
+    /// version" action; retention LM-003 limits this to 10 per material).
+    /// </summary>
+    public DbSet<LearningMaterialVersion> LearningMaterialVersions { get; set; }
+
+    /// <summary>
     /// Online/virtual lessons
     /// </summary>
     public DbSet<OnlineLesson> OnlineLessons { get; set; }
@@ -551,7 +557,14 @@ public class psmsDbContext : AbpZeroDbContext<Tenant, Role, User, psmsDbContext>
 
     private void ConfigureLearningModule(ModelBuilder modelBuilder)
     {
-        // No special configurations needed
+        // Each LearningMaterialVersion's (MaterialId, VersionNumber) pair is
+        // unique — guards against accidental duplicate version writes from a
+        // race in the app service's "max+1" logic. Also indexes the FK for
+        // fast version-history lookups.
+        modelBuilder.Entity<LearningMaterialVersion>()
+            .HasIndex(v => new { v.LearningMaterialId, v.VersionNumber })
+            .IsUnique()
+            .HasDatabaseName("IX_LearningMaterialVersions_MaterialId_VersionNumber");
     }
 
     private void ConfigureCommunicationModule(ModelBuilder modelBuilder)

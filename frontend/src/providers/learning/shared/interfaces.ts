@@ -83,6 +83,29 @@ export interface IPagedAndSortedResultRequest {
     isPublished?: boolean;
     keyword?: string;
   }
+
+  // ------------------------------------------------------------------
+  // Material Versioning (T-T07 / US-TCH-003)
+  // ------------------------------------------------------------------
+  export interface ILearningMaterialVersion {
+    id: string;
+    learningMaterialId: string;
+    versionNumber: number;
+    changeDescription: string;
+    fileName?: string;
+    fileUrl?: string;
+    fileSizeBytes?: number;
+    contentType?: string;
+    uploadedByUserId: number;
+    creationTime: string;
+  }
+
+  // Multipart payload for uploading a new version of an existing material.
+  export interface IUploadNewVersion {
+    learningMaterialId: string;
+    changeDescription: string;
+    file: File;
+  }
   
   // OnlineLesson Interfaces
   export interface IOnlineLesson {

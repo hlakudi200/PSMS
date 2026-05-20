@@ -9,6 +9,7 @@ import {
   ICreateLearningMaterial,
   IUpdateLearningMaterial,
   IGetLearningMaterialsInput,
+  IUploadNewVersion,
 } from "../shared/interfaces";
 import { IUploadLearningMaterial } from "./context";
 import { LearningMaterialReducer } from "./reducer";
@@ -44,6 +45,16 @@ import {
     uploadLearningMaterialPending,
     uploadLearningMaterialSuccess,
     uploadLearningMaterialError,
+    // T-T07 versioning actions
+    getVersionsPending,
+    getVersionsSuccess,
+    getVersionsError,
+    uploadNewVersionPending,
+    uploadNewVersionSuccess,
+    uploadNewVersionError,
+    restoreVersionPending,
+    restoreVersionSuccess,
+    restoreVersionError,
 } from "./actions";
 
 export const LearningMaterialProvider = ({
@@ -249,6 +260,63 @@ export const LearningMaterialProvider = ({
         });
     };
 
+  // ── T-T07 Versioning ───────────────────────────────────────────────
+
+  const getVersionsAsync = async (learningMaterialId: string) => {
+    dispatch(getVersionsPending());
+    const endpoint =
+      `/api/services/app/LearningMaterial/GetVersions?learningMaterialId=${learningMaterialId}`;
+    await instance
+      .get(endpoint)
+      .then((response) => {
+        dispatch(getVersionsSuccess({ items: response.data.result.items }));
+      })
+      .catch((error) => {
+        console.error(error);
+        dispatch(getVersionsError());
+        throw error;
+      });
+  };
+
+  const uploadNewVersionAsync = async (input: IUploadNewVersion) => {
+    dispatch(uploadNewVersionPending());
+    const endpoint = `/api/services/app/LearningMaterial/UploadNewVersion`;
+    const formData = new FormData();
+    formData.append('LearningMaterialId', input.learningMaterialId);
+    formData.append('ChangeDescription', input.changeDescription);
+    formData.append('File', input.file);
+    await instance
+      .post(endpoint, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
+      .then((response) => {
+        dispatch(uploadNewVersionSuccess(response.data.result));
+      })
+      .catch((error) => {
+        console.error(error);
+        dispatch(uploadNewVersionError());
+        throw error;
+      });
+  };
+
+  const restoreVersionAsync = async (
+    learningMaterialId: string,
+    versionId: string
+  ) => {
+    dispatch(restoreVersionPending());
+    const endpoint = `/api/services/app/LearningMaterial/RestoreVersion?learningMaterialId=${learningMaterialId}&versionId=${versionId}`;
+    await instance
+      .post(endpoint)
+      .then((response) => {
+        dispatch(restoreVersionSuccess(response.data.result));
+      })
+      .catch((error) => {
+        console.error(error);
+        dispatch(restoreVersionError());
+        throw error;
+      });
+  };
+
   return (
     <LearningMaterialStateContext.Provider value={state}>
       <LearningMaterialActionContext.Provider
@@ -263,6 +331,9 @@ export const LearningMaterialProvider = ({
           publishAsync,
           unpublishAsync,
           incrementViewCountAsync,
+          getVersionsAsync,
+          uploadNewVersionAsync,
+          restoreVersionAsync,
         }}
       >
         {children}

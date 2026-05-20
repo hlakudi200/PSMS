@@ -28,17 +28,24 @@ namespace psms.Learning.LearningMaterials;
 public class LearningMaterialAppService : ApplicationService, ILearningMaterialAppService
 {
     private readonly IRepository<LearningMaterial, Guid> _learningMaterialRepository;
+    private readonly IRepository<LearningMaterialVersion, Guid> _versionRepository;
     private readonly IRepository<ClassSubject, Guid> _classSubjectRepository;
     private readonly IRepository<Term, Guid> _termRepository;
     private readonly IRepository<Teacher, Guid> _teacherRepository;
 
+    // LM-003 retention cap. Beyond this we prune the oldest version on
+    // every new upload to keep history bounded.
+    private const int MaxVersionsPerMaterial = 10;
+
     public LearningMaterialAppService(
         IRepository<LearningMaterial, Guid> learningMaterialRepository,
+        IRepository<LearningMaterialVersion, Guid> versionRepository,
         IRepository<ClassSubject, Guid> classSubjectRepository,
         IRepository<Term, Guid> termRepository,
         IRepository<Teacher, Guid> teacherRepository)
     {
         _learningMaterialRepository = learningMaterialRepository;
+        _versionRepository = versionRepository;
         _classSubjectRepository = classSubjectRepository;
         _termRepository = termRepository;
         _teacherRepository = teacherRepository;
@@ -383,7 +390,275 @@ public class LearningMaterialAppService : ApplicationService, ILearningMaterialA
         await CurrentUnitOfWork.SaveChangesAsync();
     }
 
+    [AbpAuthorize(PermissionNames.Learning_Materials_View)]
+    public async Task<ListResultDto<LearningMaterialVersionDto>> GetVersionsAsync(Guid learningMaterialId)
+    {
+        // Teacher-ownership scope: a teacher can only enumerate version
+        // history for materials in classes they teach. Without this guard
+        // any teacher (or any role holding the view permission) could
+        // enumerate another teacher's change descriptions and file URLs.
+        var teacherId = await ResolveCurrentTeacherIdOrThrowAsync();
+
+        var materialOwned = await _learningMaterialRepository
+            .GetAll()
+            .Include(lm => lm.ClassSubject)
+            .AnyAsync(lm => lm.Id == learningMaterialId
+                         && lm.TenantId == AbpSession.TenantId
+                         && lm.ClassSubject.TeacherId == teacherId);
+        if (!materialOwned)
+            throw new UserFriendlyException(LearningExceptionCodes.LearningMaterialNotFound,
+                "Learning material not found for the current teacher.");
+
+        var versions = await _versionRepository
+            .GetAll()
+            .Where(v => v.LearningMaterialId == learningMaterialId
+                     && v.TenantId == AbpSession.TenantId)
+            .OrderByDescending(v => v.VersionNumber)
+            .ToListAsync();
+
+        return new ListResultDto<LearningMaterialVersionDto>(
+            ObjectMapper.Map<List<LearningMaterialVersionDto>>(versions));
+    }
+
+    [AbpAuthorize(PermissionNames.Learning_Materials_ManageVersions)]
+    public async Task<LearningMaterialDto> UploadNewVersionAsync(UploadNewVersionDto input)
+    {
+        var teacherId = await ResolveCurrentTeacherIdOrThrowAsync();
+
+        // Load the material WITH its current ClassSubject so we can scope
+        // the ownership check to the calling teacher.
+        var material = await _learningMaterialRepository
+            .GetAll()
+            .Include(lm => lm.ClassSubject)
+            .FirstOrDefaultAsync(lm => lm.Id == input.LearningMaterialId
+                                    && lm.TenantId == AbpSession.TenantId);
+        if (material == null)
+            throw new UserFriendlyException(LearningExceptionCodes.LearningMaterialNotFound,
+                "Learning material not found.");
+
+        if (material.ClassSubject?.TeacherId != teacherId)
+            throw new UserFriendlyException(LearningExceptionCodes.LearningMaterialNotFound,
+                "You may only upload new versions for materials in your own classes.");
+
+        // File validation uses the parent material's type to match against
+        // the right whitelist + size cap (LM-001).
+        ValidateFile(input.File, material.MaterialType);
+
+        // Best-effort next number; the unique index on
+        // (LearningMaterialId, VersionNumber) is the source of truth and is
+        // what *detects* a concurrent insert — see the try/catch below.
+        // Tenant filter is defence-in-depth: a query without it would still
+        // be correct because LearningMaterialId already implies the tenant,
+        // but it keeps the behaviour stable even if ABP's tenant filter is
+        // ever disabled upstream.
+        var nextVersionNumber = await _versionRepository
+            .GetAll()
+            .Where(v => v.LearningMaterialId == material.Id
+                     && v.TenantId == AbpSession.TenantId)
+            .Select(v => (int?)v.VersionNumber)
+            .MaxAsync() ?? 0;
+        nextVersionNumber += 1;
+
+        var version = new LearningMaterialVersion(
+            Guid.NewGuid(),
+            AbpSession.TenantId,
+            material.Id,
+            nextVersionNumber,
+            input.ChangeDescription.Trim(),
+            AbpSession.UserId.Value);
+
+        var fileExtension = Path.GetExtension(input.File.FileName).ToLowerInvariant();
+        var storedFileName = $"{Guid.NewGuid()}{fileExtension}";
+        var storagePath = Path.Combine(material.ClassSubjectId.ToString(), storedFileName);
+        var fileUrl = $"/api/learning-materials/{storagePath.Replace('\\', '/')}";
+
+        version.SetFile(
+            input.File.FileName,
+            fileUrl,
+            input.File.Length,
+            input.File.ContentType ?? "application/octet-stream");
+
+        await _versionRepository.InsertAsync(version);
+
+        // Move the parent material's current pointer to the new version.
+        material.SetFile(
+            input.File.FileName,
+            fileUrl,
+            input.File.Length,
+            input.File.ContentType ?? "application/octet-stream");
+
+        // Enforce LM-003 — retain at most MaxVersionsPerMaterial rows.
+        // SaveChanges first so the new row is visible to the count query.
+        // Concurrent uploads can race on MaxAsync(VersionNumber)+1 — surface
+        // *only* the unique-index violation as a friendly retry. Anything
+        // else (FK, NOT NULL, deadlock, etc.) must bubble so logs are useful.
+        // NOTE: callers must NOT retry within the same UoW — `material` is
+        // already dirty (SetFile above) and `version` has been Insert'd; on
+        // rollback the DB is consistent but ABP's ChangeTracker still sees
+        // the mutations.
+        try
+        {
+            await CurrentUnitOfWork.SaveChangesAsync();
+        }
+        catch (DbUpdateException ex) when (IsUniqueConstraintViolation(ex))
+        {
+            throw new UserFriendlyException(LearningExceptionCodes.VersionConflict,
+                "Another version was saved for this material at the same time. Please retry.");
+        }
+        await PruneOldVersionsAsync(material.Id);
+
+        return await GetAsync(material.Id);
+    }
+
+    [AbpAuthorize(PermissionNames.Learning_Materials_ManageVersions)]
+    public async Task<LearningMaterialDto> RestoreVersionAsync(Guid learningMaterialId, Guid versionId)
+    {
+        var teacherId = await ResolveCurrentTeacherIdOrThrowAsync();
+
+        var material = await _learningMaterialRepository
+            .GetAll()
+            .Include(lm => lm.ClassSubject)
+            .FirstOrDefaultAsync(lm => lm.Id == learningMaterialId
+                                    && lm.TenantId == AbpSession.TenantId);
+        if (material == null)
+            throw new UserFriendlyException(LearningExceptionCodes.LearningMaterialNotFound,
+                "Learning material not found.");
+
+        if (material.ClassSubject?.TeacherId != teacherId)
+            throw new UserFriendlyException(LearningExceptionCodes.LearningMaterialNotFound,
+                "You may only restore versions on materials in your own classes.");
+
+        var sourceVersion = await _versionRepository
+            .GetAll()
+            .FirstOrDefaultAsync(v => v.Id == versionId
+                                   && v.LearningMaterialId == learningMaterialId
+                                   && v.TenantId == AbpSession.TenantId);
+        if (sourceVersion == null)
+            throw new UserFriendlyException(LearningExceptionCodes.LearningMaterialNotFound,
+                "Version not found for this material.");
+
+        var nextVersionNumber = await _versionRepository
+            .GetAll()
+            .Where(v => v.LearningMaterialId == material.Id
+                     && v.TenantId == AbpSession.TenantId)
+            .Select(v => (int?)v.VersionNumber)
+            .MaxAsync() ?? 0;
+        nextVersionNumber += 1;
+
+        var restored = new LearningMaterialVersion(
+            Guid.NewGuid(),
+            AbpSession.TenantId,
+            material.Id,
+            nextVersionNumber,
+            $"Restored from v{sourceVersion.VersionNumber}",
+            AbpSession.UserId.Value);
+        restored.SetFile(
+            sourceVersion.FileName,
+            sourceVersion.FileUrl,
+            sourceVersion.FileSizeBytes,
+            sourceVersion.ContentType);
+
+        await _versionRepository.InsertAsync(restored);
+
+        // Point the material at the restored copy.
+        material.SetFile(
+            sourceVersion.FileName,
+            sourceVersion.FileUrl,
+            sourceVersion.FileSizeBytes ?? 0,
+            sourceVersion.ContentType);
+
+        // Same race window as UploadNewVersionAsync — guard the unique-index
+        // only, let other DbUpdateException causes bubble. Same UoW caveat:
+        // do not retry inside the same call.
+        try
+        {
+            await CurrentUnitOfWork.SaveChangesAsync();
+        }
+        catch (DbUpdateException ex) when (IsUniqueConstraintViolation(ex))
+        {
+            throw new UserFriendlyException(LearningExceptionCodes.VersionConflict,
+                "Another version was saved for this material at the same time. Please retry.");
+        }
+        // Restore copies sourceVersion.FileUrl onto `restored`, so the two
+        // rows share a blob URL. Today PruneOldVersionsAsync only deletes
+        // *rows* (never blobs), so a future prune of `sourceVersion` cannot
+        // strand or double-free the file the parent material now points at.
+        // If/when prune ever learns to delete blobs, this must switch to
+        // ref-counting before that change is enabled — otherwise restoring an
+        // old version and then uploading enough new ones to prune the source
+        // row would 404 the material's file. Follow-up: file a ticket when
+        // the storage layer changes.
+        await PruneOldVersionsAsync(material.Id);
+
+        return await GetAsync(material.Id);
+    }
+
     #region Private Methods
+
+    /// <summary>
+    /// LM-003: trim the oldest versions when the retention cap is exceeded
+    /// so a material's history never grows beyond MaxVersionsPerMaterial
+    /// rows. Hard-deletes the trimmed rows; the unique-index on
+    /// (MaterialId, VersionNumber) means restored copies always slot in
+    /// at the top with a freshly-allocated number.
+    /// </summary>
+    private async Task PruneOldVersionsAsync(Guid learningMaterialId)
+    {
+        var totalCount = await _versionRepository
+            .GetAll()
+            .Where(v => v.LearningMaterialId == learningMaterialId
+                     && v.TenantId == AbpSession.TenantId)
+            .CountAsync();
+        if (totalCount <= MaxVersionsPerMaterial) return;
+
+        var overage = totalCount - MaxVersionsPerMaterial;
+        var oldestIds = await _versionRepository
+            .GetAll()
+            .Where(v => v.LearningMaterialId == learningMaterialId
+                     && v.TenantId == AbpSession.TenantId)
+            .OrderBy(v => v.VersionNumber)
+            .Take(overage)
+            .Select(v => v.Id)
+            .ToListAsync();
+        foreach (var id in oldestIds)
+        {
+            await _versionRepository.DeleteAsync(id);
+        }
+        await CurrentUnitOfWork.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Returns true when the EF Core exception was raised by a unique-index
+    /// or unique-constraint violation. Walks the inner-exception chain and
+    /// duck-types the provider-specific exception so we don't need a direct
+    /// reference to Microsoft.Data.SqlClient / Npgsql in this assembly.
+    /// </summary>
+    /// <remarks>
+    /// SQL Server: error number 2601 (duplicate key, unique index with
+    /// IGNORE_DUP_KEY off) or 2627 (unique constraint violation).
+    /// PostgreSQL: SQLSTATE 23505 (unique_violation).
+    /// </remarks>
+    private static bool IsUniqueConstraintViolation(DbUpdateException ex)
+    {
+        for (var inner = ex.InnerException; inner != null; inner = inner.InnerException)
+        {
+            var typeName = inner.GetType().FullName;
+            if (typeName == "Microsoft.Data.SqlClient.SqlException"
+                || typeName == "System.Data.SqlClient.SqlException")
+            {
+                var numberValue = inner.GetType().GetProperty("Number")?.GetValue(inner);
+                if (numberValue is int number && (number == 2601 || number == 2627))
+                    return true;
+            }
+            else if (typeName == "Npgsql.PostgresException")
+            {
+                var sqlStateValue = inner.GetType().GetProperty("SqlState")?.GetValue(inner);
+                if (sqlStateValue is string sqlState && sqlState == "23505")
+                    return true;
+            }
+        }
+        return false;
+    }
 
     /// <summary>
     /// Resolves the Teacher.Id for the active session user. Used to scope
