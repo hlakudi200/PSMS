@@ -40,6 +40,12 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
     private const int SchoolStartHourSast = 7;
     private const int SchoolEndHourSast = 17;
     private static readonly TimeSpan SastOffset = TimeSpan.FromHours(2);
+    // OL-006 host-window guard: teachers can Start a lesson at most 15
+    // minutes before its scheduled start. Joining earlier would surprise
+    // students and gives the meeting too long to drift before the lesson
+    // really begins. Past the scheduled end time the lesson is considered
+    // missed and must be rescheduled.
+    private static readonly TimeSpan StartLeadWindow = TimeSpan.FromMinutes(15);
 
     public OnlineLessonAppService(
         IRepository<OnlineLesson, Guid> onlineLessonRepository,
@@ -63,6 +69,30 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
         if (lesson == null)
             throw new UserFriendlyException(LearningExceptionCodes.OnlineLessonNotFound,
                 "Online lesson not found.");
+
+        // Teacher-ownership scope on the read path too — without this a
+        // teacher could navigate to /teacher/lessons/{anotherTeachersId}
+        // and see the title, description, meeting link / password of a
+        // lesson they don't host. Mirrors LoadOwnedLessonOrThrowAsync with
+        // host fallback; Principals/Admins (no Teacher record) get the
+        // pass-through so oversight UI keeps working.
+        var teacherId = await ResolveCurrentTeacherIdOrNullAsync();
+        if (teacherId.HasValue)
+        {
+            var ownsViaClassSubject = lesson.ClassSubject?.TeacherId == teacherId.Value;
+            var ownsViaHost = AbpSession.UserId.HasValue
+                && lesson.HostTeacherUserId == AbpSession.UserId.Value;
+            if (!ownsViaClassSubject && !ownsViaHost)
+            {
+                // SOC tooling needs to tell probe traffic apart from
+                // genuine 404s; the user-facing message stays the same so
+                // we don't leak existence, but we log the attempted access.
+                Logger.Warn(
+                    $"Teacher {teacherId.Value} (user {AbpSession.UserId}) tried to read lesson {id} without ownership.");
+                throw new UserFriendlyException(LearningExceptionCodes.OnlineLessonNotFound,
+                    "Online lesson not found.");
+            }
+        }
 
         return ObjectMapper.Map<OnlineLessonDto>(lesson);
     }
@@ -261,6 +291,34 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
     {
         var lesson = await LoadOwnedLessonOrThrowAsync(id, allowHostFallback: true);
 
+        // Status check first so a Cancelled or Completed lesson "5 min
+        // before start" returns the right error class instead of the
+        // (technically true but unhelpful) time-window message.
+        if (lesson.Status != OnlineLessonStatus.Scheduled)
+        {
+            throw new UserFriendlyException(LearningExceptionCodes.InvalidLessonStatusTransition,
+                "Only scheduled lessons can be started.");
+        }
+
+        // OL-006: only allow Start within [scheduledStart - 15 min,
+        // scheduledEnd). Before the lead window we tell the teacher to
+        // wait; after the scheduled end we treat the lesson as missed and
+        // force a reschedule so the schedule grid stays truthful.
+        var now = DateTime.UtcNow;
+        var earliest = lesson.ScheduledStartTime - StartLeadWindow;
+        if (now < earliest)
+        {
+            throw new UserFriendlyException(LearningExceptionCodes.LessonStartTooEarly,
+                $"This lesson can only be started from {(int)StartLeadWindow.TotalMinutes} minutes before its scheduled start.");
+        }
+        if (now >= lesson.ScheduledEndTime)
+        {
+            throw new UserFriendlyException(LearningExceptionCodes.LessonStartTooLate,
+                "This lesson's scheduled window has passed. Reschedule it before starting.");
+        }
+
+        // Status was checked above, so this only catches concurrent
+        // mutations that flipped Status mid-call. Keep the guard.
         try
         {
             lesson.Start();
@@ -271,7 +329,6 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
                 "Only scheduled lessons can be started.");
         }
 
-        await _onlineLessonRepository.UpdateAsync(lesson);
         await CurrentUnitOfWork.SaveChangesAsync();
 
         return await GetAsync(id);
@@ -281,6 +338,19 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
     public async Task<OnlineLessonDto> EndAsync(Guid id, int attendeeCount)
     {
         var lesson = await LoadOwnedLessonOrThrowAsync(id, allowHostFallback: true);
+
+        // OL-002 (max 100 participants) is a meeting-platform capability —
+        // PSMS cannot enforce it on the live call. What we CAN enforce is
+        // sane bounds on the *recorded* attendee count so a typo doesn't
+        // permanently poison reporting. 0 ≤ count ≤ MaxAttendeeCount.
+        // TODO(settings): surface MaxAttendeeCount via ISettingManager so
+        // a tenant with a 100-seat license can tighten without a redeploy.
+        const int MaxAttendeeCount = 1000;
+        if (attendeeCount < 0 || attendeeCount > MaxAttendeeCount)
+        {
+            throw new UserFriendlyException(LearningExceptionCodes.AttendeeCountOutOfRange,
+                $"Attendee count must be between 0 and {MaxAttendeeCount}.");
+        }
 
         try
         {
@@ -401,15 +471,33 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
     /// who has the view permission but no Teacher record — should still be
     /// able to read lesson lists. Callers decide whether the absence is an
     /// error (mutations) or a degenerate-but-valid case (return empty).
+    /// Result is memoised on the ambient UoW so the same request firing
+    /// multiple lesson operations (e.g. Get + Cancel) only pays one DB hit.
     /// </summary>
     private async Task<Guid?> ResolveCurrentTeacherIdOrNullAsync()
     {
         if (AbpSession.UserId == null) return null;
+
+        // UoW.Items is a per-request dictionary that ABP carries with the
+        // ambient unit of work; safe to share across calls inside the same
+        // HTTP request, isolated across requests.
+        var cacheKey = $"OnlineLessonAppService.TeacherIdForUser:{AbpSession.UserId.Value}";
+        var uow = CurrentUnitOfWork;
+        if (uow != null && uow.Items.TryGetValue(cacheKey, out var cached))
+        {
+            return cached as Guid?;
+        }
+
         var teacher = await _teacherRepository
             .GetAll()
             .FirstOrDefaultAsync(t => t.UserId == AbpSession.UserId.Value
                                    && t.TenantId == AbpSession.TenantId);
-        return teacher?.Id;
+        var teacherId = teacher?.Id;
+        if (uow != null)
+        {
+            uow.Items[cacheKey] = teacherId;
+        }
+        return teacherId;
     }
 
     private async Task EnsureTeacherOwnsClassSubjectAsync(Guid classSubjectId, Guid teacherId)
@@ -473,16 +561,16 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
     private static void ValidateMeetingLinkOrThrow(string meetingLink)
     {
         if (string.IsNullOrWhiteSpace(meetingLink))
-            throw new UserFriendlyException(LearningExceptionCodes.InvalidLessonTimes,
+            throw new UserFriendlyException(LearningExceptionCodes.InvalidMeetingLink,
                 "Meeting link is required.");
 
         var trimmed = meetingLink.Trim();
         if (!Uri.TryCreate(trimmed, UriKind.Absolute, out var uri))
-            throw new UserFriendlyException(LearningExceptionCodes.InvalidLessonTimes,
+            throw new UserFriendlyException(LearningExceptionCodes.InvalidMeetingLink,
                 "Meeting link must be an absolute URL.");
 
         if (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps)
-            throw new UserFriendlyException(LearningExceptionCodes.InvalidLessonTimes,
+            throw new UserFriendlyException(LearningExceptionCodes.InvalidMeetingLink,
                 "Meeting link must use http:// or https://.");
     }
 
