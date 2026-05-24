@@ -15,4 +15,11 @@ public class GetOnlineLessonsInput : PagedAndSortedResultRequestDto
     public DateTime? EndDate { get; set; }
     public long? HostTeacherUserId { get; set; }
     public string Keyword { get; set; }
+    /// <summary>
+    /// When true, scopes results to lessons attached to a class-subject the
+    /// calling teacher is assigned to. Used by the teacher portal so the
+    /// table only ever shows the caller's own lessons, regardless of what
+    /// the shared view-permission would otherwise allow.
+    /// </summary>
+    public bool MineOnly { get; set; }
 }

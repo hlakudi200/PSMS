@@ -17,6 +17,11 @@ export interface IOnlineLessonStateContext {
   onlineLesson?: IOnlineLesson;
   onlineLessons?: IOnlineLessonList[];
   totalCount?: number;
+  // Separate slot for getByClassSubject so the modal's conflict pre-check
+  // does not clobber the main list while a Schedule modal is open.
+  lessonsByClassSubject?: IOnlineLessonList[];
+  lessonsByClassSubjectPending?: boolean;
+  lessonsByClassSubjectError?: boolean;
 }
 
 export interface IOnlineLessonActionContext {

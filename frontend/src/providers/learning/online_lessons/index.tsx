@@ -79,15 +79,20 @@ export const OnlineLessonProvider = ({
     dispatch(getAllOnlineLessonsPending());
 
     const params = new URLSearchParams();
-    if (input?.maxResultCount) params.append('MaxResultCount', input.maxResultCount.toString());
-    if (input?.skipCount) params.append('SkipCount', input.skipCount.toString());
+    // Numeric/Long fields use `!= null` to avoid falsy-zero bugs — today
+    // the status enum starts at 1 but a future Status === 0 would silently
+    // drop without this guard.
+    if (input?.maxResultCount != null) params.append('MaxResultCount', input.maxResultCount.toString());
+    if (input?.skipCount != null) params.append('SkipCount', input.skipCount.toString());
     if (input?.sorting) params.append('Sorting', input.sorting);
     if (input?.classSubjectId) params.append('ClassSubjectId', input.classSubjectId);
-    if (input?.status) params.append('Status', input.status.toString());
+    if (input?.status != null) params.append('Status', input.status.toString());
     if (input?.startDate) params.append('StartDate', input.startDate);
     if (input?.endDate) params.append('EndDate', input.endDate);
-    if (input?.hostTeacherUserId) params.append('HostTeacherUserId', input.hostTeacherUserId.toString());
-    
+    if (input?.hostTeacherUserId != null) params.append('HostTeacherUserId', input.hostTeacherUserId.toString());
+    if (input?.keyword) params.append('Keyword', input.keyword);
+    if (input?.mineOnly) params.append('MineOnly', 'true');
+
     const endpoint = `/api/services/app/OnlineLesson/GetAll?${params.toString()}`;
     await instance
       .get(endpoint)
