@@ -175,6 +175,14 @@ export interface IPagedAndSortedResultRequest {
     startDate?: string;
     endDate?: string;
     hostTeacherUserId?: number;
+    keyword?: string;
+    /**
+     * When true, the backend scopes results to lessons attached to a
+     * class-subject the calling teacher is assigned to. Lets the teacher
+     * portal show correct counts and pagination without leaking other
+     * teachers' lessons.
+     */
+    mineOnly?: boolean;
   }
   
   export interface IRescheduleOnlineLesson {

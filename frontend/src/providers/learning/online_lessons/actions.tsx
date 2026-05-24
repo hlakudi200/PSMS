@@ -99,9 +99,19 @@ export const getAllOnlineLessonsError = createAction<IOnlineLessonStateContext>(
 );
 
 // Get By ClassSubject Actions
+// Writes to lessonsByClassSubject (not onlineLessons) so a modal-driven
+// conflict pre-check does not clobber the materials table's list. Also
+// only touches its own pending/error flags, not the shared isPending
+// that the table's spinner depends on.
 export const getByClassSubjectPending = createAction<IOnlineLessonStateContext>(
     OnlineLessonActionEnums.getByClassSubjectPending,
-    () => ({ isPending: true, isSuccess: false, isError: false })
+    () => ({
+        isPending: false,
+        isSuccess: false,
+        isError: false,
+        lessonsByClassSubjectPending: true,
+        lessonsByClassSubjectError: false,
+    })
     );
 
 export const getByClassSubjectSuccess = createAction<
@@ -110,16 +120,29 @@ export const getByClassSubjectSuccess = createAction<
     >(
     OnlineLessonActionEnums.getByClassSubjectSuccess,
     (result: IListResult<IOnlineLessonList>) => ({
+        // Only the dedicated lessonsByClassSubject* flags carry the truth
+        // for this action — we deliberately do NOT touch the shared
+        // isPending/isSuccess/isError so the materials table's spinner is
+        // not affected by a modal-driven conflict pre-check, and a stale
+        // "success" doesn't bleed into a subsequent create-toast.
         isPending: false,
-        isSuccess: true,
+        isSuccess: false,
         isError: false,
-        onlineLessons: result.items,
+        lessonsByClassSubject: result.items,
+        lessonsByClassSubjectPending: false,
+        lessonsByClassSubjectError: false,
     })
     );
 
 export const getByClassSubjectError = createAction<IOnlineLessonStateContext>(
     OnlineLessonActionEnums.getByClassSubjectError,
-    () => ({ isPending: false, isSuccess: false, isError: true })
+    () => ({
+        isPending: false,
+        isSuccess: false,
+        isError: false,
+        lessonsByClassSubjectPending: false,
+        lessonsByClassSubjectError: true,
+    })
     );
 
 // Get Upcoming Actions

@@ -19,8 +19,16 @@ public static class LearningExceptionCodes
     // OnlineLesson
     public const string OnlineLessonNotFound = "LRN_ONLINE_LESSON_NOT_FOUND";
     public const string InvalidLessonTimes = "LRN_INVALID_LESSON_TIMES";
-    public const string LessonStartTimeInPast = "LRN_LESSON_START_TIME_IN_PAST";
     public const string InvalidLessonStatusTransition = "LRN_INVALID_LESSON_STATUS_TRANSITION";
     public const string CannotUpdateNonScheduledLesson = "LRN_CANNOT_UPDATE_NON_SCHEDULED_LESSON";
     public const string CannotDeleteActiveLesson = "LRN_CANNOT_DELETE_ACTIVE_LESSON";
+    // OL-001 scheduling guard rails — must schedule >=24h ahead, within
+    // 07:00-17:00 SA time, 30-180 minutes long, and not overlap an
+    // already-scheduled lesson on the same class-subject.
+    public const string LessonTooSoon = "LRN_LESSON_TOO_SOON";
+    public const string LessonOutsideSchoolHours = "LRN_LESSON_OUTSIDE_SCHOOL_HOURS";
+    public const string LessonOverlapsExisting = "LRN_LESSON_OVERLAPS_EXISTING";
+    public const string LessonDurationOutOfRange = "LRN_LESSON_DURATION_OUT_OF_RANGE";
+    public const string LessonNotOwnedByTeacher = "LRN_LESSON_NOT_OWNED_BY_TEACHER";
+    public const string TeacherNotFoundForCurrentUser = "LRN_TEACHER_NOT_FOUND_FOR_CURRENT_USER";
 }

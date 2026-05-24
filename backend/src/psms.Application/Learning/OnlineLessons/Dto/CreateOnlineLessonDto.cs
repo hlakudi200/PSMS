@@ -24,6 +24,7 @@ public class CreateOnlineLessonDto
 
     [Required]
     [StringLength(500)]
+    [Url]
     public string MeetingLink { get; set; }
 
     [StringLength(100)]
