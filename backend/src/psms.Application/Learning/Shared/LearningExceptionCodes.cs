@@ -31,4 +31,14 @@ public static class LearningExceptionCodes
     public const string LessonDurationOutOfRange = "LRN_LESSON_DURATION_OUT_OF_RANGE";
     public const string LessonNotOwnedByTeacher = "LRN_LESSON_NOT_OWNED_BY_TEACHER";
     public const string TeacherNotFoundForCurrentUser = "LRN_TEACHER_NOT_FOUND_FOR_CURRENT_USER";
+    // OL-006 host-window guard — Start can only fire from 15 min before
+    // the scheduled start until the scheduled end time. Outside that
+    // window we either tell the teacher to wait or ask them to reschedule.
+    public const string LessonStartTooEarly = "LRN_LESSON_START_TOO_EARLY";
+    public const string LessonStartTooLate = "LRN_LESSON_START_TOO_LATE";
+    // Distinct codes for non-time validation failures so audit-log / i18n
+    // consumers don't have to disambiguate "invalid lesson times" between
+    // three semantically different errors.
+    public const string AttendeeCountOutOfRange = "LRN_ATTENDEE_COUNT_OUT_OF_RANGE";
+    public const string InvalidMeetingLink = "LRN_INVALID_MEETING_LINK";
 }

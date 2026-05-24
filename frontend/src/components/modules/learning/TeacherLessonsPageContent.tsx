@@ -29,6 +29,7 @@ import {
   VideoCameraOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
+import { useRouter } from 'next/navigation';
 import { useAuthState } from '@/providers/auth';
 import {
   TeacherProvider,
@@ -48,11 +49,9 @@ import {
 import type { IClassSubjectList } from '@/providers/academic/shared/interfaces';
 import type {
   IOnlineLessonList,
-  IOnlineLesson,
 } from '@/providers/learning/shared/interfaces';
 import { ONLINE_LESSON_STATUS } from '@/providers/learning/shared/online-lesson-status';
 import { ScheduleLessonModal } from '@/components/modals/learning/ScheduleLessonModal';
-import { getAxiosInstance } from '@/utils/axios-instance';
 
 const { Title, Text } = Typography;
 
@@ -92,6 +91,7 @@ function formatRange(startIso: string, endIso: string): string {
 }
 
 function TeacherLessonsContent() {
+  const router = useRouter();
   const { currentUser } = useAuthState();
   const [scheduleOpen, setScheduleOpen] = useState(false);
 
@@ -228,34 +228,11 @@ function TeacherLessonsContent() {
     }
   };
 
-  const handleJoin = async (record: IOnlineLessonList) => {
-    // The list DTO does NOT carry meetingLink (intentional — keeps the
-    // teacher list lightweight and avoids leaking URLs to anyone holding
-    // the list-view permission). Fetch the full DTO on click, then open
-    // the link in a new tab. T-T09 will replace this with a dedicated
-    // /host shell that also flips status to InProgress.
-    try {
-      const res = await getAxiosInstance().get(
-        `/api/services/app/OnlineLesson/Get?id=${record.id}`
-      );
-      const full = res.data?.result as IOnlineLesson | undefined;
-      const link = full?.meetingLink?.trim();
-      if (!link) {
-        message.warning('This lesson has no meeting link set.');
-        return;
-      }
-      // Defence-in-depth: the server already whitelists http/https in
-      // ValidateMeetingLinkOrThrow, but we mirror the check here so any
-      // legacy row (pre-validation) cannot smuggle a javascript: or data:
-      // URL into a new-tab navigation via Update.
-      if (!/^https?:\/\//i.test(link)) {
-        message.error('This lesson has an unsupported meeting link.');
-        return;
-      }
-      window.open(link, '_blank', 'noopener,noreferrer');
-    } catch {
-      // Surfaced by axios interceptor
-    }
+  const handleOpen = (record: IOnlineLessonList) => {
+    // Route into the host shell where Start/End/Cancel and the meeting
+    // link live. Same surface for Scheduled (where Start is gated by the
+    // 15-min lead window) and InProgress lessons.
+    router.push(`/teacher/lessons/${record.id}`);
   };
 
   const columns: ColumnsType<IOnlineLessonList> = [
@@ -324,7 +301,7 @@ function TeacherLessonsContent() {
                 type="primary"
                 icon={<PlayCircleOutlined />}
                 aria-label={`Open ${record.title}`}
-                onClick={() => handleJoin(record)}
+                onClick={() => handleOpen(record)}
               >
                 Open
               </Button>
