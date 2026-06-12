@@ -102,6 +102,24 @@ export interface IGetAssessmentsInput extends IPagedAndSortedResultRequest {
   name?: string;
 }
 
+// A single multiple-choice question supplied inline when creating an
+// assessment together with its questions (QA-001). Mirrors the backend
+// CreateAssessmentQuestionInlineDto.
+export interface ICreateAssessmentQuestionInline {
+  questionText: string;
+  marks: number;
+  options: string[];
+  correctOptionIndex: number;
+  explanation?: string;
+  cognitiveLevel?: number;
+}
+
+// Creates an assessment + its questions atomically via
+// Assessment/CreateWithQuestions (one backend unit of work).
+export interface ICreateAssessmentWithQuestions extends ICreateAssessment {
+  questions: ICreateAssessmentQuestionInline[];
+}
+
 // ============================================================
 // AssessmentQuestion
 // ============================================================

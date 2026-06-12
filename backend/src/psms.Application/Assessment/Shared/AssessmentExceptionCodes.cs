@@ -10,6 +10,8 @@ public static class AssessmentExceptionCodes
     public const string ClassSubjectNotFound = "ASM_CLASS_SUBJECT_NOT_FOUND";
     public const string TermNotFound = "ASM_TERM_NOT_FOUND";
     public const string TermInFuture = "ASM_TERM_IN_FUTURE";
+    // QA-002: a due date must not fall before the scheduled date.
+    public const string DueDateBeforeScheduled = "ASM_DUE_BEFORE_SCHEDULED";
     public const string NotAssignedTeacher = "ASM_NOT_ASSIGNED_TEACHER";
     public const string CannotEditPublished = "ASM_CANNOT_EDIT_PUBLISHED";
     public const string CannotDeleteWithMarks = "ASM_CANNOT_DELETE_WITH_MARKS";
@@ -23,6 +25,11 @@ public static class AssessmentExceptionCodes
     public const string QuestionTotalExceedsMax = "ASM_QUESTION_TOTAL_EXCEEDS_MAX";
     public const string CannotEditPublishedQuestion = "ASM_CANNOT_EDIT_PUBLISHED_QUESTION";
     public const string InvalidOptionsForType = "ASM_INVALID_OPTIONS_FOR_TYPE";
+    // QA-001: structure rules enforced by CreateWithQuestionsAsync.
+    public const string InsufficientQuestions = "ASM_INSUFFICIENT_QUESTIONS";
+    public const string TooManyQuestions = "ASM_TOO_MANY_QUESTIONS";
+    public const string InvalidQuestionOptions = "ASM_INVALID_QUESTION_OPTIONS";
+    public const string InvalidCorrectOption = "ASM_INVALID_CORRECT_OPTION";
 
     // Mark
     public const string MarkNotFound = "ASM_MARK_NOT_FOUND";
