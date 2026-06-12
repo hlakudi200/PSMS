@@ -148,10 +148,10 @@ public class AttendanceAppService : ApplicationService, IAttendanceAppService
     [AbpAuthorize(PermissionNames.Academic_Attendance_Capture)]
     public async Task<ListResultDto<AttendanceDto>> BulkCaptureAsync(BulkCaptureAttendanceDto input)
     {
-        // Validate attendance date is not in the future
-        if (input.AttendanceDate.Date > DateTime.Today)
-            throw new UserFriendlyException(AcademicExceptionCodes.AttendanceDateInFuture,
-                "Attendance date cannot be in the future.");
+        // Date guard: not future, and (AT-002) not a locked past date.
+        // Shared with single CaptureAsync so the lock can't be bypassed by
+        // posting one student at a time.
+        await EnsureDateCapturableOrThrowAsync(input.AttendanceDate);
 
         // Validate class exists
         var cls = await _classRepository
@@ -304,12 +304,30 @@ public class AttendanceAppService : ApplicationService, IAttendanceAppService
         return new ListResultDto<AttendanceSummaryDto>(summaries);
     }
 
-    private async Task ValidateAttendanceInput(Guid studentId, Guid classId, Guid teacherId, DateTime attendanceDate, Guid? subjectId)
+    /// <summary>
+    /// Date guard shared by single and bulk capture: the date may not be in
+    /// the future, and (AT-002 midnight lock) once the calendar day has
+    /// passed a regular teacher can no longer capture that date — only a user
+    /// with the admin-level ViewAll permission may backfill/correct a past
+    /// date. (Uses the same server-local DateTime.Today convention as the
+    /// rest of this service.)
+    /// </summary>
+    private async Task EnsureDateCapturableOrThrowAsync(DateTime attendanceDate)
     {
-        // Validate attendance date is not in the future
         if (attendanceDate.Date > DateTime.Today)
             throw new UserFriendlyException(AcademicExceptionCodes.AttendanceDateInFuture,
                 "Attendance date cannot be in the future.");
+
+        if (attendanceDate.Date < DateTime.Today
+            && !await PermissionChecker.IsGrantedAsync(PermissionNames.Academic_Attendance_ViewAll))
+            throw new UserFriendlyException(AcademicExceptionCodes.AttendanceLocked,
+                "Attendance for a past date is locked. Ask an administrator to capture or correct it.");
+    }
+
+    private async Task ValidateAttendanceInput(Guid studentId, Guid classId, Guid teacherId, DateTime attendanceDate, Guid? subjectId)
+    {
+        // Date guard: not future, and (AT-002) not a locked past date.
+        await EnsureDateCapturableOrThrowAsync(attendanceDate);
 
         // Validate student exists and belongs to class
         var student = await _studentRepository
