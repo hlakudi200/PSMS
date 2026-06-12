@@ -266,6 +266,8 @@ public class AcademicMapper : Profile
                 opt => opt.MapFrom(src => src.Student != null ? src.Student.AdmissionNumber : null))
             .ForMember(dest => dest.ParentName,
                 opt => opt.MapFrom(src => src.Parent != null ? src.Parent.GetFullName() : null))
+            .ForMember(dest => dest.ParentUserId,
+                opt => opt.MapFrom(src => src.Parent != null ? src.Parent.UserId : 0))
             .ForMember(dest => dest.ParentEmail,
                 opt => opt.MapFrom(src => src.Parent != null ? src.Parent.Email : null))
             .ForMember(dest => dest.ParentPhone,

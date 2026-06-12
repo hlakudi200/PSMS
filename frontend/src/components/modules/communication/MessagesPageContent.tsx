@@ -30,7 +30,14 @@ dayjs.extend(relativeTime);
 
 const { Text, Paragraph } = Typography;
 
-function MessagesContent() {
+interface MessagesContentProps {
+  // Optional override for the "new message" compose modal. Lets the teacher
+  // portal swap in a parent-scoped composer while reusing the inbox / sent /
+  // threading UI. Defaults to the standard ComposeMessageModal.
+  renderCompose?: (props: { open: boolean; onClose: (refresh?: boolean) => void }) => React.ReactNode;
+}
+
+function MessagesContent({ renderCompose }: MessagesContentProps) {
   const { messages, threadMessages, totalCount, isPending } = useMessageState();
   const { getInboxAsync, getSentAsync, getThreadAsync, markAsReadAsync, sendAsync } = useMessageActions();
 
@@ -365,18 +372,22 @@ function MessagesContent() {
         )}
       </Drawer>
 
-      <ComposeMessageModal
-        open={composeOpen}
-        onClose={handleComposeClose}
-      />
+      {renderCompose
+        ? renderCompose({ open: composeOpen, onClose: handleComposeClose })
+        : (
+          <ComposeMessageModal
+            open={composeOpen}
+            onClose={handleComposeClose}
+          />
+        )}
     </>
   );
 }
 
-export default function MessagesPageContent() {
+export default function MessagesPageContent({ renderCompose }: MessagesContentProps = {}) {
   return (
     <MessageProvider>
-      <MessagesContent />
+      <MessagesContent renderCompose={renderCompose} />
     </MessageProvider>
   );
 }

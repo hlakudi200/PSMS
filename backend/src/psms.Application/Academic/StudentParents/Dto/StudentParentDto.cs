@@ -13,6 +13,8 @@ public class StudentParentDto : EntityDto<Guid>
     public string StudentName { get; set; }
     public string StudentAdmissionNumber { get; set; }
     public Guid ParentId { get; set; }
+    /// <summary>The parent's login user id — used to message the parent.</summary>
+    public long ParentUserId { get; set; }
     public string ParentName { get; set; }
     public string ParentEmail { get; set; }
     public string ParentPhone { get; set; }
