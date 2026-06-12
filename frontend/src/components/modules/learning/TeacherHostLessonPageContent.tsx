@@ -12,6 +12,7 @@ import {
   Input,
   InputNumber,
   Modal,
+  Popconfirm,
   Result,
   Row,
   Skeleton,
@@ -26,10 +27,12 @@ import {
   ArrowLeftOutlined,
   ClockCircleOutlined,
   CloseCircleOutlined,
+  CloudUploadOutlined,
   CopyOutlined,
   LinkOutlined,
   PlayCircleOutlined,
   StopOutlined,
+  VideoCameraOutlined,
 } from '@ant-design/icons';
 import {
   OnlineLessonProvider,
@@ -37,6 +40,7 @@ import {
   useOnlineLessonState,
 } from '@/providers/learning/online_lessons';
 import { ONLINE_LESSON_STATUS } from '@/providers/learning/shared/online-lesson-status';
+import { RecordingUploadModal } from '@/components/modals/learning/RecordingUploadModal';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -91,6 +95,30 @@ function isHttpUrl(value: string | null | undefined): value is string {
   return !!value && /^https?:\/\//i.test(value);
 }
 
+// Recording URLs may be either same-origin server-minted paths (current
+// upload flow returns `/api/online-lesson-recordings/...`) or — for the
+// legacy URL-only `AddRecording` flow — an absolute http(s) URL. Both
+// shapes are safe to open in a new tab; anything else (javascript:,
+// data:) is rejected. Normalises through the URL constructor so
+// path-traversal payloads like `/api/../../evil` collapse to `/evil` and
+// fail the prefix check.
+function isSafeRecordingUrl(value: string | null | undefined): value is string {
+  if (!value) return false;
+  if (typeof window === 'undefined') {
+    // SSR guard — function shouldn't be called there, but stay safe.
+    return value.startsWith('/api/') || /^https?:\/\//i.test(value);
+  }
+  try {
+    const parsed = new URL(value, window.location.origin);
+    if (parsed.origin === window.location.origin) {
+      return parsed.pathname.toLowerCase().startsWith('/api/');
+    }
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
 function TeacherHostLessonContent() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
@@ -109,6 +137,7 @@ function TeacherHostLessonContent() {
   }, [lessonId]);
 
   const [endModalOpen, setEndModalOpen] = useState(false);
+  const [recordingModalOpen, setRecordingModalOpen] = useState(false);
   const [attendeeCount, setAttendeeCount] = useState<number | null>(null);
   const [actionPending, setActionPending] = useState<
     'start' | 'end' | 'cancel' | null
@@ -534,6 +563,67 @@ function TeacherHostLessonContent() {
             />
           )}
 
+          {/* Recording upload — only meaningful on Completed lessons per
+              OL-003. We show the upload button OR the playback card based
+              on whether a recording is already attached. */}
+          {onlineLesson.status === ONLINE_LESSON_STATUS.Completed && (
+            <Card
+              variant="borderless"
+              title={
+                <Space>
+                  <VideoCameraOutlined />
+                  <span>Recording</span>
+                </Space>
+              }
+              style={{ marginTop: 12 }}
+            >
+              {onlineLesson.hasRecording && onlineLesson.recordingUrl ? (
+                <Space direction="vertical" style={{ width: '100%' }}>
+                  <Text type="secondary">A recording is attached to this lesson.</Text>
+                  <Button
+                    type="primary"
+                    icon={<LinkOutlined />}
+                    onClick={() => {
+                      const url = onlineLesson.recordingUrl;
+                      if (isSafeRecordingUrl(url)) {
+                        window.open(url, '_blank', 'noopener,noreferrer');
+                      } else {
+                        message.error('Unsupported or unsafe recording link.');
+                      }
+                    }}
+                  >
+                    Open recording
+                  </Button>
+                  <Popconfirm
+                    title="Replace the existing recording?"
+                    description="The current recording link will be unlinked. Until blob-storage cleanup ships, the previous file remains on the server."
+                    okText="Replace"
+                    onConfirm={() => setRecordingModalOpen(true)}
+                  >
+                    <Button icon={<CloudUploadOutlined />}>
+                      Replace recording
+                    </Button>
+                  </Popconfirm>
+                </Space>
+              ) : (
+                <Space direction="vertical" style={{ width: '100%' }}>
+                  <Text type="secondary">
+                    No recording attached yet. Upload an MP4 / MOV / AVI /
+                    WebM file up to 5 GB.
+                  </Text>
+                  <Button
+                    type="primary"
+                    icon={<CloudUploadOutlined />}
+                    onClick={() => setRecordingModalOpen(true)}
+                    aria-label="Upload recording"
+                  >
+                    Upload recording
+                  </Button>
+                </Space>
+              )}
+            </Card>
+          )}
+
           {onlineLesson.status === ONLINE_LESSON_STATUS.Cancelled && (
             <Alert
               role="status"
@@ -576,6 +666,15 @@ function TeacherHostLessonContent() {
           autoFocus
         />
       </Modal>
+
+      <RecordingUploadModal
+        open={recordingModalOpen}
+        lesson={onlineLesson}
+        onClose={(refresh) => {
+          setRecordingModalOpen(false);
+          if (refresh && lessonId) getAsync(lessonId);
+        }}
+      />
 
       {/* Tiny indicator at the bottom while a refresh is in flight, so
           the teacher knows the page is doing something after they

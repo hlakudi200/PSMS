@@ -50,6 +50,10 @@ export enum OnlineLessonActionEnums {
   addRecordingPending = "ADD_RECORDING_PENDING",
   addRecordingSuccess = "ADD_RECORDING_SUCCESS",
   addRecordingError = "ADD_RECORDING_ERROR",
+
+  uploadRecordingPending = "UPLOAD_RECORDING_PENDING",
+  uploadRecordingSuccess = "UPLOAD_RECORDING_SUCCESS",
+  uploadRecordingError = "UPLOAD_RECORDING_ERROR",
 }
 
 // Get Single OnlineLesson Actions
@@ -333,5 +337,29 @@ export const addRecordingSuccess = createAction<IOnlineLessonStateContext, IOnli
 
 export const addRecordingError = createAction<IOnlineLessonStateContext>(
     OnlineLessonActionEnums.addRecordingError,
+    () => ({ isPending: false, isSuccess: false, isError: true })
+    );
+
+// Upload Recording Actions (multipart) — distinct from AddRecording
+// because the success payload still drops back to the same onlineLesson
+// state; just split for traceability and so a separate spinner could
+// appear on the host shell if/when we wire one.
+export const uploadRecordingPending = createAction<IOnlineLessonStateContext>(
+    OnlineLessonActionEnums.uploadRecordingPending,
+    () => ({ isPending: true, isSuccess: false, isError: false })
+    );
+
+export const uploadRecordingSuccess = createAction<IOnlineLessonStateContext, IOnlineLesson>(
+    OnlineLessonActionEnums.uploadRecordingSuccess,
+    (onlineLesson: IOnlineLesson) => ({
+        isPending: false,
+        isSuccess: true,
+        isError: false,
+        onlineLesson,
+    })
+    );
+
+export const uploadRecordingError = createAction<IOnlineLessonStateContext>(
+    OnlineLessonActionEnums.uploadRecordingError,
     () => ({ isPending: false, isSuccess: false, isError: true })
     );

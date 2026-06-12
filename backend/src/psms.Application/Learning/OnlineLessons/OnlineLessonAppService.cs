@@ -5,6 +5,7 @@ using Abp.Domain.Repositories;
 using Abp.Domain.Uow;
 using Abp.Linq.Extensions;
 using Abp.UI;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using psms.Authorization;
 using psms.Domain.Academic.Entities;
@@ -14,10 +15,11 @@ using psms.Learning.OnlineLessons.Dto;
 using psms.Learning.Shared;
 using System;
 using System.Collections.Generic;
-using System.Data;
+using System.IO;
 using System.Linq;
 using System.Linq.Dynamic.Core;
 using System.Threading.Tasks;
+using System.Transactions;
 
 namespace psms.Learning.OnlineLessons;
 
@@ -193,17 +195,24 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
     }
 
     [AbpAuthorize(PermissionNames.Learning_Lessons_Schedule)]
-    [UnitOfWork(IsolationLevel = IsolationLevel.Serializable)]
     public async Task<OnlineLessonDto> CreateAsync(CreateOnlineLessonDto input)
     {
         // Serializable isolation so the overlap pre-check + insert are
         // atomic: two parallel CreateAsync calls cannot both pass
         // ValidateScheduleOrThrowAsync and then both insert. On SQL Server
         // this acquires key-range locks on the indexed (TenantId,
-        // ClassSubjectId, ScheduledStartTime) query, blocking phantom
-        // inserts in the overlap window. On Npgsql we rely on
-        // serialisation failure → retry, which ABP surfaces as a normal
-        // exception (callers retry the API call). See iter-1 senior review.
+        // ClassSubjectId, ScheduledStartTime) query; on Npgsql we rely on
+        // serialisation failure → caught below as a friendly retry.
+        // NOTE: ABP's [UnitOfWork] attribute can't carry IsolationLevel
+        // because the property is `IsolationLevel?` and nullable enums are
+        // not valid attribute argument types in C#. Use the programmatic
+        // Begin/Complete pattern instead.
+        using var uow = UnitOfWorkManager.Begin(new UnitOfWorkOptions
+        {
+            IsolationLevel = System.Transactions.IsolationLevel.Serializable,
+            Scope = TransactionScopeOption.RequiresNew,
+        });
+
         var teacherId = await ResolveCurrentTeacherIdOrThrowAsync();
         await EnsureTeacherOwnsClassSubjectAsync(input.ClassSubjectId, teacherId);
         // Scheme whitelist is a security guard: `[Url]` on the DTO admits
@@ -243,6 +252,10 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
             throw new UserFriendlyException(LearningExceptionCodes.LessonOverlapsExisting,
                 "This time slot was just booked by another request. Please retry.");
         }
+
+        // Commit the inner UoW so the Serializable transaction we opened
+        // above is closed before we fetch the lesson back for the DTO.
+        await uow.CompleteAsync();
 
         return await GetAsync(lesson.Id);
     }
@@ -390,10 +403,17 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
     }
 
     [AbpAuthorize(PermissionNames.Learning_Lessons_Schedule)]
-    [UnitOfWork(IsolationLevel = IsolationLevel.Serializable)]
     public async Task<OnlineLessonDto> RescheduleAsync(Guid id, RescheduleOnlineLessonDto input)
     {
-        // Same TOCTOU mitigation as CreateAsync — see comment there.
+        // Same TOCTOU mitigation as CreateAsync — programmatic UoW with
+        // Serializable isolation. See the comment in CreateAsync for why
+        // we can't use the [UnitOfWork] attribute for this.
+        using var uow = UnitOfWorkManager.Begin(new UnitOfWorkOptions
+        {
+            IsolationLevel = System.Transactions.IsolationLevel.Serializable,
+            Scope = TransactionScopeOption.RequiresNew,
+        });
+
         var lesson = await LoadOwnedLessonOrThrowAsync(id);
 
         // Same OL-001 guard rails as scheduling, applied to the new times.
@@ -425,6 +445,8 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
                 "This time slot was just booked by another request. Please retry.");
         }
 
+        await uow.CompleteAsync();
+
         return await GetAsync(id);
     }
 
@@ -443,11 +465,72 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
                 "Recordings can only be attached to in-progress or completed lessons.");
         }
 
+        ValidateRecordingUrlOrThrow(input.RecordingUrl);
         lesson.AddRecording(input.RecordingUrl);
 
         await CurrentUnitOfWork.SaveChangesAsync();
 
         return await GetAsync(id);
+    }
+
+    [AbpAuthorize(PermissionNames.Learning_Recordings_Upload)]
+    public async Task<OnlineLessonDto> UploadRecordingAsync(UploadRecordingDto input)
+    {
+        // Serializable isolation so two parallel uploads on the same
+        // lesson cannot both succeed — the second-arriving SaveChanges
+        // would otherwise quietly overwrite the first's RecordingUrl,
+        // leaking the loser's storage path. We translate a serialisation
+        // failure into a friendly retry message via IsConcurrencyRetryable.
+        // (See CreateAsync for why we use the programmatic UoW pattern.)
+        using var uow = UnitOfWorkManager.Begin(new UnitOfWorkOptions
+        {
+            IsolationLevel = System.Transactions.IsolationLevel.Serializable,
+            Scope = TransactionScopeOption.RequiresNew,
+        });
+
+        var lesson = await LoadOwnedLessonOrThrowAsync(input.LessonId, allowHostFallback: true);
+
+        // OL-003 acceptance criterion: only Completed lessons can have a
+        // recording attached. Letting an in-progress lesson accept a file
+        // would race with the End flow and pollute attendance reporting.
+        if (lesson.Status != OnlineLessonStatus.Completed)
+        {
+            throw new UserFriendlyException(LearningExceptionCodes.LessonNotCompleted,
+                "Recordings can only be uploaded for completed lessons.");
+        }
+
+        ValidateRecordingFile(input.File);
+
+        // Stage the file. TODO(blob-storage): integrate Azure Blob / S3 /
+        // local file system + a server-side virus scan hook (Microsoft
+        // Defender ATP API or ClamAV). For now we mirror the existing
+        // LearningMaterial pattern: record a path reference without
+        // writing the bytes. When real storage lands:
+        //   1. enqueue an AV scan on the uploaded blob,
+        //   2. on a "Replace recording", schedule a delete of the previous
+        //      `RecordingUrl` so the old blob doesn't orphan, and
+        //   3. swap ValidateRecordingFile from the in-memory IFormFile to
+        //      a stream-based MIME/byte sniff.
+        var fileExtension = Path.GetExtension(input.File.FileName).ToLowerInvariant();
+        // Build the path directly so we don't have to mop up
+        // platform-specific separators with `Replace('\\','/')`.
+        var fileUrl = $"/api/online-lesson-recordings/{lesson.Id}/{Guid.NewGuid()}{fileExtension}";
+
+        lesson.AddRecording(fileUrl);
+
+        try
+        {
+            await CurrentUnitOfWork.SaveChangesAsync();
+        }
+        catch (Exception ex) when (IsConcurrencyRetryable(ex))
+        {
+            throw new UserFriendlyException(LearningExceptionCodes.RecordingUploadConflict,
+                "Another upload completed for this lesson at the same time. Please retry.");
+        }
+
+        await uow.CompleteAsync();
+
+        return await GetAsync(lesson.Id);
     }
 
     #region Private Methods
@@ -549,6 +632,31 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
         return lesson;
     }
 
+    // OL-003: recording-file whitelist + 5 GB hard cap. The frontend
+    // surfaces a friendlier "advisory" cap at the same value so the user
+    // gets immediate feedback before the upload begins.
+    private const long MaxRecordingFileBytes = 5L * 1024 * 1024 * 1024; // 5 GB
+    private static readonly HashSet<string> RecordingFileExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".mp4", ".mov", ".avi", ".webm"
+    };
+
+    private static void ValidateRecordingFile(IFormFile file)
+    {
+        if (file == null || file.Length == 0)
+            throw new UserFriendlyException(LearningExceptionCodes.RecordingFileMissing,
+                "A recording file is required.");
+
+        if (file.Length > MaxRecordingFileBytes)
+            throw new UserFriendlyException(LearningExceptionCodes.RecordingFileTooLarge,
+                $"Recording file exceeds the 5 GB cap.");
+
+        var extension = Path.GetExtension(file.FileName);
+        if (string.IsNullOrEmpty(extension) || !RecordingFileExtensions.Contains(extension))
+            throw new UserFriendlyException(LearningExceptionCodes.RecordingFileTypeInvalid,
+                "Recording must be one of: MP4, MOV, AVI, WebM.");
+    }
+
     /// <summary>
     /// Whitelists meeting-link schemes. `[Url]` on the DTO only requires the
     /// value to look like a URL (and admits `file://`, `ftp://`, padded
@@ -560,18 +668,38 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
     /// </summary>
     private static void ValidateMeetingLinkOrThrow(string meetingLink)
     {
-        if (string.IsNullOrWhiteSpace(meetingLink))
-            throw new UserFriendlyException(LearningExceptionCodes.InvalidMeetingLink,
-                "Meeting link is required.");
+        ValidateHttpsUrlOrThrow(
+            meetingLink,
+            LearningExceptionCodes.InvalidMeetingLink,
+            "Meeting link");
+    }
 
-        var trimmed = meetingLink.Trim();
+    private static void ValidateRecordingUrlOrThrow(string recordingUrl)
+    {
+        ValidateHttpsUrlOrThrow(
+            recordingUrl,
+            LearningExceptionCodes.InvalidRecordingUrl,
+            "Recording URL");
+    }
+
+    /// <summary>
+    /// Shared http(s)-scheme allowlist. Takes the error code so callers can
+    /// surface a domain-specific code (Meeting vs Recording) instead of
+    /// overloading one validation code for two semantically different
+    /// fields. Mirrored client-side in TeacherLessonsPageContent /
+    /// TeacherHostLessonPageContent's handleJoin / handleOpenMeeting.
+    /// </summary>
+    private static void ValidateHttpsUrlOrThrow(string value, string errorCode, string label)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            throw new UserFriendlyException(errorCode, $"{label} is required.");
+
+        var trimmed = value.Trim();
         if (!Uri.TryCreate(trimmed, UriKind.Absolute, out var uri))
-            throw new UserFriendlyException(LearningExceptionCodes.InvalidMeetingLink,
-                "Meeting link must be an absolute URL.");
+            throw new UserFriendlyException(errorCode, $"{label} must be an absolute URL.");
 
         if (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps)
-            throw new UserFriendlyException(LearningExceptionCodes.InvalidMeetingLink,
-                "Meeting link must use http:// or https://.");
+            throw new UserFriendlyException(errorCode, $"{label} must use http:// or https://.");
     }
 
     /// <summary>

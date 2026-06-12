@@ -151,6 +151,18 @@ export const OnlineLessonReducer = handleActions<
         ...state,
         ...action.payload,
     }),
+    [OnlineLessonActionEnums.uploadRecordingPending]: (state, action) => ({
+        ...state,
+        ...action.payload,
+    }),
+    [OnlineLessonActionEnums.uploadRecordingSuccess]: (state, action) => ({
+        ...state,
+        ...action.payload,
+    }),
+    [OnlineLessonActionEnums.uploadRecordingError]: (state, action) => ({
+        ...state,
+        ...action.payload,
+    }),
   },
   INITIAL_STATE
 );

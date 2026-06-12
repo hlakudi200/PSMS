@@ -11,6 +11,7 @@ import {
   IGetOnlineLessonsInput,
   IRescheduleOnlineLesson,
   IAddRecording,
+  IUploadRecording,
 } from "../shared/interfaces";
 import { OnlineLessonReducer } from "./reducer";
 import { useContext, useReducer } from "react";
@@ -51,6 +52,9 @@ import {
     addRecordingPending,
     addRecordingSuccess,
     addRecordingError,
+    uploadRecordingPending,
+    uploadRecordingSuccess,
+    uploadRecordingError,
 } from "./actions";
 
 export const OnlineLessonProvider = ({
@@ -253,6 +257,29 @@ export const OnlineLessonProvider = ({
         });
     };
 
+    const uploadRecordingAsync = async (input: IUploadRecording) => {
+    dispatch(uploadRecordingPending());
+    const endpoint = `/api/services/app/OnlineLesson/UploadRecording`;
+    // Same multipart shape as LearningMaterial.Upload: ABP MVC binds
+    // LessonId/File from the form keys, so we keep them PascalCase. We
+    // re-throw so the caller can sequence the modal-close + page-refresh.
+    const formData = new FormData();
+    formData.append('LessonId', input.lessonId);
+    formData.append('File', input.file);
+    await instance
+        .post(endpoint, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+        })
+        .then((response) => {
+            dispatch(uploadRecordingSuccess(response.data.result));
+        })
+        .catch((error) => {
+            console.error(error);
+            dispatch(uploadRecordingError());
+            throw error;
+        });
+    };
+
   return (
     <OnlineLessonStateContext.Provider value={state}>
       <OnlineLessonActionContext.Provider
@@ -269,6 +296,7 @@ export const OnlineLessonProvider = ({
           cancelAsync,
           rescheduleAsync,
           addRecordingAsync,
+          uploadRecordingAsync,
         }}
       >
         {children}

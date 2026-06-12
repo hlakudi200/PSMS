@@ -193,4 +193,12 @@ export interface IPagedAndSortedResultRequest {
   export interface IAddRecording {
     recordingUrl: string;
   }
+
+  // Multipart upload of a recording file for a Completed lesson. Server
+  // validates type (mp4 / mov / avi / webm), size (5 GB cap, OL-003), and
+  // that the lesson is in Completed status before persisting the URL.
+  export interface IUploadRecording {
+    lessonId: string;
+    file: File;
+  }
   
