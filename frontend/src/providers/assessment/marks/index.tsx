@@ -164,6 +164,9 @@ export const MarkProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(bulkRecordMarksError());
+        // Re-throw so callers (the mark-capture page) can sequence a
+        // bulk-create + per-row updates and know whether each step landed.
+        throw error;
       });
   };
 
@@ -178,6 +181,7 @@ export const MarkProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(updateMarkError());
+        throw error;
       });
   };
 
