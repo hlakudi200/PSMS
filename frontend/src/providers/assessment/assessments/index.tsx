@@ -7,6 +7,7 @@ import {
 } from "./context";
 import {
   ICreateAssessment,
+  ICreateAssessmentWithQuestions,
   IUpdateAssessment,
   IGetAssessmentsInput,
 } from "../shared/interfaces";
@@ -108,6 +109,24 @@ export const AssessmentProvider = ({
       });
   };
 
+  // Atomic create: the backend persists the assessment and all questions
+  // in one unit of work (QA-001). Re-throws so the modal can keep itself
+  // open and surface the server's validation message on failure.
+  const createWithQuestionsAsync = async (input: ICreateAssessmentWithQuestions) => {
+    dispatch(createAssessmentPending());
+    const endpoint = `/api/services/app/Assessment/CreateWithQuestions`;
+    await instance
+      .post(endpoint, input)
+      .then((response) => {
+        dispatch(createAssessmentSuccess(response.data.result));
+      })
+      .catch((error) => {
+        console.error(error);
+        dispatch(createAssessmentError());
+        throw error;
+      });
+  };
+
   const updateAsync = async (id: string, input: IUpdateAssessment) => {
     dispatch(updateAssessmentPending());
     const endpoint = `/api/services/app/Assessment/Update?id=${id}`;
@@ -190,6 +209,7 @@ export const AssessmentProvider = ({
           getAsync,
           getAllAsync,
           createAsync,
+          createWithQuestionsAsync,
           updateAsync,
           deleteAsync,
           publishAsync,

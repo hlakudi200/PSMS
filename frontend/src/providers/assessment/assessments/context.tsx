@@ -4,6 +4,7 @@ import {
   IAssessment,
   IAssessmentList,
   ICreateAssessment,
+  ICreateAssessmentWithQuestions,
   IUpdateAssessment,
   IGetAssessmentsInput,
 } from "../shared/interfaces";
@@ -21,6 +22,7 @@ export interface IAssessmentActionContext {
   getAsync: (id: string) => void;
   getAllAsync: (input?: IGetAssessmentsInput) => void;
   createAsync: (input: ICreateAssessment) => void;
+  createWithQuestionsAsync: (input: ICreateAssessmentWithQuestions) => Promise<void>;
   updateAsync: (id: string, input: IUpdateAssessment) => void;
   deleteAsync: (id: string) => void;
   publishAsync: (id: string) => void;
