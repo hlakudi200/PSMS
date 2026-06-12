@@ -19,7 +19,7 @@ import {
   Typography,
   message,
 } from 'antd';
-import { ArrowLeftOutlined, LockOutlined, SaveOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, ImportOutlined, LockOutlined, SaveOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import {
   AssessmentProvider,
@@ -42,6 +42,7 @@ import {
   useStudentClassState,
 } from '@/providers/academic/student_classes';
 import type { IMarkList, IStudentMark } from '@/providers/assessment/shared/interfaces';
+import { ImportMarksModal } from '@/components/modals/assessment/ImportMarksModal';
 
 const { Title, Text } = Typography;
 
@@ -105,6 +106,7 @@ function MarkCaptureContent() {
 
   const [rows, setRows] = useState<Record<string, CaptureRow>>({});
   const [saving, setSaving] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
 
   // 1. Load the assessment + its existing marks.
   useEffect(() => {
@@ -204,6 +206,17 @@ function MarkCaptureContent() {
   const pendingEntries = useMemo(
     () => rowList.filter((r) => !r.existingMark && (r.wasAbsent || r.rawMark != null)),
     [rowList]
+  );
+
+  // Passed to the Excel-import modal so it scopes to the same enrolled set
+  // the grid uses and flags students who already have a mark.
+  const enrolledStudentIds = useMemo(
+    () => new Set(enrolled.map((sc) => sc.studentId)),
+    [enrolled]
+  );
+  const recordedStudentIds = useMemo(
+    () => new Set(Array.from(marksByStudent.keys())),
+    [marksByStudent]
   );
 
   const handleSave = async () => {
@@ -404,17 +417,37 @@ function MarkCaptureContent() {
               <Descriptions.Item label="Max marks">{assessment.maxMarks}</Descriptions.Item>
             </Descriptions>
           </div>
-          <Button
-            type="primary"
-            icon={<SaveOutlined />}
-            loading={saving}
-            disabled={locked || pendingEntries.length === 0}
-            onClick={handleSave}
-          >
-            Save marks{pendingEntries.length > 0 ? ` (${pendingEntries.length})` : ''}
-          </Button>
+          <Space>
+            <Button
+              icon={<ImportOutlined />}
+              disabled={locked}
+              onClick={() => setImportOpen(true)}
+            >
+              Import marks
+            </Button>
+            <Button
+              type="primary"
+              icon={<SaveOutlined />}
+              loading={saving}
+              disabled={locked || pendingEntries.length === 0}
+              onClick={handleSave}
+            >
+              Save marks{pendingEntries.length > 0 ? ` (${pendingEntries.length})` : ''}
+            </Button>
+          </Space>
         </Space>
       </Card>
+
+      <ImportMarksModal
+        open={importOpen}
+        assessment={assessment}
+        enrolledStudentIds={enrolledStudentIds}
+        recordedStudentIds={recordedStudentIds}
+        onClose={(refresh) => {
+          setImportOpen(false);
+          if (refresh) getByAssessmentAsync(assessmentId);
+        }}
+      />
 
       {loadError && !loading && (
         <Alert
