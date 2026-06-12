@@ -143,6 +143,9 @@ public static class AcademicExceptionCodes
     public const string DuplicateAttendance = "ACD_DUPLICATE_ATTENDANCE";
     public const string AttendanceDateInFuture = "ACD_ATTENDANCE_DATE_IN_FUTURE";
     public const string AttendanceStudentNotInClass = "ACD_ATTENDANCE_STUDENT_NOT_IN_CLASS";
+    // AT-002: once the day has passed, a regular teacher can no longer
+    // capture that date's register (admin override = ViewAll permission).
+    public const string AttendanceLocked = "ACD_ATTENDANCE_LOCKED";
 
     // Timetable
     public const string TimetableNotFound = "ACD_TIMETABLE_NOT_FOUND";
