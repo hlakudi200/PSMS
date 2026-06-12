@@ -23,8 +23,8 @@ export interface IMarkActionContext {
   getByAssessmentAsync: (assessmentId: string) => void;
   getByStudentAsync: (studentId: string, termId?: string) => void;
   recordMarkAsync: (input: IRecordMark) => void;
-  bulkRecordMarksAsync: (input: IBulkRecordMarks) => void;
-  updateMarkAsync: (id: string, input: IRecordMark) => void;
+  bulkRecordMarksAsync: (input: IBulkRecordMarks) => Promise<void>;
+  updateMarkAsync: (id: string, input: IRecordMark) => Promise<void>;
   markAsAbsentAsync: (id: string) => void;
   applyModerationAsync: (id: string, adjustment: number) => void;
   unlockMarkAsync: (id: string) => void;
