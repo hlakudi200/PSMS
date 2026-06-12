@@ -96,9 +96,13 @@ export const RoleProvider = ({
 
   const updateAsync = async (id: number, input: IUpdateRole) => {
     dispatch(updateRolePending());
-    const endpoint = `/api/services/app/Role/Update?id=${id}`;
+    // ABP's RoleAppService.UpdateAsync(RoleDto input) reads the role id
+    // from input.Id in the body, not the query string. Sending id only as
+    // ?id= leaves input.Id at 0, so GetRoleByIdAsync(0) throws "There is no
+    // role with id: 0" (500). Put the id in the body.
+    const endpoint = `/api/services/app/Role/Update`;
     await instance
-      .put(endpoint, input)
+      .put(endpoint, { ...input, id })
       .then((response) => {
         dispatch(updateRoleSuccess(response.data.result));
       })
