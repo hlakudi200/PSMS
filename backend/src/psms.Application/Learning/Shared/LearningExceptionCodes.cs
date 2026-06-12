@@ -41,4 +41,12 @@ public static class LearningExceptionCodes
     // three semantically different errors.
     public const string AttendeeCountOutOfRange = "LRN_ATTENDEE_COUNT_OUT_OF_RANGE";
     public const string InvalidMeetingLink = "LRN_INVALID_MEETING_LINK";
+    // OL-003 recording upload guards: type whitelist, 5 GB size cap, and
+    // status guard (only Completed lessons may have a recording attached).
+    public const string RecordingFileTypeInvalid = "LRN_RECORDING_FILE_TYPE_INVALID";
+    public const string RecordingFileTooLarge = "LRN_RECORDING_FILE_TOO_LARGE";
+    public const string RecordingFileMissing = "LRN_RECORDING_FILE_MISSING";
+    public const string LessonNotCompleted = "LRN_LESSON_NOT_COMPLETED";
+    public const string InvalidRecordingUrl = "LRN_INVALID_RECORDING_URL";
+    public const string RecordingUploadConflict = "LRN_RECORDING_UPLOAD_CONFLICT";
 }

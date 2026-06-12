@@ -23,4 +23,5 @@ public interface IOnlineLessonAppService : IApplicationService
     Task<OnlineLessonDto> CancelAsync(Guid id);
     Task<OnlineLessonDto> RescheduleAsync(Guid id, RescheduleOnlineLessonDto input);
     Task<OnlineLessonDto> AddRecordingAsync(Guid id, AddRecordingDto input);
+    Task<OnlineLessonDto> UploadRecordingAsync(UploadRecordingDto input);
 }

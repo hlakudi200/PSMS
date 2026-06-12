@@ -8,6 +8,7 @@ import {
   IGetOnlineLessonsInput,
   IRescheduleOnlineLesson,
   IAddRecording,
+  IUploadRecording,
 } from "../shared/interfaces";
 
 export interface IOnlineLessonStateContext {
@@ -37,6 +38,7 @@ export interface IOnlineLessonActionContext {
   cancelAsync: (id: string) => void;
   rescheduleAsync: (id: string, input: IRescheduleOnlineLesson) => void;
   addRecordingAsync: (id: string, input: IAddRecording) => void;
+  uploadRecordingAsync: (input: IUploadRecording) => Promise<void>;
 }
 
 export const INITIAL_STATE: IOnlineLessonStateContext = {
