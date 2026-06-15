@@ -611,6 +611,7 @@ export interface IStudentParent {
   studentName?: string;
   studentAdmissionNumber?: string;
   parentId: string;
+  parentUserId?: number;
   parentName?: string;
   parentEmail?: string;
   parentPhone?: string;
