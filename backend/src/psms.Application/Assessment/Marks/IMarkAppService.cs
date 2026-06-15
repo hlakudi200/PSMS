@@ -18,6 +18,7 @@ public interface IMarkAppService : IApplicationService
     Task<MarkDto> RecordMarkAsync(RecordMarkDto input);
     Task<ListResultDto<MarkDto>> BulkRecordMarksAsync(BulkRecordMarksDto input);
     Task<MarkDto> UpdateMarkAsync(Guid id, RecordMarkDto input);
+    Task<MarkDto> UpdateFeedbackAsync(Guid id, UpdateFeedbackDto input);
     Task<MarkDto> MarkAsAbsentAsync(Guid id);
     Task<MarkDto> ApplyModerationAsync(Guid id, decimal adjustment);
     Task<MarkDto> UnlockMarkAsync(Guid id);

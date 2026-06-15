@@ -5,6 +5,7 @@ using Abp.Domain.Repositories;
 using Abp.Linq.Extensions;
 using Abp.UI;
 using Microsoft.EntityFrameworkCore;
+using Newtonsoft.Json;
 using psms.Assessment.Marks.Dto;
 using psms.Assessment.Shared;
 using psms.Authorization;
@@ -15,6 +16,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Dynamic.Core;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using AssessmentEntity = psms.Domain.Assessment.Entities.Assessment;
 
@@ -299,6 +301,94 @@ public class MarkAppService : ApplicationService, IMarkAppService
         await CurrentUnitOfWork.SaveChangesAsync();
 
         return await GetAsync(id);
+    }
+
+    // TF-004: feedback may be edited up to 48 hours after marks are released.
+    private const int FeedbackEditWindowHours = 48;
+
+    // TF-002: minimal inappropriate-language denylist, matched on word
+    // boundaries (case-insensitive). A real deployment would source this from
+    // configuration / a moderation service; the scan is enforced server-side
+    // regardless of the client.
+    private static readonly string[] InappropriateTerms =
+    {
+        "stupid", "idiot", "dumb", "useless", "lazy", "pathetic", "moron", "worthless"
+    };
+
+    /// <summary>
+    /// Edit a mark's feedback (TF-002/004/005): enforces the 48-hour
+    /// post-release window, scans for inappropriate language, and appends the
+    /// previous text to the mark's edit history.
+    /// </summary>
+    [AbpAuthorize(PermissionNames.Assessment_Feedback_Edit)]
+    public async Task<MarkDto> UpdateFeedbackAsync(Guid id, UpdateFeedbackDto input)
+    {
+        var mark = await _markRepository
+            .GetAll()
+            .Include(m => m.Assessment)
+            .FirstOrDefaultAsync(m => m.Id == id && m.TenantId == AbpSession.TenantId);
+
+        if (mark == null)
+            throw new UserFriendlyException(AssessmentExceptionCodes.MarkNotFound, "Mark not found.");
+
+        var feedback = (input.Feedback ?? string.Empty).Trim();
+        if (feedback.Length > Mark.MaxFeedbackLength)
+            throw new UserFriendlyException(AssessmentExceptionCodes.FeedbackTooLong,
+                $"Feedback must be {Mark.MaxFeedbackLength} characters or fewer.");
+
+        // TF-004: once marks are released, feedback may only be edited within
+        // the 48-hour window measured from the release timestamp. Fail CLOSED:
+        // a released assessment with no recorded release date (e.g. released
+        // before this feature shipped) is treated as past its window rather
+        // than editable forever.
+        if (mark.Assessment.MarksReleased)
+        {
+            var releasedAt = mark.Assessment.MarksReleasedDate;
+            var withinWindow = releasedAt.HasValue
+                && DateTime.UtcNow <= releasedAt.Value.AddHours(FeedbackEditWindowHours);
+            if (!withinWindow)
+                throw new UserFriendlyException(AssessmentExceptionCodes.FeedbackEditWindowExpired,
+                    releasedAt.HasValue
+                        ? $"The {FeedbackEditWindowHours}-hour feedback edit window closed on {releasedAt.Value.AddHours(FeedbackEditWindowHours):u}."
+                        : "The feedback edit window has closed for this assessment.");
+        }
+
+        // TF-002: reject inappropriate language.
+        if (ContainsInappropriateLanguage(feedback))
+            throw new UserFriendlyException(AssessmentExceptionCodes.FeedbackInappropriateLanguage,
+                "Feedback contains language that isn't allowed. Please revise it.");
+
+        // TF-005: record the previous feedback in the edit history (only when
+        // it actually changes and there was prior text to preserve).
+        var previous = mark.Feedback?.Trim();
+        if (!string.IsNullOrEmpty(previous) && previous != feedback)
+        {
+            var history = string.IsNullOrWhiteSpace(mark.FeedbackHistory)
+                ? new List<FeedbackEditEntry>()
+                : JsonConvert.DeserializeObject<List<FeedbackEditEntry>>(mark.FeedbackHistory)
+                    ?? new List<FeedbackEditEntry>();
+            history.Add(new FeedbackEditEntry
+            {
+                At = DateTime.UtcNow,
+                ByUserId = AbpSession.UserId,
+                Previous = mark.Feedback
+            });
+            mark.FeedbackHistory = JsonConvert.SerializeObject(history);
+        }
+
+        mark.Feedback = feedback;
+
+        await _markRepository.UpdateAsync(mark);
+        await CurrentUnitOfWork.SaveChangesAsync();
+
+        return await GetAsync(id);
+    }
+
+    private static bool ContainsInappropriateLanguage(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return false;
+        return InappropriateTerms.Any(term =>
+            Regex.IsMatch(text, $@"\b{Regex.Escape(term)}\b", RegexOptions.IgnoreCase));
     }
 
     [AbpAuthorize(PermissionNames.Assessment_Marks_Edit)]

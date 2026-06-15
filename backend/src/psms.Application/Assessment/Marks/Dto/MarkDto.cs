@@ -19,6 +19,8 @@ public class MarkDto : FullAuditedEntityDto<Guid>
     public bool IsReassessment { get; set; }
     public string TeacherComment { get; set; }
     public string Feedback { get; set; }
+    /// <summary>JSON array of prior feedback edits (TF-005).</summary>
+    public string FeedbackHistory { get; set; }
     public DateTime? MarkedDate { get; set; }
     public long? MarkedByTeacherUserId { get; set; }
     public bool IsModerated { get; set; }
@@ -27,6 +29,12 @@ public class MarkDto : FullAuditedEntityDto<Guid>
     // Flattened from Assessment
     public string AssessmentName { get; set; }
     public decimal AssessmentMaxMarks { get; set; }
+    public bool MarksReleased { get; set; }
+    /// <summary>
+    /// When the post-publish feedback edit window closes (release + 48h).
+    /// Null when marks aren't released yet (feedback freely editable).
+    /// </summary>
+    public DateTime? FeedbackEditableUntil { get; set; }
 
     // Flattened from Student
     public string StudentName { get; set; }
