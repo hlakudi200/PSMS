@@ -108,6 +108,12 @@ namespace psms.Domain.Assessment.Entities
         public bool MarksReleased { get; set; }
 
         /// <summary>
+        /// When marks were released (UTC). Anchors the TF-004 48-hour
+        /// feedback edit window.
+        /// </summary>
+        public DateTime? MarksReleasedDate { get; set; }
+
+        /// <summary>
         /// Teacher who created the assessment
         /// </summary>
         [Required]
@@ -192,6 +198,7 @@ namespace psms.Domain.Assessment.Entities
                 throw new InvalidOperationException("Cannot release marks for an unpublished assessment.");
 
             MarksReleased = true;
+            MarksReleasedDate = DateTime.UtcNow;
         }
 
         /// <summary>

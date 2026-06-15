@@ -8,6 +8,7 @@ import {
 import {
   IRecordMark,
   IBulkRecordMarks,
+  IUpdateFeedback,
   IGetMarksInput,
 } from "../shared/interfaces";
 import { MarkReducer } from "./reducer";
@@ -185,6 +186,24 @@ export const MarkProvider = ({
       });
   };
 
+  // TF-004/005: edit a mark's feedback after publish. Reuses the update
+  // pending/success/error actions; re-throws so the modal can react to the
+  // server's window/language-scan rejection.
+  const updateFeedbackAsync = async (id: string, input: IUpdateFeedback) => {
+    dispatch(updateMarkPending());
+    const endpoint = `/api/services/app/Mark/UpdateFeedback?id=${id}`;
+    await instance
+      .put(endpoint, input)
+      .then((response) => {
+        dispatch(updateMarkSuccess(response.data.result));
+      })
+      .catch((error) => {
+        console.error(error);
+        dispatch(updateMarkError());
+        throw error;
+      });
+  };
+
   const markAsAbsentAsync = async (id: string) => {
     dispatch(markAsAbsentPending());
     const endpoint = `/api/services/app/Mark/MarkAsAbsent?id=${id}`;
@@ -252,6 +271,7 @@ export const MarkProvider = ({
           recordMarkAsync,
           bulkRecordMarksAsync,
           updateMarkAsync,
+          updateFeedbackAsync,
           markAsAbsentAsync,
           applyModerationAsync,
           unlockMarkAsync,

@@ -5,6 +5,7 @@ import {
   IMarkList,
   IRecordMark,
   IBulkRecordMarks,
+  IUpdateFeedback,
   IGetMarksInput,
 } from "../shared/interfaces";
 
@@ -25,6 +26,7 @@ export interface IMarkActionContext {
   recordMarkAsync: (input: IRecordMark) => void;
   bulkRecordMarksAsync: (input: IBulkRecordMarks) => Promise<void>;
   updateMarkAsync: (id: string, input: IRecordMark) => Promise<void>;
+  updateFeedbackAsync: (id: string, input: IUpdateFeedback) => Promise<void>;
   markAsAbsentAsync: (id: string) => void;
   applyModerationAsync: (id: string, adjustment: number) => void;
   unlockMarkAsync: (id: string) => void;

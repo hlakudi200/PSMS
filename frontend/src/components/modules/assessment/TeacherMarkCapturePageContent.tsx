@@ -19,7 +19,7 @@ import {
   Typography,
   message,
 } from 'antd';
-import { ArrowLeftOutlined, ImportOutlined, LockOutlined, SaveOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, CommentOutlined, ImportOutlined, LockOutlined, SaveOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import {
   AssessmentProvider,
@@ -43,6 +43,7 @@ import {
 } from '@/providers/academic/student_classes';
 import type { IMarkList, IStudentMark } from '@/providers/assessment/shared/interfaces';
 import { ImportMarksModal } from '@/components/modals/assessment/ImportMarksModal';
+import { FeedbackEditModal } from '@/components/modals/assessment/FeedbackEditModal';
 
 const { Title, Text } = Typography;
 
@@ -107,6 +108,7 @@ function MarkCaptureContent() {
   const [rows, setRows] = useState<Record<string, CaptureRow>>({});
   const [saving, setSaving] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [feedbackTarget, setFeedbackTarget] = useState<{ markId: string; studentName: string } | null>(null);
 
   // 1. Load the assessment + its existing marks.
   useEffect(() => {
@@ -392,6 +394,25 @@ function MarkCaptureContent() {
         return meta ? <Tag color={meta.color}>{meta.label}</Tag> : <Tag>—</Tag>;
       },
     },
+    {
+      title: 'Feedback',
+      key: 'feedback',
+      width: 120,
+      render: (_: unknown, row) =>
+        row.existingMark ? (
+          <Button
+            size="small"
+            icon={<CommentOutlined />}
+            onClick={() =>
+              setFeedbackTarget({ markId: row.existingMark!.id, studentName: row.studentName })
+            }
+          >
+            Feedback
+          </Button>
+        ) : (
+          <Text type="secondary">—</Text>
+        ),
+    },
   ];
 
   return (
@@ -445,6 +466,16 @@ function MarkCaptureContent() {
         recordedStudentIds={recordedStudentIds}
         onClose={(refresh) => {
           setImportOpen(false);
+          if (refresh) getByAssessmentAsync(assessmentId);
+        }}
+      />
+
+      <FeedbackEditModal
+        open={!!feedbackTarget}
+        markId={feedbackTarget?.markId ?? null}
+        studentName={feedbackTarget?.studentName}
+        onClose={(refresh) => {
+          setFeedbackTarget(null);
           if (refresh) getByAssessmentAsync(assessmentId);
         }}
       />

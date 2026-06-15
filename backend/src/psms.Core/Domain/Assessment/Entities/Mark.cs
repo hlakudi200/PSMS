@@ -80,6 +80,13 @@ namespace psms.Domain.Assessment.Entities
         public string Feedback { get; set; }
 
         /// <summary>
+        /// JSON log of post-publish feedback edits (TF-005): an array of
+        /// { at, byUserId, previous } entries. Written by the application
+        /// service so the edit history can be shown to the teacher.
+        /// </summary>
+        public string FeedbackHistory { get; set; }
+
+        /// <summary>
         /// Date when the mark was recorded
         /// </summary>
         public DateTime? MarkedDate { get; set; }

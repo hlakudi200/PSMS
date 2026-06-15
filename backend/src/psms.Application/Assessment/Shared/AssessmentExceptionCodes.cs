@@ -42,6 +42,10 @@ public static class AssessmentExceptionCodes
     public const string AssessmentNotPublished = "ASM_ASSESSMENT_NOT_PUBLISHED";
     public const string StudentNotFound = "ASM_STUDENT_NOT_FOUND";
     public const string DuplicateStudentInBatch = "ASM_DUPLICATE_STUDENT_IN_BATCH";
+    // TF-002/004: post-publish feedback edit guards.
+    public const string FeedbackTooLong = "ASM_FEEDBACK_TOO_LONG";
+    public const string FeedbackEditWindowExpired = "ASM_FEEDBACK_EDIT_WINDOW_EXPIRED";
+    public const string FeedbackInappropriateLanguage = "ASM_FEEDBACK_INAPPROPRIATE_LANGUAGE";
 
     // Report
     public const string ReportNotFound = "ASM_REPORT_NOT_FOUND";

@@ -5,6 +5,7 @@ using psms.Assessment.Marks.Dto;
 using psms.Assessment.Reports.Dto;
 using psms.Assessment.ReportSubjects.Dto;
 using psms.Domain.Assessment.Entities;
+using System;
 using System.Linq;
 using AssessmentEntity = psms.Domain.Assessment.Entities.Assessment;
 
@@ -75,6 +76,13 @@ public class AssessmentMapper : Profile
                 opt => opt.MapFrom(src => src.Assessment != null ? src.Assessment.Name : null))
             .ForMember(dest => dest.AssessmentMaxMarks,
                 opt => opt.MapFrom(src => src.Assessment != null ? src.Assessment.MaxMarks : 0))
+            .ForMember(dest => dest.MarksReleased,
+                opt => opt.MapFrom(src => src.Assessment != null && src.Assessment.MarksReleased))
+            .ForMember(dest => dest.FeedbackEditableUntil,
+                opt => opt.MapFrom(src =>
+                    src.Assessment != null && src.Assessment.MarksReleased && src.Assessment.MarksReleasedDate.HasValue
+                        ? (DateTime?)src.Assessment.MarksReleasedDate.Value.AddHours(48)
+                        : null))
             .ForMember(dest => dest.StudentName,
                 opt => opt.MapFrom(src => src.Student != null ? src.Student.GetFullName() : null))
             .ForMember(dest => dest.StudentAdmissionNumber,

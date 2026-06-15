@@ -194,14 +194,29 @@ export interface IMark {
   isReassessment: boolean;
   teacherComment?: string;
   feedback?: string;
+  feedbackHistory?: string;
   markedDate?: string;
   markedByTeacherUserId?: number;
   isModerated: boolean;
   moderationAdjustment?: number;
   assessmentName?: string;
   assessmentMaxMarks: number;
+  marksReleased?: boolean;
+  feedbackEditableUntil?: string;
   studentName?: string;
   studentAdmissionNumber?: string;
+}
+
+// TF-005: one entry in a mark's feedback edit history (parsed from the
+// IMark.feedbackHistory JSON string).
+export interface IFeedbackEditEntry {
+  at: string;
+  byUserId?: number;
+  previous: string;
+}
+
+export interface IUpdateFeedback {
+  feedback: string;
 }
 
 export interface IMarkList {
