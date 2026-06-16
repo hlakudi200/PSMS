@@ -18,18 +18,26 @@ public class MedicalInfoAppService : ApplicationService, IMedicalInfoAppService
 {
     private readonly IRepository<MedicalInfo, Guid> _medicalInfoRepository;
     private readonly IRepository<Student, Guid> _studentRepository;
+    private readonly psms.Academic.Students.ICurrentStudentResolver _currentStudent;
 
     public MedicalInfoAppService(
         IRepository<MedicalInfo, Guid> medicalInfoRepository,
-        IRepository<Student, Guid> studentRepository)
+        IRepository<Student, Guid> studentRepository,
+        psms.Academic.Students.ICurrentStudentResolver currentStudent)
     {
         _medicalInfoRepository = medicalInfoRepository;
         _studentRepository = studentRepository;
+        _currentStudent = currentStudent;
     }
 
     [AbpAuthorize(PermissionNames.Academic_Students_View)]
     public async Task<MedicalInfoDto> GetByStudentAsync(Guid studentId)
     {
+        // LC-08: a student-portal user may only read their own medical info.
+        var selfId = await _currentStudent.GetCurrentStudentIdAsync();
+        if (selfId.HasValue && selfId.Value != studentId)
+            throw new UserFriendlyException(AcademicExceptionCodes.MedicalInfoNotFound, "Medical information not found for this student.");
+
         var medicalInfo = await _medicalInfoRepository
             .GetAll()
             .Include(mi => mi.Student)

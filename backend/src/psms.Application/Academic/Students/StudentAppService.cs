@@ -29,22 +29,46 @@ public class StudentAppService : ApplicationService, IStudentAppService
     private readonly IRepository<Grade, Guid> _gradeRepository;
     private readonly IRepository<Class, Guid> _classRepository;
     private readonly IStudentLoginProvisioner _loginProvisioner;
+    private readonly ICurrentStudentResolver _currentStudent;
 
     public StudentAppService(
         IRepository<Student, Guid> studentRepository,
         IRepository<Grade, Guid> gradeRepository,
         IRepository<Class, Guid> classRepository,
-        IStudentLoginProvisioner loginProvisioner)
+        IStudentLoginProvisioner loginProvisioner,
+        ICurrentStudentResolver currentStudent)
     {
         _studentRepository = studentRepository;
         _gradeRepository = gradeRepository;
         _classRepository = classRepository;
         _loginProvisioner = loginProvisioner;
+        _currentStudent = currentStudent;
+    }
+
+    /// <summary>Returns a single-item list of just the given student (LC-08 self-scope).</summary>
+    private async Task<ListResultDto<StudentListDto>> SelfOnlyListAsync(Guid studentId)
+    {
+        var self = await _studentRepository
+            .GetAll()
+            .Include(s => s.CurrentGrade)
+            .Include(s => s.CurrentClass)
+            .Include(s => s.ParentLinks)
+            .FirstOrDefaultAsync(s => s.Id == studentId);
+
+        var list = self == null ? new List<Student>() : new List<Student> { self };
+        return new ListResultDto<StudentListDto>(ObjectMapper.Map<List<StudentListDto>>(list));
     }
 
     [AbpAuthorize(PermissionNames.Academic_Students_View)]
     public async Task<StudentDto> GetAsync(Guid id)
     {
+        // LC-08: a student-portal user (a user linked to a Student record) may
+        // only read their OWN record. Staff have no Student record → unchanged.
+        // Return not-found (not forbidden) so existence isn't leaked.
+        var selfStudentId = await _currentStudent.GetCurrentStudentIdAsync();
+        if (selfStudentId.HasValue && selfStudentId.Value != id)
+            throw new UserFriendlyException(AcademicExceptionCodes.StudentNotFound, "Student not found.");
+
         var student = await _studentRepository
             .GetAll()
             .Include(s => s.CurrentGrade)
@@ -62,6 +86,14 @@ public class StudentAppService : ApplicationService, IStudentAppService
     [AbpAuthorize(PermissionNames.Academic_Students_View)]
     public async Task<PagedResultDto<StudentListDto>> GetAllAsync(GetAcademicEntityInput input)
     {
+        // LC-08: a student-portal user only ever sees their own record.
+        var selfStudentId = await _currentStudent.GetCurrentStudentIdAsync();
+        if (selfStudentId.HasValue)
+        {
+            var selfList = (await SelfOnlyListAsync(selfStudentId.Value)).Items.ToList();
+            return new PagedResultDto<StudentListDto>(selfList.Count, selfList);
+        }
+
         var query = _studentRepository
             .GetAll()
             .Include(s => s.CurrentGrade)
@@ -295,6 +327,9 @@ public class StudentAppService : ApplicationService, IStudentAppService
     [AbpAuthorize(PermissionNames.Academic_Students_View)]
     public async Task<ListResultDto<StudentListDto>> GetActiveStudentsAsync()
     {
+        var selfId = await _currentStudent.GetCurrentStudentIdAsync();
+        if (selfId.HasValue) return await SelfOnlyListAsync(selfId.Value);
+
         var students = await _studentRepository
             .GetAll()
             .Include(s => s.CurrentGrade)
@@ -312,6 +347,9 @@ public class StudentAppService : ApplicationService, IStudentAppService
     [AbpAuthorize(PermissionNames.Academic_Students_View)]
     public async Task<ListResultDto<StudentListDto>> GetStudentsByGradeAsync(Guid gradeId)
     {
+        var selfId = await _currentStudent.GetCurrentStudentIdAsync();
+        if (selfId.HasValue) return await SelfOnlyListAsync(selfId.Value);
+
         var students = await _studentRepository
             .GetAll()
             .Include(s => s.CurrentGrade)
@@ -329,6 +367,9 @@ public class StudentAppService : ApplicationService, IStudentAppService
     [AbpAuthorize(PermissionNames.Academic_Students_View)]
     public async Task<ListResultDto<StudentListDto>> GetStudentsByClassAsync(Guid classId)
     {
+        var selfId = await _currentStudent.GetCurrentStudentIdAsync();
+        if (selfId.HasValue) return await SelfOnlyListAsync(selfId.Value);
+
         var students = await _studentRepository
             .GetAll()
             .Include(s => s.CurrentGrade)
@@ -346,6 +387,9 @@ public class StudentAppService : ApplicationService, IStudentAppService
     [AbpAuthorize(PermissionNames.Academic_Students_View)]
     public async Task<ListResultDto<StudentListDto>> SearchAsync(string searchTerm)
     {
+        var selfId = await _currentStudent.GetCurrentStudentIdAsync();
+        if (selfId.HasValue) return await SelfOnlyListAsync(selfId.Value);
+
         IQueryable<Student> query = _studentRepository
             .GetAll()
             .Include(s => s.CurrentGrade)

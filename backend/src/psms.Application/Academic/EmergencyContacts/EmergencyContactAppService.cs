@@ -20,13 +20,16 @@ public class EmergencyContactAppService : ApplicationService, IEmergencyContactA
 {
     private readonly IRepository<EmergencyContact, Guid> _emergencyContactRepository;
     private readonly IRepository<Student, Guid> _studentRepository;
+    private readonly psms.Academic.Students.ICurrentStudentResolver _currentStudent;
 
     public EmergencyContactAppService(
         IRepository<EmergencyContact, Guid> emergencyContactRepository,
-        IRepository<Student, Guid> studentRepository)
+        IRepository<Student, Guid> studentRepository,
+        psms.Academic.Students.ICurrentStudentResolver currentStudent)
     {
         _emergencyContactRepository = emergencyContactRepository;
         _studentRepository = studentRepository;
+        _currentStudent = currentStudent;
     }
 
     [AbpAuthorize(PermissionNames.Academic_Students_View)]
@@ -40,12 +43,22 @@ public class EmergencyContactAppService : ApplicationService, IEmergencyContactA
         if (contact == null)
             throw new UserFriendlyException(AcademicExceptionCodes.EmergencyContactNotFound, "Emergency contact not found.");
 
+        // LC-08: a student may only read their own contacts.
+        var selfId = await _currentStudent.GetCurrentStudentIdAsync();
+        if (selfId.HasValue && selfId.Value != contact.StudentId)
+            throw new UserFriendlyException(AcademicExceptionCodes.EmergencyContactNotFound, "Emergency contact not found.");
+
         return ObjectMapper.Map<EmergencyContactDto>(contact);
     }
 
     [AbpAuthorize(PermissionNames.Academic_Students_View)]
     public async Task<ListResultDto<EmergencyContactListDto>> GetByStudentAsync(Guid studentId)
     {
+        // LC-08: a student may only read their own contacts.
+        var selfId = await _currentStudent.GetCurrentStudentIdAsync();
+        if (selfId.HasValue && selfId.Value != studentId)
+            throw new UserFriendlyException(AcademicExceptionCodes.EmergencyContactNotFound, "Emergency contact not found.");
+
         var contacts = await _emergencyContactRepository
             .GetAll()
             .Where(ec => ec.StudentId == studentId && ec.TenantId == AbpSession.TenantId)

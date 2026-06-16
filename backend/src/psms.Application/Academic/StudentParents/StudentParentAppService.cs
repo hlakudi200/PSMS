@@ -24,20 +24,28 @@ public class StudentParentAppService : ApplicationService, IStudentParentAppServ
     private readonly IRepository<StudentParent, Guid> _studentParentRepository;
     private readonly IRepository<Student, Guid> _studentRepository;
     private readonly IRepository<Parent, Guid> _parentRepository;
+    private readonly psms.Academic.Students.ICurrentStudentResolver _currentStudent;
 
     public StudentParentAppService(
         IRepository<StudentParent, Guid> studentParentRepository,
         IRepository<Student, Guid> studentRepository,
-        IRepository<Parent, Guid> parentRepository)
+        IRepository<Parent, Guid> parentRepository,
+        psms.Academic.Students.ICurrentStudentResolver currentStudent)
     {
         _studentParentRepository = studentParentRepository;
         _studentRepository = studentRepository;
         _parentRepository = parentRepository;
+        _currentStudent = currentStudent;
     }
 
     [AbpAuthorize(PermissionNames.Academic_Students_View)]
     public async Task<ListResultDto<StudentParentDto>> GetByStudentAsync(Guid studentId)
     {
+        // LC-08: a student may only read their own parent links.
+        var selfId = await _currentStudent.GetCurrentStudentIdAsync();
+        if (selfId.HasValue && selfId.Value != studentId)
+            return new ListResultDto<StudentParentDto>(new System.Collections.Generic.List<StudentParentDto>());
+
         var links = await _studentParentRepository
             .GetAll()
             .Include(sp => sp.Student)
