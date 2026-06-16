@@ -34,6 +34,7 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
     private readonly IRepository<OnlineLesson, Guid> _onlineLessonRepository;
     private readonly IRepository<ClassSubject, Guid> _classSubjectRepository;
     private readonly IRepository<Teacher, Guid> _teacherRepository;
+    private readonly IRepository<Student, Guid> _studentRepository;
     private readonly IRepository<User, long> _userRepository;
     private readonly IFileStorageService _fileStorage;
     private readonly ILiveKitTokenService _liveKit;
@@ -61,6 +62,7 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
         IRepository<OnlineLesson, Guid> onlineLessonRepository,
         IRepository<ClassSubject, Guid> classSubjectRepository,
         IRepository<Teacher, Guid> teacherRepository,
+        IRepository<Student, Guid> studentRepository,
         IRepository<User, long> userRepository,
         IFileStorageService fileStorage,
         ILiveKitTokenService liveKit)
@@ -68,6 +70,7 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
         _onlineLessonRepository = onlineLessonRepository;
         _classSubjectRepository = classSubjectRepository;
         _teacherRepository = teacherRepository;
+        _studentRepository = studentRepository;
         _userRepository = userRepository;
         _fileStorage = fileStorage;
         _liveKit = liveKit;
@@ -604,12 +607,8 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
 
     // Gated on the dedicated Join permission (held by teachers + students, NOT
     // parents) rather than View — issuing a live-classroom token is a stronger
-    // capability than reading lesson metadata.
-    // TODO(LC-04): tighten the non-host path to per-class enrolment once a
-    // server-side student<->user link exists. Today the lessons module has no
-    // server-side enrolment scoping (visibility is client-side), so any holder
-    // of the Join permission in the tenant can view a live class; the Join
-    // permission + tenant scope is the current boundary.
+    // capability than reading lesson metadata. LC-07 further restricts the
+    // non-host path to students actually enrolled in the lesson's class.
     [AbpAuthorize(PermissionNames.Learning_Lessons_Join)]
     public async Task<LiveClassJoinDto> GetJoinTokenAsync(Guid id)
     {
@@ -647,10 +646,27 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
         var isHost = (teacherId.HasValue && lesson.ClassSubject?.TeacherId == teacherId.Value)
                      || (AbpSession.UserId.HasValue && lesson.HostTeacherUserId == AbpSession.UserId.Value);
 
-        // Students can only join once the teacher has actually started the class.
-        if (!isHost && lesson.Status != OnlineLessonStatus.InProgress)
-            throw new UserFriendlyException(LearningExceptionCodes.LiveClassNotAvailable,
-                "The class hasn't started yet. Please wait for your teacher to start the lesson.");
+        // Non-host (student) gate: the class must be live, and the caller must
+        // be a student actually enrolled in this lesson's class (LC-07).
+        if (!isHost)
+        {
+            if (lesson.Status != OnlineLessonStatus.InProgress)
+                throw new UserFriendlyException(LearningExceptionCodes.LiveClassNotAvailable,
+                    "The class hasn't started yet. Please wait for your teacher to start the lesson.");
+
+            var student = await _studentRepository
+                .FirstOrDefaultAsync(s => s.UserId == AbpSession.UserId.Value
+                                       && s.TenantId == AbpSession.TenantId);
+            if (student == null)
+                throw new UserFriendlyException(LearningExceptionCodes.LiveClassNotAvailable,
+                    "Only the class teacher and enrolled students can join this live class.");
+
+            // Null-safe: if the ClassSubject is somehow unavailable, treat as
+            // not-enrolled rather than throwing a raw NRE.
+            if (student.CurrentClassId != lesson.ClassSubject?.ClassId)
+                throw new UserFriendlyException(LearningExceptionCodes.LiveClassNotAvailable,
+                    "You are not enrolled in this class.");
+        }
 
         // Room name is derived from the lesson id — no stored column needed.
         var roomName = LiveClassRoomName(lesson.Id);

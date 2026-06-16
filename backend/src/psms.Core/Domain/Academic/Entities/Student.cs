@@ -104,6 +104,13 @@ namespace psms.Domain.Academic.Entities
         public Guid CurrentClassId { get; set; }
 
         /// <summary>
+        /// The AbpUser login account provisioned for this student (LC-07).
+        /// Nullable: students created before LC-07 (or via paths that don't
+        /// provision a login) have no account. Set via <see cref="LinkUser"/>.
+        /// </summary>
+        public long? UserId { get; set; }
+
+        /// <summary>
         /// Physical address
         /// </summary>
         public Address PhysicalAddress { get; set; }
@@ -241,6 +248,12 @@ namespace psms.Domain.Academic.Entities
             if (DateOfBirth.Date > today.AddYears(-age))
                 age--;
             return age;
+        }
+
+        /// <summary>Links this student to their AbpUser login account (LC-07).</summary>
+        public void LinkUser(long userId)
+        {
+            UserId = userId;
         }
     }
 }

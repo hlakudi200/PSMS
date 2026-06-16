@@ -54,4 +54,18 @@ public class StudentDto : FullAuditedEntityDto<Guid>
 
     /// <summary>Number of subject enrollments.</summary>
     public int SubjectCount { get; set; }
+
+    /// <summary>
+    /// Login username for the student's portal account (LC-07). Populated only
+    /// in the CreateAsync response (alongside TemporaryPassword); null on reads.
+    /// </summary>
+    public string LoginUserName { get; set; }
+
+    /// <summary>
+    /// One-time temporary password — populated ONLY in the response to
+    /// CreateAsync when a login account is freshly provisioned, so the admin
+    /// can hand it to the student. Never returned on reads (it isn't stored in
+    /// plaintext). The student must change it on first login.
+    /// </summary>
+    public string TemporaryPassword { get; set; }
 }

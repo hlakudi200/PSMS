@@ -33,6 +33,7 @@ public class EnrollmentAppService : ApplicationService, IEnrollmentAppService
     private readonly IRepository<StudentParent, Guid> _studentParentRepository;
     private readonly IRepository<Parent, Guid> _parentRepository;
     private readonly IRepository<Domain.Admissions.Entities.AdmissionSettings, Guid> _settingsRepository;
+    private readonly psms.Academic.Students.IStudentLoginProvisioner _loginProvisioner;
 
     public EnrollmentAppService(
         IRepository<Application, Guid> applicationRepository,
@@ -41,7 +42,8 @@ public class EnrollmentAppService : ApplicationService, IEnrollmentAppService
         IRepository<ApplicantParent, Guid> applicantParentRepository,
         IRepository<StudentParent, Guid> studentParentRepository,
         IRepository<Parent, Guid> parentRepository,
-        IRepository<Domain.Admissions.Entities.AdmissionSettings, Guid> settingsRepository)
+        IRepository<Domain.Admissions.Entities.AdmissionSettings, Guid> settingsRepository,
+        psms.Academic.Students.IStudentLoginProvisioner loginProvisioner)
     {
         _applicationRepository = applicationRepository;
         _studentRepository = studentRepository;
@@ -50,6 +52,7 @@ public class EnrollmentAppService : ApplicationService, IEnrollmentAppService
         _studentParentRepository = studentParentRepository;
         _parentRepository = parentRepository;
         _settingsRepository = settingsRepository;
+        _loginProvisioner = loginProvisioner;
     }
 
     [AbpAuthorize(PermissionNames.Admissions_Enrollment_View)]
@@ -250,6 +253,11 @@ public class EnrollmentAppService : ApplicationService, IEnrollmentAppService
 
         await _studentRepository.InsertAsync(student);
 
+        // LC-07: provision the student's portal login in the same unit of work,
+        // exactly like the manual StudentAppService path, so admissions-enrolled
+        // students also get a linked account (and can join their live classes).
+        var login = await _loginProvisioner.ProvisionAsync(student);
+
         // Link parents to student (ADM-027)
         await LinkParentsToStudentAsync(application.Id, student.Id);
 
@@ -269,7 +277,12 @@ public class EnrollmentAppService : ApplicationService, IEnrollmentAppService
 
         await CurrentUnitOfWork.SaveChangesAsync();
 
-        return await GetByApplicationAsync(input.ApplicationId);
+        var dto = await GetByApplicationAsync(input.ApplicationId);
+        // Surface the freshly-provisioned login once so the admissions officer
+        // can hand the credentials to the family (never returned on reads).
+        dto.LoginUserName = login.UserName;
+        dto.TemporaryPassword = login.TemporaryPassword;
+        return dto;
     }
 
     #region Private Methods
