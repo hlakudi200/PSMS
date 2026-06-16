@@ -10,6 +10,7 @@ using psms.Authorization;
 using psms.Domain.Academic.Entities;
 using psms.Domain.Learning.Entities;
 using psms.Domain.Shared.Enums;
+using psms.Domain.Shared.LiveStreaming;
 using psms.Domain.Shared.Storage;
 using psms.Learning.OnlineLessons.Dto;
 using psms.Learning.Shared;
@@ -33,6 +34,7 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
     private readonly IRepository<ClassSubject, Guid> _classSubjectRepository;
     private readonly IRepository<Teacher, Guid> _teacherRepository;
     private readonly IFileStorageService _fileStorage;
+    private readonly ILiveKitTokenService _liveKit;
 
     // Supabase bucket for lesson recordings (public-read, like materials).
     private const string RecordingsBucket = "recordings";
@@ -57,12 +59,14 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
         IRepository<OnlineLesson, Guid> onlineLessonRepository,
         IRepository<ClassSubject, Guid> classSubjectRepository,
         IRepository<Teacher, Guid> teacherRepository,
-        IFileStorageService fileStorage)
+        IFileStorageService fileStorage,
+        ILiveKitTokenService liveKit)
     {
         _onlineLessonRepository = onlineLessonRepository;
         _classSubjectRepository = classSubjectRepository;
         _teacherRepository = teacherRepository;
         _fileStorage = fileStorage;
+        _liveKit = liveKit;
     }
 
     [AbpAuthorize(PermissionNames.Learning_Lessons_View)]
@@ -221,9 +225,25 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
 
         var teacherId = await ResolveCurrentTeacherIdOrThrowAsync();
         await EnsureTeacherOwnsClassSubjectAsync(input.ClassSubjectId, teacherId);
-        // Scheme whitelist is a security guard: `[Url]` on the DTO admits
-        // file:// and weird payloads. See ValidateMeetingLinkOrThrow.
-        ValidateMeetingLinkOrThrow(input.MeetingLink);
+
+        // In-app (LiveKit) live classes are hosted inside PSMS — no external
+        // meeting URL. The MeetingLink column is NOT NULL, so we store a
+        // derived in-app join route. External platforms still require a real,
+        // scheme-whitelisted URL (the [Url] DataAnnotation alone admits
+        // file:// and weird payloads — see ValidateMeetingLinkOrThrow).
+        var lessonId = Guid.NewGuid();
+        var isInApp = input.Platform == OnlinePlatform.InApp;
+        string meetingLink;
+        if (isInApp)
+        {
+            meetingLink = $"/live-class/{lessonId}";
+        }
+        else
+        {
+            ValidateMeetingLinkOrThrow(input.MeetingLink);
+            meetingLink = input.MeetingLink;
+        }
+
         await ValidateScheduleOrThrowAsync(
             input.ClassSubjectId,
             input.ScheduledStartTime,
@@ -231,12 +251,12 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
             excludeLessonId: null);
 
         var lesson = new OnlineLesson(
-            Guid.NewGuid(),
+            lessonId,
             AbpSession.TenantId,
             input.ClassSubjectId,
             input.Title.Trim(),
             input.Platform,
-            input.MeetingLink,
+            meetingLink,
             input.ScheduledStartTime,
             input.ScheduledEndTime,
             AbpSession.UserId.Value)
@@ -561,6 +581,79 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
         await uow.CompleteAsync();
 
         return await GetAsync(lesson.Id);
+    }
+
+    // Gated on the dedicated Join permission (held by teachers + students, NOT
+    // parents) rather than View — issuing a live-classroom token is a stronger
+    // capability than reading lesson metadata.
+    // TODO(LC-04): tighten the non-host path to per-class enrolment once a
+    // server-side student<->user link exists. Today the lessons module has no
+    // server-side enrolment scoping (visibility is client-side), so any holder
+    // of the Join permission in the tenant can view a live class; the Join
+    // permission + tenant scope is the current boundary.
+    [AbpAuthorize(PermissionNames.Learning_Lessons_Join)]
+    public async Task<LiveClassJoinDto> GetJoinTokenAsync(Guid id)
+    {
+        if (!AbpSession.UserId.HasValue)
+            throw new UserFriendlyException(LearningExceptionCodes.LiveClassNotAvailable,
+                "You must be signed in to join a live class.");
+
+        var lesson = await _onlineLessonRepository
+            .GetAll()
+            .Include(ol => ol.ClassSubject)
+            .FirstOrDefaultAsync(ol => ol.Id == id && ol.TenantId == AbpSession.TenantId);
+        if (lesson == null)
+            throw new UserFriendlyException(LearningExceptionCodes.OnlineLessonNotFound,
+                "Online lesson not found.");
+
+        if (lesson.Platform != OnlinePlatform.InApp)
+            throw new UserFriendlyException(LearningExceptionCodes.LiveClassNotAvailable,
+                "This lesson is not an in-app live class.");
+
+        if (lesson.Status == OnlineLessonStatus.Completed
+            || lesson.Status == OnlineLessonStatus.Cancelled
+            || lesson.Status == OnlineLessonStatus.Rescheduled)
+            throw new UserFriendlyException(LearningExceptionCodes.LiveClassNotAvailable,
+                "This class is no longer live.");
+
+        if (!_liveKit.IsConfigured)
+            throw new UserFriendlyException(LearningExceptionCodes.LiveClassNotAvailable,
+                "Live classes are not configured on this server yet.");
+
+        // The hosting teacher publishes; everyone else (students, who hold the
+        // lesson-view permission required above) joins as a viewer. Ownership
+        // mirrors LoadOwnedLessonOrThrowAsync: assigned ClassSubject teacher OR
+        // the recorded host user.
+        var teacherId = await ResolveCurrentTeacherIdOrNullAsync();
+        var isHost = (teacherId.HasValue && lesson.ClassSubject?.TeacherId == teacherId.Value)
+                     || (AbpSession.UserId.HasValue && lesson.HostTeacherUserId == AbpSession.UserId.Value);
+
+        // Students can only join once the teacher has actually started the class.
+        if (!isHost && lesson.Status != OnlineLessonStatus.InProgress)
+            throw new UserFriendlyException(LearningExceptionCodes.LiveClassNotAvailable,
+                "The class hasn't started yet. Please wait for your teacher to start the lesson.");
+
+        // Room name is derived from the lesson id — no stored column needed.
+        var roomName = $"class-{lesson.Id}";
+        var identity = $"user-{AbpSession.UserId}";
+
+        var ticket = _liveKit.CreateJoinToken(new LiveKitJoinRequest
+        {
+            Identity = identity,
+            Name = identity,
+            RoomName = roomName,
+            CanPublish = isHost,
+            CanPublishData = true,
+        });
+
+        return new LiveClassJoinDto
+        {
+            ServerUrl = ticket.ServerUrl,
+            Token = ticket.Token,
+            RoomName = roomName,
+            Identity = identity,
+            CanPublish = isHost,
+        };
     }
 
     #region Private Methods

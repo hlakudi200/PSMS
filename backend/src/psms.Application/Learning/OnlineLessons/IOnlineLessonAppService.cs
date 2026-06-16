@@ -26,4 +26,10 @@ public interface IOnlineLessonAppService : IApplicationService
     Task<OnlineLessonDto> AddRecordingAsync(Guid id, AddRecordingDto input);
     Task<FileUploadTicket> RequestRecordingUploadUrlAsync(RequestRecordingUploadUrlDto input);
     Task<OnlineLessonDto> UploadRecordingAsync(UploadRecordingDto input);
+
+    /// <summary>
+    /// Mints a LiveKit join token for the in-app live classroom (LC-01). The
+    /// hosting teacher gets publish rights; everyone else joins as a viewer.
+    /// </summary>
+    Task<LiveClassJoinDto> GetJoinTokenAsync(Guid id);
 }
