@@ -124,10 +124,8 @@ export interface IPagedAndSortedResultRequest {
   export interface IUploadNewVersion {
     learningMaterialId: string;
     changeDescription: string;
-    fileUrl: string;
+    objectKey: string;
     fileName: string;
-    fileSizeBytes: number;
-    contentType?: string;
   }
   
   // OnlineLesson Interfaces

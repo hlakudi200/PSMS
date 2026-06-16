@@ -114,18 +114,20 @@ export const MaterialVersionHistoryDrawer: React.FC<
       await uploadNewVersionAsync({
         learningMaterialId: material.id,
         changeDescription: changeDescription.trim(),
-        fileUrl: ticket.publicUrl,
+        objectKey: ticket.objectKey,
         fileName: file.name,
-        fileSizeBytes: file.size,
-        contentType: file.type || 'application/octet-stream',
       });
       message.success('New version uploaded');
       setChangeDescription('');
       setFileList([]);
       // Refresh history so the new row shows immediately.
       getVersionsAsync(material.id);
-    } catch {
-      // Server errors surfaced by the axios response interceptor.
+    } catch (err) {
+      // The direct-to-storage PUT uses fetch (not axios), so surface its
+      // failure here; axios errors (with .response) are shown by the interceptor.
+      if (!(err as { response?: unknown })?.response) {
+        message.error((err as Error)?.message || 'Upload failed. Please try again.');
+      }
     } finally {
       setUploading(false);
     }

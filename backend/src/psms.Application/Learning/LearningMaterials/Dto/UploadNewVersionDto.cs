@@ -20,17 +20,15 @@ public class UploadNewVersionDto
     [StringLength(500, MinimumLength = 5)]
     public string ChangeDescription { get; set; }
 
-    /// <summary>Public URL of the already-uploaded new file.</summary>
+    /// <summary>
+    /// Storage object key from RequestVersionUploadUrl. Validated + measured
+    /// server-side; the public URL is derived (not trusted from the client).
+    /// </summary>
     [Required]
-    [StringLength(1000)]
-    public string FileUrl { get; set; }
+    [StringLength(500)]
+    public string ObjectKey { get; set; }
 
     [Required]
     [StringLength(260)]
     public string FileName { get; set; }
-
-    public long FileSizeBytes { get; set; }
-
-    [StringLength(150)]
-    public string ContentType { get; set; }
 }

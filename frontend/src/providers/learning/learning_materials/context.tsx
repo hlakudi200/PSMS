@@ -38,11 +38,10 @@ export interface IUploadLearningMaterial {
   title: string;
   description: string;
   materialType: number;
-  // File was uploaded directly to storage; these describe it.
-  fileUrl?: string;
+  // Storage object key of the already-uploaded file (from the ticket). The
+  // server derives the URL + real size; the client doesn't supply them.
+  objectKey?: string;
   fileName?: string;
-  fileSizeBytes?: number;
-  contentType?: string;
   externalLink?: string;
   displayOrder?: number;
 }

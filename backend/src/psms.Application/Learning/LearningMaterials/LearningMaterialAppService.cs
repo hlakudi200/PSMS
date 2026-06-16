@@ -65,6 +65,36 @@ public class LearningMaterialAppService : ApplicationService, ILearningMaterialA
     }
 
     /// <summary>
+    /// Validates a client-supplied object key (must be in this tenant +
+    /// class-subject prefix), confirms the file actually exists in storage,
+    /// reads its REAL size/type (the client's reported values are not
+    /// trusted), enforces LM-001, and returns the server-derived public URL.
+    /// </summary>
+    private async Task<(string FileUrl, long Size, string ContentType)> ResolveUploadedFileAsync(
+        string objectKey, Guid classSubjectId, string fileName, LearningMaterialType materialType)
+    {
+        var expectedPrefix = $"{AbpSession.TenantId ?? 0}/{classSubjectId}/";
+        if (string.IsNullOrWhiteSpace(objectKey)
+            || !objectKey.StartsWith(expectedPrefix, StringComparison.Ordinal)
+            || objectKey.Contains(".."))
+            throw new UserFriendlyException(LearningExceptionCodes.InvalidLearningMaterialUpload,
+                "Invalid upload reference. Call RequestUploadUrl and upload the file first.");
+
+        var info = await _fileStorage.GetObjectInfoAsync(MaterialsBucket, objectKey);
+        if (info == null)
+            throw new UserFriendlyException(LearningExceptionCodes.InvalidLearningMaterialUpload,
+                "The uploaded file was not found in storage. Please re-upload.");
+
+        // Enforce LM-001 against the REAL stored size, not a client claim.
+        ValidateFileMetadata(fileName, info.SizeBytes, materialType);
+
+        return (
+            _fileStorage.GetPublicUrl(MaterialsBucket, objectKey),
+            info.SizeBytes,
+            string.IsNullOrWhiteSpace(info.ContentType) ? "application/octet-stream" : info.ContentType);
+    }
+
+    /// <summary>
     /// Step 1 of the direct upload: validate ownership + file type, then mint
     /// a one-time signed URL the client PUTs the bytes to (bytes never pass
     /// through the server). The client then calls UploadAsync with the
@@ -217,9 +247,15 @@ public class LearningMaterialAppService : ApplicationService, ILearningMaterialA
             ExternalLink = input.ExternalLink
         };
 
-        // Set file info if provided
+        // Set file info if provided. Guard against arbitrary/cross-tenant
+        // URLs: a supplied FileUrl must point inside this tenant's materials
+        // space (the secure upload path is RequestUploadUrl + UploadAsync).
         if (!string.IsNullOrWhiteSpace(input.FileName) && !string.IsNullOrWhiteSpace(input.FileUrl))
         {
+            var allowedPrefix = _fileStorage.GetPublicUrl(MaterialsBucket, $"{AbpSession.TenantId ?? 0}/");
+            if (!input.FileUrl.StartsWith(allowedPrefix, StringComparison.Ordinal))
+                throw new UserFriendlyException(LearningExceptionCodes.InvalidLearningMaterialUpload,
+                    "File URL must reference an uploaded file in this school's materials storage.");
             material.SetFile(input.FileName, input.FileUrl, input.FileSizeBytes ?? 0, input.ContentType);
         }
 
@@ -273,6 +309,7 @@ public class LearningMaterialAppService : ApplicationService, ILearningMaterialA
 
         // ── Validate input combination
         var isExternalLinkOnly = input.MaterialType == LearningMaterialType.ExternalLink;
+        (string FileUrl, long Size, string ContentType)? resolvedFile = null;
         if (isExternalLinkOnly)
         {
             if (string.IsNullOrWhiteSpace(input.ExternalLink))
@@ -281,10 +318,8 @@ public class LearningMaterialAppService : ApplicationService, ILearningMaterialA
         }
         else
         {
-            if (string.IsNullOrWhiteSpace(input.FileUrl))
-                throw new UserFriendlyException(LearningExceptionCodes.InvalidLearningMaterialUpload,
-                    "A file must be uploaded before saving (call RequestUploadUrl first).");
-            ValidateFileMetadata(input.FileName, input.FileSizeBytes, input.MaterialType);
+            resolvedFile = await ResolveUploadedFileAsync(
+                input.ObjectKey, input.ClassSubjectId, input.FileName, input.MaterialType);
         }
 
         var material = new LearningMaterial(
@@ -301,15 +336,15 @@ public class LearningMaterialAppService : ApplicationService, ILearningMaterialA
             ExternalLink = input.ExternalLink
         };
 
-        // The file was already uploaded directly to storage via the ticket
-        // from RequestUploadUrl; just record its public URL + metadata.
-        if (!isExternalLinkOnly)
+        // The file was uploaded directly to storage via the RequestUploadUrl
+        // ticket; record the server-derived URL + real size/type.
+        if (resolvedFile != null)
         {
             material.SetFile(
                 input.FileName,
-                input.FileUrl,
-                input.FileSizeBytes,
-                input.ContentType ?? "application/octet-stream");
+                resolvedFile.Value.FileUrl,
+                resolvedFile.Value.Size,
+                resolvedFile.Value.ContentType);
         }
 
         await _learningMaterialRepository.InsertAsync(material);
@@ -487,13 +522,11 @@ public class LearningMaterialAppService : ApplicationService, ILearningMaterialA
             throw new UserFriendlyException(LearningExceptionCodes.LearningMaterialNotFound,
                 "You may only upload new versions for materials in your own classes.");
 
-        // File validation uses the parent material's type to match against
-        // the right whitelist + size cap (LM-001). The bytes were already
-        // uploaded directly to storage via RequestVersionUploadUrl.
-        if (string.IsNullOrWhiteSpace(input.FileUrl))
-            throw new UserFriendlyException(LearningExceptionCodes.InvalidLearningMaterialUpload,
-                "A file must be uploaded before saving (call RequestVersionUploadUrl first).");
-        ValidateFileMetadata(input.FileName, input.FileSizeBytes, material.MaterialType);
+        // The bytes were uploaded directly to storage via
+        // RequestVersionUploadUrl; validate the key + measure the real file
+        // server-side (LM-001 against the parent material's type).
+        var resolved = await ResolveUploadedFileAsync(
+            input.ObjectKey, material.ClassSubjectId, input.FileName, material.MaterialType);
 
         // Best-effort next number; the unique index on
         // (LearningMaterialId, VersionNumber) is the source of truth and is
@@ -518,22 +551,20 @@ public class LearningMaterialAppService : ApplicationService, ILearningMaterialA
             input.ChangeDescription.Trim(),
             AbpSession.UserId.Value);
 
-        var contentType = input.ContentType ?? "application/octet-stream";
-
         version.SetFile(
             input.FileName,
-            input.FileUrl,
-            input.FileSizeBytes,
-            contentType);
+            resolved.FileUrl,
+            resolved.Size,
+            resolved.ContentType);
 
         await _versionRepository.InsertAsync(version);
 
         // Move the parent material's current pointer to the new version.
         material.SetFile(
             input.FileName,
-            input.FileUrl,
-            input.FileSizeBytes,
-            contentType);
+            resolved.FileUrl,
+            resolved.Size,
+            resolved.ContentType);
 
         // Enforce LM-003 — retain at most MaxVersionsPerMaterial rows.
         // SaveChanges first so the new row is visible to the count query.

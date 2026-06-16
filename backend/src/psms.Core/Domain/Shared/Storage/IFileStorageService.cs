@@ -38,4 +38,13 @@ public interface IFileStorageService
     /// Returns a time-limited signed URL to download a private object.
     /// </summary>
     Task<string> CreateSignedDownloadUrlAsync(string bucket, string objectKey, int expirySeconds = 3600);
+
+    /// <summary>The public URL an object is served from.</summary>
+    string GetPublicUrl(string bucket, string objectKey);
+
+    /// <summary>
+    /// Real object metadata (size/type) from storage, or null if the object
+    /// doesn't exist. Used to verify a direct-uploaded file server-side.
+    /// </summary>
+    Task<FileObjectInfo> GetObjectInfoAsync(string bucket, string objectKey);
 }

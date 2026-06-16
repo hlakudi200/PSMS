@@ -190,11 +190,9 @@ export const MaterialUploadModal: React.FC<MaterialUploadModalProps> = ({
       setLoading(true);
 
       // Direct upload: get a signed URL, PUT the file straight to storage
-      // (bytes bypass our server), then record the material with its URL.
-      let fileUrl: string | undefined;
+      // (bytes bypass our server), then record the material by object key.
+      let objectKey: string | undefined;
       let fileName: string | undefined;
-      let fileSizeBytes: number | undefined;
-      let contentType: string | undefined;
       if (!isExternalLink) {
         const f = file as File;
         const ticket = await requestUploadUrlAsync({
@@ -203,10 +201,8 @@ export const MaterialUploadModal: React.FC<MaterialUploadModalProps> = ({
           materialType: parsed.data.materialType,
         });
         await uploadFileToStorageAsync(ticket.uploadUrl, f);
-        fileUrl = ticket.publicUrl;
+        objectKey = ticket.objectKey;
         fileName = f.name;
-        fileSizeBytes = f.size;
-        contentType = f.type || 'application/octet-stream';
       }
 
       await uploadAsync({
@@ -217,15 +213,18 @@ export const MaterialUploadModal: React.FC<MaterialUploadModalProps> = ({
         materialType: parsed.data.materialType,
         externalLink: parsed.data.externalLink,
         displayOrder: parsed.data.displayOrder,
-        fileUrl,
+        objectKey,
         fileName,
-        fileSizeBytes,
-        contentType,
       });
       message.success('Learning material uploaded');
       onClose(true);
-    } catch {
-      // Server errors are surfaced by the axios response interceptor.
+    } catch (err) {
+      // The direct-to-storage PUT uses fetch, so its failure is NOT caught by
+      // the axios interceptor — surface it. Axios errors (with .response) are
+      // already shown by the interceptor.
+      if (!(err as { response?: unknown })?.response) {
+        message.error((err as Error)?.message || 'Upload failed. Please try again.');
+      }
     } finally {
       setLoading(false);
     }

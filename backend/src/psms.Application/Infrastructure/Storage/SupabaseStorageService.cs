@@ -63,25 +63,41 @@ public class SupabaseStorageService : IFileStorageService
         await client.DeleteObjectAsync(request);
     }
 
+    // Single shared client — minting tickets is request-frequent, so a new
+    // HttpClient per call would risk socket exhaustion. Per-request headers
+    // go on the HttpRequestMessage, not DefaultRequestHeaders.
+    private static readonly HttpClient Http = new HttpClient();
+
+    private async Task<JObject> PostSignAsync(string url, string jsonBody)
+    {
+        var config = GetConfig();
+        if (string.IsNullOrEmpty(config.ServiceKey))
+            throw new InvalidOperationException(
+                "SupabaseStorage:ServiceKey is not configured — set env var SupabaseStorage__ServiceKey to mint signed URLs.");
+
+        using var req = new HttpRequestMessage(HttpMethod.Post, url);
+        req.Headers.TryAddWithoutValidation("apikey", config.ServiceKey);
+        req.Headers.TryAddWithoutValidation("Authorization", "Bearer " + config.ServiceKey);
+        req.Content = new StringContent(jsonBody, Encoding.UTF8, "application/json");
+
+        var resp = await Http.SendAsync(req);
+        resp.EnsureSuccessStatusCode();
+        return JObject.Parse(await resp.Content.ReadAsStringAsync());
+    }
+
     public async Task<FileUploadTicket> CreateUploadTicketAsync(string bucket, string objectKey)
     {
         var config = GetConfig();
-        using var http = new HttpClient();
-        http.DefaultRequestHeaders.Add("apikey", config.ServiceKey);
-        http.DefaultRequestHeaders.Add("Authorization", "Bearer " + config.ServiceKey);
-
         // Supabase mints a one-time signed upload URL; the client then PUTs the
         // bytes straight to storage (they never transit this server).
-        var resp = await http.PostAsync(
-            $"{config.ProjectUrl}/storage/v1/object/upload/sign/{bucket}/{objectKey}",
-            new StringContent("{}", Encoding.UTF8, "application/json"));
-        resp.EnsureSuccessStatusCode();
-        var relative = JObject.Parse(await resp.Content.ReadAsStringAsync())["url"]?.ToString();
+        var result = await PostSignAsync(
+            $"{config.ProjectUrl}/storage/v1/object/upload/sign/{bucket}/{objectKey}", "{}");
+        var relative = result["url"]?.ToString();
 
         return new FileUploadTicket
         {
             UploadUrl = $"{config.ProjectUrl}/storage/v1{relative}",
-            PublicUrl = $"{config.PublicUrl}/{bucket}/{objectKey}",
+            PublicUrl = GetPublicUrl(bucket, objectKey),
             ObjectKey = objectKey,
         };
     }
@@ -89,17 +105,31 @@ public class SupabaseStorageService : IFileStorageService
     public async Task<string> CreateSignedDownloadUrlAsync(string bucket, string objectKey, int expirySeconds = 3600)
     {
         var config = GetConfig();
-        using var http = new HttpClient();
-        http.DefaultRequestHeaders.Add("apikey", config.ServiceKey);
-        http.DefaultRequestHeaders.Add("Authorization", "Bearer " + config.ServiceKey);
-
-        var resp = await http.PostAsync(
+        var result = await PostSignAsync(
             $"{config.ProjectUrl}/storage/v1/object/sign/{bucket}/{objectKey}",
-            new StringContent($"{{\"expiresIn\":{expirySeconds}}}", Encoding.UTF8, "application/json"));
-        resp.EnsureSuccessStatusCode();
-        var relative = JObject.Parse(await resp.Content.ReadAsStringAsync())["signedURL"]?.ToString();
+            $"{{\"expiresIn\":{expirySeconds}}}");
+        return $"{config.ProjectUrl}/storage/v1{result["signedURL"]?.ToString()}";
+    }
 
-        return $"{config.ProjectUrl}/storage/v1{relative}";
+    public string GetPublicUrl(string bucket, string objectKey)
+        => $"{GetConfig().PublicUrl}/{bucket}/{objectKey}";
+
+    public async Task<FileObjectInfo> GetObjectInfoAsync(string bucket, string objectKey)
+    {
+        using var client = CreateClient(GetConfig());
+        try
+        {
+            var meta = await client.GetObjectMetadataAsync(bucket, objectKey);
+            return new FileObjectInfo
+            {
+                SizeBytes = meta.ContentLength,
+                ContentType = meta.Headers.ContentType,
+            };
+        }
+        catch (AmazonS3Exception ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            return null;
+        }
     }
 
     private AmazonS3Client CreateClient(SupabaseStorageConfig config)

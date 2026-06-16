@@ -30,21 +30,18 @@ public class UploadLearningMaterialDto
     public LearningMaterialType MaterialType { get; set; }
 
     /// <summary>
-    /// Public URL of the already-uploaded file (from the upload ticket).
+    /// Storage object key returned by RequestUploadUrl (the file the client
+    /// already PUT to storage). The server validates it belongs to this
+    /// tenant/class-subject, reads the real size/type from storage, and
+    /// derives the public URL — none of these are trusted from the client.
     /// Required when MaterialType is not ExternalLink.
     /// </summary>
-    [StringLength(1000)]
-    public string FileUrl { get; set; }
+    [StringLength(500)]
+    public string ObjectKey { get; set; }
 
-    /// <summary>Original file name (used for the type/extension check).</summary>
+    /// <summary>Original file name (used for the display name + extension check).</summary>
     [StringLength(260)]
     public string FileName { get; set; }
-
-    /// <summary>Client-reported size in bytes (re-checked against LM-001).</summary>
-    public long FileSizeBytes { get; set; }
-
-    [StringLength(150)]
-    public string ContentType { get; set; }
 
     /// <summary>
     /// Required when MaterialType is ExternalLink, otherwise optional.
