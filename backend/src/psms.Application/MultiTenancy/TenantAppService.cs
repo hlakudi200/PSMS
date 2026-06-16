@@ -131,6 +131,10 @@ public class TenantAppService : AsyncCrudAppService<Tenant, TenantDto, int, Page
     /// <summary>
     /// Seeds PSMS role permissions for an existing tenant.
     /// Use this to fix tenants that were created before the permission seeder was added.
+    /// WARNING: this REPLACES each standard role's full permission set with the
+    /// canonical list — it will strip any tenant-specific customisations a role
+    /// has accumulated. For purely additive backfills (e.g. workflow access)
+    /// prefer <see cref="GrantWorkflowPermissionsAsync"/>.
     /// </summary>
     [AbpAuthorize(PermissionNames.Pages_Tenants)]
     public async Task SeedRolePermissionsAsync(EntityDto<int> input)
@@ -140,6 +144,25 @@ public class TenantAppService : AsyncCrudAppService<Tenant, TenantDto, int, Page
         using (CurrentUnitOfWork.SetTenantId(tenant.Id))
         {
             await _rolePermissionSeeder.SeedRolePermissionsAsync(tenant.Id);
+            await CurrentUnitOfWork.SaveChangesAsync();
+        }
+    }
+
+    /// <summary>
+    /// WF-01: additively grant workflow permissions to an existing tenant's staff
+    /// roles (Principal/VP get full config; HOD/Teacher get view+advance) without
+    /// disturbing their other grants. Safe to run on live, customised tenants —
+    /// unlike <see cref="SeedRolePermissionsAsync"/> which replaces the full set.
+    /// Idempotent.
+    /// </summary>
+    [AbpAuthorize(PermissionNames.Pages_Tenants)]
+    public async Task GrantWorkflowPermissionsAsync(EntityDto<int> input)
+    {
+        var tenant = await _tenantManager.GetByIdAsync(input.Id);
+
+        using (CurrentUnitOfWork.SetTenantId(tenant.Id))
+        {
+            await _rolePermissionSeeder.GrantWorkflowPermissionsToStaffRolesAsync();
             await CurrentUnitOfWork.SaveChangesAsync();
         }
     }
