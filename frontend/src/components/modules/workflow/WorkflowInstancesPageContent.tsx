@@ -285,6 +285,7 @@ function InstancesContent() {
         }}
         instanceId={selectedInstance?.id ?? ''}
         currentStepName={selectedInstance?.currentStepName}
+        isCommentRequired={selectedInstance?.currentStepIsCommentRequired}
       />
     </>
   );

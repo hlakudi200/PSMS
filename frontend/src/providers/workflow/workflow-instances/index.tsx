@@ -200,6 +200,26 @@ export const WorkflowInstanceProvider = ({
       });
   };
 
+  // WF-03: the current user's actionable "my tasks" — server scopes by the
+  // caller's user/role assignment, so no role param is passed.
+  const getMyPendingAsync = async (input?: IPagedAndSortedResultRequest) => {
+    dispatch(getInstancesPending());
+    const params = buildQueryParams(input as Record<string, unknown>);
+    const endpoint = `/api/services/app/WorkflowInstance/GetMyPending?${params.toString()}`;
+    await instance
+      .get(endpoint)
+      .then((response) => {
+        dispatch(getInstancesSuccess({
+          items: response.data.result.items,
+          totalCount: response.data.result.totalCount,
+        }));
+      })
+      .catch((error) => {
+        console.error(error);
+        dispatch(getInstancesError());
+      });
+  };
+
   const getOverdueAsync = async (input?: IPagedAndSortedResultRequest) => {
     dispatch(getInstancesPending());
     const params = buildQueryParams(input as Record<string, unknown>);
@@ -232,6 +252,7 @@ export const WorkflowInstanceProvider = ({
           batchAdvanceAsync,
           getHistoryAsync,
           getPendingForRoleAsync,
+          getMyPendingAsync,
           getOverdueAsync,
         }}
       >

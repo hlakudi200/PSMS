@@ -11,6 +11,7 @@ import {
   CheckSquareOutlined,
   FileTextOutlined,
   MessageOutlined,
+  CarryOutOutlined,
 } from '@ant-design/icons';
 import LayoutShell from '@/components/shared/LayoutShell';
 import { roleColors } from '@/utils/theme-config';
@@ -20,6 +21,11 @@ const menuItems = [
     key: '/teacher',
     icon: <DashboardOutlined />,
     label: 'Dashboard',
+  },
+  {
+    key: '/teacher/workflow',
+    icon: <CarryOutOutlined />,
+    label: 'My Approvals',
   },
   {
     type: 'group' as const,
