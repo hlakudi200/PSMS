@@ -2,7 +2,6 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  Alert,
   Form,
   Input,
   InputNumber,
@@ -110,7 +109,8 @@ export const MaterialUploadModal: React.FC<MaterialUploadModalProps> = ({
   classSubjects,
 }) => {
   const [form] = Form.useForm();
-  const { uploadAsync } = useLearningMaterialActions();
+  const { uploadAsync, requestUploadUrlAsync, uploadFileToStorageAsync } =
+    useLearningMaterialActions();
   const [loading, setLoading] = useState(false);
   const [fileList, setFileList] = useState<UploadFile[]>([]);
   const [materialType, setMaterialType] = useState<LearningMaterialType>(
@@ -188,6 +188,23 @@ export const MaterialUploadModal: React.FC<MaterialUploadModalProps> = ({
       }
 
       setLoading(true);
+
+      // Direct upload: get a signed URL, PUT the file straight to storage
+      // (bytes bypass our server), then record the material by object key.
+      let objectKey: string | undefined;
+      let fileName: string | undefined;
+      if (!isExternalLink) {
+        const f = file as File;
+        const ticket = await requestUploadUrlAsync({
+          classSubjectId: parsed.data.classSubjectId,
+          fileName: f.name,
+          materialType: parsed.data.materialType,
+        });
+        await uploadFileToStorageAsync(ticket.uploadUrl, f);
+        objectKey = ticket.objectKey;
+        fileName = f.name;
+      }
+
       await uploadAsync({
         classSubjectId: parsed.data.classSubjectId,
         termId: parsed.data.termId,
@@ -196,12 +213,18 @@ export const MaterialUploadModal: React.FC<MaterialUploadModalProps> = ({
         materialType: parsed.data.materialType,
         externalLink: parsed.data.externalLink,
         displayOrder: parsed.data.displayOrder,
-        file: isExternalLink ? undefined : (file as File | undefined),
+        objectKey,
+        fileName,
       });
       message.success('Learning material uploaded');
       onClose(true);
-    } catch {
-      // Server errors are surfaced by the axios response interceptor.
+    } catch (err) {
+      // The direct-to-storage PUT uses fetch, so its failure is NOT caught by
+      // the axios interceptor — surface it. Axios errors (with .response) are
+      // already shown by the interceptor.
+      if (!(err as { response?: unknown })?.response) {
+        message.error((err as Error)?.message || 'Upload failed. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
@@ -218,13 +241,6 @@ export const MaterialUploadModal: React.FC<MaterialUploadModalProps> = ({
       width={640}
       okText="Upload"
     >
-      <Alert
-        type="info"
-        showIcon
-        message="File hosting"
-        description="Files are recorded against the material now; the platform-wide file storage layer is being wired up separately. Title, type, and metadata are stored immediately."
-        style={{ marginBottom: 16 }}
-      />
       <Form form={form} layout="vertical">
         <Form.Item
           label="Class &amp; subject"

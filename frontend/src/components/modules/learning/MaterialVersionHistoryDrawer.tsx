@@ -64,6 +64,8 @@ export const MaterialVersionHistoryDrawer: React.FC<
 > = ({ open, onClose, material }) => {
   const {
     getVersionsAsync,
+    requestVersionUploadUrlAsync,
+    uploadFileToStorageAsync,
     uploadNewVersionAsync,
     restoreVersionAsync,
   } = useLearningMaterialActions();
@@ -103,18 +105,29 @@ export const MaterialVersionHistoryDrawer: React.FC<
     }
     setUploading(true);
     try {
+      // Direct upload: signed URL → PUT to storage → record the version.
+      const ticket = await requestVersionUploadUrlAsync({
+        learningMaterialId: material.id,
+        fileName: file.name,
+      });
+      await uploadFileToStorageAsync(ticket.uploadUrl, file);
       await uploadNewVersionAsync({
         learningMaterialId: material.id,
         changeDescription: changeDescription.trim(),
-        file,
+        objectKey: ticket.objectKey,
+        fileName: file.name,
       });
       message.success('New version uploaded');
       setChangeDescription('');
       setFileList([]);
       // Refresh history so the new row shows immediately.
       getVersionsAsync(material.id);
-    } catch {
-      // Server errors surfaced by the axios response interceptor.
+    } catch (err) {
+      // The direct-to-storage PUT uses fetch (not axios), so surface its
+      // failure here; axios errors (with .response) are shown by the interceptor.
+      if (!(err as { response?: unknown })?.response) {
+        message.error((err as Error)?.message || 'Upload failed. Please try again.');
+      }
     } finally {
       setUploading(false);
     }

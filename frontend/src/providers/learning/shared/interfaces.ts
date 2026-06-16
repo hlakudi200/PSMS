@@ -101,10 +101,31 @@ export interface IPagedAndSortedResultRequest {
   }
 
   // Multipart payload for uploading a new version of an existing material.
+  // Direct-upload ticket: the server mints a one-time signed URL the client
+  // PUTs the file to (bytes bypass the server), plus the public URL to store.
+  export interface IFileUploadTicket {
+    uploadUrl: string;
+    publicUrl: string;
+    objectKey: string;
+  }
+
+  export interface IRequestMaterialUploadUrl {
+    classSubjectId: string;
+    fileName: string;
+    materialType: number;
+  }
+
+  export interface IRequestVersionUploadUrl {
+    learningMaterialId: string;
+    fileName: string;
+  }
+
+  // Posted after the new version's file has been uploaded directly to storage.
   export interface IUploadNewVersion {
     learningMaterialId: string;
     changeDescription: string;
-    file: File;
+    objectKey: string;
+    fileName: string;
   }
   
   // OnlineLesson Interfaces
