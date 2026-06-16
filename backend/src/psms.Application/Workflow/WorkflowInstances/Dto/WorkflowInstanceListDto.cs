@@ -13,6 +13,7 @@ public class WorkflowInstanceListDto : EntityDto<Guid>
     public int CurrentStepOrder { get; set; }
     public string CurrentStepName { get; set; }
     public string CurrentStepAssignedRole { get; set; }
+    public bool CurrentStepIsCommentRequired { get; set; }
     public DateTime? CurrentStepDueDate { get; set; }
     public bool IsOverdue { get; set; }
     public DateTime? StartedDate { get; set; }

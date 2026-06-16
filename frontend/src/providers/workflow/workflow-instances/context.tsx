@@ -34,6 +34,7 @@ export interface IWorkflowInstanceActionContext {
   batchAdvanceAsync: (input: IBatchAdvance) => void;
   getHistoryAsync: (instanceId: string) => void;
   getPendingForRoleAsync: (roleName: string, input?: IPagedAndSortedResultRequest) => void;
+  getMyPendingAsync: (input?: IPagedAndSortedResultRequest) => void;
   getOverdueAsync: (input?: IPagedAndSortedResultRequest) => void;
 }
 

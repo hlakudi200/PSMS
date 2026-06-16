@@ -51,6 +51,8 @@ public class WorkflowMapper : Profile
                 opt => opt.MapFrom(src => src.CurrentStep != null ? src.CurrentStep.Name : null))
             .ForMember(dest => dest.CurrentStepAssignedRole,
                 opt => opt.MapFrom(src => src.CurrentStep != null ? src.CurrentStep.AssignedRole : null))
+            .ForMember(dest => dest.CurrentStepIsCommentRequired,
+                opt => opt.MapFrom(src => src.CurrentStep != null && src.CurrentStep.IsCommentRequired))
             .ForMember(dest => dest.IsOverdue,
                 opt => opt.MapFrom(src => src.IsOverdue));
     }

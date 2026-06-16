@@ -527,6 +527,61 @@ public class WorkflowInstanceAppService : ApplicationService, IWorkflowInstanceA
     }
 
     /// <summary>
+    /// WF-03: the "my tasks" list — in-progress instances whose CURRENT step is
+    /// actionable by the logged-in user: assigned to them specifically, or (when
+    /// the step is not user-assigned) assigned to one of their roles. Unlike
+    /// GetPendingForRole, which matches a role tenant-wide and ignores per-user
+    /// assignment, this is correctly scoped to the caller so e.g. a teacher only
+    /// sees the items they actually need to act on.
+    ///
+    /// Role matching is case-insensitive, mirroring ValidateUserCanActOnStep, so
+    /// the list never diverges from what the caller can actually advance.
+    /// NOTE (v1): delegated items (acting on behalf of another user/role) are NOT
+    /// included here yet, even though ValidateUserCanActOnStep honours delegations
+    /// at action time.
+    /// </summary>
+    [AbpAuthorize(PermissionNames.Workflow_Instances_View)]
+    public async Task<PagedResultDto<WorkflowInstanceListDto>> GetMyPendingAsync(
+        PagedAndSortedResultRequestDto input)
+    {
+        var userId = AbpSession.UserId;
+        if (!userId.HasValue)
+            return new PagedResultDto<WorkflowInstanceListDto>(0, new List<WorkflowInstanceListDto>());
+
+        var user = await _userManager.FindByIdAsync(userId.Value.ToString());
+        // Lower-cased so the role comparison is case-insensitive in SQL (matches
+        // the case-insensitive check in ValidateUserCanActOnStep).
+        var roles = (user != null
+                ? await _userManager.GetRolesAsync(user)
+                : new List<string>())
+            .Select(r => r.ToLower())
+            .ToList();
+
+        var query = _instanceRepository
+            .GetAll()
+            .Include(i => i.WorkflowDefinition)
+            .Include(i => i.CurrentStep)
+            .Where(i => i.TenantId == AbpSession.TenantId
+                && i.Status == WorkflowStatus.InProgress
+                && i.CurrentStep != null
+                && (i.CurrentStep.AssignedUserId == userId.Value
+                    || (i.CurrentStep.AssignedUserId == null
+                        && i.CurrentStep.AssignedRole != null
+                        && roles.Contains(i.CurrentStep.AssignedRole.ToLower()))));
+
+        var totalCount = await query.CountAsync();
+
+        var items = await query
+            .OrderBy(input.Sorting ?? "StartedDate ASC")
+            .PageBy(input)
+            .ToListAsync();
+
+        return new PagedResultDto<WorkflowInstanceListDto>(
+            totalCount,
+            ObjectMapper.Map<List<WorkflowInstanceListDto>>(items));
+    }
+
+    /// <summary>
     /// Validates the current user is authorized to act on the given step.
     /// Checks: specific user assignment → role match → active delegation.
     /// </summary>

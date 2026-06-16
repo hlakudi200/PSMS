@@ -222,6 +222,7 @@ export interface IWorkflowInstanceList {
   currentStepOrder: number;
   currentStepName?: string;
   currentStepAssignedRole?: string;
+  currentStepIsCommentRequired?: boolean;
   currentStepDueDate?: string;
   isOverdue: boolean;
   startedDate?: string;
