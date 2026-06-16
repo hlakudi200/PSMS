@@ -628,6 +628,19 @@ public class psmsDbContext : AbpZeroDbContext<Tenant, Role, User, psmsDbContext>
             .IsUnique()
             .HasDatabaseName("IX_WorkflowSteps_DefinitionId_StepOrder");
 
+        // WorkflowStep.AssignedUserId -> AbpUsers (WF-06). DB-level integrity
+        // backstop for the per-user pin (WF-05 validates it at the app layer).
+        // ON DELETE SET NULL so a HARD user delete reverts the step to its
+        // role-based assignment rather than orphaning the pin. Note: AbpUsers are
+        // normally SOFT-deleted, so in routine operation the pin persists and is
+        // re-validated whenever the step is next edited (WF-05). No navigation
+        // property — the relationship is config-only.
+        modelBuilder.Entity<WorkflowStep>()
+            .HasOne<User>()
+            .WithMany()
+            .HasForeignKey(s => s.AssignedUserId)
+            .OnDelete(DeleteBehavior.SetNull);
+
         // WorkflowInstance - one active instance per entity
         modelBuilder.Entity<WorkflowInstance>()
             .HasIndex(i => new { i.TenantId, i.EntityType, i.EntityId })
