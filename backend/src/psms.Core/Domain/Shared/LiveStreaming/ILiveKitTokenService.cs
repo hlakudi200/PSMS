@@ -1,4 +1,5 @@
 using System;
+using System.Threading.Tasks;
 
 namespace psms.Domain.Shared.LiveStreaming;
 
@@ -18,6 +19,30 @@ public interface ILiveKitTokenService
 
     /// <summary>Creates a signed join token for a participant.</summary>
     LiveKitJoinTicket CreateJoinToken(LiveKitJoinRequest request);
+
+    /// <summary>
+    /// True when LiveKit AND an S3 recording destination are both configured
+    /// (LC-03) — i.e. live classes can be recorded.
+    /// </summary>
+    bool IsRecordingConfigured { get; }
+
+    /// <summary>
+    /// Ensures the room exists with auto-egress recording configured to write
+    /// the composited MP4 to <paramref name="recordingObjectKey"/> in the
+    /// recordings bucket. Call this before the host joins (egress must be set
+    /// at room creation — it can't be added to an already-active room).
+    /// No-op when recording isn't configured. Best-effort: implementations
+    /// should swallow/translate transport errors so a recording hiccup never
+    /// blocks the class from starting.
+    /// </summary>
+    Task EnsureRecordingRoomAsync(string roomName, string recordingObjectKey);
+
+    /// <summary>
+    /// Closes the LiveKit room (disconnects everyone) so any active auto-egress
+    /// finalizes and uploads promptly — call when the class ends. No-op when
+    /// LiveKit isn't configured. Best-effort.
+    /// </summary>
+    Task CloseRoomAsync(string roomName);
 }
 
 /// <summary>Inputs for a single participant's join token.</summary>
