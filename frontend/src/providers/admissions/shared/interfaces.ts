@@ -325,7 +325,8 @@ export interface IApplicationDocument {
   categoryDisplayName: string;
   documentName: string;
   fileName: string;
-  fileUrl: string;
+  // NOTE: no fileUrl — the documents bucket is private. Use getDownloadUrlAsync
+  // to obtain a short-lived signed URL for viewing/downloading.
   fileSizeBytes: number;
   fileSizeDisplay: string;
   contentType: string;
@@ -338,10 +339,27 @@ export interface IApplicationDocument {
   canDelete: boolean;
 }
 
+// SF-03 direct upload to the PRIVATE "documents" bucket: ask the server for a
+// one-time signed URL, PUT the file straight to storage (bytes bypass our
+// server), then record the object key. Downloads use short-lived signed URLs.
+export interface IFileUploadTicket {
+  uploadUrl: string;
+  publicUrl: string;
+  objectKey: string;
+}
+
+export interface IRequestDocumentUploadUrl {
+  applicationId: string;
+  category: string;
+  fileName: string;
+}
+
+// Posted after the document's bytes have been uploaded directly to storage.
 export interface IUploadDocument {
   applicationId: string;
   category: string;
-  file: File;
+  objectKey: string;
+  fileName: string;
   description?: string;
 }
 
