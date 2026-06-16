@@ -5,12 +5,12 @@ using Abp.Domain.Repositories;
 using Abp.Domain.Uow;
 using Abp.Linq.Extensions;
 using Abp.UI;
-using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using psms.Authorization;
 using psms.Domain.Academic.Entities;
 using psms.Domain.Learning.Entities;
 using psms.Domain.Shared.Enums;
+using psms.Domain.Shared.Storage;
 using psms.Learning.OnlineLessons.Dto;
 using psms.Learning.Shared;
 using System;
@@ -32,6 +32,10 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
     private readonly IRepository<OnlineLesson, Guid> _onlineLessonRepository;
     private readonly IRepository<ClassSubject, Guid> _classSubjectRepository;
     private readonly IRepository<Teacher, Guid> _teacherRepository;
+    private readonly IFileStorageService _fileStorage;
+
+    // Supabase bucket for lesson recordings (public-read, like materials).
+    private const string RecordingsBucket = "recordings";
 
     // OL-001 scheduling guard rails. All times are in UTC; the school-hours
     // window is converted from 07:00-17:00 South Africa Standard Time (SAST,
@@ -52,11 +56,13 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
     public OnlineLessonAppService(
         IRepository<OnlineLesson, Guid> onlineLessonRepository,
         IRepository<ClassSubject, Guid> classSubjectRepository,
-        IRepository<Teacher, Guid> teacherRepository)
+        IRepository<Teacher, Guid> teacherRepository,
+        IFileStorageService fileStorage)
     {
         _onlineLessonRepository = onlineLessonRepository;
         _classSubjectRepository = classSubjectRepository;
         _teacherRepository = teacherRepository;
+        _fileStorage = fileStorage;
     }
 
     [AbpAuthorize(PermissionNames.Learning_Lessons_View)]
@@ -473,6 +479,31 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
         return await GetAsync(id);
     }
 
+    /// <summary>
+    /// Step 1 of the direct recording upload (SF-02): validate ownership +
+    /// Completed status + file extension, then mint a one-time signed URL the
+    /// client PUTs the bytes to (bytes never pass through this server — the
+    /// scalable path for multi-GB recordings). The client then calls
+    /// UploadRecordingAsync with the resulting object key.
+    /// </summary>
+    [AbpAuthorize(PermissionNames.Learning_Recordings_Upload)]
+    public async Task<FileUploadTicket> RequestRecordingUploadUrlAsync(RequestRecordingUploadUrlDto input)
+    {
+        var lesson = await LoadOwnedLessonOrThrowAsync(input.LessonId, allowHostFallback: true);
+
+        // OL-003: only Completed lessons can have a recording attached. Fail
+        // here so the client never wastes a multi-GB upload that Upload would
+        // reject afterwards.
+        if (lesson.Status != OnlineLessonStatus.Completed)
+            throw new UserFriendlyException(LearningExceptionCodes.LessonNotCompleted,
+                "Recordings can only be uploaded for completed lessons.");
+
+        ValidateRecordingExtension(input.FileName);
+
+        var key = BuildRecordingObjectKey(lesson.Id, input.FileName);
+        return await _fileStorage.CreateUploadTicketAsync(RecordingsBucket, key);
+    }
+
     [AbpAuthorize(PermissionNames.Learning_Recordings_Upload)]
     public async Task<OnlineLessonDto> UploadRecordingAsync(UploadRecordingDto input)
     {
@@ -482,6 +513,16 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
         // leaking the loser's storage path. We translate a serialisation
         // failure into a friendly retry message via IsConcurrencyRetryable.
         // (See CreateAsync for why we use the programmatic UoW pattern.)
+        //
+        // The storage HEAD in ResolveRecordingFileAsync runs inside this
+        // transaction. On PostgreSQL that is fine: Serializable uses SSI
+        // (predicate locks) which do NOT block concurrent writers — a true
+        // conflict surfaces as a retryable serialisation failure at commit,
+        // already handled below. So the HEAD's latency cannot deadlock or
+        // block another upload; it only briefly holds a pooled connection.
+        // Loading the lesson here (rather than before Begin) also keeps a
+        // single tracked entity, so the GetAsync re-read at the end reflects
+        // the saved RecordingUrl.
         using var uow = UnitOfWorkManager.Begin(new UnitOfWorkOptions
         {
             IsolationLevel = System.Transactions.IsolationLevel.Serializable,
@@ -499,22 +540,11 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
                 "Recordings can only be uploaded for completed lessons.");
         }
 
-        ValidateRecordingFile(input.File);
-
-        // Stage the file. TODO(blob-storage): integrate Azure Blob / S3 /
-        // local file system + a server-side virus scan hook (Microsoft
-        // Defender ATP API or ClamAV). For now we mirror the existing
-        // LearningMaterial pattern: record a path reference without
-        // writing the bytes. When real storage lands:
-        //   1. enqueue an AV scan on the uploaded blob,
-        //   2. on a "Replace recording", schedule a delete of the previous
-        //      `RecordingUrl` so the old blob doesn't orphan, and
-        //   3. swap ValidateRecordingFile from the in-memory IFormFile to
-        //      a stream-based MIME/byte sniff.
-        var fileExtension = Path.GetExtension(input.File.FileName).ToLowerInvariant();
-        // Build the path directly so we don't have to mop up
-        // platform-specific separators with `Replace('\\','/')`.
-        var fileUrl = $"/api/online-lesson-recordings/{lesson.Id}/{Guid.NewGuid()}{fileExtension}";
+        // The bytes were PUT directly to storage via the RequestRecordingUploadUrl
+        // ticket. Validate the key belongs to this tenant/lesson, confirm the file
+        // really exists, and enforce OL-003 against the REAL stored size — the
+        // server derives the public URL (none of this is trusted from the client).
+        var fileUrl = await ResolveRecordingFileAsync(input.ObjectKey, lesson.Id);
 
         lesson.AddRecording(fileUrl);
 
@@ -641,20 +671,57 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
         ".mp4", ".mov", ".avi", ".webm"
     };
 
-    private static void ValidateRecordingFile(IFormFile file)
+    /// <summary>OL-003 extension whitelist (checked before minting a ticket).</summary>
+    private static void ValidateRecordingExtension(string fileName)
     {
-        if (file == null || file.Length == 0)
-            throw new UserFriendlyException(LearningExceptionCodes.RecordingFileMissing,
-                "A recording file is required.");
-
-        if (file.Length > MaxRecordingFileBytes)
-            throw new UserFriendlyException(LearningExceptionCodes.RecordingFileTooLarge,
-                $"Recording file exceeds the 5 GB cap.");
-
-        var extension = Path.GetExtension(file.FileName);
+        var extension = Path.GetExtension(fileName ?? string.Empty);
         if (string.IsNullOrEmpty(extension) || !RecordingFileExtensions.Contains(extension))
             throw new UserFriendlyException(LearningExceptionCodes.RecordingFileTypeInvalid,
                 "Recording must be one of: MP4, MOV, AVI, WebM.");
+    }
+
+    /// <summary>Tenant + lesson-scoped object key for a recording file.</summary>
+    private string BuildRecordingObjectKey(Guid lessonId, string fileName)
+    {
+        var ext = Path.GetExtension(fileName).ToLowerInvariant();
+        return $"{AbpSession.TenantId ?? 0}/{lessonId}/{Guid.NewGuid()}{ext}";
+    }
+
+    /// <summary>
+    /// Validates a client-supplied recording object key (must sit in this
+    /// tenant + lesson prefix, no traversal), confirms the file actually
+    /// exists in storage, enforces OL-003 (extension + 5 GB cap) against the
+    /// REAL stored size, and returns the server-derived public URL.
+    /// </summary>
+    private async Task<string> ResolveRecordingFileAsync(string objectKey, Guid lessonId)
+    {
+        var expectedPrefix = $"{AbpSession.TenantId ?? 0}/{lessonId}/";
+        if (string.IsNullOrWhiteSpace(objectKey)
+            || !objectKey.StartsWith(expectedPrefix, StringComparison.Ordinal)
+            || objectKey.Contains(".."))
+            throw new UserFriendlyException(LearningExceptionCodes.InvalidRecordingUpload,
+                "Invalid upload reference. Call RequestRecordingUploadUrl and upload the file first.");
+
+        // Validate the extension on the object key — the path that is actually
+        // stored and served — not just the cosmetic FileName. (The signed
+        // upload URL is already bound to this exact key, so the extension is
+        // effectively fixed at request time; this is belt-and-braces.)
+        ValidateRecordingExtension(objectKey);
+
+        var info = await _fileStorage.GetObjectInfoAsync(RecordingsBucket, objectKey);
+        if (info == null)
+            throw new UserFriendlyException(LearningExceptionCodes.InvalidRecordingUpload,
+                "The uploaded recording was not found in storage. Please re-upload.");
+
+        if (info.SizeBytes == 0)
+            throw new UserFriendlyException(LearningExceptionCodes.RecordingFileMissing,
+                "A recording file is required.");
+
+        if (info.SizeBytes > MaxRecordingFileBytes)
+            throw new UserFriendlyException(LearningExceptionCodes.RecordingFileTooLarge,
+                "Recording file exceeds the 5 GB cap.");
+
+        return _fileStorage.GetPublicUrl(RecordingsBucket, objectKey);
     }
 
     /// <summary>

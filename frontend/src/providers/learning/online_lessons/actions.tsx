@@ -340,7 +340,7 @@ export const addRecordingError = createAction<IOnlineLessonStateContext>(
     () => ({ isPending: false, isSuccess: false, isError: true })
     );
 
-// Upload Recording Actions (multipart) — distinct from AddRecording
+// Upload Recording Actions (direct-to-storage) — distinct from AddRecording
 // because the success payload still drops back to the same onlineLesson
 // state; just split for traceability and so a separate spinner could
 // appear on the host shell if/when we wire one.

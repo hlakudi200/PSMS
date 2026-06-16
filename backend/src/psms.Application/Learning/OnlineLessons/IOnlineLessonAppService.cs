@@ -1,5 +1,6 @@
 using Abp.Application.Services;
 using Abp.Application.Services.Dto;
+using psms.Domain.Shared.Storage;
 using psms.Learning.OnlineLessons.Dto;
 using System;
 using System.Threading.Tasks;
@@ -23,5 +24,6 @@ public interface IOnlineLessonAppService : IApplicationService
     Task<OnlineLessonDto> CancelAsync(Guid id);
     Task<OnlineLessonDto> RescheduleAsync(Guid id, RescheduleOnlineLessonDto input);
     Task<OnlineLessonDto> AddRecordingAsync(Guid id, AddRecordingDto input);
+    Task<FileUploadTicket> RequestRecordingUploadUrlAsync(RequestRecordingUploadUrlDto input);
     Task<OnlineLessonDto> UploadRecordingAsync(UploadRecordingDto input);
 }

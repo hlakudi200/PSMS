@@ -12,6 +12,8 @@ import {
   IRescheduleOnlineLesson,
   IAddRecording,
   IUploadRecording,
+  IRequestRecordingUploadUrl,
+  IFileUploadTicket,
 } from "../shared/interfaces";
 import { OnlineLessonReducer } from "./reducer";
 import { useContext, useReducer } from "react";
@@ -257,19 +259,39 @@ export const OnlineLessonProvider = ({
         });
     };
 
+    // SF-02 Step 1: ask the server for a one-time signed upload URL. The
+    // server validates ownership + Completed status + extension first.
+    const requestRecordingUploadUrlAsync = async (
+        input: IRequestRecordingUploadUrl
+    ): Promise<IFileUploadTicket> => {
+        const endpoint = `/api/services/app/OnlineLesson/RequestRecordingUploadUrl`;
+        const response = await instance.post(endpoint, input);
+        return response.data.result as IFileUploadTicket;
+    };
+
+    // SF-02 Step 2: PUT the bytes straight to storage. This uses fetch (not
+    // the axios instance) so no Authorization header is sent to Supabase, and
+    // the multi-GB body never touches our server. Throws on a non-2xx so the
+    // caller surfaces it (the axios interceptor won't, it's not an axios call).
+    const uploadFileToStorageAsync = async (uploadUrl: string, file: File) => {
+        const res = await fetch(uploadUrl, {
+            method: 'PUT',
+            body: file,
+            headers: { 'Content-Type': file.type || 'application/octet-stream' },
+        });
+        if (!res.ok) {
+            throw new Error(`Storage upload failed (${res.status}).`);
+        }
+    };
+
+    // SF-02 Step 3: record the uploaded object key. The server re-validates
+    // the key, HEADs the real size, and derives the public URL. We re-throw so
+    // the caller can sequence the modal-close + page-refresh.
     const uploadRecordingAsync = async (input: IUploadRecording) => {
     dispatch(uploadRecordingPending());
     const endpoint = `/api/services/app/OnlineLesson/UploadRecording`;
-    // Same multipart shape as LearningMaterial.Upload: ABP MVC binds
-    // LessonId/File from the form keys, so we keep them PascalCase. We
-    // re-throw so the caller can sequence the modal-close + page-refresh.
-    const formData = new FormData();
-    formData.append('LessonId', input.lessonId);
-    formData.append('File', input.file);
     await instance
-        .post(endpoint, formData, {
-            headers: { 'Content-Type': 'multipart/form-data' },
-        })
+        .post(endpoint, input)
         .then((response) => {
             dispatch(uploadRecordingSuccess(response.data.result));
         })
@@ -296,6 +318,8 @@ export const OnlineLessonProvider = ({
           cancelAsync,
           rescheduleAsync,
           addRecordingAsync,
+          requestRecordingUploadUrlAsync,
+          uploadFileToStorageAsync,
           uploadRecordingAsync,
         }}
       >
