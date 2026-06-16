@@ -40,6 +40,8 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
     private readonly ILiveKitTokenService _liveKit;
 
     // Supabase bucket for lesson recordings (public-read, like materials).
+    // Supabase bucket for lesson recordings — PRIVATE (LC-06). Object keys are
+    // stored; playback is via short-lived signed URLs (GetRecordingDownloadUrl).
     private const string RecordingsBucket = "recordings";
 
     // OL-001 scheduling guard rails. All times are in UTC; the school-hours
@@ -584,11 +586,11 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
 
         // The bytes were PUT directly to storage via the RequestRecordingUploadUrl
         // ticket. Validate the key belongs to this tenant/lesson, confirm the file
-        // really exists, and enforce OL-003 against the REAL stored size — the
-        // server derives the public URL (none of this is trusted from the client).
-        var fileUrl = await ResolveRecordingFileAsync(input.ObjectKey, lesson.Id);
+        // really exists, and enforce OL-003 against the REAL stored size. The
+        // private-bucket object key is stored (LC-06); playback uses signed URLs.
+        var recordingKey = await ResolveRecordingFileAsync(input.ObjectKey, lesson.Id);
 
-        lesson.AddRecording(fileUrl);
+        lesson.AddRecording(recordingKey);
 
         try
         {
@@ -708,6 +710,73 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
             Identity = identity,
             CanPublish = isHost,
         };
+    }
+
+    // How long a recording playback URL stays valid. Long enough to watch a
+    // full lesson recording, short enough that a leaked URL expires.
+    private const int RecordingUrlExpirySeconds = 6 * 60 * 60; // 6h
+
+    [AbpAuthorize(PermissionNames.Learning_Recordings_View)]
+    public async Task<string> GetRecordingDownloadUrlAsync(Guid id)
+    {
+        var lesson = await _onlineLessonRepository
+            .GetAll()
+            .Include(ol => ol.ClassSubject)
+            .FirstOrDefaultAsync(ol => ol.Id == id && ol.TenantId == AbpSession.TenantId);
+        if (lesson == null)
+            throw new UserFriendlyException(LearningExceptionCodes.OnlineLessonNotFound,
+                "Online lesson not found.");
+
+        if (!lesson.HasRecording || string.IsNullOrWhiteSpace(lesson.RecordingUrl))
+            throw new UserFriendlyException(LearningExceptionCodes.InvalidRecordingUrl,
+                "This lesson has no recording.");
+
+        // Enrolment scope: a student-portal user may only fetch recordings for a
+        // class they're enrolled in (staff are unrestricted, like the rest of
+        // the recordings module). Host teachers always pass.
+        var teacherId = await ResolveCurrentTeacherIdOrNullAsync();
+        var isHost = (teacherId.HasValue && lesson.ClassSubject?.TeacherId == teacherId.Value)
+                     || (AbpSession.UserId.HasValue && lesson.HostTeacherUserId == AbpSession.UserId.Value);
+        if (!isHost)
+        {
+            var student = await _studentRepository
+                .FirstOrDefaultAsync(s => s.UserId == AbpSession.UserId.Value
+                                       && s.TenantId == AbpSession.TenantId);
+            if (student != null && student.CurrentClassId != lesson.ClassSubject?.ClassId)
+                throw new UserFriendlyException(LearningExceptionCodes.OnlineLessonNotFound,
+                    "Online lesson not found.");
+        }
+
+        var recording = lesson.RecordingUrl.Trim();
+        // A signed URL is only ever minted for THIS lesson's own object key
+        // (prevents a crafted external "recording URL" pointing at another
+        // tenant/lesson's key from being extracted and signed).
+        var expectedPrefix = $"{lesson.TenantId ?? 0}/{lesson.Id}/";
+
+        string CandidateKey()
+        {
+            const string publicMarker = "/public/recordings/";
+            if (!recording.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+                return recording; // stored object key (LC-06)
+            var idx = recording.IndexOf(publicMarker, StringComparison.Ordinal);
+            return idx < 0 ? null : recording.Substring(idx + publicMarker.Length); // legacy public URL
+        }
+
+        var objectKey = CandidateKey();
+
+        // External provider URL (Zoom/Teams) — or a key that isn't ours: never
+        // sign it. External URLs are returned as-is; a non-matching key is denied.
+        if (objectKey == null || objectKey.Contains("..")
+            || !objectKey.StartsWith(expectedPrefix, StringComparison.Ordinal))
+        {
+            if (recording.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+                return recording; // genuine external URL (our private bucket URLs 404 anyway)
+            throw new UserFriendlyException(LearningExceptionCodes.InvalidRecordingUrl,
+                "This lesson has no valid recording.");
+        }
+
+        return await _fileStorage.CreateSignedDownloadUrlAsync(
+            RecordingsBucket, objectKey, RecordingUrlExpirySeconds);
     }
 
     #region Private Methods
@@ -849,7 +918,8 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
     /// Validates a client-supplied recording object key (must sit in this
     /// tenant + lesson prefix, no traversal), confirms the file actually
     /// exists in storage, enforces OL-003 (extension + 5 GB cap) against the
-    /// REAL stored size, and returns the server-derived public URL.
+    /// REAL stored size, and returns the validated object key (the bucket is
+    /// private — playback is via a signed URL, not a public one).
     /// </summary>
     private async Task<string> ResolveRecordingFileAsync(string objectKey, Guid lessonId)
     {
@@ -879,7 +949,9 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
             throw new UserFriendlyException(LearningExceptionCodes.RecordingFileTooLarge,
                 "Recording file exceeds the 5 GB cap.");
 
-        return _fileStorage.GetPublicUrl(RecordingsBucket, objectKey);
+        // LC-06: the recordings bucket is PRIVATE — store the object key, not a
+        // public URL. Playback goes through GetRecordingDownloadUrl (signed).
+        return objectKey;
     }
 
     /// <summary>
@@ -905,6 +977,14 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
             recordingUrl,
             LearningExceptionCodes.InvalidRecordingUrl,
             "Recording URL");
+
+        // LC-06 defence-in-depth: an external recording URL must never reference
+        // our own (now private) recordings bucket path — that would let a crafted
+        // URL smuggle another lesson/tenant's object key into RecordingUrl.
+        if (recordingUrl != null
+            && recordingUrl.IndexOf("/recordings/", StringComparison.OrdinalIgnoreCase) >= 0)
+            throw new UserFriendlyException(LearningExceptionCodes.InvalidRecordingUrl,
+                "External recording links may not reference the internal recordings storage.");
     }
 
     /// <summary>

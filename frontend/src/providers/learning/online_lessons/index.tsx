@@ -312,6 +312,18 @@ export const OnlineLessonProvider = ({
         return response.data.result as ILiveClassJoin;
     };
 
+    // LC-06: recordings live in a private bucket — fetch a short-lived signed URL.
+    const getRecordingDownloadUrlAsync = async (lessonId: string): Promise<string | undefined> => {
+        const endpoint = `/api/services/app/OnlineLesson/GetRecordingDownloadUrl?id=${lessonId}`;
+        try {
+            const response = await instance.get(endpoint);
+            return response.data.result as string;
+        } catch (error) {
+            console.error(error);
+            return undefined;
+        }
+    };
+
   return (
     <OnlineLessonStateContext.Provider value={state}>
       <OnlineLessonActionContext.Provider
@@ -332,6 +344,7 @@ export const OnlineLessonProvider = ({
           uploadFileToStorageAsync,
           uploadRecordingAsync,
           getJoinTokenAsync,
+          getRecordingDownloadUrlAsync,
         }}
       >
         {children}

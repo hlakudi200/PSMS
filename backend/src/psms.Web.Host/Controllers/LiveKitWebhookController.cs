@@ -103,8 +103,8 @@ public class LiveKitWebhookController : psmsControllerBase
 
     /// <summary>
     /// Egress finished — if the recording actually landed in storage, attach
-    /// its public URL to the lesson. HEAD-confirming avoids marking a lesson as
-    /// recorded when egress produced nothing (e.g. nobody published).
+    /// its object key to the lesson (private bucket — LC-06). HEAD-confirming
+    /// avoids marking a lesson as recorded when egress produced nothing.
     /// </summary>
     private async Task AttachRecordingAsync(Guid lessonId)
     {
@@ -117,7 +117,9 @@ public class LiveKitWebhookController : psmsControllerBase
             var info = await _fileStorage.GetObjectInfoAsync(RecordingsBucket, key);
             if (info == null || info.SizeBytes <= 0) return; // nothing recorded
 
-            lesson.AddRecording(_fileStorage.GetPublicUrl(RecordingsBucket, key));
+            // LC-06: store the object key (private bucket); playback is via a
+            // signed URL from GetRecordingDownloadUrl, not a public link.
+            lesson.AddRecording(key);
             await _unitOfWorkManager.Current.SaveChangesAsync();
         }
     }
