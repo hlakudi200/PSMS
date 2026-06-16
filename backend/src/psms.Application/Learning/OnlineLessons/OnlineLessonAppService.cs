@@ -368,6 +368,14 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
                 "Only scheduled lessons can be started.");
         }
 
+        // LC-03: Start is the moment a class begins, and it's host-only. Create
+        // the LiveKit room WITH auto-egress recording HERE — before the status
+        // is committed to InProgress (so no student, who is only allowed to join
+        // once InProgress, can implicitly create the room first and thereby lose
+        // the egress config). Best-effort: never blocks starting the lesson.
+        if (lesson.Platform == OnlinePlatform.InApp && _liveKit.IsRecordingConfigured)
+            await _liveKit.EnsureRecordingRoomAsync(LiveClassRoomName(lesson.Id), LiveClassRecordingKey(lesson.Id));
+
         await CurrentUnitOfWork.SaveChangesAsync();
 
         return await GetAsync(id);
@@ -403,6 +411,13 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
 
         await _onlineLessonRepository.UpdateAsync(lesson);
         await CurrentUnitOfWork.SaveChangesAsync();
+
+        // LC-03: closing the room stops any active auto-egress so the
+        // recording finalizes + uploads promptly (rather than waiting for the
+        // room's empty-timeout). Best-effort; the egress_ended webhook (LC-04)
+        // is what reliably attaches the resulting recording URL.
+        if (lesson.Platform == OnlinePlatform.InApp && _liveKit.IsRecordingConfigured)
+            await _liveKit.CloseRoomAsync(LiveClassRoomName(lesson.Id));
 
         return await GetAsync(id);
     }
@@ -634,8 +649,15 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
                 "The class hasn't started yet. Please wait for your teacher to start the lesson.");
 
         // Room name is derived from the lesson id — no stored column needed.
-        var roomName = $"class-{lesson.Id}";
+        var roomName = LiveClassRoomName(lesson.Id);
         var identity = $"user-{AbpSession.UserId}";
+
+        // LC-03 defence-in-depth: the egress-recorded room is primarily created
+        // in StartAsync (before students can join). Re-ensure it on the host's
+        // join too, in case the empty room was reaped before anyone arrived.
+        // Idempotent (CreateRoom on an existing room is a no-op); best-effort.
+        if (isHost && _liveKit.IsRecordingConfigured)
+            await _liveKit.EnsureRecordingRoomAsync(roomName, LiveClassRecordingKey(lesson.Id));
 
         var ticket = _liveKit.CreateJoinToken(new LiveKitJoinRequest
         {
@@ -657,6 +679,17 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
     }
 
     #region Private Methods
+
+    /// <summary>LiveKit room name for an in-app live class (derived, not stored).</summary>
+    private static string LiveClassRoomName(Guid lessonId) => $"class-{lessonId}";
+
+    /// <summary>
+    /// Deterministic object key the live-class recording is egressed to, in the
+    /// recordings bucket. One recording per lesson (a re-run overwrites). Kept
+    /// deterministic so the egress_ended webhook (LC-04) can locate it.
+    /// </summary>
+    private string LiveClassRecordingKey(Guid lessonId)
+        => $"{AbpSession.TenantId ?? 0}/{lessonId}/recording.mp4";
 
     /// <summary>
     /// Resolves the Teacher.Id for the active session user. Used to scope
