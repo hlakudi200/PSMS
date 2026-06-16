@@ -28,15 +28,18 @@ public class StudentAppService : ApplicationService, IStudentAppService
     private readonly IRepository<Student, Guid> _studentRepository;
     private readonly IRepository<Grade, Guid> _gradeRepository;
     private readonly IRepository<Class, Guid> _classRepository;
+    private readonly IStudentLoginProvisioner _loginProvisioner;
 
     public StudentAppService(
         IRepository<Student, Guid> studentRepository,
         IRepository<Grade, Guid> gradeRepository,
-        IRepository<Class, Guid> classRepository)
+        IRepository<Class, Guid> classRepository,
+        IStudentLoginProvisioner loginProvisioner)
     {
         _studentRepository = studentRepository;
         _gradeRepository = gradeRepository;
         _classRepository = classRepository;
+        _loginProvisioner = loginProvisioner;
     }
 
     [AbpAuthorize(PermissionNames.Academic_Students_View)]
@@ -183,9 +186,21 @@ public class StudentAppService : ApplicationService, IStudentAppService
         }
 
         await _studentRepository.InsertAsync(student);
+
+        // LC-07: provision a portal login account for the student and link it,
+        // in the same unit of work so a provisioning failure (e.g. a duplicate
+        // username) rolls back the whole create — every student ends up with
+        // exactly one linked account.
+        var login = await _loginProvisioner.ProvisionAsync(student);
+
         await CurrentUnitOfWork.SaveChangesAsync();
 
-        return await GetAsync(student.Id);
+        var dto = await GetAsync(student.Id);
+        // Surface the freshly-minted credentials ONCE so the admin can hand
+        // them to the student (never returned on reads).
+        dto.LoginUserName = login.UserName;
+        dto.TemporaryPassword = login.TemporaryPassword;
+        return dto;
     }
 
     [AbpAuthorize(PermissionNames.Academic_Students_Edit)]

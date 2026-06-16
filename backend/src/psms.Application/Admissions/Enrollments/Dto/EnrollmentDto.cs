@@ -40,4 +40,10 @@ public class EnrollmentDto : EntityDto<Guid>
     // Created Student
     public Guid? CreatedStudentId { get; set; }
     public string AdmissionNumber { get; set; }
+
+    // LC-07: the student's freshly-provisioned login. Populated ONLY in the
+    // CompleteEnrollment response so the officer can hand the credentials over;
+    // never returned on reads (the password isn't stored in plaintext).
+    public string LoginUserName { get; set; }
+    public string TemporaryPassword { get; set; }
 }
