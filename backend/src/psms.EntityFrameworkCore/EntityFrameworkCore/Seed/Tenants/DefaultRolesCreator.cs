@@ -78,6 +78,28 @@ public class DefaultRolesCreator
     {
         return new List<string>
         {
+            // Workflow - full configuration + instance management (WF-01)
+            PermissionNames.Workflow,
+            PermissionNames.Workflow_Definitions,
+            PermissionNames.Workflow_Definitions_View,
+            PermissionNames.Workflow_Definitions_Create,
+            PermissionNames.Workflow_Definitions_Edit,
+            PermissionNames.Workflow_Definitions_Delete,
+            PermissionNames.Workflow_Definitions_Activate,
+            PermissionNames.Workflow_Instances,
+            PermissionNames.Workflow_Instances_View,
+            PermissionNames.Workflow_Instances_ViewAll,
+            PermissionNames.Workflow_Instances_Start,
+            PermissionNames.Workflow_Instances_Advance,
+            PermissionNames.Workflow_Instances_Cancel,
+            PermissionNames.Workflow_Instances_ViewHistory,
+            PermissionNames.Workflow_Instances_Recall,
+            PermissionNames.Workflow_Instances_BatchAdvance,
+            PermissionNames.Workflow_Delegations,
+            PermissionNames.Workflow_Delegations_View,
+            PermissionNames.Workflow_Delegations_Create,
+            PermissionNames.Workflow_Delegations_Revoke,
+
             // Admissions - Full access including decisions
             PermissionNames.Admissions,
             PermissionNames.Admissions_Applications,
@@ -292,6 +314,28 @@ public class DefaultRolesCreator
     {
         return new List<string>
         {
+            // Workflow - full configuration + instance management (WF-01)
+            PermissionNames.Workflow,
+            PermissionNames.Workflow_Definitions,
+            PermissionNames.Workflow_Definitions_View,
+            PermissionNames.Workflow_Definitions_Create,
+            PermissionNames.Workflow_Definitions_Edit,
+            PermissionNames.Workflow_Definitions_Delete,
+            PermissionNames.Workflow_Definitions_Activate,
+            PermissionNames.Workflow_Instances,
+            PermissionNames.Workflow_Instances_View,
+            PermissionNames.Workflow_Instances_ViewAll,
+            PermissionNames.Workflow_Instances_Start,
+            PermissionNames.Workflow_Instances_Advance,
+            PermissionNames.Workflow_Instances_Cancel,
+            PermissionNames.Workflow_Instances_ViewHistory,
+            PermissionNames.Workflow_Instances_Recall,
+            PermissionNames.Workflow_Instances_BatchAdvance,
+            PermissionNames.Workflow_Delegations,
+            PermissionNames.Workflow_Delegations_View,
+            PermissionNames.Workflow_Delegations_Create,
+            PermissionNames.Workflow_Delegations_Revoke,
+
             // Admissions - Review and limited decisions
             PermissionNames.Admissions,
             PermissionNames.Admissions_Applications,
@@ -475,6 +519,13 @@ public class DefaultRolesCreator
     {
         return new List<string>
         {
+            // Workflow - act on assigned approval steps (WF-01)
+            PermissionNames.Workflow,
+            PermissionNames.Workflow_Instances,
+            PermissionNames.Workflow_Instances_View,
+            PermissionNames.Workflow_Instances_Advance,
+            PermissionNames.Workflow_Instances_ViewHistory,
+
             // Admissions - Limited to interviews/assessments
             PermissionNames.Admissions_Interviews,
             PermissionNames.Admissions_Interviews_View,
@@ -697,6 +748,13 @@ public class DefaultRolesCreator
     {
         return new List<string>
         {
+            // Workflow - act on assigned approval steps (WF-01)
+            PermissionNames.Workflow,
+            PermissionNames.Workflow_Instances,
+            PermissionNames.Workflow_Instances_View,
+            PermissionNames.Workflow_Instances_Advance,
+            PermissionNames.Workflow_Instances_ViewHistory,
+
             // Admissions - Assessments only
             PermissionNames.Admissions_Assessments,
             PermissionNames.Admissions_Assessments_View,

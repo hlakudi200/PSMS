@@ -111,12 +111,118 @@ public class PsmsRolePermissionSeeder : ITransientDependency
         await _roleManager.SetGrantedPermissionsAsync(role, permissionsToGrant);
     }
 
+    /// <summary>
+    /// WF-01: ADDITIVELY grant the workflow permissions each staff role should
+    /// have for the CURRENT tenant, leaving every other grant untouched.
+    ///
+    /// Use this to backfill workflow access on EXISTING tenants — NOT
+    /// <see cref="SeedRolePermissionsAsync"/>, which REPLACES a role's entire
+    /// permission set (via SetGrantedPermissions) and would strip any
+    /// tenant-specific customisations a role has accumulated.
+    /// </summary>
+    public async Task GrantWorkflowPermissionsToStaffRolesAsync()
+    {
+        await AddPermissionsToRoleAsync(StaticRoleNames.Tenants.Principal, GetWorkflowFullPermissions());
+        await AddPermissionsToRoleAsync(StaticRoleNames.Tenants.VicePrincipal, GetWorkflowFullPermissions());
+        await AddPermissionsToRoleAsync(StaticRoleNames.Tenants.HOD, GetWorkflowActPermissions());
+        await AddPermissionsToRoleAsync(StaticRoleNames.Tenants.Teacher, GetWorkflowActPermissions());
+    }
+
+    /// <summary>
+    /// Grants the named permissions to the role and NEVER removes an existing
+    /// grant (unlike SetGrantedPermissions, which replaces the whole set).
+    /// GrantPermissionAsync is itself idempotent — it no-ops when the permission
+    /// is already granted — so we simply grant each desired permission and always
+    /// materialise an explicit grant row (robust even if a permission's default
+    /// grant ever changes).
+    /// </summary>
+    private async Task AddPermissionsToRoleAsync(string roleName, List<string> permissionNames)
+    {
+        var role = _roleManager.Roles.FirstOrDefault(r => r.Name == roleName);
+        if (role == null) return;
+
+        var toGrant = _permissionManager.GetAllPermissions()
+            .Where(p => permissionNames.Contains(p.Name))
+            .ToList();
+
+        foreach (var permission in toGrant)
+            await _roleManager.GrantPermissionAsync(role, permission);
+    }
+
+    // NOTE: the workflow permission sets below are also embedded inline in the
+    // four role getters in this file AND mirrored in DefaultRolesCreator (the
+    // seed-time creator for tenant 1 / tests). Keep all three in sync if you
+    // change a role's workflow grants.
+
+    /// <summary>Full workflow rights (configure + manage instances) — Principal/VP.</summary>
+    private static List<string> GetWorkflowFullPermissions()
+    {
+        return new List<string>
+        {
+            PermissionNames.Workflow,
+            PermissionNames.Workflow_Definitions,
+            PermissionNames.Workflow_Definitions_View,
+            PermissionNames.Workflow_Definitions_Create,
+            PermissionNames.Workflow_Definitions_Edit,
+            PermissionNames.Workflow_Definitions_Delete,
+            PermissionNames.Workflow_Definitions_Activate,
+            PermissionNames.Workflow_Instances,
+            PermissionNames.Workflow_Instances_View,
+            PermissionNames.Workflow_Instances_ViewAll,
+            PermissionNames.Workflow_Instances_Start,
+            PermissionNames.Workflow_Instances_Advance,
+            PermissionNames.Workflow_Instances_Cancel,
+            PermissionNames.Workflow_Instances_ViewHistory,
+            PermissionNames.Workflow_Instances_Recall,
+            PermissionNames.Workflow_Instances_BatchAdvance,
+            PermissionNames.Workflow_Delegations,
+            PermissionNames.Workflow_Delegations_View,
+            PermissionNames.Workflow_Delegations_Create,
+            PermissionNames.Workflow_Delegations_Revoke,
+        };
+    }
+
+    /// <summary>Act-only workflow rights (view + advance assigned steps) — HOD/Teacher.</summary>
+    private static List<string> GetWorkflowActPermissions()
+    {
+        return new List<string>
+        {
+            PermissionNames.Workflow,
+            PermissionNames.Workflow_Instances,
+            PermissionNames.Workflow_Instances_View,
+            PermissionNames.Workflow_Instances_Advance,
+            PermissionNames.Workflow_Instances_ViewHistory,
+        };
+    }
+
     #region Role Permission Definitions
 
     private static List<string> GetPrincipalPermissions()
     {
         return new List<string>
         {
+            // Workflow - full configuration + instance management (WF-01)
+            PermissionNames.Workflow,
+            PermissionNames.Workflow_Definitions,
+            PermissionNames.Workflow_Definitions_View,
+            PermissionNames.Workflow_Definitions_Create,
+            PermissionNames.Workflow_Definitions_Edit,
+            PermissionNames.Workflow_Definitions_Delete,
+            PermissionNames.Workflow_Definitions_Activate,
+            PermissionNames.Workflow_Instances,
+            PermissionNames.Workflow_Instances_View,
+            PermissionNames.Workflow_Instances_ViewAll,
+            PermissionNames.Workflow_Instances_Start,
+            PermissionNames.Workflow_Instances_Advance,
+            PermissionNames.Workflow_Instances_Cancel,
+            PermissionNames.Workflow_Instances_ViewHistory,
+            PermissionNames.Workflow_Instances_Recall,
+            PermissionNames.Workflow_Instances_BatchAdvance,
+            PermissionNames.Workflow_Delegations,
+            PermissionNames.Workflow_Delegations_View,
+            PermissionNames.Workflow_Delegations_Create,
+            PermissionNames.Workflow_Delegations_Revoke,
+
             // Admissions - Full access including decisions
             PermissionNames.Admissions,
             PermissionNames.Admissions_Applications,
@@ -334,6 +440,28 @@ public class PsmsRolePermissionSeeder : ITransientDependency
     {
         return new List<string>
         {
+            // Workflow - full configuration + instance management (WF-01)
+            PermissionNames.Workflow,
+            PermissionNames.Workflow_Definitions,
+            PermissionNames.Workflow_Definitions_View,
+            PermissionNames.Workflow_Definitions_Create,
+            PermissionNames.Workflow_Definitions_Edit,
+            PermissionNames.Workflow_Definitions_Delete,
+            PermissionNames.Workflow_Definitions_Activate,
+            PermissionNames.Workflow_Instances,
+            PermissionNames.Workflow_Instances_View,
+            PermissionNames.Workflow_Instances_ViewAll,
+            PermissionNames.Workflow_Instances_Start,
+            PermissionNames.Workflow_Instances_Advance,
+            PermissionNames.Workflow_Instances_Cancel,
+            PermissionNames.Workflow_Instances_ViewHistory,
+            PermissionNames.Workflow_Instances_Recall,
+            PermissionNames.Workflow_Instances_BatchAdvance,
+            PermissionNames.Workflow_Delegations,
+            PermissionNames.Workflow_Delegations_View,
+            PermissionNames.Workflow_Delegations_Create,
+            PermissionNames.Workflow_Delegations_Revoke,
+
             // Admissions - Review and limited decisions
             PermissionNames.Admissions,
             PermissionNames.Admissions_Applications,
@@ -520,6 +648,13 @@ public class PsmsRolePermissionSeeder : ITransientDependency
     {
         return new List<string>
         {
+            // Workflow - act on assigned approval steps (WF-01)
+            PermissionNames.Workflow,
+            PermissionNames.Workflow_Instances,
+            PermissionNames.Workflow_Instances_View,
+            PermissionNames.Workflow_Instances_Advance,
+            PermissionNames.Workflow_Instances_ViewHistory,
+
             // Admissions - Limited to interviews/assessments
             PermissionNames.Admissions_Interviews,
             PermissionNames.Admissions_Interviews_View,
@@ -737,6 +872,13 @@ public class PsmsRolePermissionSeeder : ITransientDependency
     {
         return new List<string>
         {
+            // Workflow - act on assigned approval steps (WF-01)
+            PermissionNames.Workflow,
+            PermissionNames.Workflow_Instances,
+            PermissionNames.Workflow_Instances_View,
+            PermissionNames.Workflow_Instances_Advance,
+            PermissionNames.Workflow_Instances_ViewHistory,
+
             // Admissions - Assessments only
             PermissionNames.Admissions_Assessments,
             PermissionNames.Admissions_Assessments_View,
