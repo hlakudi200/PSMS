@@ -13,6 +13,7 @@ import {
 } from '@ant-design/icons';
 import { useParams, useRouter } from 'next/navigation';
 import { useWorkflowBasePath } from './useWorkflowBasePath';
+import { useAuthState } from '@/providers/auth';
 import {
   WorkflowInstanceProvider,
   useWorkflowInstanceState,
@@ -56,7 +57,20 @@ function DetailContent() {
   const id = params?.id as string;
   const { instance: wfInstance, isPending } = useWorkflowInstanceState();
   const { getAsync, cancelAsync, recallAsync } = useWorkflowInstanceActions();
+  const { currentRole, currentUser } = useAuthState();
   const [advanceOpen, setAdvanceOpen] = useState(false);
+
+  // Cancel/Recall require Workflow.Instances.Cancel/Recall, held only by
+  // Admin/Principal/VicePrincipal (WF-01). This hides them from approvers
+  // (Teacher/HOD) as a UX nicety — the server is the real boundary
+  // (CancelAsync/RecallAsync are [AbpAuthorize]'d on those permissions). Gate on
+  // the user's full role set (not just the primary role) so a multi-role
+  // manager isn't wrongly blocked.
+  const managementRoles = ['admin', 'principal', 'viceprincipal'];
+  const myRoles = (currentUser?.roleNames?.length ? currentUser.roleNames : [currentRole])
+    .filter(Boolean)
+    .map((r) => (r as string).toLowerCase());
+  const canManageInstance = myRoles.some((r) => managementRoles.includes(r));
 
   useEffect(() => {
     if (id) getAsync(id);
@@ -84,10 +98,15 @@ function DetailContent() {
     <div style={{ padding: 24 }}>
       <Button
         icon={<ArrowLeftOutlined />}
-        onClick={() => router.push(`${base}/instances`)}
+        onClick={() => {
+          // Return to wherever the user came from; fall back to the portal's
+          // workflow home when opened via a direct link (no SPA history).
+          if (typeof window !== 'undefined' && window.history.length > 1) router.back();
+          else router.push(base);
+        }}
         style={{ marginBottom: 16 }}
       >
-        Back to Instances
+        Back
       </Button>
 
       <Card style={{ marginBottom: 24 }}>
@@ -102,8 +121,12 @@ function DetailContent() {
               >
                 Take Action
               </Button>
-              <Button icon={<UndoOutlined />} onClick={handleRecall}>Recall</Button>
-              <Button danger icon={<StopOutlined />} onClick={handleCancel}>Cancel</Button>
+              {canManageInstance && (
+                <>
+                  <Button icon={<UndoOutlined />} onClick={handleRecall}>Recall</Button>
+                  <Button danger icon={<StopOutlined />} onClick={handleCancel}>Cancel</Button>
+                </>
+              )}
             </Space>
           )}
         </div>

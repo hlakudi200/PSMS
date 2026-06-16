@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState, useCallback } from 'react';
-import { PlayCircleOutlined } from '@ant-design/icons';
+import { PlayCircleOutlined, EyeOutlined } from '@ant-design/icons';
+import { useRouter } from 'next/navigation';
 import { EnterpriseTable } from '@/components/shared/enterprise-table';
 import type { ColumnConfig, TableQuery, RowAction } from '@/components/shared/enterprise-table';
 import {
@@ -10,6 +11,7 @@ import {
   useWorkflowInstanceActions,
 } from '@/providers/workflow/workflow-instances';
 import { AdvanceWorkflowModal } from '@/components/modals/workflow/AdvanceWorkflowModal';
+import { useWorkflowBasePath } from './useWorkflowBasePath';
 import type { IWorkflowInstanceList } from '@/providers/workflow/shared/interfaces';
 import { WorkflowStatus, WorkflowEntityTypeLabels } from '@/providers/workflow/shared/interfaces';
 
@@ -23,6 +25,8 @@ import { WorkflowStatus, WorkflowEntityTypeLabels } from '@/providers/workflow/s
 function MyTasksContent() {
   const { instances, totalCount, isPending, isError } = useWorkflowInstanceState();
   const { getMyPendingAsync } = useWorkflowInstanceActions();
+  const router = useRouter();
+  const base = useWorkflowBasePath();
   const [advanceModalOpen, setAdvanceModalOpen] = useState(false);
   const [selectedInstance, setSelectedInstance] = useState<IWorkflowInstanceList | null>(null);
   const [lastQuery, setLastQuery] = useState<TableQuery | null>(null);
@@ -69,6 +73,12 @@ function MyTasksContent() {
   ];
 
   const rowActions: RowAction<IWorkflowInstanceList>[] = [
+    {
+      key: 'view',
+      label: 'View Details',
+      icon: <EyeOutlined />,
+      onClick: (record) => router.push(`${base}/instances/${record.id}`),
+    },
     {
       key: 'advance',
       label: 'Take Action',
