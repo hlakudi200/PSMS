@@ -25,22 +25,30 @@ public class StudentSubjectAppService : ApplicationService, IStudentSubjectAppSe
     private readonly IRepository<Student, Guid> _studentRepository;
     private readonly IRepository<Subject, Guid> _subjectRepository;
     private readonly IRepository<AcademicYear, Guid> _academicYearRepository;
+    private readonly psms.Academic.Students.ICurrentStudentResolver _currentStudent;
 
     public StudentSubjectAppService(
         IRepository<StudentSubject, Guid> studentSubjectRepository,
         IRepository<Student, Guid> studentRepository,
         IRepository<Subject, Guid> subjectRepository,
-        IRepository<AcademicYear, Guid> academicYearRepository)
+        IRepository<AcademicYear, Guid> academicYearRepository,
+        psms.Academic.Students.ICurrentStudentResolver currentStudent)
     {
         _studentSubjectRepository = studentSubjectRepository;
         _studentRepository = studentRepository;
         _subjectRepository = subjectRepository;
         _academicYearRepository = academicYearRepository;
+        _currentStudent = currentStudent;
     }
 
     [AbpAuthorize(PermissionNames.Academic_Students_View)]
     public async Task<ListResultDto<StudentSubjectDto>> GetByStudentAsync(Guid studentId)
     {
+        // LC-08: a student may only read their own subject enrollments.
+        var selfId = await _currentStudent.GetCurrentStudentIdAsync();
+        if (selfId.HasValue && selfId.Value != studentId)
+            return new ListResultDto<StudentSubjectDto>(new List<StudentSubjectDto>());
+
         var enrollments = await _studentSubjectRepository
             .GetAll()
             .Include(ss => ss.Student)
@@ -76,6 +84,11 @@ public class StudentSubjectAppService : ApplicationService, IStudentSubjectAppSe
     [AbpAuthorize(PermissionNames.Academic_Students_View)]
     public async Task<ListResultDto<StudentSubjectDto>> GetByStudentAndYearAsync(Guid studentId, Guid academicYearId)
     {
+        // LC-08: a student may only read their own subject enrollments.
+        var selfId = await _currentStudent.GetCurrentStudentIdAsync();
+        if (selfId.HasValue && selfId.Value != studentId)
+            return new ListResultDto<StudentSubjectDto>(new List<StudentSubjectDto>());
+
         var enrollments = await _studentSubjectRepository
             .GetAll()
             .Include(ss => ss.Student)

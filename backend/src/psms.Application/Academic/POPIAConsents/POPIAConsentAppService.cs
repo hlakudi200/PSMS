@@ -24,20 +24,28 @@ public class POPIAConsentAppService : ApplicationService, IPOPIAConsentAppServic
     private readonly IRepository<POPIAConsent, Guid> _popiaConsentRepository;
     private readonly IRepository<Student, Guid> _studentRepository;
     private readonly IHttpContextAccessor _httpContextAccessor;
+    private readonly psms.Academic.Students.ICurrentStudentResolver _currentStudent;
 
     public POPIAConsentAppService(
         IRepository<POPIAConsent, Guid> popiaConsentRepository,
         IRepository<Student, Guid> studentRepository,
-        IHttpContextAccessor httpContextAccessor)
+        IHttpContextAccessor httpContextAccessor,
+        psms.Academic.Students.ICurrentStudentResolver currentStudent)
     {
         _popiaConsentRepository = popiaConsentRepository;
         _studentRepository = studentRepository;
         _httpContextAccessor = httpContextAccessor;
+        _currentStudent = currentStudent;
     }
 
     [AbpAuthorize(PermissionNames.Academic_Students_View)]
     public async Task<POPIAConsentDto> GetByStudentAsync(Guid studentId)
     {
+        // LC-08: a student may only read their own POPIA consent.
+        var selfId = await _currentStudent.GetCurrentStudentIdAsync();
+        if (selfId.HasValue && selfId.Value != studentId)
+            throw new UserFriendlyException(AcademicExceptionCodes.POPIAConsentNotFound, "POPIA consent not found for this student.");
+
         var consent = await _popiaConsentRepository
             .GetAll()
             .Include(pc => pc.Student)
@@ -52,10 +60,14 @@ public class POPIAConsentAppService : ApplicationService, IPOPIAConsentAppServic
     [AbpAuthorize(PermissionNames.Academic_Students_View)]
     public async Task<PagedResultDto<POPIAConsentDto>> GetAllAsync(GetPOPIAConsentsInput input)
     {
+        // LC-08: a student-portal user only ever sees their own consent.
+        var selfId = await _currentStudent.GetCurrentStudentIdAsync();
+
         var query = _popiaConsentRepository
             .GetAll()
             .Include(pc => pc.Student)
             .Where(pc => pc.TenantId == AbpSession.TenantId)
+            .WhereIf(selfId.HasValue, pc => pc.StudentId == selfId.Value)
             .WhereIf(!string.IsNullOrWhiteSpace(input.Keyword),
                 pc => pc.Student.FirstName.ToLower().Contains(input.Keyword.ToLower())
                   || pc.Student.LastName.ToLower().Contains(input.Keyword.ToLower()))
