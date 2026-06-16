@@ -1,13 +1,14 @@
-using Microsoft.AspNetCore.Http;
 using System;
 using System.ComponentModel.DataAnnotations;
 
 namespace psms.Learning.OnlineLessons.Dto;
 
 /// <summary>
-/// Multipart upload payload for attaching a recording to a completed
-/// lesson. Mirrors the LearningMaterials upload shape so the same
-/// pre-signed-blob future migration path applies to both.
+/// Posted after the recording file has been uploaded directly to storage
+/// via a ticket from RequestRecordingUploadUrl (the bytes never pass through
+/// this server — see SF-02). Mirrors the LearningMaterials direct-upload
+/// shape: the client supplies only the object key; the server validates it,
+/// HEADs the real size/type, and derives the public URL.
 /// </summary>
 public class UploadRecordingDto
 {
@@ -19,9 +20,16 @@ public class UploadRecordingDto
     public Guid LessonId { get; set; }
 
     /// <summary>
-    /// The recording file. Extension and size are validated server-side
-    /// (mp4 / mov / avi / webm, 5 GB cap — see OL-003).
+    /// Storage object key from RequestRecordingUploadUrl. Validated +
+    /// measured server-side (mp4 / mov / avi / webm, 5 GB cap — see OL-003);
+    /// the public URL is derived, not trusted from the client.
     /// </summary>
     [Required]
-    public IFormFile File { get; set; }
+    [StringLength(500)]
+    public string ObjectKey { get; set; }
+
+    /// <summary>Original file name (used for the extension check).</summary>
+    [Required]
+    [StringLength(260)]
+    public string FileName { get; set; }
 }

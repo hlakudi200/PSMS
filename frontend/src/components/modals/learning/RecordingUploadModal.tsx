@@ -82,7 +82,11 @@ export const RecordingUploadModal: React.FC<RecordingUploadModalProps> = ({
   const [submitting, setSubmitting] = useState(false);
   const [zodError, setZodError] = useState<string | null>(null);
 
-  const { uploadRecordingAsync } = useOnlineLessonActions();
+  const {
+    requestRecordingUploadUrlAsync,
+    uploadFileToStorageAsync,
+    uploadRecordingAsync,
+  } = useOnlineLessonActions();
   // Intentionally NOT reading `isPending` from provider state here. That
   // flag is provider-wide; binding confirmLoading to it would spin the
   // button during unrelated refetches (e.g. the host shell's getAsync
@@ -116,12 +120,27 @@ export const RecordingUploadModal: React.FC<RecordingUploadModalProps> = ({
 
     setSubmitting(true);
     try {
-      await uploadRecordingAsync({ lessonId: lesson.id, file });
+      // SF-02 direct upload: mint a signed URL, PUT the bytes straight to
+      // storage (they never touch our server), then record the object key.
+      const ticket = await requestRecordingUploadUrlAsync({
+        lessonId: lesson.id,
+        fileName: file.name,
+      });
+      await uploadFileToStorageAsync(ticket.uploadUrl, file);
+      await uploadRecordingAsync({
+        lessonId: lesson.id,
+        objectKey: ticket.objectKey,
+        fileName: file.name,
+      });
       message.success('Recording uploaded');
       onClose(true);
-    } catch {
-      // Server errors (415 type, 413 size, virus scan rejection) are
-      // surfaced by the axios response interceptor's message bubble.
+    } catch (err) {
+      // The direct-to-storage PUT uses fetch, so its failure is NOT caught by
+      // the axios interceptor — surface it. Axios errors (with .response,
+      // e.g. wrong status / size rejection) are already shown by the interceptor.
+      if (!(err as { response?: unknown })?.response) {
+        message.error((err as Error)?.message || 'Upload failed. Please try again.');
+      }
     } finally {
       setSubmitting(false);
     }
@@ -158,6 +177,12 @@ export const RecordingUploadModal: React.FC<RecordingUploadModalProps> = ({
       }
       okText="Upload"
       okButtonProps={{ disabled: !isCompleted || fileList.length === 0 }}
+      // Block cancel / backdrop / X while an upload is in flight so the user
+      // can't close the modal mid-PUT and leave a recording that silently
+      // attaches afterwards (the fetch PUT + metadata post keep running).
+      cancelButtonProps={{ disabled: submitting }}
+      maskClosable={!submitting}
+      closable={!submitting}
       confirmLoading={submitting}
       onOk={handleSubmit}
       onCancel={() => onClose(false)}

@@ -49,4 +49,7 @@ public static class LearningExceptionCodes
     public const string LessonNotCompleted = "LRN_LESSON_NOT_COMPLETED";
     public const string InvalidRecordingUrl = "LRN_INVALID_RECORDING_URL";
     public const string RecordingUploadConflict = "LRN_RECORDING_UPLOAD_CONFLICT";
+    // Direct-upload reference (object key) failed validation — it didn't
+    // belong to this tenant/lesson, or the file wasn't found in storage.
+    public const string InvalidRecordingUpload = "LRN_INVALID_RECORDING_UPLOAD";
 }

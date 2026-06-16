@@ -215,11 +215,19 @@ export interface IPagedAndSortedResultRequest {
     recordingUrl: string;
   }
 
-  // Multipart upload of a recording file for a Completed lesson. Server
-  // validates type (mp4 / mov / avi / webm), size (5 GB cap, OL-003), and
-  // that the lesson is in Completed status before persisting the URL.
+  // SF-02 direct-upload: ask the server for a one-time signed URL, PUT the
+  // recording straight to storage (bytes bypass our server), then record the
+  // object key. Server validates type (mp4 / mov / avi / webm), the real size
+  // (5 GB cap, OL-003), and that the lesson is Completed before persisting.
+  export interface IRequestRecordingUploadUrl {
+    lessonId: string;
+    fileName: string;
+  }
+
+  // Posted after the recording's bytes have been uploaded directly to storage.
   export interface IUploadRecording {
     lessonId: string;
-    file: File;
+    objectKey: string;
+    fileName: string;
   }
   
