@@ -126,6 +126,65 @@ public class LiveKitTokenService : ILiveKitTokenService
     private static string Base64Url(byte[] bytes)
         => Convert.ToBase64String(bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');
 
+    private static byte[] Base64UrlDecode(string s)
+    {
+        s = s.Replace('-', '+').Replace('_', '/');
+        switch (s.Length % 4) { case 2: s += "=="; break; case 3: s += "="; break; }
+        return Convert.FromBase64String(s);
+    }
+
+    public bool VerifyWebhook(string authToken, byte[] body)
+    {
+        if (string.IsNullOrWhiteSpace(authToken) || body == null) return false;
+        var (_, _, apiSecret) = GetConfig();
+        if (string.IsNullOrEmpty(apiSecret)) return false;
+
+        var token = authToken.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)
+            ? authToken.Substring(7).Trim()
+            : authToken.Trim();
+        var parts = token.Split('.');
+        if (parts.Length != 3) return false;
+
+        try
+        {
+            // 0) Reject anything that doesn't declare HS256 (defence-in-depth —
+            // we only ever verify with the symmetric secret).
+            using (var headerDoc = JsonDocument.Parse(Base64UrlDecode(parts[0])))
+            {
+                if (!headerDoc.RootElement.TryGetProperty("alg", out var algEl)
+                    || !string.Equals(algEl.GetString(), "HS256", StringComparison.Ordinal))
+                    return false;
+            }
+
+            // 1) HS256 signature over header.payload with our API secret.
+            using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(apiSecret));
+            var expectedSig = Base64Url(hmac.ComputeHash(Encoding.ASCII.GetBytes($"{parts[0]}.{parts[1]}")));
+            if (!CryptographicOperations.FixedTimeEquals(
+                    Encoding.ASCII.GetBytes(expectedSig), Encoding.ASCII.GetBytes(parts[2])))
+                return false;
+
+            using var doc = JsonDocument.Parse(Base64UrlDecode(parts[1]));
+            var root = doc.RootElement;
+
+            // 2) Not expired (allow small clock skew).
+            if (root.TryGetProperty("exp", out var expEl) && expEl.TryGetInt64(out var exp)
+                && DateTimeOffset.UtcNow.ToUnixTimeSeconds() > exp + 60)
+                return false;
+
+            // 3) Body integrity: sha256 claim (std base64) == SHA-256(body).
+            if (!root.TryGetProperty("sha256", out var shaEl)) return false;
+            using var sha = SHA256.Create();
+            var actual = Convert.ToBase64String(sha.ComputeHash(body));
+            var claimed = shaEl.GetString() ?? string.Empty;
+            return CryptographicOperations.FixedTimeEquals(
+                Encoding.ASCII.GetBytes(claimed), Encoding.ASCII.GetBytes(actual));
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     // ── LC-03: room recording via LiveKit auto-egress ─────────────────────
 
     public bool IsRecordingConfigured

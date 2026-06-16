@@ -7,6 +7,7 @@ using Abp.Linq.Extensions;
 using Abp.UI;
 using Microsoft.EntityFrameworkCore;
 using psms.Authorization;
+using psms.Authorization.Users;
 using psms.Domain.Academic.Entities;
 using psms.Domain.Learning.Entities;
 using psms.Domain.Shared.Enums;
@@ -33,6 +34,7 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
     private readonly IRepository<OnlineLesson, Guid> _onlineLessonRepository;
     private readonly IRepository<ClassSubject, Guid> _classSubjectRepository;
     private readonly IRepository<Teacher, Guid> _teacherRepository;
+    private readonly IRepository<User, long> _userRepository;
     private readonly IFileStorageService _fileStorage;
     private readonly ILiveKitTokenService _liveKit;
 
@@ -59,12 +61,14 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
         IRepository<OnlineLesson, Guid> onlineLessonRepository,
         IRepository<ClassSubject, Guid> classSubjectRepository,
         IRepository<Teacher, Guid> teacherRepository,
+        IRepository<User, long> userRepository,
         IFileStorageService fileStorage,
         ILiveKitTokenService liveKit)
     {
         _onlineLessonRepository = onlineLessonRepository;
         _classSubjectRepository = classSubjectRepository;
         _teacherRepository = teacherRepository;
+        _userRepository = userRepository;
         _fileStorage = fileStorage;
         _liveKit = liveKit;
     }
@@ -652,6 +656,18 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
         var roomName = LiveClassRoomName(lesson.Id);
         var identity = $"user-{AbpSession.UserId}";
 
+        // LC-04: use the participant's real display name on their tile (falls
+        // back to username, then identity). Resolved from AbpUsers; never throws.
+        var displayName = identity;
+        var user = await _userRepository.FirstOrDefaultAsync(AbpSession.UserId.Value);
+        if (user != null)
+        {
+            var fullName = $"{user.Name} {user.Surname}".Trim();
+            displayName = !string.IsNullOrWhiteSpace(fullName) ? fullName
+                : !string.IsNullOrWhiteSpace(user.UserName) ? user.UserName
+                : identity;
+        }
+
         // LC-03 defence-in-depth: the egress-recorded room is primarily created
         // in StartAsync (before students can join). Re-ensure it on the host's
         // join too, in case the empty room was reaped before anyone arrived.
@@ -662,7 +678,7 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
         var ticket = _liveKit.CreateJoinToken(new LiveKitJoinRequest
         {
             Identity = identity,
-            Name = identity,
+            Name = displayName,
             RoomName = roomName,
             CanPublish = isHost,
             CanPublishData = true,

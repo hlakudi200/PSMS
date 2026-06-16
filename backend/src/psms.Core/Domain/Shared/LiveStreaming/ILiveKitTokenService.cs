@@ -43,6 +43,14 @@ public interface ILiveKitTokenService
     /// LiveKit isn't configured. Best-effort.
     /// </summary>
     Task CloseRoomAsync(string roomName);
+
+    /// <summary>
+    /// Verifies a LiveKit webhook request (LC-04). LiveKit signs the request
+    /// with a JWT in the Authorization header whose `sha256` claim must equal
+    /// the SHA-256 of the raw body; the JWT itself is HS256-signed with our API
+    /// secret. Returns false for any missing/invalid/tampered/expired request.
+    /// </summary>
+    bool VerifyWebhook(string authToken, byte[] body);
 }
 
 /// <summary>Inputs for a single participant's join token.</summary>
