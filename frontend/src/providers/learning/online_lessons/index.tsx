@@ -14,6 +14,7 @@ import {
   IUploadRecording,
   IRequestRecordingUploadUrl,
   IFileUploadTicket,
+  ILiveClassJoin,
 } from "../shared/interfaces";
 import { OnlineLessonReducer } from "./reducer";
 import { useContext, useReducer } from "react";
@@ -302,6 +303,15 @@ export const OnlineLessonProvider = ({
         });
     };
 
+    // LC-02: fetch a LiveKit join token for the in-app classroom. Returns the
+    // server URL + signed token; the server decides publish (teacher) vs
+    // view-only (student). Throws so the classroom page can show a clear error.
+    const getJoinTokenAsync = async (lessonId: string): Promise<ILiveClassJoin> => {
+        const endpoint = `/api/services/app/OnlineLesson/GetJoinToken?id=${lessonId}`;
+        const response = await instance.get(endpoint);
+        return response.data.result as ILiveClassJoin;
+    };
+
   return (
     <OnlineLessonStateContext.Provider value={state}>
       <OnlineLessonActionContext.Provider
@@ -321,6 +331,7 @@ export const OnlineLessonProvider = ({
           requestRecordingUploadUrlAsync,
           uploadFileToStorageAsync,
           uploadRecordingAsync,
+          getJoinTokenAsync,
         }}
       >
         {children}
