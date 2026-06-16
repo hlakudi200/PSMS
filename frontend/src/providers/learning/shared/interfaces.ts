@@ -120,6 +120,16 @@ export interface IPagedAndSortedResultRequest {
     fileName: string;
   }
 
+  // LC-02 in-app live classroom: what the client needs to connect to LiveKit.
+  // canPublish=true => the hosting teacher (cam/mic/screen); false => viewer.
+  export interface ILiveClassJoin {
+    serverUrl: string;
+    token: string;
+    roomName: string;
+    identity: string;
+    canPublish: boolean;
+  }
+
   // Posted after the new version's file has been uploaded directly to storage.
   export interface IUploadNewVersion {
     learningMaterialId: string;
@@ -173,7 +183,9 @@ export interface IPagedAndSortedResultRequest {
     title: string;
     description?: string;
     platform: number;
-    meetingLink: string;
+    // Optional: omitted for the in-app (LiveKit) platform — the server derives
+    // the join route. Required + validated for external platforms.
+    meetingLink?: string;
     meetingId?: string;
     meetingPassword?: string;
     scheduledStartTime: string;

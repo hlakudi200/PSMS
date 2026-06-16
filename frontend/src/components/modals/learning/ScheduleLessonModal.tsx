@@ -44,7 +44,9 @@ const SCHOOL_END_HOUR = 17; // 17:00 SAST
 const SAST_OFFSET_MINUTES = 2 * 60; // UTC+02:00, no DST in South Africa
 
 // Backend enum psms.Domain.Shared.Enums.OnlinePlatform.
+const PLATFORM_INAPP = 7;
 const PLATFORM_OPTIONS = [
+  { value: PLATFORM_INAPP, label: 'In-App Live Class (PSMS — recommended)' },
   { value: 1, label: 'Zoom' },
   { value: 2, label: 'Microsoft Teams' },
   { value: 3, label: 'Google Meet' },
@@ -70,11 +72,13 @@ const scheduleLessonSchema = z.object({
     .number({ message: 'Pick a platform.' })
     .int()
     .min(1)
-    .max(6),
+    .max(7),
+  // Required + valid URL for external platforms; omitted for the in-app
+  // (LiveKit) platform, where the join route is derived server-side.
   meetingLink: z
     .string()
-    .min(1, 'Meeting link is required.')
-    .url('Meeting link must be a valid URL (https://…).'),
+    .optional()
+    .or(z.literal('')),
   meetingId: z
     .string()
     .max(100, 'Meeting ID must be 100 characters or fewer.')
@@ -97,6 +101,16 @@ const scheduleLessonSchema = z.object({
     .int()
     .min(MIN_DURATION_MINUTES, `Duration must be at least ${MIN_DURATION_MINUTES} minutes.`)
     .max(MAX_DURATION_MINUTES, `Duration cannot exceed ${MAX_DURATION_MINUTES} minutes.`),
+}).superRefine((val, ctx) => {
+  // External platforms need a valid meeting URL; in-app classes don't.
+  if (val.platform !== PLATFORM_INAPP) {
+    const link = val.meetingLink?.trim() ?? '';
+    if (!link) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['meetingLink'], message: 'Meeting link is required.' });
+    } else if (!/^https?:\/\/.+/i.test(link)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['meetingLink'], message: 'Meeting link must be a valid URL (https://…).' });
+    }
+  }
 });
 
 interface ScheduleLessonFormValues {
@@ -212,6 +226,9 @@ export const ScheduleLessonModal: React.FC<ScheduleLessonModalProps> = ({
   const watchedClassSubjectId = Form.useWatch('classSubjectId', form);
   const watchedStart = Form.useWatch('scheduledStart', form);
   const watchedDuration = Form.useWatch('durationMinutes', form);
+  const watchedPlatform = Form.useWatch('platform', form);
+  // In-app (LiveKit) live classes are hosted inside PSMS — no external link.
+  const isInApp = watchedPlatform === PLATFORM_INAPP;
 
   useEffect(() => {
     if (open && watchedClassSubjectId) {
@@ -335,9 +352,20 @@ export const ScheduleLessonModal: React.FC<ScheduleLessonModalProps> = ({
         title: result.data.title.trim(),
         description: result.data.description?.trim() || undefined,
         platform: result.data.platform,
-        meetingLink: result.data.meetingLink.trim(),
-        meetingId: result.data.meetingId?.trim() || undefined,
-        meetingPassword: result.data.meetingPassword?.trim() || undefined,
+        // In-app classes have no external link — the server derives the join
+        // route. External platforms send the validated URL + optional creds.
+        meetingLink:
+          result.data.platform === PLATFORM_INAPP
+            ? undefined
+            : result.data.meetingLink?.trim(),
+        meetingId:
+          result.data.platform === PLATFORM_INAPP
+            ? undefined
+            : result.data.meetingId?.trim() || undefined,
+        meetingPassword:
+          result.data.platform === PLATFORM_INAPP
+            ? undefined
+            : result.data.meetingPassword?.trim() || undefined,
         scheduledStartTime: start.toISOString(),
         scheduledEndTime: end.toISOString(),
         isRecurring: false,
@@ -536,41 +564,53 @@ export const ScheduleLessonModal: React.FC<ScheduleLessonModalProps> = ({
           </Text>
         )}
 
-        <Form.Item
-          label="Meeting link"
-          name="meetingLink"
-          rules={[
-            { required: true, message: 'Meeting link is required.' },
-            { type: 'url', message: 'Must be a valid URL.' },
-          ]}
-          validateStatus={zodErrors.meetingLink ? 'error' : undefined}
-          help={zodErrors.meetingLink}
-        >
-          <Input placeholder="https://zoom.us/j/123456789" />
-        </Form.Item>
+        {isInApp ? (
+          <Alert
+            type="info"
+            showIcon
+            message="In-app live class"
+            description="Students and you join the live classroom inside PSMS — no external meeting link needed. You broadcast your camera, mic and screen; students watch, chat and can raise a hand."
+            style={{ marginBottom: 12 }}
+          />
+        ) : (
+          <>
+            <Form.Item
+              label="Meeting link"
+              name="meetingLink"
+              rules={[
+                { required: true, message: 'Meeting link is required.' },
+                { type: 'url', message: 'Must be a valid URL.' },
+              ]}
+              validateStatus={zodErrors.meetingLink ? 'error' : undefined}
+              help={zodErrors.meetingLink}
+            >
+              <Input placeholder="https://zoom.us/j/123456789" />
+            </Form.Item>
 
-        <Row gutter={12}>
-          <Col xs={24} md={12}>
-            <Form.Item
-              label="Meeting ID (optional)"
-              name="meetingId"
-              validateStatus={zodErrors.meetingId ? 'error' : undefined}
-              help={zodErrors.meetingId}
-            >
-              <Input placeholder="123-456-789" />
-            </Form.Item>
-          </Col>
-          <Col xs={24} md={12}>
-            <Form.Item
-              label="Meeting password (optional)"
-              name="meetingPassword"
-              validateStatus={zodErrors.meetingPassword ? 'error' : undefined}
-              help={zodErrors.meetingPassword}
-            >
-              <Input placeholder="Optional passcode" />
-            </Form.Item>
-          </Col>
-        </Row>
+            <Row gutter={12}>
+              <Col xs={24} md={12}>
+                <Form.Item
+                  label="Meeting ID (optional)"
+                  name="meetingId"
+                  validateStatus={zodErrors.meetingId ? 'error' : undefined}
+                  help={zodErrors.meetingId}
+                >
+                  <Input placeholder="123-456-789" />
+                </Form.Item>
+              </Col>
+              <Col xs={24} md={12}>
+                <Form.Item
+                  label="Meeting password (optional)"
+                  name="meetingPassword"
+                  validateStatus={zodErrors.meetingPassword ? 'error' : undefined}
+                  help={zodErrors.meetingPassword}
+                >
+                  <Input placeholder="Optional passcode" />
+                </Form.Item>
+              </Col>
+            </Row>
+          </>
+        )}
       </Form>
     </Modal>
   );

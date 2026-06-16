@@ -11,6 +11,7 @@ import {
   IUploadRecording,
   IRequestRecordingUploadUrl,
   IFileUploadTicket,
+  ILiveClassJoin,
 } from "../shared/interfaces";
 
 export interface IOnlineLessonStateContext {
@@ -45,6 +46,8 @@ export interface IOnlineLessonActionContext {
   requestRecordingUploadUrlAsync: (input: IRequestRecordingUploadUrl) => Promise<IFileUploadTicket>;
   uploadFileToStorageAsync: (uploadUrl: string, file: File) => Promise<void>;
   uploadRecordingAsync: (input: IUploadRecording) => Promise<void>;
+  // LC-02: fetch a LiveKit join token (server decides publish vs view-only).
+  getJoinTokenAsync: (lessonId: string) => Promise<ILiveClassJoin>;
 }
 
 export const INITIAL_STATE: IOnlineLessonStateContext = {

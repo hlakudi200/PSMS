@@ -63,6 +63,7 @@ const STATUS_META: Record<number, { label: string; color: string }> = {
   4: { label: 'Cancelled', color: 'red' },
 };
 
+const PLATFORM_INAPP = 7;
 const PLATFORM_LABEL: Record<number, string> = {
   1: 'Zoom',
   2: 'Microsoft Teams',
@@ -70,6 +71,7 @@ const PLATFORM_LABEL: Record<number, string> = {
   4: 'BigBlueButton',
   5: 'WebEx',
   6: 'Other',
+  7: 'In-App Live',
 };
 
 function formatRange(startIso: string, endIso: string): string {
@@ -293,12 +295,27 @@ function TeacherLessonsContent() {
       width: 220,
       render: (_: unknown, record: IOnlineLessonList) => (
         <Space size="small">
+          {record.platform === PLATFORM_INAPP
+            && (record.status === ONLINE_LESSON_STATUS.Scheduled
+              || record.status === ONLINE_LESSON_STATUS.InProgress) && (
+            <Tooltip title="Join the in-app live classroom">
+              <Button
+                size="small"
+                type="primary"
+                icon={<VideoCameraOutlined />}
+                aria-label={`Join live class ${record.title}`}
+                onClick={() => router.push(`/live-class/${record.id}`)}
+              >
+                Live
+              </Button>
+            </Tooltip>
+          )}
           {(record.status === ONLINE_LESSON_STATUS.Scheduled
             || record.status === ONLINE_LESSON_STATUS.InProgress) && (
             <Tooltip title="Open lesson">
               <Button
                 size="small"
-                type="primary"
+                type={record.platform === PLATFORM_INAPP ? 'default' : 'primary'}
                 icon={<PlayCircleOutlined />}
                 aria-label={`Open ${record.title}`}
                 onClick={() => handleOpen(record)}
