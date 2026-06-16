@@ -39,6 +39,7 @@ public class ReportAppService : ApplicationService, IReportAppService
     private readonly IRepository<ClassSubject, Guid> _classSubjectRepository;
     private readonly IRepository<AssessmentEntity, Guid> _assessmentRepository;
     private readonly IBackgroundJobManager _backgroundJobManager;
+    private readonly psms.Academic.Students.ICurrentStudentResolver _currentStudent;
 
     public ReportAppService(
         IRepository<Report, Guid> reportRepository,
@@ -50,7 +51,8 @@ public class ReportAppService : ApplicationService, IReportAppService
         IRepository<Mark, Guid> markRepository,
         IRepository<ClassSubject, Guid> classSubjectRepository,
         IRepository<AssessmentEntity, Guid> assessmentRepository,
-        IBackgroundJobManager backgroundJobManager)
+        IBackgroundJobManager backgroundJobManager,
+        psms.Academic.Students.ICurrentStudentResolver currentStudent)
     {
         _reportRepository = reportRepository;
         _reportSubjectRepository = reportSubjectRepository;
@@ -62,6 +64,7 @@ public class ReportAppService : ApplicationService, IReportAppService
         _classSubjectRepository = classSubjectRepository;
         _assessmentRepository = assessmentRepository;
         _backgroundJobManager = backgroundJobManager;
+        _currentStudent = currentStudent;
     }
 
     [AbpAuthorize(PermissionNames.Assessment_ReportCards_View)]
@@ -81,6 +84,11 @@ public class ReportAppService : ApplicationService, IReportAppService
         if (report == null)
             throw new UserFriendlyException(AssessmentExceptionCodes.ReportNotFound, "Report not found.");
 
+        // LC-10: a student may only read their own report card.
+        var selfId = await _currentStudent.GetCurrentStudentIdAsync();
+        if (selfId.HasValue && selfId.Value != report.StudentId)
+            throw new UserFriendlyException(AssessmentExceptionCodes.ReportNotFound, "Report not found.");
+
         var dto = ObjectMapper.Map<ReportDto>(report);
         dto.SubjectReports = ObjectMapper.Map<List<ReportSubjectDto>>(report.SubjectReports.OrderBy(sr => sr.Subject?.SubjectName).ToList());
         return dto;
@@ -89,6 +97,9 @@ public class ReportAppService : ApplicationService, IReportAppService
     [AbpAuthorize(PermissionNames.Assessment_ReportCards_View)]
     public async Task<PagedResultDto<ReportListDto>> GetAllAsync(GetReportsInput input)
     {
+        // LC-10: a student-portal user only ever sees their own report cards.
+        var selfId = await _currentStudent.GetCurrentStudentIdAsync();
+
         var query = _reportRepository
             .GetAll()
             .Include(r => r.Student)
@@ -97,6 +108,7 @@ public class ReportAppService : ApplicationService, IReportAppService
             .Include(r => r.AcademicYear)
             .Include(r => r.SubjectReports)
             .Where(r => r.TenantId == AbpSession.TenantId)
+            .WhereIf(selfId.HasValue, r => r.StudentId == selfId.Value)
             .WhereIf(input.StudentId.HasValue, r => r.StudentId == input.StudentId.Value)
             .WhereIf(input.ClassId.HasValue, r => r.ClassId == input.ClassId.Value)
             .WhereIf(input.TermId.HasValue, r => r.TermId == input.TermId.Value)
@@ -125,6 +137,11 @@ public class ReportAppService : ApplicationService, IReportAppService
     [AbpAuthorize(PermissionNames.Assessment_ReportCards_View)]
     public async Task<ReportDto> GetByStudentTermAsync(Guid studentId, Guid termId, ReportType reportType)
     {
+        // LC-10: a student may only read their own report card.
+        var selfId = await _currentStudent.GetCurrentStudentIdAsync();
+        if (selfId.HasValue && selfId.Value != studentId)
+            throw new UserFriendlyException(AssessmentExceptionCodes.ReportNotFound, "Report not found.");
+
         var report = await _reportRepository
             .GetAll()
             .Include(r => r.Student)
@@ -423,6 +440,12 @@ public class ReportAppService : ApplicationService, IReportAppService
         if (report == null)
             throw new UserFriendlyException(AssessmentExceptionCodes.ReportNotFound, "Report not found.");
 
+        // LC-10: if a student-portal user reaches this, they may only act on
+        // their own report (this is primarily a parent action).
+        var selfId = await _currentStudent.GetCurrentStudentIdAsync();
+        if (selfId.HasValue && selfId.Value != report.StudentId)
+            throw new UserFriendlyException(AssessmentExceptionCodes.ReportNotFound, "Report not found.");
+
         // Parent can only acknowledge a published report
         if (report.Status != ReportStatus.Published)
             throw new UserFriendlyException(AssessmentExceptionCodes.ReportNotPublished,
@@ -534,6 +557,11 @@ public class ReportAppService : ApplicationService, IReportAppService
             .FirstOrDefaultAsync(r => r.Id == id && r.TenantId == AbpSession.TenantId);
 
         if (report == null)
+            throw new UserFriendlyException(AssessmentExceptionCodes.ReportNotFound, "Report not found.");
+
+        // LC-10: a student may only fetch their own report-card PDF.
+        var selfId = await _currentStudent.GetCurrentStudentIdAsync();
+        if (selfId.HasValue && selfId.Value != report.StudentId)
             throw new UserFriendlyException(AssessmentExceptionCodes.ReportNotFound, "Report not found.");
 
         return report.PdfUrl;

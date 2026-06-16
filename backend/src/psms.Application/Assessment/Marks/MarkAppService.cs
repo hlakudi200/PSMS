@@ -31,15 +31,18 @@ public class MarkAppService : ApplicationService, IMarkAppService
     private readonly IRepository<Mark, Guid> _markRepository;
     private readonly IRepository<AssessmentEntity, Guid> _assessmentRepository;
     private readonly IRepository<Student, Guid> _studentRepository;
+    private readonly psms.Academic.Students.ICurrentStudentResolver _currentStudent;
 
     public MarkAppService(
         IRepository<Mark, Guid> markRepository,
         IRepository<AssessmentEntity, Guid> assessmentRepository,
-        IRepository<Student, Guid> studentRepository)
+        IRepository<Student, Guid> studentRepository,
+        psms.Academic.Students.ICurrentStudentResolver currentStudent)
     {
         _markRepository = markRepository;
         _assessmentRepository = assessmentRepository;
         _studentRepository = studentRepository;
+        _currentStudent = currentStudent;
     }
 
     [AbpAuthorize(PermissionNames.Assessment_Marks_View)]
@@ -54,17 +57,26 @@ public class MarkAppService : ApplicationService, IMarkAppService
         if (mark == null)
             throw new UserFriendlyException(AssessmentExceptionCodes.MarkNotFound, "Mark not found.");
 
+        // LC-10: a student may only read their own marks.
+        var selfId = await _currentStudent.GetCurrentStudentIdAsync();
+        if (selfId.HasValue && selfId.Value != mark.StudentId)
+            throw new UserFriendlyException(AssessmentExceptionCodes.MarkNotFound, "Mark not found.");
+
         return ObjectMapper.Map<MarkDto>(mark);
     }
 
     [AbpAuthorize(PermissionNames.Assessment_Marks_View)]
     public async Task<PagedResultDto<MarkListDto>> GetAllAsync(GetMarksInput input)
     {
+        // LC-10: a student-portal user only ever sees their own marks.
+        var selfId = await _currentStudent.GetCurrentStudentIdAsync();
+
         var query = _markRepository
             .GetAll()
             .Include(m => m.Assessment).ThenInclude(a => a.ClassSubject)
             .Include(m => m.Student)
             .Where(m => m.TenantId == AbpSession.TenantId)
+            .WhereIf(selfId.HasValue, m => m.StudentId == selfId.Value)
             .WhereIf(input.AssessmentId.HasValue, m => m.AssessmentId == input.AssessmentId.Value)
             .WhereIf(input.StudentId.HasValue, m => m.StudentId == input.StudentId.Value)
             .WhereIf(input.ClassId.HasValue, m => m.Assessment.ClassSubject.ClassId == input.ClassId.Value)
@@ -93,12 +105,17 @@ public class MarkAppService : ApplicationService, IMarkAppService
     [AbpAuthorize(PermissionNames.Assessment_Marks_View)]
     public async Task<ListResultDto<MarkListDto>> GetByAssessmentAsync(Guid assessmentId)
     {
+        // LC-10: a student sees only their own mark for the assessment, not the
+        // whole class score sheet.
+        var selfId = await _currentStudent.GetCurrentStudentIdAsync();
+
         var items = await _markRepository
             .GetAll()
             .Include(m => m.Assessment)
             .Include(m => m.Student)
             .Where(m => m.TenantId == AbpSession.TenantId)
             .Where(m => m.AssessmentId == assessmentId)
+            .WhereIf(selfId.HasValue, m => m.StudentId == selfId.Value)
             .OrderBy(m => m.Student.LastName)
             .ThenBy(m => m.Student.FirstName)
             .ToListAsync();
@@ -110,6 +127,11 @@ public class MarkAppService : ApplicationService, IMarkAppService
     [AbpAuthorize(PermissionNames.Assessment_Marks_View)]
     public async Task<ListResultDto<MarkListDto>> GetByStudentAsync(Guid studentId, Guid? termId)
     {
+        // LC-10: a student may only read their own marks.
+        var selfId = await _currentStudent.GetCurrentStudentIdAsync();
+        if (selfId.HasValue && selfId.Value != studentId)
+            return new ListResultDto<MarkListDto>(new System.Collections.Generic.List<MarkListDto>());
+
         var items = await _markRepository
             .GetAll()
             .Include(m => m.Assessment)

@@ -25,13 +25,16 @@ public class ReportSubjectAppService : ApplicationService, IReportSubjectAppServ
 {
     private readonly IRepository<ReportSubject, Guid> _reportSubjectRepository;
     private readonly IRepository<Report, Guid> _reportRepository;
+    private readonly psms.Academic.Students.ICurrentStudentResolver _currentStudent;
 
     public ReportSubjectAppService(
         IRepository<ReportSubject, Guid> reportSubjectRepository,
-        IRepository<Report, Guid> reportRepository)
+        IRepository<Report, Guid> reportRepository,
+        psms.Academic.Students.ICurrentStudentResolver currentStudent)
     {
         _reportSubjectRepository = reportSubjectRepository;
         _reportRepository = reportRepository;
+        _currentStudent = currentStudent;
     }
 
     [AbpAuthorize(PermissionNames.Assessment_ReportCards_View)]
@@ -50,6 +53,13 @@ public class ReportSubjectAppService : ApplicationService, IReportSubjectAppServ
             throw new UserFriendlyException(AssessmentExceptionCodes.ReportSubjectNotFound,
                 "Report subject entry not found.");
 
+        // LC-10: a student may only read their own report's subject entries
+        // (scope via the parent Report's StudentId).
+        var selfId = await _currentStudent.GetCurrentStudentIdAsync();
+        if (selfId.HasValue && selfId.Value != reportSubject.Report.StudentId)
+            throw new UserFriendlyException(AssessmentExceptionCodes.ReportSubjectNotFound,
+                "Report subject entry not found.");
+
         return ObjectMapper.Map<ReportSubjectDto>(reportSubject);
     }
 
@@ -57,11 +67,16 @@ public class ReportSubjectAppService : ApplicationService, IReportSubjectAppServ
     public async Task<ListResultDto<ReportSubjectDto>> GetByReportAsync(Guid reportId)
     {
         // Validate report exists and belongs to tenant
-        var reportExists = await _reportRepository
+        var report = await _reportRepository
             .GetAll()
-            .AnyAsync(r => r.Id == reportId && r.TenantId == AbpSession.TenantId);
+            .FirstOrDefaultAsync(r => r.Id == reportId && r.TenantId == AbpSession.TenantId);
 
-        if (!reportExists)
+        if (report == null)
+            throw new UserFriendlyException(AssessmentExceptionCodes.ReportNotFound, "Report not found.");
+
+        // LC-10: a student may only read their own report's subject entries.
+        var selfId = await _currentStudent.GetCurrentStudentIdAsync();
+        if (selfId.HasValue && selfId.Value != report.StudentId)
             throw new UserFriendlyException(AssessmentExceptionCodes.ReportNotFound, "Report not found.");
 
         var items = await _reportSubjectRepository
