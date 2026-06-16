@@ -5,6 +5,8 @@ import {
   IUploadDocument,
   IVerifyDocument,
   IRequiredDocumentsStatus,
+  IRequestDocumentUploadUrl,
+  IFileUploadTicket,
 } from "../shared/interfaces";
 
 export interface IApplicationDocumentStateContext {
@@ -21,11 +23,15 @@ export interface IApplicationDocumentActionContext {
   getAsync: (id: string) => void;
   getAllByApplicationAsync: (applicationId: string) => void;
   getRequiredDocumentsStatusAsync: (applicationId: string) => void;
-  uploadAsync: (input: IUploadDocument) => void;
+  // SF-03 direct upload. Step 1: signed URL. Step 2: PUT to storage. Step 3: record.
+  requestUploadUrlAsync: (input: IRequestDocumentUploadUrl) => Promise<IFileUploadTicket>;
+  uploadFileToStorageAsync: (uploadUrl: string, file: File) => Promise<void>;
+  uploadAsync: (input: IUploadDocument) => Promise<void>;
   deleteAsync: (id: string) => void;
   verifyAsync: (id: string, input: IVerifyDocument) => void;
   rejectAsync: (id: string, reason: string) => void;
-  getDownloadUrlAsync: (id: string) => void;
+  // Returns a short-lived signed URL for the private document, or undefined on error.
+  getDownloadUrlAsync: (id: string) => Promise<string | undefined>;
 }
 
 export const INITIAL_STATE: IApplicationDocumentStateContext = {

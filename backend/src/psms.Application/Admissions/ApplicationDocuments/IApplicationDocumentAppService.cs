@@ -1,6 +1,7 @@
 using Abp.Application.Services;
 using Abp.Application.Services.Dto;
 using psms.Admissions.ApplicationDocuments.Dto;
+using psms.Domain.Shared.Storage;
 using System;
 using System.Threading.Tasks;
 
@@ -28,7 +29,13 @@ public interface IApplicationDocumentAppService : IApplicationService
     Task<RequiredDocumentsStatusDto> GetRequiredDocumentsStatusAsync(Guid applicationId);
 
     /// <summary>
-    /// Uploads a document to an application.
+    /// Step 1 of the direct upload: mints a one-time signed URL for the client
+    /// to PUT the file straight to the private "documents" bucket.
+    /// </summary>
+    Task<FileUploadTicket> RequestUploadUrlAsync(RequestDocumentUploadUrlDto input);
+
+    /// <summary>
+    /// Records a document whose bytes were already uploaded directly to storage.
     /// </summary>
     Task<ApplicationDocumentDto> UploadAsync(UploadDocumentDto input);
 

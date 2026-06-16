@@ -108,11 +108,36 @@ function ParentsSection({ applicationId }: { applicationId: string }) {
 // ─── Documents Tab ─────────────────────────────────────────────
 function DocumentsSection({ applicationId }: { applicationId: string }) {
   const { documents: applicationDocuments, isPending } = useApplicationDocumentState();
-  const { getAllByApplicationAsync } = useApplicationDocumentActions();
+  const { getAllByApplicationAsync, getDownloadUrlAsync } = useApplicationDocumentActions();
+  const [openingId, setOpeningId] = useState<string | null>(null);
 
   useEffect(() => {
     getAllByApplicationAsync(applicationId);
   }, [applicationId, getAllByApplicationAsync]);
+
+  // The documents bucket is private — there is no public link. Fetch a
+  // short-lived signed URL on click and open it. (Opening a blank tab first
+  // and then redirecting it keeps the user gesture so the browser doesn't
+  // block the pop-up while we await the URL.)
+  const handleView = async (id: string) => {
+    setOpeningId(id);
+    // Open the tab synchronously (inside the click gesture) so the browser
+    // doesn't block it while we await the signed URL. NOTE: do NOT pass
+    // "noopener" in the features arg — per spec that makes window.open return
+    // null, and we need the handle to redirect it. We sever opener manually.
+    const tab = window.open('', '_blank');
+    if (tab) tab.opener = null;
+    try {
+      const url = await getDownloadUrlAsync(id);
+      if (url && tab) tab.location.href = url;
+      else {
+        tab?.close();
+        if (!url) message.error('Could not open the document. Please try again.');
+      }
+    } finally {
+      setOpeningId(null);
+    }
+  };
 
   const columns = [
     { title: 'Document', dataIndex: 'documentName', key: 'documentName' },
@@ -134,7 +159,14 @@ function DocumentsSection({ applicationId }: { applicationId: string }) {
     {
       title: '', key: 'action', width: 80,
       render: (_: unknown, r: IApplicationDocument) => (
-        <a href={r.fileUrl} target="_blank" rel="noopener noreferrer">View</a>
+        <Button
+          type="link"
+          size="small"
+          loading={openingId === r.id}
+          onClick={() => handleView(r.id)}
+        >
+          View
+        </Button>
       ),
     },
   ];

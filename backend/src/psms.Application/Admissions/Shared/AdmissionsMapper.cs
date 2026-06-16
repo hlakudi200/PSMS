@@ -123,6 +123,11 @@ public class AdmissionsMapper : Profile
     {
         CreateMap<ApplicationDocument, ApplicationDocumentDto>()
             .ForMember(dest => dest.ApplicationNumber, opt => opt.MapFrom(src => src.Application != null ? src.Application.ApplicationNumber : null))
+            // Don't ship the raw storage object key (held in entity.FileUrl) to
+            // clients — the bucket is private and access is via signed URLs from
+            // GetDownloadUrl. Leaking the internal path serves no purpose and
+            // invites treating it as a clickable link again.
+            .ForMember(dest => dest.FileUrl, opt => opt.Ignore())
             .ForMember(dest => dest.VerifiedByUserName, opt => opt.Ignore()); // Set in service
     }
 
