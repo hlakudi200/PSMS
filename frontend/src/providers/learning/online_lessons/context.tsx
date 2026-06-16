@@ -48,6 +48,8 @@ export interface IOnlineLessonActionContext {
   uploadRecordingAsync: (input: IUploadRecording) => Promise<void>;
   // LC-02: fetch a LiveKit join token (server decides publish vs view-only).
   getJoinTokenAsync: (lessonId: string) => Promise<ILiveClassJoin>;
+  // LC-06: fetch a short-lived signed URL to play a lesson's (private) recording.
+  getRecordingDownloadUrlAsync: (lessonId: string) => Promise<string | undefined>;
 }
 
 export const INITIAL_STATE: IOnlineLessonStateContext = {

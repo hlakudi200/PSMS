@@ -124,8 +124,9 @@ function TeacherHostLessonContent() {
   const router = useRouter();
   const lessonId = params?.id;
 
-  const { getAsync, startAsync, endAsync, cancelAsync } =
+  const { getAsync, startAsync, endAsync, cancelAsync, getRecordingDownloadUrlAsync } =
     useOnlineLessonActions();
+  const [openingRecording, setOpeningRecording] = useState(false);
   const { onlineLesson, isPending, isError } = useOnlineLessonState();
 
   // We need the per-page record to track the *current* lesson without
@@ -583,12 +584,25 @@ function TeacherHostLessonContent() {
                   <Button
                     type="primary"
                     icon={<LinkOutlined />}
-                    onClick={() => {
-                      const url = onlineLesson.recordingUrl;
-                      if (isSafeRecordingUrl(url)) {
-                        window.open(url, '_blank', 'noopener,noreferrer');
-                      } else {
-                        message.error('Unsupported or unsafe recording link.');
+                    loading={openingRecording}
+                    onClick={async () => {
+                      if (!lessonId) return;
+                      // LC-06: recordings are private — fetch a short-lived signed
+                      // URL. Open the tab synchronously (preserve the user gesture),
+                      // then redirect it once the URL resolves.
+                      const tab = window.open('', '_blank');
+                      if (tab) tab.opener = null;
+                      setOpeningRecording(true);
+                      try {
+                        const url = await getRecordingDownloadUrlAsync(lessonId);
+                        if (url && isSafeRecordingUrl(url) && tab) {
+                          tab.location.href = url;
+                        } else {
+                          tab?.close();
+                          message.error('Could not open the recording. Please try again.');
+                        }
+                      } finally {
+                        setOpeningRecording(false);
                       }
                     }}
                   >

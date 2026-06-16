@@ -32,4 +32,10 @@ public interface IOnlineLessonAppService : IApplicationService
     /// hosting teacher gets publish rights; everyone else joins as a viewer.
     /// </summary>
     Task<LiveClassJoinDto> GetJoinTokenAsync(Guid id);
+
+    /// <summary>
+    /// Returns a short-lived signed URL for a lesson's recording (LC-06). The
+    /// recordings bucket is private; external (Zoom/Teams) URLs are returned as-is.
+    /// </summary>
+    Task<string> GetRecordingDownloadUrlAsync(Guid id);
 }
