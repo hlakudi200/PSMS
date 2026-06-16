@@ -11,6 +11,7 @@ import {
   ArrowLeftOutlined,
 } from '@ant-design/icons';
 import { useParams, useRouter } from 'next/navigation';
+import { useWorkflowBasePath } from './useWorkflowBasePath';
 import {
   WorkflowDefinitionProvider,
   useWorkflowDefinitionState,
@@ -33,6 +34,7 @@ const { Title, Text } = Typography;
 function DetailContent() {
   const params = useParams();
   const router = useRouter();
+  const base = useWorkflowBasePath();
   const id = params?.id as string;
   const { definition, isPending: defPending } = useWorkflowDefinitionState();
   const { getAsync: getDefinition } = useWorkflowDefinitionActions();
@@ -175,7 +177,7 @@ function DetailContent() {
     <div style={{ padding: 24 }}>
       <Button
         icon={<ArrowLeftOutlined />}
-        onClick={() => router.push('/admin/workflow/definitions')}
+        onClick={() => router.push(`${base}/definitions`)}
         style={{ marginBottom: 16 }}
       >
         Back to Definitions
