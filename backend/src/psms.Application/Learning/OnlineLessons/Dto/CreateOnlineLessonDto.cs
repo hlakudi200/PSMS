@@ -22,9 +22,13 @@ public class CreateOnlineLessonDto
     [Required]
     public OnlinePlatform Platform { get; set; }
 
-    [Required]
+    /// <summary>
+    /// External meeting URL. Required for external platforms (Zoom/Teams/etc.)
+    /// and validated server-side; omitted for <see cref="OnlinePlatform.InApp"/>
+    /// live classes, where the classroom is hosted inside PSMS and the join
+    /// route is derived from the lesson id (see CreateAsync / LC-01).
+    /// </summary>
     [StringLength(500)]
-    [Url]
     public string MeetingLink { get; set; }
 
     [StringLength(100)]

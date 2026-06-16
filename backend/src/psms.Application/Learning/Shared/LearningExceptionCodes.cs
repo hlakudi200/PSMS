@@ -52,4 +52,7 @@ public static class LearningExceptionCodes
     // Direct-upload reference (object key) failed validation — it didn't
     // belong to this tenant/lesson, or the file wasn't found in storage.
     public const string InvalidRecordingUpload = "LRN_INVALID_RECORDING_UPLOAD";
+    // LC-01 in-app live classroom: the lesson isn't an in-app live class, the
+    // class hasn't started yet (for students), or LiveKit isn't configured.
+    public const string LiveClassNotAvailable = "LRN_LIVE_CLASS_NOT_AVAILABLE";
 }
