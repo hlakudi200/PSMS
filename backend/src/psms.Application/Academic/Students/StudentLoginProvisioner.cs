@@ -6,6 +6,7 @@ using Abp.Dependency;
 using Abp.IdentityFramework;
 using Abp.Localization;
 using Abp.Runtime.Session;
+using psms.Authorization;
 using psms.Authorization.Roles;
 using psms.Authorization.Users;
 using psms.Domain.Academic.Entities;
@@ -35,15 +36,18 @@ public class StudentLoginProvisioner : IStudentLoginProvisioner
     private readonly UserManager _userManager;
     private readonly ILocalizationManager _localizationManager;
     private readonly IAbpSession _abpSession;
+    private readonly PsmsRolePermissionSeeder _rolePermissionSeeder;
 
     public StudentLoginProvisioner(
         UserManager userManager,
         ILocalizationManager localizationManager,
-        IAbpSession abpSession)
+        IAbpSession abpSession,
+        PsmsRolePermissionSeeder rolePermissionSeeder)
     {
         _userManager = userManager;
         _localizationManager = localizationManager;
         _abpSession = abpSession;
+        _rolePermissionSeeder = rolePermissionSeeder;
     }
 
     /// <summary>
@@ -78,6 +82,13 @@ public class StudentLoginProvisioner : IStudentLoginProvisioner
         };
 
         (await _userManager.CreateAsync(user, tempPassword)).CheckErrors(_localizationManager);
+
+        // LC-09: a tenant created before the Student role was seeded would lack
+        // it, making the SetRoles below fail and roll back the whole student
+        // create. Ensure it exists (idempotent) first so provisioning is robust
+        // across every tenant, not just freshly-seeded ones.
+        await _rolePermissionSeeder.EnsureStudentRoleExistsAsync();
+
         (await _userManager.SetRolesAsync(user, new[] { StaticRoleNames.Tenants.Student }))
             .CheckErrors(_localizationManager);
 
