@@ -24,6 +24,7 @@ import {
   SwapOutlined,
   EnvironmentOutlined,
   ShoppingOutlined,
+  PartitionOutlined,
 } from '@ant-design/icons';
 import LayoutShell from '@/components/shared/LayoutShell';
 import { roleColors } from '@/utils/theme-config';
@@ -85,6 +86,7 @@ const menuItems = [
     type: 'group' as const,
     label: 'Operations',
     children: [
+      { key: '/principal/workflow', icon: <PartitionOutlined />, label: 'Workflows' },
       { key: '/principal/disciplinary', icon: <WarningOutlined />, label: 'Disciplinary' },
       { key: '/principal/student-transfers', icon: <SwapOutlined />, label: 'Transfers' },
       { key: '/principal/staff-leave', icon: <CalendarOutlined />, label: 'Staff Leave' },

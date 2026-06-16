@@ -28,12 +28,14 @@ import {
   WorkflowEntityTypeLabels,
 } from '@/providers/workflow/shared/interfaces';
 import { useRouter } from 'next/navigation';
+import { useWorkflowBasePath } from './useWorkflowBasePath';
 
 function InstancesContent() {
   const { instances, totalCount, isPending, isError } = useWorkflowInstanceState();
   const { getAllAsync, cancelAsync, recallAsync, batchAdvanceAsync, getOverdueAsync, getPendingForRoleAsync } = useWorkflowInstanceActions();
   const { currentRole } = useAuthState();
   const router = useRouter();
+  const base = useWorkflowBasePath();
   const [startModalOpen, setStartModalOpen] = useState(false);
   const [advanceModalOpen, setAdvanceModalOpen] = useState(false);
   const [selectedInstance, setSelectedInstance] = useState<IWorkflowInstanceList | null>(null);
@@ -161,7 +163,7 @@ function InstancesContent() {
       key: 'view',
       label: 'View Details',
       icon: <EyeOutlined />,
-      onClick: (record) => router.push(`/admin/workflow/instances/${record.id}`),
+      onClick: (record) => router.push(`${base}/instances/${record.id}`),
     },
     {
       key: 'advance',

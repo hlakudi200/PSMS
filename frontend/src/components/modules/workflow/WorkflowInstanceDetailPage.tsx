@@ -12,6 +12,7 @@ import {
   ClockCircleOutlined,
 } from '@ant-design/icons';
 import { useParams, useRouter } from 'next/navigation';
+import { useWorkflowBasePath } from './useWorkflowBasePath';
 import {
   WorkflowInstanceProvider,
   useWorkflowInstanceState,
@@ -51,6 +52,7 @@ const actionColors: Record<number, string> = {
 function DetailContent() {
   const params = useParams();
   const router = useRouter();
+  const base = useWorkflowBasePath();
   const id = params?.id as string;
   const { instance: wfInstance, isPending } = useWorkflowInstanceState();
   const { getAsync, cancelAsync, recallAsync } = useWorkflowInstanceActions();
@@ -82,7 +84,7 @@ function DetailContent() {
     <div style={{ padding: 24 }}>
       <Button
         icon={<ArrowLeftOutlined />}
-        onClick={() => router.push('/admin/workflow/instances')}
+        onClick={() => router.push(`${base}/instances`)}
         style={{ marginBottom: 16 }}
       >
         Back to Instances

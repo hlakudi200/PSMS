@@ -11,12 +11,14 @@ import { WorkflowDefinitionFormModal } from '@/components/modals/workflow/Workfl
 import type { IWorkflowDefinitionList } from '@/providers/workflow/shared/interfaces';
 import { WorkflowEntityTypeLabels } from '@/providers/workflow/shared/interfaces';
 import { useRouter } from 'next/navigation';
+import { useWorkflowBasePath } from './useWorkflowBasePath';
 
 function DefinitionsContent() {
   const { definitions, totalCount, isPending, isError } = useWorkflowDefinitionState();
   const { getAllAsync, deleteAsync, activateAsync, deactivateAsync } = useWorkflowDefinitionActions();
   const { currentRole } = useAuthState();
   const router = useRouter();
+  const base = useWorkflowBasePath();
   const [modalOpen, setModalOpen] = useState(false);
   const [editRecord, setEditRecord] = useState<IWorkflowDefinitionList | null>(null);
   const [lastQuery, setLastQuery] = useState<TableQuery | null>(null);
@@ -86,7 +88,7 @@ function DefinitionsContent() {
       key: 'view',
       label: 'View Details',
       icon: <EyeOutlined />,
-      onClick: (record) => router.push(`/admin/workflow/definitions/${record.id}`),
+      onClick: (record) => router.push(`${base}/definitions/${record.id}`),
     },
     {
       key: 'edit',
@@ -125,7 +127,9 @@ function DefinitionsContent() {
       label: 'Delete',
       icon: <DeleteOutlined />,
       danger: true,
-      requiredPermissions: ['Admin'],
+      // Principal/VP hold Workflow.Definitions.Delete (WF-01 full config), so the
+      // UI mirrors that rather than restricting delete to Admin alone.
+      requiredPermissions: ['Admin', 'Principal'],
       confirm: { title: 'Delete this definition?', description: 'This cannot be undone. Definitions with active instances cannot be deleted.' },
       onClick: async (record) => {
         await deleteAsync(record.id);

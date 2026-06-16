@@ -11,6 +11,7 @@ import {
   RightOutlined,
 } from '@ant-design/icons';
 import { useRouter } from 'next/navigation';
+import { useWorkflowBasePath } from './useWorkflowBasePath';
 import {
   WorkflowDashboardProvider,
   useWorkflowDashboardState,
@@ -28,6 +29,7 @@ function DashboardContent() {
   const { dashboard, recentActivity, isPending } = useWorkflowDashboardState();
   const { getDashboardAsync, getRecentActivityAsync } = useWorkflowDashboardActions();
   const router = useRouter();
+  const base = useWorkflowBasePath();
 
   useEffect(() => {
     getDashboardAsync();
@@ -178,7 +180,7 @@ function DashboardContent() {
             children: (
               <div
                 style={{ cursor: 'pointer' }}
-                onClick={() => router.push(`/admin/workflow/instances/${activity.workflowInstanceId}`)}
+                onClick={() => router.push(`${base}/instances/${activity.workflowInstanceId}`)}
               >
                 <Tag color={actionColors[activity.action]}>
                   {WorkflowActionTypeLabels[activity.action] ?? activity.action}
