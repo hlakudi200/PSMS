@@ -15,6 +15,7 @@ import {
   IRequestRecordingUploadUrl,
   IFileUploadTicket,
   ILiveClassJoin,
+  ILiveClassAttendance,
 } from "../shared/interfaces";
 import { OnlineLessonReducer } from "./reducer";
 import { useContext, useReducer } from "react";
@@ -324,6 +325,21 @@ export const OnlineLessonProvider = ({
         }
     };
 
+    // LC-05: distinct attendee roll-call. Host/staff only — students are denied
+    // server-side (returns undefined here so callers render an empty state).
+    const getLiveAttendanceAsync = async (
+        lessonId: string
+    ): Promise<ILiveClassAttendance | undefined> => {
+        const endpoint = `/api/services/app/OnlineLesson/GetLiveAttendance?id=${lessonId}`;
+        try {
+            const response = await instance.get(endpoint);
+            return response.data.result as ILiveClassAttendance;
+        } catch (error) {
+            console.error(error);
+            return undefined;
+        }
+    };
+
   return (
     <OnlineLessonStateContext.Provider value={state}>
       <OnlineLessonActionContext.Provider
@@ -345,6 +361,7 @@ export const OnlineLessonProvider = ({
           uploadRecordingAsync,
           getJoinTokenAsync,
           getRecordingDownloadUrlAsync,
+          getLiveAttendanceAsync,
         }}
       >
         {children}

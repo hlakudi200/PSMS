@@ -130,6 +130,19 @@ export interface IPagedAndSortedResultRequest {
     canPublish: boolean;
   }
 
+  // LC-05: distinct attendee roll-call for an in-app live class.
+  export interface ILiveClassAttendee {
+    identity: string;
+    displayName?: string;
+    firstJoinedAt: string;
+    lastLeftAt?: string;
+  }
+
+  export interface ILiveClassAttendance {
+    distinctAttendeeCount: number;
+    attendees: ILiveClassAttendee[];
+  }
+
   // Posted after the new version's file has been uploaded directly to storage.
   export interface IUploadNewVersion {
     learningMaterialId: string;

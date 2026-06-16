@@ -12,6 +12,7 @@ import {
   IRequestRecordingUploadUrl,
   IFileUploadTicket,
   ILiveClassJoin,
+  ILiveClassAttendance,
 } from "../shared/interfaces";
 
 export interface IOnlineLessonStateContext {
@@ -50,6 +51,8 @@ export interface IOnlineLessonActionContext {
   getJoinTokenAsync: (lessonId: string) => Promise<ILiveClassJoin>;
   // LC-06: fetch a short-lived signed URL to play a lesson's (private) recording.
   getRecordingDownloadUrlAsync: (lessonId: string) => Promise<string | undefined>;
+  // LC-05: fetch the distinct attendee roll-call (host/staff only).
+  getLiveAttendanceAsync: (lessonId: string) => Promise<ILiveClassAttendance | undefined>;
 }
 
 export const INITIAL_STATE: IOnlineLessonStateContext = {

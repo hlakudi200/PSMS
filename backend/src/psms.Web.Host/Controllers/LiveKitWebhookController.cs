@@ -1,13 +1,17 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
+using System.Transactions;
 using Abp.Domain.Repositories;
 using Abp.Domain.Uow;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using psms.Controllers;
 using psms.Domain.Learning.Entities;
+using psms.Domain.Shared.Enums;
 using psms.Domain.Shared.Storage;
 using psms.Domain.Shared.LiveStreaming;
 
@@ -27,19 +31,27 @@ public class LiveKitWebhookController : psmsControllerBase
 {
     private const string RecordingsBucket = "recordings";
 
+    // Mirror of the EndAsync cap in OnlineLessonAppService: an attendee count
+    // beyond this is treated as poisoned reporting data, so the webhook clamps
+    // its live head-count to the same ceiling.
+    private const int MaxWebhookAttendeeCount = 1000;
+
     private readonly ILiveKitTokenService _liveKit;
     private readonly IRepository<OnlineLesson, Guid> _lessonRepository;
+    private readonly IRepository<LiveClassAttendance, Guid> _attendanceRepository;
     private readonly IFileStorageService _fileStorage;
     private readonly IUnitOfWorkManager _unitOfWorkManager;
 
     public LiveKitWebhookController(
         ILiveKitTokenService liveKit,
         IRepository<OnlineLesson, Guid> lessonRepository,
+        IRepository<LiveClassAttendance, Guid> attendanceRepository,
         IFileStorageService fileStorage,
         IUnitOfWorkManager unitOfWorkManager)
     {
         _liveKit = liveKit;
         _lessonRepository = lessonRepository;
+        _attendanceRepository = attendanceRepository;
         _fileStorage = fileStorage;
         _unitOfWorkManager = unitOfWorkManager;
     }
@@ -63,14 +75,20 @@ public class LiveKitWebhookController : psmsControllerBase
         {
             string evt;
             Guid? lessonId;
-            int num;
-            bool hasNum;
+            string participantIdentity = null;
+            string participantName = null;
             using (var doc = JsonDocument.Parse(body))
             {
                 var root = doc.RootElement;
                 evt = root.TryGetProperty("event", out var e) ? e.GetString() : null;
                 lessonId = ParseLessonId(ExtractRoomName(root));
-                hasNum = TryGetNumParticipants(root, out num);
+                if (root.TryGetProperty("participant", out var p))
+                {
+                    if (p.TryGetProperty("identity", out var pi) && pi.ValueKind == JsonValueKind.String)
+                        participantIdentity = pi.GetString();
+                    if (p.TryGetProperty("name", out var pn) && pn.ValueKind == JsonValueKind.String)
+                        participantName = pn.GetString();
+                }
             }
 
             if (lessonId == null) return Ok(); // not one of our in-app classes
@@ -86,8 +104,8 @@ public class LiveKitWebhookController : psmsControllerBase
                     break;
                 case "participant_joined":
                 case "participant_left":
-                    if (hasNum)
-                        await UpdateAttendanceAsync(lessonId.Value, num);
+                    if (!string.IsNullOrEmpty(participantIdentity))
+                        await RecordAttendanceAsync(lessonId.Value, evt, participantIdentity, participantName);
                     break;
             }
         }
@@ -124,19 +142,94 @@ public class LiveKitWebhookController : psmsControllerBase
         }
     }
 
-    /// <summary>Track the peak concurrent participant count as the attendee count.</summary>
-    private async Task UpdateAttendanceAsync(Guid lessonId, int numParticipants)
+    /// <summary>
+    /// LC-05: record DISTINCT attendance. One row per (lesson, participant);
+    /// participant_joined creates/refreshes the row, participant_left stamps the
+    /// leave time. While the lesson is live, the lesson's AttendeeCount mirrors
+    /// the distinct attendee count (a true roll-call, not peak-concurrent).
+    /// </summary>
+    private async Task RecordAttendanceAsync(Guid lessonId, string evt, string identity, string name)
     {
+        var isLeave = evt == "participant_left";
+
         using (_unitOfWorkManager.Current.DisableFilter(AbpDataFilters.MayHaveTenant))
         {
             var lesson = await _lessonRepository.FirstOrDefaultAsync(lessonId);
             if (lesson == null) return;
 
-            var peak = Math.Max(lesson.AttendeeCount ?? 0, numParticipants);
-            if (peak == (lesson.AttendeeCount ?? 0)) return; // no change
-            lesson.AttendeeCount = peak;
+            var now = DateTime.UtcNow;
+            var row = await _attendanceRepository.FirstOrDefaultAsync(
+                a => a.OnlineLessonId == lessonId && a.ParticipantIdentity == identity);
+
+            if (row == null)
+            {
+                // A leave with no prior join means we never recorded this
+                // participant joining (dropped/late join webhook, or a leave
+                // burst from the room closing after the lesson ended). Don't
+                // fabricate a zero-duration attendee — it would inflate the
+                // distinct head-count this feature exists to get right.
+                if (isLeave)
+                {
+                    await UpdateLiveAttendeeCountAsync(lesson, lessonId);
+                    await _unitOfWorkManager.Current.SaveChangesAsync();
+                    return;
+                }
+
+                // Insert the first-join row in an ISOLATED unit of work. A
+                // concurrent first-join for the SAME participant loses the
+                // unique-index (OnlineLessonId, ParticipantIdentity) race; doing
+                // it here means that failure stays in the nested DbContext and
+                // never poisons ours. We then fall through to update the winning
+                // row, so concurrent joins converge instead of 500-ing.
+                try
+                {
+                    using (var uow = _unitOfWorkManager.Begin(new UnitOfWorkOptions
+                    {
+                        Scope = TransactionScopeOption.RequiresNew,
+                    }))
+                    {
+                        // Begin() makes the nested UoW the ambient Current one.
+                        using (_unitOfWorkManager.Current.DisableFilter(AbpDataFilters.MayHaveTenant))
+                        {
+                            await _attendanceRepository.InsertAsync(new LiveClassAttendance(
+                                Guid.NewGuid(), lesson.TenantId, lessonId, identity, name, now));
+                            await uow.CompleteAsync();
+                        }
+                    }
+                }
+                catch (DbUpdateException)
+                {
+                    // Lost the race — the winning request created the row.
+                }
+
+                row = await _attendanceRepository.FirstOrDefaultAsync(
+                    a => a.OnlineLessonId == lessonId && a.ParticipantIdentity == identity);
+            }
+
+            if (row != null)
+            {
+                if (!string.IsNullOrEmpty(name)) row.DisplayName = name;
+                row.LastLeftAt = isLeave ? now : (DateTime?)null; // a join clears a stale leave
+            }
+
+            await UpdateLiveAttendeeCountAsync(lesson, lessonId);
             await _unitOfWorkManager.Current.SaveChangesAsync();
         }
+    }
+
+    /// <summary>
+    /// Mirror the live distinct head-count onto the lesson — but ONLY while it
+    /// is in progress. Once the teacher ends the lesson they confirm an
+    /// authoritative figure (EndAsync); trailing participant_left webhooks from
+    /// the room closing must not silently overwrite it. Clamped to the same
+    /// ceiling EndAsync enforces.
+    /// </summary>
+    private async Task UpdateLiveAttendeeCountAsync(OnlineLesson lesson, Guid lessonId)
+    {
+        if (lesson.Status != OnlineLessonStatus.InProgress) return;
+        var distinct = await _attendanceRepository
+            .GetAll().CountAsync(a => a.OnlineLessonId == lessonId);
+        lesson.AttendeeCount = Math.Min(distinct, MaxWebhookAttendeeCount);
     }
 
     private static string ExtractRoomName(JsonElement root)
@@ -159,12 +252,5 @@ public class LiveKitWebhookController : psmsControllerBase
         return Guid.TryParse(roomName.Substring(prefix.Length), out var id) ? id : (Guid?)null;
     }
 
-    private static bool TryGetNumParticipants(JsonElement root, out int num)
-    {
-        num = 0;
-        return root.TryGetProperty("room", out var room)
-            && room.TryGetProperty("numParticipants", out var n)
-            && n.TryGetInt32(out num);
-    }
 }
 }

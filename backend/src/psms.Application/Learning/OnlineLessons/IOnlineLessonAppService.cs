@@ -38,4 +38,10 @@ public interface IOnlineLessonAppService : IApplicationService
     /// recordings bucket is private; external (Zoom/Teams) URLs are returned as-is.
     /// </summary>
     Task<string> GetRecordingDownloadUrlAsync(Guid id);
+
+    /// <summary>
+    /// Returns the distinct attendee roll-call for a live class (LC-05).
+    /// Host-teacher/staff only — not exposed to the student portal.
+    /// </summary>
+    Task<LiveClassAttendanceDto> GetLiveAttendanceAsync(Guid id);
 }
