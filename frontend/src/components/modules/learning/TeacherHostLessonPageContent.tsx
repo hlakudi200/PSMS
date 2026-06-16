@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import {
   Alert,
@@ -31,7 +31,9 @@ import {
   CopyOutlined,
   LinkOutlined,
   PlayCircleOutlined,
+  ReloadOutlined,
   StopOutlined,
+  TeamOutlined,
   VideoCameraOutlined,
 } from '@ant-design/icons';
 import {
@@ -41,6 +43,19 @@ import {
 } from '@/providers/learning/online_lessons';
 import { ONLINE_LESSON_STATUS } from '@/providers/learning/shared/online-lesson-status';
 import { RecordingUploadModal } from '@/components/modals/learning/RecordingUploadModal';
+import type { ILiveClassAttendance } from '@/providers/learning/shared/interfaces';
+
+function formatClock(iso?: string): string {
+  if (!iso) return '—';
+  try {
+    return new Date(iso).toLocaleTimeString('en-ZA', {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  } catch {
+    return '—';
+  }
+}
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -124,10 +139,21 @@ function TeacherHostLessonContent() {
   const router = useRouter();
   const lessonId = params?.id;
 
-  const { getAsync, startAsync, endAsync, cancelAsync, getRecordingDownloadUrlAsync } =
-    useOnlineLessonActions();
+  const {
+    getAsync,
+    startAsync,
+    endAsync,
+    cancelAsync,
+    getRecordingDownloadUrlAsync,
+    getLiveAttendanceAsync,
+  } = useOnlineLessonActions();
   const [openingRecording, setOpeningRecording] = useState(false);
   const { onlineLesson, isPending, isError } = useOnlineLessonState();
+
+  // LC-05: distinct attendee roll-call (host/staff only). Fed by LiveKit
+  // participant webhooks; the count is a true headcount, not peak-concurrent.
+  const [roster, setRoster] = useState<ILiveClassAttendance | null>(null);
+  const [rosterLoading, setRosterLoading] = useState(false);
 
   // We need the per-page record to track the *current* lesson without
   // having to reload on every action — startAsync/endAsync set
@@ -158,6 +184,30 @@ function TeacherHostLessonContent() {
     const handle = setInterval(() => setNow(Date.now()), 10_000);
     return () => clearInterval(handle);
   }, []);
+
+  const loadRoster = useCallback(async (): Promise<ILiveClassAttendance | null> => {
+    if (!lessonId) return null;
+    setRosterLoading(true);
+    try {
+      const r = await getLiveAttendanceAsync(lessonId);
+      setRoster(r ?? null);
+      return r ?? null;
+    } finally {
+      setRosterLoading(false);
+    }
+  }, [lessonId, getLiveAttendanceAsync]);
+
+  // Pull the roll-call once the lesson is loaded and it's live or completed —
+  // a scheduled lesson has nobody yet. Refresh on a slow tick while live.
+  const lessonStatus = onlineLesson?.status;
+  useEffect(() => {
+    if (
+      lessonStatus === ONLINE_LESSON_STATUS.InProgress ||
+      lessonStatus === ONLINE_LESSON_STATUS.Completed
+    ) {
+      loadRoster();
+    }
+  }, [lessonStatus, loadRoster]);
 
   const status = onlineLesson?.status;
   const scheduledStartMs = onlineLesson?.scheduledStartTime
@@ -399,7 +449,20 @@ function TeacherHostLessonContent() {
                 type="primary"
                 danger
                 icon={<StopOutlined />}
-                onClick={() => setEndModalOpen(true)}
+                onClick={() => {
+                  // LC-05: seed the attendee count from the auto roll-call so
+                  // the teacher confirms a real figure instead of guessing.
+                  // Seed from the freshly-resolved roster (not the possibly-stale
+                  // render closure) and only when the teacher hasn't typed yet.
+                  setEndModalOpen(true);
+                  loadRoster().then((r) => {
+                    if (r) {
+                      setAttendeeCount((prev) =>
+                        prev == null ? r.distinctAttendeeCount : prev
+                      );
+                    }
+                  });
+                }}
                 disabled={actionPending != null && actionPending !== 'end'}
                 aria-label="End lesson"
               >
@@ -564,6 +627,60 @@ function TeacherHostLessonContent() {
             />
           )}
 
+          {/* LC-05: distinct attendee roll-call — only meaningful once the
+              class has run. Driven by LiveKit join/leave webhooks. */}
+          {(isLive ||
+            onlineLesson.status === ONLINE_LESSON_STATUS.Completed) && (
+            <Card
+              variant="borderless"
+              style={{ marginTop: 12 }}
+              title={
+                <Space>
+                  <TeamOutlined />
+                  <span>Roll-call</span>
+                  {roster && (
+                    <Tag color="blue">{roster.distinctAttendeeCount} attended</Tag>
+                  )}
+                </Space>
+              }
+              extra={
+                <Tooltip title="Refresh roll-call">
+                  <Button
+                    size="small"
+                    type="text"
+                    icon={<ReloadOutlined />}
+                    loading={rosterLoading}
+                    onClick={loadRoster}
+                    aria-label="Refresh roll-call"
+                  />
+                </Tooltip>
+              }
+            >
+              {rosterLoading && !roster ? (
+                <Skeleton active paragraph={{ rows: 2 }} />
+              ) : roster && roster.attendees.length > 0 ? (
+                <Space direction="vertical" style={{ width: '100%' }} size={4}>
+                  {roster.attendees.map((a) => (
+                    <Row key={a.identity} justify="space-between" wrap={false}>
+                      <Text ellipsis style={{ maxWidth: '60%' }}>
+                        {a.displayName || a.identity}
+                      </Text>
+                      <Text type="secondary" style={{ fontSize: 12 }}>
+                        {formatClock(a.firstJoinedAt)}
+                        {a.lastLeftAt ? ` – ${formatClock(a.lastLeftAt)}` : ' · present'}
+                      </Text>
+                    </Row>
+                  ))}
+                </Space>
+              ) : (
+                <Text type="secondary">
+                  No attendees recorded yet. Names appear as students join the
+                  in-app class.
+                </Text>
+              )}
+            </Card>
+          )}
+
           {/* Recording upload — only meaningful on Completed lessons per
               OL-003. We show the upload button OR the playback card based
               on whether a recording is already attached. */}
@@ -669,6 +786,14 @@ function TeacherHostLessonContent() {
           Enter the number of students who attended this lesson. This action
           cannot be undone.
         </Paragraph>
+        {roster && (
+          <Paragraph type="secondary" style={{ fontSize: 13 }}>
+            The in-app roll-call recorded{' '}
+            <Text strong>{roster.distinctAttendeeCount}</Text> distinct
+            attendee{roster.distinctAttendeeCount === 1 ? '' : 's'} — pre-filled
+            below. Adjust if students also joined another way.
+          </Paragraph>
+        )}
         <InputNumber
           min={0}
           max={MAX_ATTENDEE_COUNT}

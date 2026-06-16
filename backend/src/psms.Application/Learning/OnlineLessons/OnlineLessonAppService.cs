@@ -36,6 +36,7 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
     private readonly IRepository<Teacher, Guid> _teacherRepository;
     private readonly IRepository<Student, Guid> _studentRepository;
     private readonly IRepository<User, long> _userRepository;
+    private readonly IRepository<LiveClassAttendance, Guid> _attendanceRepository;
     private readonly IFileStorageService _fileStorage;
     private readonly ILiveKitTokenService _liveKit;
 
@@ -66,6 +67,7 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
         IRepository<Teacher, Guid> teacherRepository,
         IRepository<Student, Guid> studentRepository,
         IRepository<User, long> userRepository,
+        IRepository<LiveClassAttendance, Guid> attendanceRepository,
         IFileStorageService fileStorage,
         ILiveKitTokenService liveKit)
     {
@@ -74,6 +76,7 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
         _teacherRepository = teacherRepository;
         _studentRepository = studentRepository;
         _userRepository = userRepository;
+        _attendanceRepository = attendanceRepository;
         _fileStorage = fileStorage;
         _liveKit = liveKit;
     }
@@ -777,6 +780,54 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
 
         return await _fileStorage.CreateSignedDownloadUrlAsync(
             RecordingsBucket, objectKey, RecordingUrlExpirySeconds);
+    }
+
+    /// <summary>
+    /// LC-05: distinct attendee roll-call for a live class. This is a teaching
+    /// record (who attended, when) — restricted to the host teacher and staff;
+    /// students may not read the roster of their peers.
+    /// </summary>
+    [AbpAuthorize(PermissionNames.Learning_Lessons_View)]
+    public async Task<LiveClassAttendanceDto> GetLiveAttendanceAsync(Guid id)
+    {
+        var lesson = await _onlineLessonRepository
+            .GetAll()
+            .Include(ol => ol.ClassSubject)
+            .FirstOrDefaultAsync(ol => ol.Id == id && ol.TenantId == AbpSession.TenantId);
+        if (lesson == null)
+            throw new UserFriendlyException(LearningExceptionCodes.OnlineLessonNotFound,
+                "Online lesson not found.");
+
+        // Roster is a teaching record (identities + join/leave times of minors)
+        // — restrict to staff and the host. Both Student AND Parent hold
+        // Lessons.View, so the [AbpAuthorize(View)] attribute is NOT sufficient
+        // to keep them out. Gate on the manage-lessons right (Lessons.Schedule),
+        // which only staff roles (Teacher/HOD/Principal/VicePrincipal/Admin)
+        // hold — an allow-list, so a new external role can't leak in by default.
+        var teacherId = await ResolveCurrentTeacherIdOrNullAsync();
+        var isHost = (teacherId.HasValue && lesson.ClassSubject?.TeacherId == teacherId.Value)
+                     || (AbpSession.UserId.HasValue && lesson.HostTeacherUserId == AbpSession.UserId.Value);
+        if (!isHost && !await PermissionChecker.IsGrantedAsync(PermissionNames.Learning_Lessons_Schedule))
+            throw new UserFriendlyException(LearningExceptionCodes.OnlineLessonNotFound,
+                "Online lesson not found.");
+
+        var rows = await _attendanceRepository
+            .GetAll()
+            .Where(a => a.OnlineLessonId == id)
+            .OrderBy(a => a.FirstJoinedAt)
+            .ToListAsync();
+
+        return new LiveClassAttendanceDto
+        {
+            DistinctAttendeeCount = rows.Count,
+            Attendees = rows.Select(a => new LiveClassAttendeeDto
+            {
+                Identity = a.ParticipantIdentity,
+                DisplayName = a.DisplayName,
+                FirstJoinedAt = a.FirstJoinedAt,
+                LastLeftAt = a.LastLeftAt,
+            }).ToList(),
+        };
     }
 
     #region Private Methods

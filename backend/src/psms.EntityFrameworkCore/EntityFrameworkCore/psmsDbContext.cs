@@ -251,6 +251,11 @@ public class psmsDbContext : AbpZeroDbContext<Tenant, Role, User, psmsDbContext>
     /// </summary>
     public DbSet<OnlineLesson> OnlineLessons { get; set; }
 
+    /// <summary>
+    /// Per-participant live-class attendance rows (LC-05).
+    /// </summary>
+    public DbSet<LiveClassAttendance> LiveClassAttendances { get; set; }
+
     /* ==================== Communication Module ==================== */
 
     /// <summary>
@@ -464,6 +469,12 @@ public class psmsDbContext : AbpZeroDbContext<Tenant, Role, User, psmsDbContext>
             .HasIndex(ss => new { ss.StudentId, ss.SubjectId, ss.AcademicYearId })
             .IsUnique()
             .HasDatabaseName("IX_StudentSubjects_StudentId_SubjectId_AcademicYearId");
+
+        // LiveClassAttendance - one distinct attendance row per (lesson, participant) (LC-05)
+        modelBuilder.Entity<LiveClassAttendance>()
+            .HasIndex(a => new { a.OnlineLessonId, a.ParticipantIdentity })
+            .IsUnique()
+            .HasDatabaseName("IX_LiveClassAttendances_OnlineLessonId_ParticipantIdentity");
 
         // Attendance - one record per student per day
         modelBuilder.Entity<Attendance>()
