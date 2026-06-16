@@ -1,6 +1,11 @@
 using Abp.Authorization;
 using Abp.Dependency;
+using Abp.Domain.Uow;
+using Abp.IdentityFramework;
+using Abp.Localization;
+using Abp.Runtime.Session;
 using psms.Authorization.Roles;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -15,11 +20,65 @@ public class PsmsRolePermissionSeeder : ITransientDependency
 {
     private readonly RoleManager _roleManager;
     private readonly IPermissionManager _permissionManager;
+    private readonly ILocalizationManager _localizationManager;
+    private readonly IAbpSession _abpSession;
+    private readonly IUnitOfWorkManager _unitOfWorkManager;
 
-    public PsmsRolePermissionSeeder(RoleManager roleManager, IPermissionManager permissionManager)
+    public PsmsRolePermissionSeeder(
+        RoleManager roleManager,
+        IPermissionManager permissionManager,
+        ILocalizationManager localizationManager,
+        IAbpSession abpSession,
+        IUnitOfWorkManager unitOfWorkManager)
     {
         _roleManager = roleManager;
         _permissionManager = permissionManager;
+        _localizationManager = localizationManager;
+        _abpSession = abpSession;
+        _unitOfWorkManager = unitOfWorkManager;
+    }
+
+    /// <summary>
+    /// LC-09: ensure the Student role exists for the CURRENT tenant, creating it
+    /// (with its default permissions) if missing. Static roles are seeded at
+    /// tenant-creation time, so a tenant provisioned before the Student role
+    /// existed (and never re-seeded) would lack it — and student provisioning
+    /// (SetRoles "Student") would then fail and roll back the student create.
+    ///
+    /// When the role already exists this is a no-op, so a tenant's tuned grants
+    /// are never disturbed. The create path is a one-time backfill per tenant
+    /// (every later provision hits the fast path), and tolerates a concurrent
+    /// first-provision racing to create the same role.
+    /// </summary>
+    public async Task EnsureStudentRoleExistsAsync()
+    {
+        var roleName = StaticRoleNames.Tenants.Student;
+
+        var role = _roleManager.Roles.FirstOrDefault(r => r.Name == roleName);
+        if (role != null)
+            return; // already present — leave its (possibly customised) grants alone
+
+        role = new Role(_abpSession.TenantId, roleName, roleName) { IsStatic = true };
+        try
+        {
+            (await _roleManager.CreateAsync(role)).CheckErrors(_localizationManager);
+        }
+        catch (Exception) when (_roleManager.Roles.Any(r => r.Name == roleName))
+        {
+            // A concurrent first-provision created the role just before us — reuse
+            // it rather than failing the student create. (Once the role exists,
+            // this whole method short-circuits at the check above.)
+            return;
+        }
+
+        // Flush so the new role gets its Id before we attach permission rows to it
+        // — mirrors TenantAppService's "save to get static role ids" ordering.
+        await _unitOfWorkManager.Current.SaveChangesAsync();
+
+        var permissionsToGrant = _permissionManager.GetAllPermissions()
+            .Where(p => GetStudentPermissions().Contains(p.Name))
+            .ToList();
+        await _roleManager.SetGrantedPermissionsAsync(role, permissionsToGrant);
     }
 
     /// <summary>
