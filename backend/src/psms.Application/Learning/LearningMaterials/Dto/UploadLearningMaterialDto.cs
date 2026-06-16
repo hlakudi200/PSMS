@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Http;
 using psms.Domain.Shared.Enums;
 using System;
 using System.ComponentModel.DataAnnotations;
@@ -6,11 +5,11 @@ using System.ComponentModel.DataAnnotations;
 namespace psms.Learning.LearningMaterials.Dto;
 
 /// <summary>
-/// DTO for uploading a learning material file together with its metadata.
-/// File validation follows business rule LM-001:
-///  - documents (PDF/DOC/DOCX/PPT/PPTX/XLS/XLSX/TXT/ZIP) and images: ≤ 50 MB
-///  - audio: ≤ 50 MB
-///  - video (MP4/MOV/AVI/WEBM): ≤ 500 MB
+/// DTO that records a learning material after its file has been uploaded
+/// directly to storage (the client first calls RequestUploadUrl, PUTs the
+/// bytes to the returned signed URL, then posts this metadata). The file
+/// bytes never pass through the server. File validation follows LM-001
+/// (type whitelist + size cap) using the supplied metadata.
 /// </summary>
 public class UploadLearningMaterialDto
 {
@@ -31,14 +30,24 @@ public class UploadLearningMaterialDto
     public LearningMaterialType MaterialType { get; set; }
 
     /// <summary>
-    /// The uploaded file. Required when MaterialType is not ExternalLink.
-    /// Validated against LM-001 (type whitelist + size cap).
+    /// Public URL of the already-uploaded file (from the upload ticket).
+    /// Required when MaterialType is not ExternalLink.
     /// </summary>
-    public IFormFile File { get; set; }
+    [StringLength(1000)]
+    public string FileUrl { get; set; }
+
+    /// <summary>Original file name (used for the type/extension check).</summary>
+    [StringLength(260)]
+    public string FileName { get; set; }
+
+    /// <summary>Client-reported size in bytes (re-checked against LM-001).</summary>
+    public long FileSizeBytes { get; set; }
+
+    [StringLength(150)]
+    public string ContentType { get; set; }
 
     /// <summary>
-    /// Required when MaterialType is ExternalLink, otherwise optional
-    /// (allows attaching a supporting link alongside an uploaded file).
+    /// Required when MaterialType is ExternalLink, otherwise optional.
     /// </summary>
     [StringLength(500)]
     public string ExternalLink { get; set; }

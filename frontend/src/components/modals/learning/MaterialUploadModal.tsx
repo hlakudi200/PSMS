@@ -2,7 +2,6 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  Alert,
   Form,
   Input,
   InputNumber,
@@ -110,7 +109,8 @@ export const MaterialUploadModal: React.FC<MaterialUploadModalProps> = ({
   classSubjects,
 }) => {
   const [form] = Form.useForm();
-  const { uploadAsync } = useLearningMaterialActions();
+  const { uploadAsync, requestUploadUrlAsync, uploadFileToStorageAsync } =
+    useLearningMaterialActions();
   const [loading, setLoading] = useState(false);
   const [fileList, setFileList] = useState<UploadFile[]>([]);
   const [materialType, setMaterialType] = useState<LearningMaterialType>(
@@ -188,6 +188,27 @@ export const MaterialUploadModal: React.FC<MaterialUploadModalProps> = ({
       }
 
       setLoading(true);
+
+      // Direct upload: get a signed URL, PUT the file straight to storage
+      // (bytes bypass our server), then record the material with its URL.
+      let fileUrl: string | undefined;
+      let fileName: string | undefined;
+      let fileSizeBytes: number | undefined;
+      let contentType: string | undefined;
+      if (!isExternalLink) {
+        const f = file as File;
+        const ticket = await requestUploadUrlAsync({
+          classSubjectId: parsed.data.classSubjectId,
+          fileName: f.name,
+          materialType: parsed.data.materialType,
+        });
+        await uploadFileToStorageAsync(ticket.uploadUrl, f);
+        fileUrl = ticket.publicUrl;
+        fileName = f.name;
+        fileSizeBytes = f.size;
+        contentType = f.type || 'application/octet-stream';
+      }
+
       await uploadAsync({
         classSubjectId: parsed.data.classSubjectId,
         termId: parsed.data.termId,
@@ -196,7 +217,10 @@ export const MaterialUploadModal: React.FC<MaterialUploadModalProps> = ({
         materialType: parsed.data.materialType,
         externalLink: parsed.data.externalLink,
         displayOrder: parsed.data.displayOrder,
-        file: isExternalLink ? undefined : (file as File | undefined),
+        fileUrl,
+        fileName,
+        fileSizeBytes,
+        contentType,
       });
       message.success('Learning material uploaded');
       onClose(true);
@@ -218,13 +242,6 @@ export const MaterialUploadModal: React.FC<MaterialUploadModalProps> = ({
       width={640}
       okText="Upload"
     >
-      <Alert
-        type="info"
-        showIcon
-        message="File hosting"
-        description="Files are recorded against the material now; the platform-wide file storage layer is being wired up separately. Title, type, and metadata are stored immediately."
-        style={{ marginBottom: 16 }}
-      />
       <Form form={form} layout="vertical">
         <Form.Item
           label="Class &amp; subject"

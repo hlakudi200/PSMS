@@ -10,6 +10,9 @@ import {
   IUpdateLearningMaterial,
   IGetLearningMaterialsInput,
   IUploadNewVersion,
+  IFileUploadTicket,
+  IRequestMaterialUploadUrl,
+  IRequestVersionUploadUrl,
 } from "../shared/interfaces";
 import { IUploadLearningMaterial } from "./context";
 import { LearningMaterialReducer } from "./reducer";
@@ -152,29 +155,43 @@ export const LearningMaterialProvider = ({
       });
   };
 
+  // Step 1: get a signed upload URL (the file bytes never pass through our
+  // server). Returns the ticket so the caller can PUT to it and then create.
+  const requestUploadUrlAsync = async (
+    input: IRequestMaterialUploadUrl
+  ): Promise<IFileUploadTicket> => {
+    const endpoint = `/api/services/app/LearningMaterial/RequestUploadUrl`;
+    const response = await instance.post(endpoint, input);
+    return response.data.result as IFileUploadTicket;
+  };
+
+  const requestVersionUploadUrlAsync = async (
+    input: IRequestVersionUploadUrl
+  ): Promise<IFileUploadTicket> => {
+    const endpoint = `/api/services/app/LearningMaterial/RequestVersionUploadUrl`;
+    const response = await instance.post(endpoint, input);
+    return response.data.result as IFileUploadTicket;
+  };
+
+  // Step 2: PUT the file directly to storage. Uses plain fetch (not the API
+  // axios instance) — no auth header, the signed URL carries its own token.
+  const uploadFileToStorageAsync = async (uploadUrl: string, file: File) => {
+    const res = await fetch(uploadUrl, {
+      method: 'PUT',
+      body: file,
+      headers: { 'Content-Type': file.type || 'application/octet-stream' },
+    });
+    if (!res.ok) {
+      throw new Error(`Storage upload failed (${res.status}).`);
+    }
+  };
+
+  // Step 3: record the material now that its file is in storage.
   const uploadAsync = async (input: IUploadLearningMaterial) => {
     dispatch(uploadLearningMaterialPending());
     const endpoint = `/api/services/app/LearningMaterial/Upload`;
-
-    // ABP MVC binds the IFormFile from a multipart "File" field; the
-    // sibling primitive fields are bound directly off the form. Sending
-    // null/undefined values would break the binder, so we only set the
-    // ones the caller actually provided.
-    const formData = new FormData();
-    formData.append('ClassSubjectId', input.classSubjectId);
-    formData.append('Title', input.title);
-    formData.append('MaterialType', input.materialType.toString());
-    if (input.termId) formData.append('TermId', input.termId);
-    if (input.description) formData.append('Description', input.description);
-    if (input.externalLink) formData.append('ExternalLink', input.externalLink);
-    if (input.displayOrder != null)
-      formData.append('DisplayOrder', input.displayOrder.toString());
-    if (input.file) formData.append('File', input.file);
-
     await instance
-      .post(endpoint, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      })
+      .post(endpoint, input)
       .then((response) => {
         dispatch(uploadLearningMaterialSuccess(response.data.result));
       })
@@ -281,14 +298,8 @@ export const LearningMaterialProvider = ({
   const uploadNewVersionAsync = async (input: IUploadNewVersion) => {
     dispatch(uploadNewVersionPending());
     const endpoint = `/api/services/app/LearningMaterial/UploadNewVersion`;
-    const formData = new FormData();
-    formData.append('LearningMaterialId', input.learningMaterialId);
-    formData.append('ChangeDescription', input.changeDescription);
-    formData.append('File', input.file);
     await instance
-      .post(endpoint, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      })
+      .post(endpoint, input)
       .then((response) => {
         dispatch(uploadNewVersionSuccess(response.data.result));
       })
@@ -325,6 +336,9 @@ export const LearningMaterialProvider = ({
           getAllAsync,
           getByClassSubjectAsync,
           createAsync,
+          requestUploadUrlAsync,
+          requestVersionUploadUrlAsync,
+          uploadFileToStorageAsync,
           uploadAsync,
           updateAsync,
           deleteAsync,

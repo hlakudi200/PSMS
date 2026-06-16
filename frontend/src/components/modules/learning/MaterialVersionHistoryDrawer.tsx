@@ -64,6 +64,8 @@ export const MaterialVersionHistoryDrawer: React.FC<
 > = ({ open, onClose, material }) => {
   const {
     getVersionsAsync,
+    requestVersionUploadUrlAsync,
+    uploadFileToStorageAsync,
     uploadNewVersionAsync,
     restoreVersionAsync,
   } = useLearningMaterialActions();
@@ -103,10 +105,19 @@ export const MaterialVersionHistoryDrawer: React.FC<
     }
     setUploading(true);
     try {
+      // Direct upload: signed URL → PUT to storage → record the version.
+      const ticket = await requestVersionUploadUrlAsync({
+        learningMaterialId: material.id,
+        fileName: file.name,
+      });
+      await uploadFileToStorageAsync(ticket.uploadUrl, file);
       await uploadNewVersionAsync({
         learningMaterialId: material.id,
         changeDescription: changeDescription.trim(),
-        file,
+        fileUrl: ticket.publicUrl,
+        fileName: file.name,
+        fileSizeBytes: file.size,
+        contentType: file.type || 'application/octet-stream',
       });
       message.success('New version uploaded');
       setChangeDescription('');

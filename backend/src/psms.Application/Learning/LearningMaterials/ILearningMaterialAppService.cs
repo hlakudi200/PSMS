@@ -1,5 +1,6 @@
 using Abp.Application.Services;
 using Abp.Application.Services.Dto;
+using psms.Domain.Shared.Storage;
 using psms.Learning.LearningMaterials.Dto;
 using System;
 using System.Threading.Tasks;
@@ -17,11 +18,19 @@ public interface ILearningMaterialAppService : IApplicationService
     Task<LearningMaterialDto> CreateAsync(CreateLearningMaterialDto input);
 
     /// <summary>
-    /// Upload a learning material file together with its metadata. Accepts
-    /// multipart form data, validates against LM-001 (type whitelist + size
-    /// cap), then creates the LearningMaterial entity with a path reference.
-    /// File-storage integration is a TODO; this mirrors the existing pattern
-    /// in ApplicationDocument/Upload.
+    /// Step 1 of a direct upload: validates ownership + file type and returns
+    /// a one-time signed URL the client PUTs the bytes to (bytes bypass the
+    /// server). Follow with <see cref="UploadAsync"/>.
+    /// </summary>
+    Task<FileUploadTicket> RequestUploadUrlAsync(RequestMaterialUploadUrlDto input);
+
+    /// <summary>Step 1 of a direct upload for a new version of a material.</summary>
+    Task<FileUploadTicket> RequestVersionUploadUrlAsync(RequestVersionUploadUrlDto input);
+
+    /// <summary>
+    /// Step 2: records a learning material whose file was already uploaded to
+    /// storage (via the ticket from RequestUploadUrl). Validates LM-001 from
+    /// the supplied metadata and stores the public URL.
     /// </summary>
     Task<LearningMaterialDto> UploadAsync(UploadLearningMaterialDto input);
 

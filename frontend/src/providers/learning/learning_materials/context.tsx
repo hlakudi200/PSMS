@@ -7,7 +7,10 @@ import {
   IUpdateLearningMaterial,
   IGetLearningMaterialsInput,
   ILearningMaterialVersion,
-  IUploadNewVersion
+  IUploadNewVersion,
+  IFileUploadTicket,
+  IRequestMaterialUploadUrl,
+  IRequestVersionUploadUrl
 } from "../shared/interfaces";
 
 export interface ILearningMaterialStateContext {
@@ -35,7 +38,11 @@ export interface IUploadLearningMaterial {
   title: string;
   description: string;
   materialType: number;
-  file?: File;
+  // File was uploaded directly to storage; these describe it.
+  fileUrl?: string;
+  fileName?: string;
+  fileSizeBytes?: number;
+  contentType?: string;
   externalLink?: string;
   displayOrder?: number;
 }
@@ -45,6 +52,12 @@ export interface ILearningMaterialActionContext {
   getAllAsync: (input?: IGetLearningMaterialsInput) => void;
   getByClassSubjectAsync: (classSubjectId: string) => void;
   createAsync: (input: ICreateLearningMaterial) => void;
+  // Step 1: ask the server for a signed upload URL (bytes bypass the server).
+  requestUploadUrlAsync: (input: IRequestMaterialUploadUrl) => Promise<IFileUploadTicket>;
+  requestVersionUploadUrlAsync: (input: IRequestVersionUploadUrl) => Promise<IFileUploadTicket>;
+  // Step 2: PUT the file straight to storage using the ticket's uploadUrl.
+  uploadFileToStorageAsync: (uploadUrl: string, file: File) => Promise<void>;
+  // Step 3: record the material/version metadata (with the public URL).
   uploadAsync: (input: IUploadLearningMaterial) => Promise<void>;
   updateAsync: (id: string, input: IUpdateLearningMaterial) => void;
   deleteAsync: (id: string) => void;
