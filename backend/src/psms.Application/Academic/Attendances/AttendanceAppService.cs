@@ -25,17 +25,20 @@ public class AttendanceAppService : ApplicationService, IAttendanceAppService
     private readonly IRepository<Student, Guid> _studentRepository;
     private readonly IRepository<Class, Guid> _classRepository;
     private readonly IRepository<Teacher, Guid> _teacherRepository;
+    private readonly psms.Academic.Students.ICurrentStudentResolver _currentStudent;
 
     public AttendanceAppService(
         IRepository<Attendance, Guid> attendanceRepository,
         IRepository<Student, Guid> studentRepository,
         IRepository<Class, Guid> classRepository,
-        IRepository<Teacher, Guid> teacherRepository)
+        IRepository<Teacher, Guid> teacherRepository,
+        psms.Academic.Students.ICurrentStudentResolver currentStudent)
     {
         _attendanceRepository = attendanceRepository;
         _studentRepository = studentRepository;
         _classRepository = classRepository;
         _teacherRepository = teacherRepository;
+        _currentStudent = currentStudent;
     }
 
     [AbpAuthorize(PermissionNames.Academic_Attendance_View)]
@@ -52,17 +55,26 @@ public class AttendanceAppService : ApplicationService, IAttendanceAppService
         if (attendance == null)
             throw new UserFriendlyException(AcademicExceptionCodes.AttendanceNotFound, "Attendance record not found.");
 
+        // LC-10: a student may only read their own attendance.
+        var selfId = await _currentStudent.GetCurrentStudentIdAsync();
+        if (selfId.HasValue && selfId.Value != attendance.StudentId)
+            throw new UserFriendlyException(AcademicExceptionCodes.AttendanceNotFound, "Attendance record not found.");
+
         return ObjectMapper.Map<AttendanceDto>(attendance);
     }
 
     [AbpAuthorize(PermissionNames.Academic_Attendance_View)]
     public async Task<PagedResultDto<AttendanceListDto>> GetAllAsync(GetAttendanceInput input)
     {
+        // LC-10: a student-portal user only ever sees their own attendance.
+        var selfId = await _currentStudent.GetCurrentStudentIdAsync();
+
         var query = _attendanceRepository
             .GetAll()
             .Include(a => a.Student)
             .Include(a => a.Class)
             .Where(a => a.TenantId == AbpSession.TenantId)
+            .WhereIf(selfId.HasValue, a => a.StudentId == selfId.Value)
             .WhereIf(!string.IsNullOrWhiteSpace(input.Keyword),
                 a => a.Student.FirstName.ToLower().Contains(input.Keyword.ToLower())
                   || a.Student.LastName.ToLower().Contains(input.Keyword.ToLower())
@@ -89,6 +101,11 @@ public class AttendanceAppService : ApplicationService, IAttendanceAppService
     [AbpAuthorize(PermissionNames.Academic_Attendance_View)]
     public async Task<ListResultDto<AttendanceListDto>> GetByStudentAsync(Guid studentId, DateTime? startDate, DateTime? endDate)
     {
+        // LC-10: a student may only read their own attendance.
+        var selfId = await _currentStudent.GetCurrentStudentIdAsync();
+        if (selfId.HasValue && selfId.Value != studentId)
+            return new ListResultDto<AttendanceListDto>(new System.Collections.Generic.List<AttendanceListDto>());
+
         var records = await _attendanceRepository
             .GetAll()
             .Include(a => a.Student)
@@ -106,6 +123,9 @@ public class AttendanceAppService : ApplicationService, IAttendanceAppService
     [AbpAuthorize(PermissionNames.Academic_Attendance_View)]
     public async Task<ListResultDto<AttendanceListDto>> GetByClassAndDateAsync(Guid classId, DateTime date)
     {
+        // LC-10: a student must not read a class register — restrict to their own row.
+        var selfId = await _currentStudent.GetCurrentStudentIdAsync();
+
         var records = await _attendanceRepository
             .GetAll()
             .Include(a => a.Student)
@@ -113,6 +133,7 @@ public class AttendanceAppService : ApplicationService, IAttendanceAppService
             .Where(a => a.ClassId == classId
                 && a.AttendanceDate.Date == date.Date
                 && a.TenantId == AbpSession.TenantId)
+            .WhereIf(selfId.HasValue, a => a.StudentId == selfId.Value)
             .OrderBy(a => a.Student.LastName)
             .ThenBy(a => a.Student.FirstName)
             .ToListAsync();
