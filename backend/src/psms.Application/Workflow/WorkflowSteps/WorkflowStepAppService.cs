@@ -4,6 +4,7 @@ using Abp.Domain.Repositories;
 using Abp.UI;
 using Microsoft.EntityFrameworkCore;
 using psms.Authorization;
+using psms.Authorization.Users;
 using psms.Domain.Workflow.Entities;
 using psms.Domain.Workflow.Enums;
 using psms.Workflow.Shared;
@@ -21,15 +22,37 @@ public class WorkflowStepAppService : ApplicationService, IWorkflowStepAppServic
     private readonly IRepository<WorkflowStep, Guid> _stepRepository;
     private readonly IRepository<WorkflowDefinition, Guid> _definitionRepository;
     private readonly IRepository<WorkflowInstance, Guid> _instanceRepository;
+    private readonly UserManager _userManager;
 
     public WorkflowStepAppService(
         IRepository<WorkflowStep, Guid> stepRepository,
         IRepository<WorkflowDefinition, Guid> definitionRepository,
-        IRepository<WorkflowInstance, Guid> instanceRepository)
+        IRepository<WorkflowInstance, Guid> instanceRepository,
+        UserManager userManager)
     {
         _stepRepository = stepRepository;
         _definitionRepository = definitionRepository;
         _instanceRepository = instanceRepository;
+        _userManager = userManager;
+    }
+
+    /// <summary>
+    /// WF-05: when a step is pinned to a specific user, that user must hold the
+    /// step's required role — otherwise the step would be unactionable (the
+    /// act-time check requires the role too). Validated against the current
+    /// tenant's users, which also blocks assigning a user from another tenant.
+    /// </summary>
+    private async Task EnsureAssignedUserHoldsRoleAsync(long assignedUserId, string assignedRole)
+    {
+        var user = await _userManager.FindByIdAsync(assignedUserId.ToString());
+        if (user == null)
+            throw new UserFriendlyException(WorkflowExceptionCodes.AssignedUserMissingRole,
+                "The selected user does not exist in this tenant.");
+
+        var roles = await _userManager.GetRolesAsync(user);
+        if (!roles.Any(r => r.Equals(assignedRole, StringComparison.OrdinalIgnoreCase)))
+            throw new UserFriendlyException(WorkflowExceptionCodes.AssignedUserMissingRole,
+                $"The selected user does not hold the step's required role '{assignedRole}'.");
     }
 
     [AbpAuthorize(PermissionNames.Workflow_Definitions_View)]
@@ -88,6 +111,10 @@ public class WorkflowStepAppService : ApplicationService, IWorkflowStepAppServic
         if (orderExists)
             throw new UserFriendlyException(WorkflowExceptionCodes.StepOrderDuplicate,
                 $"Step order {input.StepOrder} already exists in this definition.");
+
+        // WF-05: a user-pinned step requires that user to hold the step's role.
+        if (input.AssignedUserId.HasValue)
+            await EnsureAssignedUserHoldsRoleAsync(input.AssignedUserId.Value, input.AssignedRole.Trim());
 
         var step = new WorkflowStep
         {
@@ -150,6 +177,11 @@ public class WorkflowStepAppService : ApplicationService, IWorkflowStepAppServic
 
         if (input.ClearGuardExpression) step.GuardExpression = null;
         else if (input.GuardExpression != null) step.GuardExpression = input.GuardExpression.Trim();
+
+        // WF-05: validate the FINAL state — a user-pinned step (after applying any
+        // role/user change above) requires that user to hold the step's role.
+        if (step.AssignedUserId.HasValue)
+            await EnsureAssignedUserHoldsRoleAsync(step.AssignedUserId.Value, step.AssignedRole);
 
         // Bump definition version
         step.WorkflowDefinition.BumpVersion();

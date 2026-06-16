@@ -1,10 +1,11 @@
 'use client';
 
 import React, { useEffect } from 'react';
-import { Modal, Form, Input, InputNumber, Select, DatePicker, message } from 'antd';
+import { Modal, Form, Input, Select, DatePicker, message } from 'antd';
 import { z } from 'zod';
 import { useWorkflowDelegationActions } from '@/providers/workflow/workflow-delegations';
 import { WorkflowEntityTypeLabels } from '@/providers/workflow/shared/interfaces';
+import { WorkflowUserSelect } from './WorkflowUserSelect';
 
 const delegationSchema = z.object({
   delegateUserId: z.number({ error: 'Delegate user ID is required' }).min(1, 'Delegate user ID is required'),
@@ -109,8 +110,8 @@ export const WorkflowDelegationFormModal: React.FC<WorkflowDelegationFormModalPr
       width={600}
     >
       <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
-        <Form.Item label="Delegate User ID" name="delegateUserId" rules={[{ required: true }]}>
-          <InputNumber min={1} style={{ width: '100%' }} placeholder="User ID to delegate to" />
+        <Form.Item label="Delegate To" name="delegateUserId" rules={[{ required: true }]}>
+          <WorkflowUserSelect placeholder="Select the user to delegate to" />
         </Form.Item>
         <div style={{ display: 'flex', gap: 16 }}>
           <Form.Item label="Start Date" name="startDate" rules={[{ required: true }]} style={{ flex: 1 }}>

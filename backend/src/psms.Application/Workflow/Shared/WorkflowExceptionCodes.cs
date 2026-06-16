@@ -13,6 +13,8 @@ public static class WorkflowExceptionCodes
     public const string StepOrderDuplicate = "WF_STEP_ORDER_DUPLICATE";
     public const string StepInUseByInstances = "WF_STEP_IN_USE_BY_INSTANCES";
     public const string InvalidNextStep = "WF_INVALID_NEXT_STEP";
+    // WF-05: a step assigned to a specific user requires that user to hold the step's role
+    public const string AssignedUserMissingRole = "WF_ASSIGNED_USER_MISSING_ROLE";
 
     // Steps
     public const string DefinitionHasActiveInstancesCannotModifySteps = "WF_DEFINITION_HAS_ACTIVE_INSTANCES_CANNOT_MODIFY_STEPS";

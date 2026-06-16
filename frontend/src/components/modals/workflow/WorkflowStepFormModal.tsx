@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { useWorkflowStepActions } from '@/providers/workflow/workflow-steps';
 import type { IWorkflowStep } from '@/providers/workflow/shared/interfaces';
 import { WorkflowActionType, WorkflowActionTypeLabels } from '@/providers/workflow/shared/interfaces';
+import { WorkflowUserSelect } from './WorkflowUserSelect';
 
 const stepSchema = z.object({
   workflowDefinitionId: z.string().min(1),
@@ -59,6 +60,8 @@ export const WorkflowStepFormModal: React.FC<WorkflowStepFormModalProps> = ({
   const { createAsync, updateAsync } = useWorkflowStepActions();
   const [loading, setLoading] = React.useState(false);
   const isEdit = !!editRecord;
+  // The user picker is steered to users holding the currently-selected role.
+  const selectedRole = Form.useWatch('assignedRole', form);
 
   useEffect(() => {
     if (open) {
@@ -183,8 +186,11 @@ export const WorkflowStepFormModal: React.FC<WorkflowStepFormModalProps> = ({
           <Form.Item label="SLA Hours" name="slaHours" style={{ flex: 1 }}>
             <InputNumber min={1} style={{ width: '100%' }} placeholder="Optional deadline (hours)" />
           </Form.Item>
-          <Form.Item label="Assigned User ID" name="assignedUserId" style={{ flex: 1 }}>
-            <InputNumber min={1} style={{ width: '100%' }} placeholder="Optional — overrides role" />
+          <Form.Item label="Assigned User" name="assignedUserId" style={{ flex: 1 }}>
+            <WorkflowUserSelect
+              roleFilter={selectedRole}
+              placeholder="Optional — pin to a specific user"
+            />
           </Form.Item>
         </div>
         <Form.Item label="Guard Expression" name="guardExpression">

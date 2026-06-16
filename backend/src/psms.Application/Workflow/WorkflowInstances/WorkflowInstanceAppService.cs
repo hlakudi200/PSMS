@@ -528,14 +528,16 @@ public class WorkflowInstanceAppService : ApplicationService, IWorkflowInstanceA
 
     /// <summary>
     /// WF-03: the "my tasks" list — in-progress instances whose CURRENT step is
-    /// actionable by the logged-in user: assigned to them specifically, or (when
-    /// the step is not user-assigned) assigned to one of their roles. Unlike
+    /// actionable by the logged-in user. The user must hold the step's role
+    /// (case-insensitively, mirroring ValidateUserCanActOnStep) AND the step must
+    /// be either unassigned-to-a-specific-user or pinned to them. Unlike
     /// GetPendingForRole, which matches a role tenant-wide and ignores per-user
-    /// assignment, this is correctly scoped to the caller so e.g. a teacher only
-    /// sees the items they actually need to act on.
+    /// assignment, this is scoped to the caller so e.g. a teacher only sees items
+    /// they can actually act on.
     ///
-    /// Role matching is case-insensitive, mirroring ValidateUserCanActOnStep, so
-    /// the list never diverges from what the caller can actually advance.
+    /// Requiring the role on the user-pinned branch too keeps the list in lock-step
+    /// with the act-time check (WF-05): a pinned user who later loses the role is
+    /// neither shown the item nor allowed to advance it.
     /// NOTE (v1): delegated items (acting on behalf of another user/role) are NOT
     /// included here yet, even though ValidateUserCanActOnStep honours delegations
     /// at action time.
@@ -564,10 +566,10 @@ public class WorkflowInstanceAppService : ApplicationService, IWorkflowInstanceA
             .Where(i => i.TenantId == AbpSession.TenantId
                 && i.Status == WorkflowStatus.InProgress
                 && i.CurrentStep != null
-                && (i.CurrentStep.AssignedUserId == userId.Value
-                    || (i.CurrentStep.AssignedUserId == null
-                        && i.CurrentStep.AssignedRole != null
-                        && roles.Contains(i.CurrentStep.AssignedRole.ToLower()))));
+                && i.CurrentStep.AssignedRole != null
+                && roles.Contains(i.CurrentStep.AssignedRole.ToLower())
+                && (i.CurrentStep.AssignedUserId == null
+                    || i.CurrentStep.AssignedUserId == userId.Value));
 
         var totalCount = await query.CountAsync();
 
@@ -596,7 +598,20 @@ public class WorkflowInstanceAppService : ApplicationService, IWorkflowInstanceA
         if (step.AssignedUserId.HasValue)
         {
             if (step.AssignedUserId.Value == userId.Value)
-                return;
+            {
+                // WF-05: config-time guarantees the assignee held the role, but a
+                // role can be revoked afterwards — re-check so a stale assignee
+                // can't act without the step's required role.
+                var assignedUser = await _userManager.FindByIdAsync(userId.Value.ToString());
+                var assignedRoles = assignedUser != null
+                    ? await _userManager.GetRolesAsync(assignedUser)
+                    : new List<string>();
+                if (assignedRoles.Any(r => r.Equals(step.AssignedRole, StringComparison.OrdinalIgnoreCase)))
+                    return;
+
+                throw new UserFriendlyException(WorkflowExceptionCodes.AssignedUserMissingRole,
+                    $"You no longer hold the required role '{step.AssignedRole}' for this step.");
+            }
 
             // Check if current user has an active delegation from the assigned user
             if (await HasActiveDelegationFromUser(step.AssignedUserId.Value, userId.Value, null, null))
