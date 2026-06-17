@@ -242,6 +242,8 @@ export interface IWorkflowInstanceList {
   workflowDefinitionName: string;
   entityType: number;
   entityId: string;
+  /** WF-20: concise label for the linked record (e.g. student name) for at-a-glance rows. */
+  subjectLabel?: string;
   status: number;
   currentStepOrder: number;
   currentStepName?: string;
