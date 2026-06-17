@@ -16,13 +16,12 @@ import type { IWorkflowInstanceList } from '@/providers/workflow/shared/interfac
 import { WorkflowStatus, WorkflowEntityTypeLabels } from '@/providers/workflow/shared/interfaces';
 
 /**
- * WF-03: a teacher's focused "My Approvals" list — only the in-progress
- * instances whose current step is assigned to them (by user or role), served by
- * the scoped GetMyPending endpoint. Acting on a step is done inline via the
- * advance modal; the heavier admin instance detail (with cancel/recall) is not
- * exposed here.
+ * "My Approvals" — the in-progress instances whose current step is assigned to
+ * the logged-in user (by user or role), served by the scoped GetMyPending
+ * endpoint. Used across every approver portal (teacher, principal, admin): act
+ * inline via the advance modal, or open the detail (history + entity content).
  */
-function MyTasksContent() {
+function MyApprovalsList() {
   const { instances, totalCount, isPending, isError } = useWorkflowInstanceState();
   const { getMyPendingAsync } = useWorkflowInstanceActions();
   const router = useRouter();
@@ -119,10 +118,10 @@ function MyTasksContent() {
   );
 }
 
-export default function TeacherWorkflowTasks() {
+export default function MyApprovalsContent() {
   return (
     <WorkflowInstanceProvider>
-      <MyTasksContent />
+      <MyApprovalsList />
     </WorkflowInstanceProvider>
   );
 }

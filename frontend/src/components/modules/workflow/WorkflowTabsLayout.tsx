@@ -7,14 +7,15 @@ import {
   ApartmentOutlined,
   PlayCircleOutlined,
   SwapOutlined,
+  CarryOutOutlined,
 } from '@ant-design/icons';
 import { useRouter, usePathname } from 'next/navigation';
 import { useWorkflowBasePath } from './useWorkflowBasePath';
 
 /**
- * Shared workflow sub-navigation (Dashboard / Definitions / Instances /
- * Delegations). Base-path aware so the same tabs work under any role portal
- * that mounts the workflow module (e.g. /admin/workflow, /principal/workflow).
+ * Shared workflow sub-navigation (Dashboard / My Approvals / Definitions /
+ * Instances / Delegations). Base-path aware so the same tabs work under any role
+ * portal that mounts the workflow module (e.g. /admin/workflow, /principal/workflow).
  */
 export default function WorkflowTabsLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -23,6 +24,7 @@ export default function WorkflowTabsLayout({ children }: { children: React.React
 
   const tabItems = [
     { key: base, label: 'Dashboard', icon: <DashboardOutlined /> },
+    { key: `${base}/my-approvals`, label: 'My Approvals', icon: <CarryOutOutlined /> },
     { key: `${base}/definitions`, label: 'Definitions', icon: <ApartmentOutlined /> },
     { key: `${base}/instances`, label: 'Instances', icon: <PlayCircleOutlined /> },
     { key: `${base}/delegations`, label: 'Delegations', icon: <SwapOutlined /> },
