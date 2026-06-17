@@ -547,7 +547,7 @@ public class WorkflowInstanceAppService : ApplicationService, IWorkflowInstanceA
     /// </summary>
     [AbpAuthorize(PermissionNames.Workflow_Instances_View)]
     public async Task<PagedResultDto<WorkflowInstanceListDto>> GetMyPendingAsync(
-        PagedAndSortedResultRequestDto input)
+        GetMyPendingInput input)
     {
         var userId = AbpSession.UserId;
         if (!userId.HasValue)
@@ -574,16 +574,55 @@ public class WorkflowInstanceAppService : ApplicationService, IWorkflowInstanceA
                 && (i.CurrentStep.AssignedUserId == null
                     || i.CurrentStep.AssignedUserId == userId.Value));
 
-        var totalCount = await query.CountAsync();
+        var keyword = input.Keyword?.Trim();
 
-        var items = await query
+        // WF-21: a keyword must match the SubjectLabel (e.g. the student's name),
+        // which is computed post-query (WF-20), not a DB column. "My Approvals" is
+        // a personal inbox already scoped to the caller's role/user assignments, so
+        // the candidate set is small — load it, label it, then filter + page in
+        // memory. The no-keyword path keeps efficient SQL paging untouched.
+        if (string.IsNullOrEmpty(keyword))
+        {
+            var totalCount = await query.CountAsync();
+
+            var items = await query
+                .OrderBy(input.Sorting ?? "StartedDate ASC")
+                .PageBy(input)
+                .ToListAsync();
+
+            var dtos = ObjectMapper.Map<List<WorkflowInstanceListDto>>(items);
+            await PopulateSubjectLabelsAsync(dtos);
+            return new PagedResultDto<WorkflowInstanceListDto>(totalCount, dtos);
+        }
+
+        // Defensive ceiling: "my pending" is a personal inbox, so this is far
+        // above any realistic count — it only bounds the pathological case (an
+        // account holding many roles in a very large tenant) so keyword search
+        // can't materialise an unbounded result set.
+        const int MyPendingSearchScanLimit = 1000;
+
+        var candidates = await query
             .OrderBy(input.Sorting ?? "StartedDate ASC")
-            .PageBy(input)
+            .Take(MyPendingSearchScanLimit)
             .ToListAsync();
 
-        var dtos = ObjectMapper.Map<List<WorkflowInstanceListDto>>(items);
-        await PopulateSubjectLabelsAsync(dtos);
-        return new PagedResultDto<WorkflowInstanceListDto>(totalCount, dtos);
+        var all = ObjectMapper.Map<List<WorkflowInstanceListDto>>(candidates);
+        await PopulateSubjectLabelsAsync(all);
+
+        var k = keyword.ToLowerInvariant();
+        var filtered = all
+            .Where(d =>
+                (!string.IsNullOrEmpty(d.SubjectLabel) && d.SubjectLabel.ToLowerInvariant().Contains(k))
+                || (!string.IsNullOrEmpty(d.WorkflowDefinitionName) && d.WorkflowDefinitionName.ToLowerInvariant().Contains(k))
+                || (!string.IsNullOrEmpty(d.CurrentStepName) && d.CurrentStepName.ToLowerInvariant().Contains(k)))
+            .ToList();
+
+        var paged = filtered
+            .Skip(input.SkipCount)
+            .Take(input.MaxResultCount)
+            .ToList();
+
+        return new PagedResultDto<WorkflowInstanceListDto>(filtered.Count, paged);
     }
 
     /// <summary>
