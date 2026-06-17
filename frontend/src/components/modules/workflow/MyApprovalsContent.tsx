@@ -50,6 +50,12 @@ function MyApprovalsList() {
       render: (value: number) => WorkflowEntityTypeLabels[value] ?? value,
     },
     {
+      // WF-20: at-a-glance "who/what" (e.g. the student's name) so identical-looking
+      // rows can be told apart without opening each one.
+      key: 'subjectLabel', title: 'Subject', dataIndex: 'subjectLabel',
+      render: (val?: string) => val || '—',
+    },
+    {
       key: 'currentStepName', title: 'Awaiting', dataIndex: 'currentStepName',
       render: (val?: string) => val ?? '—',
     },

@@ -115,9 +115,9 @@ public class WorkflowInstanceAppService : ApplicationService, IWorkflowInstanceA
             .PageBy(input)
             .ToListAsync();
 
-        return new PagedResultDto<WorkflowInstanceListDto>(
-            totalCount,
-            ObjectMapper.Map<List<WorkflowInstanceListDto>>(items));
+        var dtos = ObjectMapper.Map<List<WorkflowInstanceListDto>>(items);
+        await PopulateSubjectLabelsAsync(dtos);
+        return new PagedResultDto<WorkflowInstanceListDto>(totalCount, dtos);
     }
 
     [AbpAuthorize(PermissionNames.Workflow_Instances_Start)]
@@ -477,9 +477,9 @@ public class WorkflowInstanceAppService : ApplicationService, IWorkflowInstanceA
             .PageBy(input)
             .ToListAsync();
 
-        return new PagedResultDto<WorkflowInstanceListDto>(
-            totalCount,
-            ObjectMapper.Map<List<WorkflowInstanceListDto>>(items));
+        var dtos = ObjectMapper.Map<List<WorkflowInstanceListDto>>(items);
+        await PopulateSubjectLabelsAsync(dtos);
+        return new PagedResultDto<WorkflowInstanceListDto>(totalCount, dtos);
     }
 
     [AbpAuthorize(PermissionNames.Workflow_Instances_ViewHistory)]
@@ -524,9 +524,9 @@ public class WorkflowInstanceAppService : ApplicationService, IWorkflowInstanceA
             .PageBy(input)
             .ToListAsync();
 
-        return new PagedResultDto<WorkflowInstanceListDto>(
-            totalCount,
-            ObjectMapper.Map<List<WorkflowInstanceListDto>>(items));
+        var dtos = ObjectMapper.Map<List<WorkflowInstanceListDto>>(items);
+        await PopulateSubjectLabelsAsync(dtos);
+        return new PagedResultDto<WorkflowInstanceListDto>(totalCount, dtos);
     }
 
     /// <summary>
@@ -581,9 +581,9 @@ public class WorkflowInstanceAppService : ApplicationService, IWorkflowInstanceA
             .PageBy(input)
             .ToListAsync();
 
-        return new PagedResultDto<WorkflowInstanceListDto>(
-            totalCount,
-            ObjectMapper.Map<List<WorkflowInstanceListDto>>(items));
+        var dtos = ObjectMapper.Map<List<WorkflowInstanceListDto>>(items);
+        await PopulateSubjectLabelsAsync(dtos);
+        return new PagedResultDto<WorkflowInstanceListDto>(totalCount, dtos);
     }
 
     /// <summary>
@@ -603,6 +603,27 @@ public class WorkflowInstanceAppService : ApplicationService, IWorkflowInstanceA
                 "Workflow instance not found.");
 
         return await _entitySummaryProvider.GetSummaryAsync(instance.EntityType, instance.EntityId);
+    }
+
+    /// <summary>
+    /// WF-20: attach a per-row subject label (e.g. the student's name for a report)
+    /// to a page of list DTOs, so an approver can tell rows apart without opening
+    /// each. Batched in the provider — ~1–2 lightweight queries per page, not one
+    /// per row. SubjectLabel isn't AutoMapped (no source property), so it's set here.
+    /// </summary>
+    private async Task PopulateSubjectLabelsAsync(List<WorkflowInstanceListDto> items)
+    {
+        if (items == null || items.Count == 0) return;
+
+        var entities = items
+            .Select(i => new KeyValuePair<WorkflowEntityType, Guid>(i.EntityType, i.EntityId))
+            .ToList();
+
+        var labels = await _entitySummaryProvider.GetSubjectLabelsAsync(entities);
+
+        foreach (var item in items)
+            if (labels.TryGetValue(item.EntityId, out var label))
+                item.SubjectLabel = label;
     }
 
     /// <summary>

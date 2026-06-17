@@ -76,6 +76,164 @@ public class WorkflowEntitySummaryProvider : ITransientDependency
         }
     }
 
+    /// <summary>
+    /// WF-20: cheap per-row subject labels for a page of workflow instances, so a
+    /// list can show "who/what" each item is about without opening it. Unlike
+    /// GetSummaryAsync (one heavy, Include-laden round-trip per instance), this
+    /// groups the page by entity type and runs ONE lightweight projection query
+    /// per type (selecting only the few columns a label needs), plus a single
+    /// batch query to resolve student names. For a typical page (~10 rows, one
+    /// entity type) that's 1–2 queries total, not one per row.
+    ///
+    /// Returns entityId → label. Entities with no backing record (or an unmapped
+    /// type) are simply absent from the map; the caller falls back to a dash.
+    /// </summary>
+    public async Task<Dictionary<Guid, string>> GetSubjectLabelsAsync(
+        IReadOnlyCollection<KeyValuePair<WorkflowEntityType, Guid>> entities)
+    {
+        var labels = new Dictionary<Guid, string>();
+        if (entities == null || entities.Count == 0) return labels;
+
+        // entityId → studentId, for the student-keyed types whose label needs a
+        // name resolved from a single batched students query below.
+        var studentRefs = new Dictionary<Guid, Guid>();
+
+        foreach (var group in entities.GroupBy(e => e.Key))
+        {
+            var ids = group.Select(e => e.Value).Distinct().ToList();
+            switch (group.Key)
+            {
+                case WorkflowEntityType.Report:
+                {
+                    var rows = await _reportRepository.GetAll()
+                        .Where(x => ids.Contains(x.Id))
+                        .Select(x => new { x.Id, x.StudentId })
+                        .ToListAsync();
+                    foreach (var r in rows) studentRefs[r.Id] = r.StudentId;
+                    break;
+                }
+                case WorkflowEntityType.FeeWaiver:
+                {
+                    var rows = await _feeWaiverRepository.GetAll()
+                        .Where(x => ids.Contains(x.Id))
+                        .Select(x => new { x.Id, x.StudentId })
+                        .ToListAsync();
+                    foreach (var r in rows) studentRefs[r.Id] = r.StudentId;
+                    break;
+                }
+                case WorkflowEntityType.Disciplinary:
+                {
+                    // Deliberately the case number ONLY — not the student's name.
+                    // A disciplinary subject's identity is sensitive; the full record
+                    // (incl. the student) is still on the detail/summary card for an
+                    // authorized approver, but we don't surface it at list/export
+                    // altitude. The case number disambiguates rows on its own.
+                    var rows = await _disciplinaryCaseRepository.GetAll()
+                        .Where(x => ids.Contains(x.Id))
+                        .Select(x => new { x.Id, x.CaseNumber })
+                        .ToListAsync();
+                    foreach (var r in rows)
+                        labels[r.Id] = string.IsNullOrWhiteSpace(r.CaseNumber) ? "Disciplinary Case" : $"Case {r.CaseNumber}";
+                    break;
+                }
+                case WorkflowEntityType.StudentTransfer:
+                {
+                    var rows = await _transferRepository.GetAll()
+                        .Where(x => ids.Contains(x.Id))
+                        .Select(x => new { x.Id, x.TransferNumber, x.StudentId })
+                        .ToListAsync();
+                    foreach (var r in rows)
+                    {
+                        labels[r.Id] = string.IsNullOrWhiteSpace(r.TransferNumber) ? "Transfer" : $"Transfer {r.TransferNumber}";
+                        studentRefs[r.Id] = r.StudentId;
+                    }
+                    break;
+                }
+                case WorkflowEntityType.StaffLeave:
+                {
+                    var rows = await _leaveRepository.GetAll()
+                        .Where(x => ids.Contains(x.Id))
+                        .Select(x => new { x.Id, x.LeaveNumber, x.UserName })
+                        .ToListAsync();
+                    foreach (var r in rows)
+                    {
+                        var lbl = Join(r.UserName, string.IsNullOrWhiteSpace(r.LeaveNumber) ? null : $"({r.LeaveNumber})");
+                        if (!string.IsNullOrWhiteSpace(lbl)) labels[r.Id] = lbl;
+                    }
+                    break;
+                }
+                case WorkflowEntityType.FieldTrip:
+                {
+                    var rows = await _fieldTripRepository.GetAll()
+                        .Where(x => ids.Contains(x.Id))
+                        .Select(x => new { x.Id, x.TripName, x.Destination })
+                        .ToListAsync();
+                    foreach (var r in rows)
+                        labels[r.Id] = !string.IsNullOrWhiteSpace(r.TripName) ? r.TripName : (r.Destination ?? "Field Trip");
+                    break;
+                }
+                case WorkflowEntityType.ExpenseRequest:
+                {
+                    var rows = await _expenseRepository.GetAll()
+                        .Where(x => ids.Contains(x.Id))
+                        .Select(x => new { x.Id, x.RequestNumber, x.RequestedByName })
+                        .ToListAsync();
+                    foreach (var r in rows)
+                    {
+                        var num = string.IsNullOrWhiteSpace(r.RequestNumber) ? "Expense" : $"Expense {r.RequestNumber}";
+                        labels[r.Id] = string.IsNullOrWhiteSpace(r.RequestedByName) ? num : $"{num} · {r.RequestedByName}";
+                    }
+                    break;
+                }
+                case WorkflowEntityType.Application:
+                {
+                    var rows = await _applicationRepository.GetAll()
+                        .Where(x => ids.Contains(x.Id))
+                        .Select(x => new { x.Id, x.ApplicationNumber, x.ProspectiveStudentFirstName, x.ProspectiveStudentLastName })
+                        .ToListAsync();
+                    foreach (var r in rows)
+                    {
+                        var name = Join(r.ProspectiveStudentFirstName, r.ProspectiveStudentLastName);
+                        var num = string.IsNullOrWhiteSpace(r.ApplicationNumber) ? "Application" : $"Application {r.ApplicationNumber}";
+                        labels[r.Id] = string.IsNullOrWhiteSpace(name) ? num : $"{num} · {name}";
+                    }
+                    break;
+                }
+            }
+        }
+
+        // Resolve all referenced students in one query, then attach their names.
+        if (studentRefs.Count > 0)
+        {
+            var studentIds = studentRefs.Values.Distinct().ToList();
+            var students = await _studentRepository.GetAll()
+                .Where(s => studentIds.Contains(s.Id))
+                .Select(s => new { s.Id, s.FirstName, s.LastName, s.AdmissionNumber })
+                .ToListAsync();
+            var nameById = students.ToDictionary(
+                s => s.Id,
+                s => NameWithAdmission(s.FirstName, s.LastName, s.AdmissionNumber));
+
+            foreach (var kv in studentRefs)
+            {
+                var name = nameById.TryGetValue(kv.Value, out var n) ? n : null;
+                if (labels.TryGetValue(kv.Key, out var existing) && !string.IsNullOrWhiteSpace(existing))
+                    labels[kv.Key] = string.IsNullOrWhiteSpace(name) ? existing : $"{existing} · {name}";
+                else if (!string.IsNullOrWhiteSpace(name))
+                    labels[kv.Key] = name;
+            }
+        }
+
+        return labels;
+    }
+
+    private static string NameWithAdmission(string first, string last, string admission)
+    {
+        var name = Join(first, last);
+        if (string.IsNullOrWhiteSpace(name)) return null;
+        return string.IsNullOrWhiteSpace(admission) ? name : $"{name} ({admission})";
+    }
+
     // ── per-type projections ──────────────────────────────────────────────
 
     private async Task<WorkflowEntitySummaryDto> ApplicationSummary(Guid id)

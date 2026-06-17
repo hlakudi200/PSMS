@@ -76,6 +76,11 @@ function InstancesContent() {
       render: (value: number) => WorkflowEntityTypeLabels[value] ?? value,
     },
     {
+      // WF-20: at-a-glance "who/what" each instance is about (e.g. student name).
+      key: 'subjectLabel', title: 'Subject', dataIndex: 'subjectLabel',
+      render: (val?: string) => val || '—',
+    },
+    {
       key: 'status', title: 'Status', dataIndex: 'status',
       filterable: true, filterType: 'enum',
       filterOptions: Object.entries(WorkflowStatusLabels).map(([v, l]) => ({

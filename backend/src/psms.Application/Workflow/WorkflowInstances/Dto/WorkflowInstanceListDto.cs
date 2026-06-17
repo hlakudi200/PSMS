@@ -9,6 +9,13 @@ public class WorkflowInstanceListDto : EntityDto<Guid>
     public string WorkflowDefinitionName { get; set; }
     public WorkflowEntityType EntityType { get; set; }
     public Guid EntityId { get; set; }
+    /// <summary>
+    /// WF-20: a concise human label for the linked record (e.g. the student's name
+    /// for a report, the case number + student for a disciplinary case) so an
+    /// approver can tell rows apart in a list without opening each one. Null when
+    /// the entity is missing/unmapped. Populated post-map, not via AutoMapper.
+    /// </summary>
+    public string SubjectLabel { get; set; }
     public WorkflowStatus Status { get; set; }
     public int CurrentStepOrder { get; set; }
     public string CurrentStepName { get; set; }
