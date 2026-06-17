@@ -36,6 +36,9 @@ function MyApprovalsList() {
       maxResultCount: query.maxResultCount,
       skipCount: query.skipCount,
       sorting: query.sorting,
+      // The search box stores its text under filters.keyword; forward it so the
+      // server can match by subject (student name), workflow, or current step.
+      keyword: query.filters?.keyword as string | undefined,
     });
   }, [getMyPendingAsync]);
 
@@ -100,6 +103,7 @@ function MyApprovalsList() {
     <>
       <EnterpriseTable<IWorkflowInstanceList>
         title="My Approvals"
+        searchPlaceholder="Search by student, workflow, or step…"
         columns={columns}
         data={instances ?? []}
         totalCount={totalCount}
