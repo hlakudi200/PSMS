@@ -29,6 +29,7 @@ public class WorkflowInstanceAppService : ApplicationService, IWorkflowInstanceA
     private readonly IRepository<WorkflowDelegation, Guid> _delegationRepository;
     private readonly UserManager _userManager;
     private readonly WorkflowEntityBridgeService _bridgeService;
+    private readonly WorkflowEntitySummaryProvider _entitySummaryProvider;
 
     public WorkflowInstanceAppService(
         IRepository<WorkflowInstance, Guid> instanceRepository,
@@ -37,7 +38,8 @@ public class WorkflowInstanceAppService : ApplicationService, IWorkflowInstanceA
         IRepository<WorkflowTransition, Guid> transitionRepository,
         IRepository<WorkflowDelegation, Guid> delegationRepository,
         UserManager userManager,
-        WorkflowEntityBridgeService bridgeService)
+        WorkflowEntityBridgeService bridgeService,
+        WorkflowEntitySummaryProvider entitySummaryProvider)
     {
         _instanceRepository = instanceRepository;
         _definitionRepository = definitionRepository;
@@ -46,6 +48,7 @@ public class WorkflowInstanceAppService : ApplicationService, IWorkflowInstanceA
         _delegationRepository = delegationRepository;
         _userManager = userManager;
         _bridgeService = bridgeService;
+        _entitySummaryProvider = entitySummaryProvider;
     }
 
     [AbpAuthorize(PermissionNames.Workflow_Instances_View)]
@@ -581,6 +584,25 @@ public class WorkflowInstanceAppService : ApplicationService, IWorkflowInstanceA
         return new PagedResultDto<WorkflowInstanceListDto>(
             totalCount,
             ObjectMapper.Map<List<WorkflowInstanceListDto>>(items));
+    }
+
+    /// <summary>
+    /// WF-09: a human-readable summary of the entity this instance is about, so
+    /// an approver sees what they're approving. View-gated + tenant-scoped (same
+    /// as Get); the summary itself is built from tenant-filtered entity reads.
+    /// </summary>
+    [AbpAuthorize(PermissionNames.Workflow_Instances_View)]
+    public async Task<WorkflowEntitySummaryDto> GetEntitySummaryAsync(Guid instanceId)
+    {
+        var instance = await _instanceRepository
+            .GetAll()
+            .FirstOrDefaultAsync(i => i.Id == instanceId && i.TenantId == AbpSession.TenantId);
+
+        if (instance == null)
+            throw new UserFriendlyException(WorkflowExceptionCodes.InstanceNotFound,
+                "Workflow instance not found.");
+
+        return await _entitySummaryProvider.GetSummaryAsync(instance.EntityType, instance.EntityId);
     }
 
     /// <summary>

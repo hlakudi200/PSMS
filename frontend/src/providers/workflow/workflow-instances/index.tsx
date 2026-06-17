@@ -12,6 +12,7 @@ import type {
   IBatchAdvance,
   IGetWorkflowInstancesInput,
   IPagedAndSortedResultRequest,
+  IWorkflowEntitySummary,
 } from "../shared/interfaces";
 import { WorkflowInstanceReducer } from "./reducer";
 import { useContext, useReducer } from "react";
@@ -238,6 +239,23 @@ export const WorkflowInstanceProvider = ({
       });
   };
 
+  // WF-09: a read-only summary of the entity behind an instance (returned to the
+  // caller, not stored in reducer state). Undefined on error so the detail view
+  // simply omits the summary card.
+  const getEntitySummaryAsync = async (
+    instanceId: string
+  ): Promise<IWorkflowEntitySummary | undefined> => {
+    try {
+      const response = await instance.get(
+        `/api/services/app/WorkflowInstance/GetEntitySummary?instanceId=${instanceId}`
+      );
+      return response.data.result as IWorkflowEntitySummary;
+    } catch (error) {
+      console.error(error);
+      return undefined;
+    }
+  };
+
   return (
     <WorkflowInstanceStateContext.Provider value={state}>
       <WorkflowInstanceActionContext.Provider
@@ -254,6 +272,7 @@ export const WorkflowInstanceProvider = ({
           getPendingForRoleAsync,
           getMyPendingAsync,
           getOverdueAsync,
+          getEntitySummaryAsync,
         }}
       >
         {children}

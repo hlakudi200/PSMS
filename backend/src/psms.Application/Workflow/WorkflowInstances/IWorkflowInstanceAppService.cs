@@ -19,6 +19,7 @@ public interface IWorkflowInstanceAppService : IApplicationService
     Task<WorkflowInstanceDto> RecallAsync(Guid instanceId, string comment);
     Task<BatchAdvanceResultDto> BatchAdvanceAsync(BatchAdvanceInput input);
     Task<List<WorkflowTransitionDto>> GetHistoryAsync(Guid instanceId);
+    Task<WorkflowEntitySummaryDto> GetEntitySummaryAsync(Guid instanceId);
     Task<PagedResultDto<WorkflowInstanceListDto>> GetPendingForRoleAsync(string roleName, PagedAndSortedResultRequestDto input);
     Task<PagedResultDto<WorkflowInstanceListDto>> GetMyPendingAsync(PagedAndSortedResultRequestDto input);
     Task<PagedResultDto<WorkflowInstanceListDto>> GetOverdueAsync(PagedAndSortedResultRequestDto input);

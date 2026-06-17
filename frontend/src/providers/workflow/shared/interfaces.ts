@@ -212,6 +212,18 @@ export interface IWorkflowInstance {
   lastModificationTime?: string;
 }
 
+export interface IWorkflowEntitySummaryField {
+  label: string;
+  value: string;
+}
+
+/** WF-09: human-readable snapshot of the entity an instance is about. */
+export interface IWorkflowEntitySummary {
+  title: string;
+  subtitle?: string;
+  fields: IWorkflowEntitySummaryField[];
+}
+
 export interface IWorkflowInstanceList {
   id: string;
   workflowDefinitionId: string;

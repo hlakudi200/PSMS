@@ -26,7 +26,7 @@ import {
   WorkflowEntityTypeLabels,
   WorkflowActionTypeLabels,
 } from '@/providers/workflow/shared/interfaces';
-import type { IWorkflowTransition } from '@/providers/workflow/shared/interfaces';
+import type { IWorkflowTransition, IWorkflowEntitySummary } from '@/providers/workflow/shared/interfaces';
 import { message } from 'antd';
 
 const { Title, Text } = Typography;
@@ -56,9 +56,10 @@ function DetailContent() {
   const base = useWorkflowBasePath();
   const id = params?.id as string;
   const { instance: wfInstance, isPending } = useWorkflowInstanceState();
-  const { getAsync, cancelAsync, recallAsync } = useWorkflowInstanceActions();
+  const { getAsync, cancelAsync, recallAsync, getEntitySummaryAsync } = useWorkflowInstanceActions();
   const { currentRole, currentUser } = useAuthState();
   const [advanceOpen, setAdvanceOpen] = useState(false);
+  const [entitySummary, setEntitySummary] = useState<IWorkflowEntitySummary | null>(null);
 
   // Cancel/Recall require Workflow.Instances.Cancel/Recall, held only by
   // Admin/Principal/VicePrincipal (WF-01). This hides them from approvers
@@ -73,7 +74,20 @@ function DetailContent() {
   const canManageInstance = myRoles.some((r) => managementRoles.includes(r));
 
   useEffect(() => {
-    if (id) getAsync(id);
+    if (!id) return;
+    let active = true;
+    // Clear any previous instance's summary immediately so navigating between
+    // approvals never briefly shows the wrong record's content; ignore a stale
+    // (out-of-order) response.
+    setEntitySummary(null);
+    getAsync(id);
+    getEntitySummaryAsync(id).then((s) => {
+      if (active) setEntitySummary(s ?? null);
+    });
+    return () => {
+      active = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   const isInProgress = wfInstance?.status === WorkflowStatus.InProgress;
@@ -108,6 +122,22 @@ function DetailContent() {
       >
         Back
       </Button>
+
+      {entitySummary && (
+        <Card title="What you're approving" style={{ marginBottom: 24 }}>
+          <Title level={5} style={{ marginTop: 0, marginBottom: 4 }}>{entitySummary.title}</Title>
+          {entitySummary.subtitle && (
+            <Text type="secondary">{entitySummary.subtitle}</Text>
+          )}
+          {(entitySummary.fields?.length ?? 0) > 0 && (
+            <Descriptions column={{ xs: 1, sm: 2 }} size="small" style={{ marginTop: 12 }}>
+              {entitySummary.fields.map((f) => (
+                <Descriptions.Item key={f.label} label={f.label}>{f.value}</Descriptions.Item>
+              ))}
+            </Descriptions>
+          )}
+        </Card>
+      )}
 
       <Card style={{ marginBottom: 24 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>

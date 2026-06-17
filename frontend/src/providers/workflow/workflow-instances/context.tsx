@@ -10,6 +10,7 @@ import type {
   IBatchAdvanceResult,
   IGetWorkflowInstancesInput,
   IPagedAndSortedResultRequest,
+  IWorkflowEntitySummary,
 } from "../shared/interfaces";
 
 export interface IWorkflowInstanceStateContext {
@@ -36,6 +37,7 @@ export interface IWorkflowInstanceActionContext {
   getPendingForRoleAsync: (roleName: string, input?: IPagedAndSortedResultRequest) => void;
   getMyPendingAsync: (input?: IPagedAndSortedResultRequest) => void;
   getOverdueAsync: (input?: IPagedAndSortedResultRequest) => void;
+  getEntitySummaryAsync: (instanceId: string) => Promise<IWorkflowEntitySummary | undefined>;
 }
 
 export const INITIAL_STATE: IWorkflowInstanceStateContext = {
