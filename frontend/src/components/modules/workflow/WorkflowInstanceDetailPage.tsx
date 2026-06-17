@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Card, Descriptions, Tag, Button, Timeline, Typography, Space, Spin, Table } from 'antd';
+import { Card, Descriptions, Tag, Button, Timeline, Typography, Space, Spin, Table, Alert } from 'antd';
 import {
   ArrowLeftOutlined,
   PlayCircleOutlined,
@@ -60,6 +60,7 @@ function DetailContent() {
   const { currentRole, currentUser } = useAuthState();
   const [advanceOpen, setAdvanceOpen] = useState(false);
   const [entitySummary, setEntitySummary] = useState<IWorkflowEntitySummary | null>(null);
+  const [summaryLoaded, setSummaryLoaded] = useState(false);
 
   // Cancel/Recall require Workflow.Instances.Cancel/Recall, held only by
   // Admin/Principal/VicePrincipal (WF-01). This hides them from approvers
@@ -80,9 +81,13 @@ function DetailContent() {
     // approvals never briefly shows the wrong record's content; ignore a stale
     // (out-of-order) response.
     setEntitySummary(null);
+    setSummaryLoaded(false);
     getAsync(id);
     getEntitySummaryAsync(id).then((s) => {
-      if (active) setEntitySummary(s ?? null);
+      if (active) {
+        setEntitySummary(s ?? null);
+        setSummaryLoaded(true);
+      }
     });
     return () => {
       active = false;
@@ -164,6 +169,16 @@ function DetailContent() {
         </Card>
       )}
 
+      {summaryLoaded && !entitySummary && (
+        <Alert
+          type="info"
+          showIcon
+          style={{ marginBottom: 24 }}
+          message="No linked record to display"
+          description="The record this approval refers to could not be found — it may have been removed, or this item isn't linked to a viewable record."
+        />
+      )}
+
       <Card style={{ marginBottom: 24 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
           <Title level={4} style={{ margin: 0 }}>{wfInstance?.workflowDefinitionName ?? 'Loading...'}</Title>
@@ -197,7 +212,12 @@ function DetailContent() {
             {wfInstance?.entityType ? WorkflowEntityTypeLabels[wfInstance.entityType] : '—'}
           </Descriptions.Item>
           <Descriptions.Item label="Entity ID">
-            <Text copyable style={{ fontSize: 12 }}>{wfInstance?.entityId ?? '—'}</Text>
+            {wfInstance?.entityId ? (
+              // Show only the first GUID segment to avoid noise; copy the full id.
+              <Text copyable={{ text: wfInstance.entityId }} style={{ fontSize: 12 }}>
+                {wfInstance.entityId.split('-')[0]}…
+              </Text>
+            ) : '—'}
           </Descriptions.Item>
           <Descriptions.Item label="Current Step">
             {wfInstance?.currentStepName ?? '—'}
