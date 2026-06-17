@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Card, Descriptions, Tag, Button, Timeline, Typography, Space, Spin } from 'antd';
+import { Card, Descriptions, Tag, Button, Timeline, Typography, Space, Spin, Table } from 'antd';
 import {
   ArrowLeftOutlined,
   PlayCircleOutlined,
@@ -129,13 +129,38 @@ function DetailContent() {
           {entitySummary.subtitle && (
             <Text type="secondary">{entitySummary.subtitle}</Text>
           )}
-          {(entitySummary.fields?.length ?? 0) > 0 && (
-            <Descriptions column={{ xs: 1, sm: 2 }} size="small" style={{ marginTop: 12 }}>
-              {entitySummary.fields.map((f) => (
+
+          {(entitySummary.sections ?? []).map((section) => (
+            <Descriptions
+              key={section.heading}
+              title={section.heading}
+              column={{ xs: 1, sm: 2 }}
+              size="small"
+              style={{ marginTop: 16 }}
+            >
+              {section.fields.map((f) => (
                 <Descriptions.Item key={f.label} label={f.label}>{f.value}</Descriptions.Item>
               ))}
             </Descriptions>
-          )}
+          ))}
+
+          {(entitySummary.tables ?? []).map((tbl) => (
+            <div key={tbl.heading} style={{ marginTop: 16 }}>
+              <Text strong>{tbl.heading}</Text>
+              <Table
+                size="small"
+                style={{ marginTop: 8 }}
+                pagination={false}
+                rowKey="__rowKey"
+                columns={tbl.columns.map((c, ci) => ({ title: c, dataIndex: String(ci), key: String(ci) }))}
+                dataSource={tbl.rows.map((row, ri) => {
+                  const rec: Record<string, string> = { __rowKey: String(ri) };
+                  row.forEach((cell, ci) => { rec[String(ci)] = cell; });
+                  return rec;
+                })}
+              />
+            </div>
+          ))}
         </Card>
       )}
 

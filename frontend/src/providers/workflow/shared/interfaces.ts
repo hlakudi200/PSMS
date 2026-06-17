@@ -217,11 +217,23 @@ export interface IWorkflowEntitySummaryField {
   value: string;
 }
 
-/** WF-09: human-readable snapshot of the entity an instance is about. */
+export interface IWorkflowEntitySummarySection {
+  heading: string;
+  fields: IWorkflowEntitySummaryField[];
+}
+
+export interface IWorkflowEntitySummaryTable {
+  heading: string;
+  columns: string[];
+  rows: string[][];
+}
+
+/** WF-09/WF-18: the full record an instance is about — grouped sections + child tables. */
 export interface IWorkflowEntitySummary {
   title: string;
   subtitle?: string;
-  fields: IWorkflowEntitySummaryField[];
+  sections: IWorkflowEntitySummarySection[];
+  tables: IWorkflowEntitySummaryTable[];
 }
 
 export interface IWorkflowInstanceList {
