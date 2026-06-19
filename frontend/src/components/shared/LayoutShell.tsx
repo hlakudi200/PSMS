@@ -1,17 +1,17 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { Layout, Menu, Button, Typography, Badge, message } from 'antd';
+import { Layout, Menu, Button, Typography, message } from 'antd';
 import type { ItemType, MenuItemGroupType, MenuItemType } from 'antd/es/menu/interface';
 import {
   LogoutOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
-  NotificationOutlined,
 } from '@ant-design/icons';
 import { usePathname, useRouter } from 'next/navigation';
 import { ProtectedRoute } from '@/components/shared/ProtectedRoute';
 import { useAuthActions, useAuthState } from '@/providers/auth';
+import NotificationBell from '@/components/shared/NotificationBell';
 
 const { Header, Sider, Content } = Layout;
 const { Text } = Typography;
@@ -80,7 +80,7 @@ function ShellLayout({
     menuItems,
     accentColor = '#003D73',
     showProfileFooter = false,
-    showNotificationBadge = false,
+    showNotificationBadge = true,
     showRoleInHeader = true,
   } = config;
 
@@ -252,16 +252,7 @@ function ShellLayout({
             </Text>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-            {showNotificationBadge && (
-              <Badge dot offset={[-2, 2]}>
-                <Button
-                  type="text"
-                  icon={<NotificationOutlined />}
-                  aria-label="Notifications"
-                  style={{ color: '#BAE7FF', fontSize: 16 }}
-                />
-              </Badge>
-            )}
+            {showNotificationBadge && <NotificationBell />}
             <Text style={{ color: '#BAE7FF', fontSize: 13 }}>
               {currentUser?.name} {currentUser?.surname}
               {showRoleInHeader && ` (${currentRole})`}
