@@ -238,21 +238,20 @@ public class WorkflowInstanceAppService : ApplicationService, IWorkflowInstanceA
             throw new UserFriendlyException(WorkflowExceptionCodes.CommentRequired,
                 "A comment is required for this step.");
 
-        // Validate action is appropriate for step
-        if (input.Action != WorkflowActionType.Approve
-            && input.Action != WorkflowActionType.Reject
-            && input.Action != WorkflowActionType.Review
-            && input.Action != WorkflowActionType.Revise)
-        {
-            throw new UserFriendlyException(WorkflowExceptionCodes.InvalidTransition,
-                "Invalid action. Use Approve, Reject, Review, or Revise.");
-        }
-
         var allSteps = instance.WorkflowDefinition.Steps.OrderBy(s => s.StepOrder).ToList();
         Guid? toStepId = null;
-        WorkflowStep nextTargetStep = null;
 
-        if (input.Action == WorkflowActionType.Approve)
+        // Forward actions (Submit / Review / Approve) all mean "this step is done —
+        // pass it on": advance to the next step, or complete the workflow if this
+        // is the terminal step (or there is no next step). This is why clicking
+        // "Review" on a review step now progresses the workflow instead of sitting
+        // still. Reject routes to the configured reject step (or terminates).
+        // Revise sends the item back one step for changes (stays In Progress).
+        var isForward = input.Action == WorkflowActionType.Approve
+            || input.Action == WorkflowActionType.Review
+            || input.Action == WorkflowActionType.Submit;
+
+        if (isForward)
         {
             if (currentStep.IsTerminal)
             {
@@ -271,7 +270,6 @@ public class WorkflowInstanceAppService : ApplicationService, IWorkflowInstanceA
                 {
                     instance.AdvanceTo(nextStep.StepOrder, nextStep.Id, nextStep.SlaHours);
                     toStepId = nextStep.Id;
-                    nextTargetStep = nextStep;
                 }
             }
         }
@@ -295,9 +293,26 @@ public class WorkflowInstanceAppService : ApplicationService, IWorkflowInstanceA
                 instance.Reject(AbpSession.UserId.Value, input.Comment);
             }
         }
-        else if (input.Action == WorkflowActionType.Review || input.Action == WorkflowActionType.Revise)
+        else if (input.Action == WorkflowActionType.Revise)
         {
-            toStepId = currentStep.Id;
+            // Send back to the immediately previous step (by order) for changes.
+            var previousStep = allSteps
+                .Where(s => s.StepOrder < currentStep.StepOrder)
+                .OrderByDescending(s => s.StepOrder)
+                .FirstOrDefault();
+
+            if (previousStep == null)
+                throw new UserFriendlyException(WorkflowExceptionCodes.InvalidTransition,
+                    "There is no earlier step to send this back to for revision.");
+
+            instance.AdvanceTo(previousStep.StepOrder, previousStep.Id, previousStep.SlaHours);
+            toStepId = previousStep.Id;
+        }
+        else
+        {
+            // Cancel / Recall have their own endpoints; anything else is invalid here.
+            throw new UserFriendlyException(WorkflowExceptionCodes.InvalidTransition,
+                "Invalid action. Use Submit, Review, Approve, Reject, or Send for Revision.");
         }
 
         // Record the transition

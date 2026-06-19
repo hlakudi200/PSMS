@@ -200,6 +200,10 @@ export interface IWorkflowInstance {
   currentStepId?: string;
   currentStepName?: string;
   currentStepAssignedRole?: string;
+  /** WF-22: current step's action type, so the action modal offers only valid choices. */
+  currentStepActionType?: number;
+  /** WF-22: whether the current step requires a comment (for the detail page action modal). */
+  currentStepIsCommentRequired?: boolean;
   workflowDefinitionVersion: number;
   currentStepDueDate?: string;
   isOverdue: boolean;
@@ -248,6 +252,8 @@ export interface IWorkflowInstanceList {
   currentStepOrder: number;
   currentStepName?: string;
   currentStepAssignedRole?: string;
+  /** WF-22: current step's action type, so the action modal offers only valid choices. */
+  currentStepActionType?: number;
   currentStepIsCommentRequired?: boolean;
   currentStepDueDate?: string;
   isOverdue: boolean;

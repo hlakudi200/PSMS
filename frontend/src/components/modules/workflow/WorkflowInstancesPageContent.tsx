@@ -291,6 +291,8 @@ function InstancesContent() {
         instanceId={selectedInstance?.id ?? ''}
         currentStepName={selectedInstance?.currentStepName}
         isCommentRequired={selectedInstance?.currentStepIsCommentRequired}
+        currentStepActionType={selectedInstance?.currentStepActionType}
+        currentStepOrder={selectedInstance?.currentStepOrder}
       />
     </>
   );

@@ -286,6 +286,9 @@ function DetailContent() {
         }}
         instanceId={id}
         currentStepName={wfInstance?.currentStepName}
+        isCommentRequired={wfInstance?.currentStepIsCommentRequired}
+        currentStepActionType={wfInstance?.currentStepActionType}
+        currentStepOrder={wfInstance?.currentStepOrder}
       />
     </div>
   );

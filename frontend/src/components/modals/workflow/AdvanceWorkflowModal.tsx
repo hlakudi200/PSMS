@@ -18,14 +18,43 @@ interface AdvanceWorkflowModalProps {
   instanceId: string;
   currentStepName?: string;
   isCommentRequired?: boolean;
+  /** WF-22: current step's action type — drives which actions are offered. */
+  currentStepActionType?: number;
+  /** WF-22: 1-based step order — "Send for Revision" only shows when > 1. */
+  currentStepOrder?: number;
 }
 
-const advanceActionOptions = [
+// The primary "forward" action for each step type. Submit / Review / Approve all
+// advance the workflow; the label tells the user what their forward action means.
+const forwardActionByType: Record<number, { value: number; label: string }> = {
+  [WorkflowActionType.Submit]: { value: WorkflowActionType.Submit, label: 'Submit' },
+  [WorkflowActionType.Review]: { value: WorkflowActionType.Review, label: 'Review & Forward' },
+  [WorkflowActionType.Approve]: { value: WorkflowActionType.Approve, label: 'Approve' },
+};
+
+// Full set, used as a fallback when the step's action type is unknown.
+const allActionOptions = [
   { value: WorkflowActionType.Approve, label: 'Approve' },
   { value: WorkflowActionType.Reject, label: 'Reject' },
-  { value: WorkflowActionType.Review, label: 'Review' },
+  { value: WorkflowActionType.Review, label: 'Review & Forward' },
   { value: WorkflowActionType.Revise, label: 'Send for Revision' },
 ];
+
+function buildActionOptions(actionType?: number, currentStepOrder?: number) {
+  const forward = actionType != null ? forwardActionByType[actionType] : undefined;
+  if (!forward) return allActionOptions;
+
+  const options = [forward];
+  // Submit steps just submit; review/approve steps can also reject.
+  if (actionType !== WorkflowActionType.Submit) {
+    options.push({ value: WorkflowActionType.Reject, label: 'Reject' });
+  }
+  // Can only send back when there is an earlier step to send it to.
+  if ((currentStepOrder ?? 1) > 1) {
+    options.push({ value: WorkflowActionType.Revise, label: 'Send for Revision' });
+  }
+  return options;
+}
 
 export const AdvanceWorkflowModal: React.FC<AdvanceWorkflowModalProps> = ({
   open,
@@ -33,16 +62,23 @@ export const AdvanceWorkflowModal: React.FC<AdvanceWorkflowModalProps> = ({
   instanceId,
   currentStepName,
   isCommentRequired,
+  currentStepActionType,
+  currentStepOrder,
 }) => {
   const [form] = Form.useForm();
   const { advanceAsync } = useWorkflowInstanceActions();
   const [loading, setLoading] = React.useState(false);
 
+  const actionOptions = buildActionOptions(currentStepActionType, currentStepOrder);
+
   useEffect(() => {
     if (open) {
       form.resetFields();
+      // Pre-select the step's primary (forward) action to save a click.
+      form.setFieldsValue({ action: actionOptions[0]?.value });
     }
-  }, [open, form]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, form, currentStepActionType, currentStepOrder]);
 
   const handleSubmit = async () => {
     try {
@@ -86,7 +122,7 @@ export const AdvanceWorkflowModal: React.FC<AdvanceWorkflowModalProps> = ({
     >
       <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
         <Form.Item label="Action" name="action" rules={[{ required: true }]}>
-          <Select options={advanceActionOptions} placeholder="Select action" />
+          <Select options={actionOptions} placeholder="Select action" />
         </Form.Item>
         <Form.Item
           label="Comment"
