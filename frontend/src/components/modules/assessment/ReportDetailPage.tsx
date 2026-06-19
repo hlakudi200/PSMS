@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useCallback, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, usePathname } from 'next/navigation';
 import {
   Card,
   Descriptions,
@@ -32,6 +32,7 @@ import {
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { ReportProvider, useReportState, useReportActions } from '@/providers/assessment/reports';
+import { useAuthState } from '@/providers/auth';
 import type { IReport, IReportSubject } from '@/providers/assessment/shared/interfaces';
 
 const { Title, Text, Paragraph } = Typography;
@@ -312,7 +313,28 @@ const printStyles = `
 function ReportDetailContent() {
   const params = useParams();
   const router = useRouter();
+  const pathname = usePathname();
   const reportId = params.id as string;
+
+  const { currentRole, currentUser } = useAuthState();
+  // Managers (principal/vice-principal/admin) get the full report actions
+  // (Approve / Publish / Generate PDF / Principal Comment). Everyone else — e.g.
+  // a teacher reviewing the report at the HOD step via the workflow — gets a
+  // clean read-only view. The server is the real boundary (those actions are
+  // permission-gated); this just keeps the UI honest.
+  const managementRoles = ['admin', 'principal', 'viceprincipal'];
+  const myRoles = (currentUser?.roleNames?.length ? currentUser.roleNames : [currentRole])
+    .filter(Boolean)
+    .map((r) => (r as string).toLowerCase());
+  const canManageReport = myRoles.some((r) => managementRoles.includes(r));
+  const isTeacherPortal = pathname?.startsWith('/teacher') ?? false;
+
+  const goBack = useCallback(() => {
+    // Prefer browser history; fall back to the portal's home (the teacher portal
+    // has no reports list page — reports are reached via the workflow link).
+    if (typeof window !== 'undefined' && window.history.length > 1) router.back();
+    else router.push(isTeacherPortal ? '/teacher' : '/principal/reports');
+  }, [router, isTeacherPortal]);
 
   const { report, isPending, isError } = useReportState();
   const { getAsync, approveAsync, publishAsync, addPrincipalCommentAsync, generatePdfAsync } = useReportActions();
@@ -402,8 +424,8 @@ function ReportDetailContent() {
   if (isError || (!isPending && !report)) {
     return (
       <div style={{ padding: 24 }}>
-        <Button icon={<ArrowLeftOutlined />} onClick={() => router.push('/principal/reports')} style={{ marginBottom: 16 }}>
-          Back to Reports
+        <Button icon={<ArrowLeftOutlined />} onClick={goBack} style={{ marginBottom: 16 }}>
+          Back
         </Button>
         <Empty description="Report not found" />
       </div>
@@ -599,8 +621,8 @@ function ReportDetailContent() {
       {/* ══════════════ SCREEN LAYOUT (shown on screen, hidden on print) ══════════════ */}
 
       <Space className="no-print" style={{ marginBottom: 16 }}>
-        <Button icon={<ArrowLeftOutlined />} onClick={() => router.push('/principal/reports')}>
-          Back to Reports
+        <Button icon={<ArrowLeftOutlined />} onClick={goBack}>
+          Back
         </Button>
         <Button icon={<PrinterOutlined />} onClick={handlePrint}>
           Print Report Card
@@ -614,7 +636,7 @@ function ReportDetailContent() {
             Download PDF
           </Button>
         ) : (
-          report.status >= 2 && (
+          canManageReport && report.status >= 2 && (
             <Button
               icon={pdfGenerating ? <LoadingOutlined /> : <FilePdfOutlined />}
               onClick={handleGeneratePdf}
@@ -626,8 +648,8 @@ function ReportDetailContent() {
         )}
       </Space>
 
-      {/* Status Banner */}
-      {report.status === 3 && (
+      {/* Status Banner — manage actions only for principal/vice-principal/admin */}
+      {canManageReport && report.status === 3 && (
         <Alert
           className="no-print"
           type="warning"
@@ -641,7 +663,7 @@ function ReportDetailContent() {
           }
         />
       )}
-      {report.status === 4 && (
+      {canManageReport && report.status === 4 && (
         <Alert
           className="no-print"
           type="info"
@@ -740,28 +762,39 @@ function ReportDetailContent() {
           </div>
         )}
 
-        <div style={{ marginBottom: 16 }}>
-          <Text strong>Principal Comment</Text>
-          <Input.TextArea
-            value={principalComment}
-            onChange={(e) => setPrincipalComment(e.target.value)}
-            rows={3}
-            placeholder="Add your comment..."
-            maxLength={1000}
-            style={{ marginTop: 4 }}
-          />
-          <Button
-            type="primary"
-            size="small"
-            icon={<MessageOutlined />}
-            onClick={handleSaveComment}
-            loading={commentSaving}
-            disabled={!principalComment.trim()}
-            style={{ marginTop: 8 }}
-          >
-            Save Comment
-          </Button>
-        </div>
+        {canManageReport ? (
+          <div style={{ marginBottom: 16 }}>
+            <Text strong>Principal Comment</Text>
+            <Input.TextArea
+              value={principalComment}
+              onChange={(e) => setPrincipalComment(e.target.value)}
+              rows={3}
+              placeholder="Add your comment..."
+              maxLength={1000}
+              style={{ marginTop: 4 }}
+            />
+            <Button
+              type="primary"
+              size="small"
+              icon={<MessageOutlined />}
+              onClick={handleSaveComment}
+              loading={commentSaving}
+              disabled={!principalComment.trim()}
+              style={{ marginTop: 8 }}
+            >
+              Save Comment
+            </Button>
+          </div>
+        ) : (
+          report.principalComment && (
+            <div style={{ marginBottom: 16 }}>
+              <Text strong>Principal Comment</Text>
+              <Paragraph style={{ marginTop: 4, padding: '8px 12px', background: '#f6f8fa', borderRadius: 4 }}>
+                {report.principalComment}
+              </Paragraph>
+            </div>
+          )
+        )}
 
         {report.parentComment && (
           <div>
