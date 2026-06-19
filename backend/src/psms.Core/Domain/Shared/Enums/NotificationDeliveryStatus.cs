@@ -12,6 +12,10 @@ namespace psms.Domain.Shared.Enums
         Sent = 2,
         Delivered = 3,
         Read = 4,
-        Failed = 5
+        Failed = 5,
+
+        /// <summary>COMM-05: not sent on this channel — blocked by the recipient's
+        /// preferences or missing consent. Recorded for audit, never retried.</summary>
+        Suppressed = 6
     }
 }
