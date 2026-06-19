@@ -1,5 +1,6 @@
 using AutoMapper;
 using psms.Domain.Workflow.Entities;
+using psms.Domain.Workflow.Enums;
 using psms.Workflow.WorkflowDefinitions.Dto;
 using psms.Workflow.WorkflowDelegations.Dto;
 using psms.Workflow.WorkflowInstances.Dto;
@@ -41,6 +42,10 @@ public class WorkflowMapper : Profile
                 opt => opt.MapFrom(src => src.CurrentStep != null ? src.CurrentStep.Name : null))
             .ForMember(dest => dest.CurrentStepAssignedRole,
                 opt => opt.MapFrom(src => src.CurrentStep != null ? src.CurrentStep.AssignedRole : null))
+            .ForMember(dest => dest.CurrentStepActionType,
+                opt => opt.MapFrom(src => src.CurrentStep != null ? (WorkflowActionType?)src.CurrentStep.ActionType : null))
+            .ForMember(dest => dest.CurrentStepIsCommentRequired,
+                opt => opt.MapFrom(src => src.CurrentStep != null && src.CurrentStep.IsCommentRequired))
             .ForMember(dest => dest.IsOverdue,
                 opt => opt.MapFrom(src => src.IsOverdue));
 
@@ -51,6 +56,8 @@ public class WorkflowMapper : Profile
                 opt => opt.MapFrom(src => src.CurrentStep != null ? src.CurrentStep.Name : null))
             .ForMember(dest => dest.CurrentStepAssignedRole,
                 opt => opt.MapFrom(src => src.CurrentStep != null ? src.CurrentStep.AssignedRole : null))
+            .ForMember(dest => dest.CurrentStepActionType,
+                opt => opt.MapFrom(src => src.CurrentStep != null ? (WorkflowActionType?)src.CurrentStep.ActionType : null))
             .ForMember(dest => dest.CurrentStepIsCommentRequired,
                 opt => opt.MapFrom(src => src.CurrentStep != null && src.CurrentStep.IsCommentRequired))
             .ForMember(dest => dest.IsOverdue,

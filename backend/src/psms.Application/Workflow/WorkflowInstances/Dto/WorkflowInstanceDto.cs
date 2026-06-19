@@ -17,6 +17,12 @@ public class WorkflowInstanceDto : FullAuditedEntityDto<Guid>
     public Guid? CurrentStepId { get; set; }
     public string CurrentStepName { get; set; }
     public string CurrentStepAssignedRole { get; set; }
+    /// <summary>WF-22: the current step's configured action type, so the UI can
+    /// offer only the actions valid for this step.</summary>
+    public WorkflowActionType? CurrentStepActionType { get; set; }
+    /// <summary>WF-22: whether the current step requires a comment, so the detail
+    /// page's action modal enforces it client-side (the list DTOs already carry this).</summary>
+    public bool CurrentStepIsCommentRequired { get; set; }
     public int WorkflowDefinitionVersion { get; set; }
     public DateTime? CurrentStepDueDate { get; set; }
     public bool IsOverdue { get; set; }

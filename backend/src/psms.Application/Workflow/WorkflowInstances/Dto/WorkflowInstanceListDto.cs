@@ -20,6 +20,9 @@ public class WorkflowInstanceListDto : EntityDto<Guid>
     public int CurrentStepOrder { get; set; }
     public string CurrentStepName { get; set; }
     public string CurrentStepAssignedRole { get; set; }
+    /// <summary>WF-22: the current step's configured action type, so the UI can
+    /// offer only the actions valid for this step.</summary>
+    public WorkflowActionType? CurrentStepActionType { get; set; }
     public bool CurrentStepIsCommentRequired { get; set; }
     public DateTime? CurrentStepDueDate { get; set; }
     public bool IsOverdue { get; set; }
