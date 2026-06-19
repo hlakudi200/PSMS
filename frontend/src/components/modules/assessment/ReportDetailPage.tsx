@@ -327,14 +327,20 @@ function ReportDetailContent() {
     .filter(Boolean)
     .map((r) => (r as string).toLowerCase());
   const canManageReport = myRoles.some((r) => managementRoles.includes(r));
-  const isTeacherPortal = pathname?.startsWith('/teacher') ?? false;
+  // Reports detail is reached from the principal reports list and, via the
+  // workflow "View full report" link, from the teacher and admin portals.
+  const reportsPortalRoot = pathname?.startsWith('/teacher')
+    ? '/teacher'
+    : pathname?.startsWith('/admin')
+      ? '/admin'
+      : '/principal';
 
   const goBack = useCallback(() => {
-    // Prefer browser history; fall back to the portal's home (the teacher portal
-    // has no reports list page — reports are reached via the workflow link).
+    // Prefer browser history; fall back to the portal's home (only the principal
+    // portal has a reports list page — elsewhere reports are reached via links).
     if (typeof window !== 'undefined' && window.history.length > 1) router.back();
-    else router.push(isTeacherPortal ? '/teacher' : '/principal/reports');
-  }, [router, isTeacherPortal]);
+    else router.push(reportsPortalRoot === '/principal' ? '/principal/reports' : reportsPortalRoot);
+  }, [router, reportsPortalRoot]);
 
   const { report, isPending, isError } = useReportState();
   const { getAsync, approveAsync, publishAsync, addPrincipalCommentAsync, generatePdfAsync } = useReportActions();

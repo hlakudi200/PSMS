@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, usePathname } from 'next/navigation';
 import {
   Card,
   Descriptions,
@@ -300,6 +300,13 @@ function FeeSection({ applicationId }: { applicationId: string }) {
 // Surfaces the application's approval workflow inline, so the principal can see
 // what stage it's at and jump straight to taking action. Self-contained in its
 // own WorkflowInstanceProvider so it doesn't touch the admissions state.
+// The application detail page is reached from the principal portal and, via the
+// workflow "View full application" link, from the admin portal. Derive the portal
+// root from the path so internal links (workflow instance, Back) stay in-portal.
+function portalBaseFrom(pathname: string | null): string {
+  return pathname?.startsWith('/admin') ? '/admin' : '/principal';
+}
+
 const workflowStatusColor: Record<number, string> = {
   [WorkflowStatus.NotStarted]: 'default',
   [WorkflowStatus.InProgress]: 'processing',
@@ -311,6 +318,7 @@ const workflowStatusColor: Record<number, string> = {
 
 function ApplicationWorkflowCardInner({ applicationId, feePaid }: { applicationId: string; feePaid: boolean }) {
   const router = useRouter();
+  const portalBase = portalBaseFrom(usePathname());
   const { instance: wfInstance } = useWorkflowInstanceState();
   const { getByEntityAsync } = useWorkflowInstanceActions();
   // Track first-fetch completion so we show a loader (not a premature "none"
@@ -350,7 +358,7 @@ function ApplicationWorkflowCardInner({ applicationId, feePaid }: { applicationI
       title="Approval Workflow"
       style={{ marginBottom: 16 }}
       extra={
-        <Button type="link" onClick={() => router.push(`/principal/workflow/instances/${wfInstance.id}`)}>
+        <Button type="link" onClick={() => router.push(`${portalBase}/workflow/instances/${wfInstance.id}`)}>
           View / take action
         </Button>
       }
@@ -387,6 +395,7 @@ function ApplicationWorkflowCard({ applicationId, feePaid }: { applicationId: st
 function ApplicationDetailContent() {
   const params = useParams();
   const router = useRouter();
+  const portalBase = portalBaseFrom(usePathname());
   const applicationId = params.id as string;
 
   const { application, isPending, isError } = useApplicationState();
@@ -395,6 +404,13 @@ function ApplicationDetailContent() {
   useEffect(() => {
     if (applicationId) getAsync(applicationId);
   }, [applicationId, getAsync]);
+
+  const goBack = () => {
+    // Prefer browser history (e.g. came from the workflow instance); fall back to
+    // the portal's home — the admin portal has no admissions list page.
+    if (typeof window !== 'undefined' && window.history.length > 1) router.back();
+    else router.push(portalBase === '/admin' ? '/admin/workflow' : '/principal/admissions');
+  };
 
   if (isPending && !application) {
     return (
@@ -407,8 +423,8 @@ function ApplicationDetailContent() {
   if (isError || (!isPending && !application)) {
     return (
       <div style={{ padding: 24 }}>
-        <Button icon={<ArrowLeftOutlined />} onClick={() => router.push('/principal/admissions')} style={{ marginBottom: 16 }}>
-          Back to Admissions
+        <Button icon={<ArrowLeftOutlined />} onClick={goBack} style={{ marginBottom: 16 }}>
+          Back
         </Button>
         <Empty description="Application not found" />
       </div>
@@ -453,10 +469,10 @@ function ApplicationDetailContent() {
     <div style={{ padding: 24 }}>
       <Button
         icon={<ArrowLeftOutlined />}
-        onClick={() => router.push('/principal/admissions')}
+        onClick={goBack}
         style={{ marginBottom: 16 }}
       >
-        Back to Admissions
+        Back
       </Button>
 
       {/* Header */}

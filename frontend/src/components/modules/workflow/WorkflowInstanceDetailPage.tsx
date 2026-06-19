@@ -99,17 +99,16 @@ function DetailContent() {
 
   const isInProgress = wfInstance?.status === WorkflowStatus.InProgress;
 
-  // WF-23: deep-link to the full underlying record when it has a detail page, so
-  // the action-taker can open the actual application/report in one click. These
-  // detail pages live only under the principal portal.
+  // WF-23/25/26: deep-link to the full underlying record when it has a detail
+  // page, so the action-taker can open the actual application/report in one click.
   const portalRoot = base.replace(/\/workflow$/, '');
   // Which portals have a detail page for each entity type. Reports are viewable
-  // by the teacher (HOD Review step) and the principal; admissions only by the
-  // principal. The target is built under the CURRENT portal so the link respects
-  // what the viewer can actually open.
+  // by the teacher (HOD Review step), the principal, and the admin; admissions by
+  // the principal and the admin. The target is built under the CURRENT portal so
+  // the link respects what the viewer can actually open.
   const fullRecordRoutes: Record<number, { segment: string; label: string; portals: string[] }> = {
-    [WorkflowEntityType.Application]: { segment: 'admissions', label: 'View full application', portals: ['/principal'] },
-    [WorkflowEntityType.Report]: { segment: 'reports', label: 'View full report', portals: ['/principal', '/teacher'] },
+    [WorkflowEntityType.Application]: { segment: 'admissions', label: 'View full application', portals: ['/principal', '/admin'] },
+    [WorkflowEntityType.Report]: { segment: 'reports', label: 'View full report', portals: ['/principal', '/teacher', '/admin'] },
   };
   const fullRecord = wfInstance ? fullRecordRoutes[wfInstance.entityType] : undefined;
   const fullRecordHref = fullRecord && wfInstance && fullRecord.portals.includes(portalRoot)
