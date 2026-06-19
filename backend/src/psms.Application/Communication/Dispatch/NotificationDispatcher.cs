@@ -1,5 +1,8 @@
 using Abp.Dependency;
+using Abp.Domain.Repositories;
 using Castle.Core.Logging;
+using Microsoft.EntityFrameworkCore;
+using psms.Domain.Communication.Entities;
 using psms.Domain.Shared.Enums;
 using System;
 using System.Collections.Generic;
@@ -9,20 +12,25 @@ using System.Threading.Tasks;
 namespace psms.Communication.Dispatch;
 
 /// <summary>
-/// COMM-01: default dispatcher. Discovers the registered channel providers, picks
-/// the channels for this request, and delivers per recipient × channel. The
-/// channel set is in-app only today; COMM-05 (preferences/consent) and COMM-11
-/// (routing/fallback) replace <see cref="ResolveChannels"/> with real logic.
+/// COMM-01/02: default dispatcher. Discovers the registered channel providers,
+/// picks the channels for this request, delivers per recipient × channel, and
+/// records every attempt in the delivery log (COMM-02). The channel set is in-app
+/// only today; COMM-05 (preferences/consent) and COMM-11 (routing/fallback) replace
+/// <see cref="ResolveChannels"/> with real logic.
 /// </summary>
 public class NotificationDispatcher : INotificationDispatcher, ITransientDependency
 {
     private readonly IIocResolver _iocResolver;
+    private readonly IRepository<NotificationDeliveryLog, Guid> _deliveryLogRepository;
 
     public ILogger Logger { get; set; } = NullLogger.Instance;
 
-    public NotificationDispatcher(IIocResolver iocResolver)
+    public NotificationDispatcher(
+        IIocResolver iocResolver,
+        IRepository<NotificationDeliveryLog, Guid> deliveryLogRepository)
     {
         _iocResolver = iocResolver;
+        _deliveryLogRepository = deliveryLogRepository;
     }
 
     public async Task<NotificationDispatchResult> DispatchAsync(NotificationRequest request)
@@ -43,18 +51,31 @@ public class NotificationDispatcher : INotificationDispatcher, ITransientDepende
             {
                 foreach (var provider in selected)
                 {
-                    // Isolate each channel: a provider that throws (real channels hit
-                    // networks/SDKs and will) must not abort delivery to the other
-                    // recipients/channels. Convert the failure into a result instead.
+                    // Idempotency: skip a channel for a recipient that was already
+                    // delivered for this key (guards retries / duplicate triggers).
+                    if (!string.IsNullOrEmpty(request.IdempotencyKey)
+                        && await AlreadyDeliveredAsync(request, provider.Channel, recipientUserId))
+                    {
+                        result.Results.Add(ChannelSendResult.Ok(provider.Channel, recipientUserId));
+                        continue;
+                    }
+
+                    ChannelSendResult sendResult;
                     try
                     {
-                        result.Results.Add(await provider.SendAsync(request, recipientUserId));
+                        // Isolate each channel: a provider that throws (real channels
+                        // hit networks/SDKs and will) must not abort delivery to the
+                        // other recipients/channels — record the failure instead.
+                        sendResult = await provider.SendAsync(request, recipientUserId);
                     }
                     catch (Exception ex)
                     {
                         Logger.Warn($"Notification channel '{provider.Channel}' failed for user {recipientUserId}: {ex.Message}", ex);
-                        result.Results.Add(ChannelSendResult.Failed(provider.Channel, recipientUserId, ex.Message));
+                        sendResult = ChannelSendResult.Failed(provider.Channel, recipientUserId, ex.Message);
                     }
+
+                    await WriteDeliveryLogAsync(request, sendResult);
+                    result.Results.Add(sendResult);
                 }
             }
         }
@@ -67,6 +88,59 @@ public class NotificationDispatcher : INotificationDispatcher, ITransientDepende
         }
 
         return result;
+    }
+
+    private async Task<bool> AlreadyDeliveredAsync(NotificationRequest request, NotificationChannel channel, long recipientUserId)
+    {
+        // The explicit TenantId predicate is load-bearing, not redundant: in the
+        // request path ABP's IMayHaveTenant filter already scopes by the ambient
+        // tenant, but when this runs from a session-less background job (COMM-07)
+        // the ambient filter resolves to null-tenant — then this predicate is the
+        // only thing scoping the dedup check to the right tenant. Keep it.
+        return await _deliveryLogRepository.GetAll().AnyAsync(l =>
+            l.TenantId == request.TenantId
+            && l.IdempotencyKey == request.IdempotencyKey
+            && l.Channel == channel
+            && l.RecipientUserId == recipientUserId
+            && l.Status != NotificationDeliveryStatus.Failed);
+    }
+
+    private async Task WriteDeliveryLogAsync(NotificationRequest request, ChannelSendResult sendResult)
+    {
+        var log = new NotificationDeliveryLog(
+            Guid.NewGuid(),
+            request.TenantId,
+            sendResult.Channel,
+            sendResult.RecipientUserId)
+        {
+            IdempotencyKey = request.IdempotencyKey,
+            ReferenceId = sendResult.ReferenceId
+        };
+
+        // Link the in-app row so a webhook / read-sync can find it later.
+        if (sendResult.Channel == NotificationChannel.InApp
+            && Guid.TryParse(sendResult.ReferenceId, out var notificationId))
+        {
+            log.NotificationId = notificationId;
+        }
+
+        if (!sendResult.Success)
+        {
+            log.MarkFailed(sendResult.Error);
+        }
+        else if (sendResult.Channel == NotificationChannel.InApp)
+        {
+            // In-app lands directly in the inbox → Delivered on send.
+            log.MarkDelivered(sendResult.ReferenceId);
+        }
+        else
+        {
+            // External channels are Sent now; a provider webhook (COMM-07+) moves
+            // them to Delivered/Read.
+            log.MarkSent(sendResult.ReferenceId);
+        }
+
+        await _deliveryLogRepository.InsertAsync(log);
     }
 
     /// <summary>

@@ -283,6 +283,11 @@ public class psmsDbContext : AbpZeroDbContext<Tenant, Role, User, psmsDbContext>
     /// </summary>
     public DbSet<AnnouncementRead> AnnouncementReads { get; set; }
 
+    /// <summary>
+    /// COMM-02: per-channel delivery records for notifications
+    /// </summary>
+    public DbSet<NotificationDeliveryLog> NotificationDeliveryLogs { get; set; }
+
     /* ==================== SA Specific Module ==================== */
 
     /// <summary>
@@ -590,6 +595,16 @@ public class psmsDbContext : AbpZeroDbContext<Tenant, Role, User, psmsDbContext>
         modelBuilder.Entity<Message>()
             .HasIndex(m => m.ThreadId)
             .HasDatabaseName("IX_Messages_ThreadId");
+
+        // COMM-02: NotificationDeliveryLog - look up by the in-app notification it
+        // relates to, and by idempotency key (+ channel + recipient) for dedup.
+        modelBuilder.Entity<NotificationDeliveryLog>()
+            .HasIndex(d => d.NotificationId)
+            .HasDatabaseName("IX_NotificationDeliveryLogs_NotificationId");
+
+        modelBuilder.Entity<NotificationDeliveryLog>()
+            .HasIndex(d => new { d.TenantId, d.IdempotencyKey, d.Channel, d.RecipientUserId })
+            .HasDatabaseName("IX_NotificationDeliveryLogs_Idempotency");
     }
 
     private void ConfigureSASpecificModule(ModelBuilder modelBuilder)
