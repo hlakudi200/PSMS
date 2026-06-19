@@ -10,6 +10,7 @@ import {
   CheckCircleOutlined,
   CloseCircleOutlined,
   ClockCircleOutlined,
+  FileSearchOutlined,
 } from '@ant-design/icons';
 import { useParams, useRouter } from 'next/navigation';
 import { useWorkflowBasePath } from './useWorkflowBasePath';
@@ -23,6 +24,7 @@ import { AdvanceWorkflowModal } from '@/components/modals/workflow/AdvanceWorkfl
 import {
   WorkflowStatus,
   WorkflowStatusLabels,
+  WorkflowEntityType,
   WorkflowEntityTypeLabels,
   WorkflowActionTypeLabels,
 } from '@/providers/workflow/shared/interfaces';
@@ -97,6 +99,19 @@ function DetailContent() {
 
   const isInProgress = wfInstance?.status === WorkflowStatus.InProgress;
 
+  // WF-23: deep-link to the full underlying record when it has a detail page, so
+  // the action-taker can open the actual application/report in one click. These
+  // detail pages live only under the principal portal.
+  const portalRoot = base.replace(/\/workflow$/, '');
+  const fullRecordRoutes: Record<number, { segment: string; label: string }> = {
+    [WorkflowEntityType.Application]: { segment: 'admissions', label: 'View full application' },
+    [WorkflowEntityType.Report]: { segment: 'reports', label: 'View full report' },
+  };
+  const fullRecord = wfInstance ? fullRecordRoutes[wfInstance.entityType] : undefined;
+  const fullRecordHref = fullRecord && portalRoot === '/principal' && wfInstance
+    ? `${portalRoot}/${fullRecord.segment}/${wfInstance.entityId}`
+    : undefined;
+
   const handleCancel = async () => {
     await cancelAsync(id);
     message.success('Workflow cancelled');
@@ -115,18 +130,29 @@ function DetailContent() {
 
   return (
     <div style={{ padding: 24 }}>
-      <Button
-        icon={<ArrowLeftOutlined />}
-        onClick={() => {
-          // Return to wherever the user came from; fall back to the portal's
-          // workflow home when opened via a direct link (no SPA history).
-          if (typeof window !== 'undefined' && window.history.length > 1) router.back();
-          else router.push(base);
-        }}
-        style={{ marginBottom: 16 }}
-      >
-        Back
-      </Button>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+        <Button
+          icon={<ArrowLeftOutlined />}
+          onClick={() => {
+            // Return to wherever the user came from; fall back to the portal's
+            // workflow home when opened via a direct link (no SPA history).
+            if (typeof window !== 'undefined' && window.history.length > 1) router.back();
+            else router.push(base);
+          }}
+        >
+          Back
+        </Button>
+        {fullRecordHref && (
+          <Button
+            type="primary"
+            ghost
+            icon={<FileSearchOutlined />}
+            onClick={() => router.push(fullRecordHref)}
+          >
+            {fullRecord!.label}
+          </Button>
+        )}
+      </div>
 
       {entitySummary && (
         <Card title="What you're approving" style={{ marginBottom: 24 }}>

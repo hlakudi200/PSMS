@@ -41,6 +41,16 @@ import { ApplicationDocumentProvider, useApplicationDocumentState, useApplicatio
 import { AdmissionInterviewProvider, useAdmissionInterviewState, useAdmissionInterviewActions } from '@/providers/admissions/admission_interviews';
 import { AdmissionAssessmentProvider, useAdmissionAssessmentState, useAdmissionAssessmentActions } from '@/providers/admissions/admission_assessments';
 import { ApplicationFeeProvider, useApplicationFeeState, useApplicationFeeActions } from '@/providers/admissions/application_fees';
+import {
+  WorkflowInstanceProvider,
+  useWorkflowInstanceState,
+  useWorkflowInstanceActions,
+} from '@/providers/workflow/workflow-instances';
+import {
+  WorkflowStatus,
+  WorkflowStatusLabels,
+  WorkflowEntityType,
+} from '@/providers/workflow/shared/interfaces';
 import { getAxiosInstance } from '@/utils/axios-instance';
 import type {
   IApplicantParent,
@@ -293,6 +303,93 @@ function FeeSection({ applicationId }: { applicationId: string }) {
   );
 }
 
+// ─── Approval Workflow Card (WF-23) ────────────────────────────
+// Surfaces the application's approval workflow inline, so the principal can see
+// what stage it's at and jump straight to taking action. Self-contained in its
+// own WorkflowInstanceProvider so it doesn't touch the admissions state.
+const workflowStatusColor: Record<number, string> = {
+  [WorkflowStatus.NotStarted]: 'default',
+  [WorkflowStatus.InProgress]: 'processing',
+  [WorkflowStatus.Completed]: 'green',
+  [WorkflowStatus.Rejected]: 'red',
+  [WorkflowStatus.Cancelled]: 'default',
+  [WorkflowStatus.Recalled]: 'purple',
+};
+
+function ApplicationWorkflowCardInner({ applicationId, feePaid }: { applicationId: string; feePaid: boolean }) {
+  const router = useRouter();
+  const { instance: wfInstance } = useWorkflowInstanceState();
+  const { getByEntityAsync } = useWorkflowInstanceActions();
+  // Track first-fetch completion so we show a loader (not a premature "none"
+  // note) until the lookup resolves. GetByEntity returns only an ACTIVE instance.
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    setLoaded(false);
+    Promise.resolve(getByEntityAsync(WorkflowEntityType.Application, applicationId))
+      .finally(() => { if (active) setLoaded(true); });
+    return () => { active = false; };
+  }, [applicationId, getByEntityAsync]);
+
+  if (!loaded) {
+    return <Card size="small" title="Approval Workflow" loading style={{ marginBottom: 16 }} />;
+  }
+
+  // GetByEntity 404s when there's no ACTIVE workflow — either none has started
+  // (fee unpaid) or it already ran to completion. Tailor the copy so a decided
+  // application doesn't wrongly read as "never started".
+  if (!wfInstance) {
+    return (
+      <Card size="small" title="Approval Workflow" style={{ marginBottom: 16 }}>
+        <Text type="secondary">
+          {feePaid
+            ? 'No active approval workflow. If a decision has been made, the workflow has already completed.'
+            : 'No approval workflow yet — it starts automatically once the application fee is paid.'}
+        </Text>
+      </Card>
+    );
+  }
+
+  return (
+    <Card
+      size="small"
+      title="Approval Workflow"
+      style={{ marginBottom: 16 }}
+      extra={
+        <Button type="link" onClick={() => router.push(`/principal/workflow/instances/${wfInstance.id}`)}>
+          View / take action
+        </Button>
+      }
+    >
+      <Space size="large" wrap>
+        <span>
+          <Text type="secondary">Current step: </Text>
+          <Text strong>{wfInstance.currentStepName ?? '—'}</Text>
+          {wfInstance.currentStepAssignedRole && (
+            <Tag style={{ marginLeft: 8 }}>{wfInstance.currentStepAssignedRole}</Tag>
+          )}
+        </span>
+        <span>
+          <Text type="secondary">Status: </Text>
+          <Tag color={workflowStatusColor[wfInstance.status] ?? 'default'}>
+            {WorkflowStatusLabels[wfInstance.status] ?? '—'}
+          </Tag>
+        </span>
+        {wfInstance.isOverdue && <Tag color="red">Overdue</Tag>}
+      </Space>
+    </Card>
+  );
+}
+
+function ApplicationWorkflowCard({ applicationId, feePaid }: { applicationId: string; feePaid: boolean }) {
+  return (
+    <WorkflowInstanceProvider>
+      <ApplicationWorkflowCardInner applicationId={applicationId} feePaid={feePaid} />
+    </WorkflowInstanceProvider>
+  );
+}
+
 // ─── Main Content ──────────────────────────────────────────────
 function ApplicationDetailContent() {
   const params = useParams();
@@ -444,6 +541,9 @@ function ApplicationDetailContent() {
           style={{ marginBottom: 16 }}
         />
       )}
+
+      {/* Approval Workflow (WF-23) */}
+      <ApplicationWorkflowCard applicationId={applicationId} feePaid={app.isFeePaid} />
 
       {/* Decision Actions */}
       {app.canMakeDecision && (
