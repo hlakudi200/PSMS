@@ -6,9 +6,11 @@ using Abp.Linq.Extensions;
 using Abp.UI;
 using Microsoft.EntityFrameworkCore;
 using psms.Authorization;
+using psms.Communication.Dispatch;
 using psms.Communication.Notifications.Dto;
 using psms.Communication.Shared;
 using psms.Domain.Communication.Entities;
+using psms.Domain.Shared.Enums;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -21,10 +23,14 @@ namespace psms.Communication.Notifications;
 public class NotificationAppService : ApplicationService, INotificationAppService
 {
     private readonly IRepository<Notification, Guid> _notificationRepository;
+    private readonly INotificationDispatcher _dispatcher;
 
-    public NotificationAppService(IRepository<Notification, Guid> notificationRepository)
+    public NotificationAppService(
+        IRepository<Notification, Guid> notificationRepository,
+        INotificationDispatcher dispatcher)
     {
         _notificationRepository = notificationRepository;
+        _dispatcher = dispatcher;
     }
 
     [AbpAuthorize(PermissionNames.Communication_Notifications_View)]
@@ -131,29 +137,37 @@ public class NotificationAppService : ApplicationService, INotificationAppServic
     [AbpAuthorize(PermissionNames.Communication_Notifications_Configure)]
     public async Task<NotificationDto> CreateAsync(CreateNotificationDto input)
     {
-        var notification = new Notification(
-            Guid.NewGuid(),
-            AbpSession.TenantId,
-            input.UserId,
-            input.Title.Trim(),
-            input.Message.Trim(),
-            input.Type)
+        // COMM-01: route through the channel-agnostic dispatcher instead of writing
+        // the Notification row directly. Today that resolves to the in-app channel
+        // only, so behaviour is unchanged; later tickets add channels/preferences
+        // behind the same call.
+        var request = new NotificationRequest
         {
-            Priority = input.Priority
+            TenantId = AbpSession.TenantId,
+            RecipientUserIds = new List<long> { input.UserId },
+            Type = input.Type,
+            Priority = input.Priority,
+            Title = input.Title,
+            Message = input.Message,
+            ActionUrl = input.ActionUrl,
+            EntityType = input.EntityType,
+            EntityId = input.EntityId
         };
 
-        if (!string.IsNullOrWhiteSpace(input.EntityType) && input.EntityId.HasValue)
-        {
-            notification.LinkToEntity(input.EntityType.Trim(), input.EntityId.Value, input.ActionUrl?.Trim());
-        }
-        else if (!string.IsNullOrWhiteSpace(input.ActionUrl))
-        {
-            notification.ActionUrl = input.ActionUrl.Trim();
-        }
-
-        await _notificationRepository.InsertAsync(notification);
+        var dispatch = await _dispatcher.DispatchAsync(request);
         await CurrentUnitOfWork.SaveChangesAsync();
 
+        // Preserve the existing contract: return the created in-app notification.
+        var inAppResult = dispatch.Results.FirstOrDefault(r =>
+            r.Channel == NotificationChannel.InApp && r.Success && r.RecipientUserId == input.UserId);
+
+        if (inAppResult == null || !Guid.TryParse(inAppResult.ReferenceId, out var notificationId))
+        {
+            throw new UserFriendlyException(CommunicationExceptionCodes.NotificationDispatchFailed,
+                "Notification could not be created.");
+        }
+
+        var notification = await _notificationRepository.GetAsync(notificationId);
         return ObjectMapper.Map<NotificationDto>(notification);
     }
 }

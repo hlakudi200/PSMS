@@ -1,7 +1,9 @@
 ﻿using Abp.AutoMapper;
 using Abp.Modules;
 using Abp.Reflection.Extensions;
+using Castle.MicroKernel.Registration;
 using psms.Authorization;
+using psms.Communication.Dispatch;
 using psms.Domain.Shared.LiveStreaming;
 using psms.Domain.Shared.Storage;
 using psms.Infrastructure.LiveStreaming;
@@ -27,6 +29,16 @@ public class psmsApplicationModule : AbpModule
 
         IocManager.Register<IFileStorageService, SupabaseStorageService>(Abp.Dependency.DependencyLifeStyle.Transient);
         IocManager.Register<ILiveKitTokenService, LiveKitTokenService>(Abp.Dependency.DependencyLifeStyle.Transient);
+
+        // COMM-01: register every notification channel provider against the shared
+        // INotificationChannelProvider interface so the dispatcher can discover them
+        // all (IIocResolver.ResolveAll). Providers are plain classes (no marker
+        // interface), so this is their only registration — no double-registration.
+        IocManager.IocContainer.Register(
+            Classes.FromAssembly(thisAssembly)
+                .BasedOn<INotificationChannelProvider>()
+                .WithService.Base()
+                .LifestyleTransient());
 
         Configuration.Modules.AbpAutoMapper().Configurators.Add(
             // Scan the assembly for classes which inherit from AutoMapper.Profile
