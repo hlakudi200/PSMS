@@ -31,6 +31,14 @@ public class NotificationRequest
 
     public Guid? EntityId { get; set; }
 
+    /// <summary>
+    /// COMM-02: optional dedup key. When set, the dispatcher skips a channel for a
+    /// recipient if a non-failed delivery-log row already exists for the same
+    /// (key, channel, recipient) — so a retry (or a duplicate trigger) never
+    /// double-sends. Null = no dedup (e.g. ad-hoc manual sends).
+    /// </summary>
+    public string IdempotencyKey { get; set; }
+
     /// <summary>Convenience for the common single-recipient case.</summary>
     public static NotificationRequest ForUser(
         int? tenantId, long userId, NotificationType type, string title, string message)
