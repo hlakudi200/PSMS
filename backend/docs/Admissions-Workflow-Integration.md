@@ -55,20 +55,20 @@ are set by the separate admissions services (`AdmissionInterviewAppService`,
 
 ## Important finding — the decision path is workflow-only
 
-The admissions application detail page renders manual **Approve / Reject / Waitlist**
-buttons (gated on `ApplicationDto.CanMakeDecision`) that POST to
-`Application/MakeDecision`. As of this writing:
+The admissions application detail page used to render manual **Approve / Reject /
+Waitlist** buttons (gated on `ApplicationDto.CanMakeDecision`) that POST to
+`Application/MakeDecision`. That UI was **dead**:
 
 - **`ApplicationAppService` has no `MakeDecision` (or Approve/Reject/Waitlist) method** —
-  so that POST hits a non-existent endpoint and fails.
+  so that POST hit a non-existent endpoint and failed.
 - `CanMakeDecision` is only `true` when `Status == UnderConsideration`, but the
   workflow bridge moves an application `UnderReview → UnderConsideration → Approved`
   in a single step, so the application never *rests* at `UnderConsideration`. The
-  manual buttons therefore essentially never even appear.
+  manual buttons therefore essentially never even appeared.
 
-**Net:** the **workflow is effectively the only working approve/reject mechanism**
-for applications. Either remove the dead manual-decision UI, or implement a real
-`MakeDecision` endpoint — tracked as a follow-up.
+**WF-24 removed that dead UI.** The **workflow is the only approve/reject mechanism**
+for applications. If a deliberate manual-override decision is ever wanted, it should
+be a proper, workflow-aware feature with a real backend endpoint.
 
 ## What WF-23 added
 
@@ -85,7 +85,6 @@ for applications. Either remove the dead manual-decision UI, or implement a real
 
 - **Intermediate sync:** workflow steps don't update the application status. Could
   map steps → admissions statuses if tighter tracking is wanted.
-- **Dead decision UI:** remove or wire up `Application/MakeDecision`.
 - **Admissions list:** no workflow-stage column yet (needs a batched
   "active instance by entity ids" endpoint).
 - **Bridge resilience:** `HandleApplicationApproved/Rejected` silently no-op (log a
