@@ -32,4 +32,5 @@ public static class CommunicationExceptionCodes
     // Notification
     public const string NotificationNotFound = "COMM_NOTIFICATION_NOT_FOUND";
     public const string NotificationNotForCurrentUser = "COMM_NOTIFICATION_NOT_FOR_CURRENT_USER";
+    public const string NotificationDispatchFailed = "COMM_NOTIFICATION_DISPATCH_FAILED";
 }
