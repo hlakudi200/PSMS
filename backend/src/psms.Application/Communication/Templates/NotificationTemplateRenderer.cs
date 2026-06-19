@@ -64,6 +64,7 @@ public class NotificationTemplateRenderer : INotificationTemplateRenderer, ITran
             Title = Substitute(template.Title, variables),
             Body = Substitute(template.Body, variables),
             ProviderTemplateName = template.ProviderTemplateName,
+            ProviderParameterKeys = template.ProviderParameterKeys,
             Language = template.Language,
             ApprovalStatus = template.ApprovalStatus
         };

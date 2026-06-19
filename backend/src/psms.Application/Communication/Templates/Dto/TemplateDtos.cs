@@ -14,6 +14,7 @@ public class NotificationTemplateDto : EntityDto<Guid>
     public string Title { get; set; }
     public string Body { get; set; }
     public string ProviderTemplateName { get; set; }
+    public string ProviderParameterKeys { get; set; }
     public TemplateApprovalStatus ApprovalStatus { get; set; }
     public bool IsActive { get; set; }
     public DateTime CreationTime { get; set; }
@@ -51,6 +52,9 @@ public class CreateNotificationTemplateDto
 
     [StringLength(NotificationTemplate.MaxProviderTemplateNameLength)]
     public string ProviderTemplateName { get; set; }
+
+    [StringLength(NotificationTemplate.MaxProviderParameterKeysLength)]
+    public string ProviderParameterKeys { get; set; }
 }
 
 public class UpdateNotificationTemplateDto
@@ -64,6 +68,9 @@ public class UpdateNotificationTemplateDto
 
     [StringLength(NotificationTemplate.MaxProviderTemplateNameLength)]
     public string ProviderTemplateName { get; set; }
+
+    [StringLength(NotificationTemplate.MaxProviderParameterKeysLength)]
+    public string ProviderParameterKeys { get; set; }
 
     public bool IsActive { get; set; }
 }
