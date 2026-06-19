@@ -109,5 +109,12 @@ namespace psms.Domain.Communication.Entities
             AttemptCount++;
             Error = error;
         }
+
+        /// <summary>COMM-05: channel was not attempted — blocked by preference/consent.</summary>
+        public void MarkSuppressed(string reason)
+        {
+            Status = NotificationDeliveryStatus.Suppressed;
+            Error = reason;
+        }
     }
 }

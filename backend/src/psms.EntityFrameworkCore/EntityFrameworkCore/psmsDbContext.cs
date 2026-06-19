@@ -293,6 +293,16 @@ public class psmsDbContext : AbpZeroDbContext<Tenant, Role, User, psmsDbContext>
     /// </summary>
     public DbSet<UserDeviceToken> UserDeviceTokens { get; set; }
 
+    /// <summary>
+    /// COMM-05: per-user external-channel consent (POPIA opt-in/out)
+    /// </summary>
+    public DbSet<NotificationConsent> NotificationConsents { get; set; }
+
+    /// <summary>
+    /// COMM-05: per-user, per-channel, per-category notification preferences
+    /// </summary>
+    public DbSet<NotificationPreference> NotificationPreferences { get; set; }
+
     /* ==================== SA Specific Module ==================== */
 
     /// <summary>
@@ -621,6 +631,20 @@ public class psmsDbContext : AbpZeroDbContext<Tenant, Role, User, psmsDbContext>
         modelBuilder.Entity<UserDeviceToken>()
             .HasIndex(t => t.UserId)
             .HasDatabaseName("IX_UserDeviceTokens_UserId");
+
+        // COMM-05: one consent row per user per channel.
+        modelBuilder.Entity<NotificationConsent>()
+            .HasIndex(c => new { c.UserId, c.Channel })
+            .IsUnique()
+            .HasDatabaseName("IX_NotificationConsents_UserId_Channel");
+
+        // COMM-05: one preference row per user per channel per category
+        // (soft-delete aware, since the entity is full-audited).
+        modelBuilder.Entity<NotificationPreference>()
+            .HasIndex(p => new { p.UserId, p.Channel, p.Category })
+            .IsUnique()
+            .HasFilter("\"IsDeleted\" = false")
+            .HasDatabaseName("IX_NotificationPreferences_UserId_Channel_Category");
     }
 
     private void ConfigureSASpecificModule(ModelBuilder modelBuilder)
