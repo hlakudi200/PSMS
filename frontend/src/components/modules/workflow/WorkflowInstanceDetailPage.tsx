@@ -103,12 +103,16 @@ function DetailContent() {
   // the action-taker can open the actual application/report in one click. These
   // detail pages live only under the principal portal.
   const portalRoot = base.replace(/\/workflow$/, '');
-  const fullRecordRoutes: Record<number, { segment: string; label: string }> = {
-    [WorkflowEntityType.Application]: { segment: 'admissions', label: 'View full application' },
-    [WorkflowEntityType.Report]: { segment: 'reports', label: 'View full report' },
+  // Which portals have a detail page for each entity type. Reports are viewable
+  // by the teacher (HOD Review step) and the principal; admissions only by the
+  // principal. The target is built under the CURRENT portal so the link respects
+  // what the viewer can actually open.
+  const fullRecordRoutes: Record<number, { segment: string; label: string; portals: string[] }> = {
+    [WorkflowEntityType.Application]: { segment: 'admissions', label: 'View full application', portals: ['/principal'] },
+    [WorkflowEntityType.Report]: { segment: 'reports', label: 'View full report', portals: ['/principal', '/teacher'] },
   };
   const fullRecord = wfInstance ? fullRecordRoutes[wfInstance.entityType] : undefined;
-  const fullRecordHref = fullRecord && portalRoot === '/principal' && wfInstance
+  const fullRecordHref = fullRecord && wfInstance && fullRecord.portals.includes(portalRoot)
     ? `${portalRoot}/${fullRecord.segment}/${wfInstance.entityId}`
     : undefined;
 
