@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import {
   Card,
@@ -15,19 +15,13 @@ import {
   Empty,
   Steps,
   Alert,
-  Input,
   message,
-  Popconfirm,
   Row,
   Col,
   Statistic,
 } from 'antd';
 import {
   ArrowLeftOutlined,
-  CheckCircleOutlined,
-  CloseCircleOutlined,
-  UnorderedListOutlined,
-  UserAddOutlined,
   TeamOutlined,
   FileOutlined,
   AudioOutlined,
@@ -51,7 +45,6 @@ import {
   WorkflowStatusLabels,
   WorkflowEntityType,
 } from '@/providers/workflow/shared/interfaces';
-import { getAxiosInstance } from '@/utils/axios-instance';
 import type {
   IApplicantParent,
   IApplicationDocument,
@@ -398,35 +391,10 @@ function ApplicationDetailContent() {
 
   const { application, isPending, isError } = useApplicationState();
   const { getAsync } = useApplicationActions();
-  const [decisionReason, setDecisionReason] = useState('');
-  const [actionLoading, setActionLoading] = useState(false);
 
   useEffect(() => {
     if (applicationId) getAsync(applicationId);
   }, [applicationId, getAsync]);
-
-  const refresh = useCallback(() => {
-    getAsync(applicationId);
-  }, [applicationId, getAsync]);
-
-  const handleDecision = async (decision: string) => {
-    setActionLoading(true);
-    try {
-      const instance = getAxiosInstance();
-      await instance.post('/api/services/app/Application/MakeDecision', {
-        id: applicationId,
-        decision,
-        reason: decisionReason || undefined,
-      });
-      message.success(`Application ${decision.toLowerCase()}`);
-      setDecisionReason('');
-      refresh();
-    } catch {
-      message.error('Failed to process decision');
-    } finally {
-      setActionLoading(false);
-    }
-  };
 
   if (isPending && !application) {
     return (
@@ -542,33 +510,10 @@ function ApplicationDetailContent() {
         />
       )}
 
-      {/* Approval Workflow (WF-23) */}
+      {/* Approval Workflow (WF-23) — the application's decision flows through the
+          workflow; the card above links to take action. (WF-24 removed the dead
+          manual Decision card that posted to a non-existent MakeDecision endpoint.) */}
       <ApplicationWorkflowCard applicationId={applicationId} feePaid={app.isFeePaid} />
-
-      {/* Decision Actions */}
-      {app.canMakeDecision && (
-        <Card title="Decision" size="small" style={{ marginBottom: 16 }}>
-          <Input.TextArea
-            value={decisionReason}
-            onChange={(e) => setDecisionReason(e.target.value)}
-            placeholder="Reason (optional)"
-            rows={2}
-            maxLength={500}
-            style={{ marginBottom: 12 }}
-          />
-          <Space>
-            <Popconfirm title="Approve this application?" onConfirm={() => handleDecision('Approved')}>
-              <Button type="primary" icon={<CheckCircleOutlined />} loading={actionLoading}>Approve</Button>
-            </Popconfirm>
-            <Popconfirm title="Reject this application?" onConfirm={() => handleDecision('Rejected')}>
-              <Button danger icon={<CloseCircleOutlined />} loading={actionLoading}>Reject</Button>
-            </Popconfirm>
-            <Popconfirm title="Waitlist this application?" onConfirm={() => handleDecision('Waitlisted')}>
-              <Button icon={<UnorderedListOutlined />} loading={actionLoading}>Waitlist</Button>
-            </Popconfirm>
-          </Space>
-        </Card>
-      )}
 
       {/* Applicant Details */}
       <Card title="Applicant Information" size="small" style={{ marginBottom: 16 }}>
