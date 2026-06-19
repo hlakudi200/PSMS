@@ -24,6 +24,7 @@ namespace psms.Domain.Communication.Entities
         public const int MaxTitleLength = 200;
         public const int MaxBodyLength = 4000;
         public const int MaxProviderTemplateNameLength = 200;
+        public const int MaxProviderParameterKeysLength = 500;
 
         public int? TenantId { get; set; }
 
@@ -51,6 +52,15 @@ namespace psms.Domain.Communication.Entities
         [StringLength(MaxProviderTemplateNameLength)]
         public string ProviderTemplateName { get; set; }
 
+        /// <summary>
+        /// WhatsApp only — ordered, comma-separated variable names mapping our
+        /// {{placeholders}} to Meta's positional body parameters ({{1}},{{2}},…).
+        /// e.g. "studentName,grade" → Meta body params [studentName, grade]. Meta
+        /// uses its own stored template text; we only supply these ordered values.
+        /// </summary>
+        [StringLength(MaxProviderParameterKeysLength)]
+        public string ProviderParameterKeys { get; set; }
+
         public TemplateApprovalStatus ApprovalStatus { get; set; }
 
         public bool IsActive { get; set; }
@@ -61,7 +71,7 @@ namespace psms.Domain.Communication.Entities
 
         public NotificationTemplate(
             Guid id, int? tenantId, string templateKey, NotificationChannel channel, string language,
-            string title, string body, string providerTemplateName = null)
+            string title, string body, string providerTemplateName = null, string providerParameterKeys = null)
         {
             Id = id;
             TenantId = tenantId;
@@ -72,6 +82,7 @@ namespace psms.Domain.Communication.Entities
             Title = title;
             Body = body;
             ProviderTemplateName = providerTemplateName;
+            ProviderParameterKeys = providerParameterKeys;
             // WhatsApp templates start as Draft (need Meta approval); others are usable as-is.
             ApprovalStatus = channel == NotificationChannel.WhatsApp
                 ? TemplateApprovalStatus.Draft
@@ -79,11 +90,12 @@ namespace psms.Domain.Communication.Entities
             IsActive = true;
         }
 
-        public void Update(string title, string body, string providerTemplateName, bool isActive)
+        public void Update(string title, string body, string providerTemplateName, string providerParameterKeys, bool isActive)
         {
             Title = title;
             Body = body;
             ProviderTemplateName = providerTemplateName;
+            ProviderParameterKeys = providerParameterKeys;
             IsActive = isActive;
             // A WhatsApp content edit needs Meta re-approval — drop back to Draft so
             // the COMM-07 provider never sends a stale "Approved" template.

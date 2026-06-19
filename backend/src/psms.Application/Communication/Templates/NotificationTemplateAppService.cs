@@ -78,7 +78,7 @@ public class NotificationTemplateAppService : ApplicationService, INotificationT
 
         var template = new NotificationTemplate(
             Guid.NewGuid(), AbpSession.TenantId, key, input.Channel, language,
-            input.Title?.Trim(), input.Body, input.ProviderTemplateName?.Trim());
+            input.Title?.Trim(), input.Body, input.ProviderTemplateName?.Trim(), input.ProviderParameterKeys?.Trim());
 
         await _templateRepository.InsertAsync(template);
         await CurrentUnitOfWork.SaveChangesAsync();
@@ -89,7 +89,7 @@ public class NotificationTemplateAppService : ApplicationService, INotificationT
     public async Task<NotificationTemplateDto> UpdateAsync(Guid id, UpdateNotificationTemplateDto input)
     {
         var template = await GetTemplateAsync(id);
-        template.Update(input.Title?.Trim(), input.Body, input.ProviderTemplateName?.Trim(), input.IsActive);
+        template.Update(input.Title?.Trim(), input.Body, input.ProviderTemplateName?.Trim(), input.ProviderParameterKeys?.Trim(), input.IsActive);
         await _templateRepository.UpdateAsync(template);
         await CurrentUnitOfWork.SaveChangesAsync();
         return ToDto(template);
@@ -132,6 +132,7 @@ public class NotificationTemplateAppService : ApplicationService, INotificationT
         Title = t.Title,
         Body = t.Body,
         ProviderTemplateName = t.ProviderTemplateName,
+        ProviderParameterKeys = t.ProviderParameterKeys,
         ApprovalStatus = t.ApprovalStatus,
         IsActive = t.IsActive,
         CreationTime = t.CreationTime

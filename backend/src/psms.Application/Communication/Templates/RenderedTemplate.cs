@@ -15,6 +15,9 @@ public class RenderedTemplate
     /// <summary>WhatsApp only — the Meta template name to invoke.</summary>
     public string ProviderTemplateName { get; set; }
 
+    /// <summary>WhatsApp only — ordered, comma-separated variable names for Meta's body params.</summary>
+    public string ProviderParameterKeys { get; set; }
+
     /// <summary>The language actually used (requested, or the default-language fallback).</summary>
     public string Language { get; set; }
 

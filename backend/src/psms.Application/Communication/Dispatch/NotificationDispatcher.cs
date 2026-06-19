@@ -177,6 +177,7 @@ public class NotificationDispatcher : INotificationDispatcher, ITransientDepende
         // tenant, but when this runs from a session-less background job (COMM-07)
         // the ambient filter resolves to null-tenant — then this predicate is the
         // only thing scoping the dedup check to the right tenant. Keep it.
+        // (The async/background-job transport is owned by COMM-11.)
         return await _deliveryLogRepository.GetAll().AnyAsync(l =>
             l.TenantId == request.TenantId
             && l.IdempotencyKey == request.IdempotencyKey
