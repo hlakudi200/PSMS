@@ -9,6 +9,13 @@ public class User : AbpUser<User>
 {
     public const string DefaultPassword = "123qwe";
 
+    /// <summary>
+    /// COMM-04: WhatsApp number (E.164) for the WhatsApp channel. Distinct from
+    /// AbpUser.PhoneNumber (the SMS/voice MSISDN) because WhatsApp needs its own
+    /// opt-in and may differ. Null when the user has no WhatsApp contact.
+    /// </summary>
+    public virtual string WhatsAppNumber { get; set; }
+
     public static string CreateRandomPassword()
     {
         return Guid.NewGuid().ToString("N").Truncate(16);
