@@ -303,6 +303,11 @@ public class psmsDbContext : AbpZeroDbContext<Tenant, Role, User, psmsDbContext>
     /// </summary>
     public DbSet<NotificationPreference> NotificationPreferences { get; set; }
 
+    /// <summary>
+    /// COMM-06: channel- and language-specific notification templates
+    /// </summary>
+    public DbSet<NotificationTemplate> NotificationTemplates { get; set; }
+
     /* ==================== SA Specific Module ==================== */
 
     /// <summary>
@@ -645,6 +650,13 @@ public class psmsDbContext : AbpZeroDbContext<Tenant, Role, User, psmsDbContext>
             .IsUnique()
             .HasFilter("\"IsDeleted\" = false")
             .HasDatabaseName("IX_NotificationPreferences_UserId_Channel_Category");
+
+        // COMM-06: one template per (tenant, key, channel, language), soft-delete aware.
+        modelBuilder.Entity<NotificationTemplate>()
+            .HasIndex(t => new { t.TenantId, t.TemplateKey, t.Channel, t.Language })
+            .IsUnique()
+            .HasFilter("\"IsDeleted\" = false")
+            .HasDatabaseName("IX_NotificationTemplates_Tenant_Key_Channel_Language");
     }
 
     private void ConfigureSASpecificModule(ModelBuilder modelBuilder)

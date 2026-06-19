@@ -39,6 +39,19 @@ public class NotificationRequest
     /// </summary>
     public string IdempotencyKey { get; set; }
 
+    /// <summary>
+    /// COMM-06: optional template key. When set, channel providers render the
+    /// per-channel/per-language template (with <see cref="Variables"/>) instead of
+    /// using the literal Title/Message. Null = use Title/Message verbatim.
+    /// </summary>
+    public string TemplateKey { get; set; }
+
+    /// <summary>COMM-06: ISO language for template rendering (defaults to "en").</summary>
+    public string Language { get; set; }
+
+    /// <summary>COMM-06: substitution values for the template's {{placeholders}}.</summary>
+    public IDictionary<string, string> Variables { get; set; }
+
     /// <summary>Convenience for the common single-recipient case.</summary>
     public static NotificationRequest ForUser(
         int? tenantId, long userId, NotificationType type, string title, string message)

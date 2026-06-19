@@ -1,7 +1,9 @@
 using Abp.Domain.Repositories;
+using psms.Communication.Templates;
 using psms.Domain.Communication.Entities;
 using psms.Domain.Shared.Enums;
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace psms.Communication.Dispatch.Providers;
@@ -16,22 +18,42 @@ namespace psms.Communication.Dispatch.Providers;
 public class InAppNotificationProvider : INotificationChannelProvider
 {
     private readonly IRepository<Notification, Guid> _notificationRepository;
+    private readonly INotificationTemplateRenderer _templateRenderer;
 
-    public InAppNotificationProvider(IRepository<Notification, Guid> notificationRepository)
+    public InAppNotificationProvider(
+        IRepository<Notification, Guid> notificationRepository,
+        INotificationTemplateRenderer templateRenderer)
     {
         _notificationRepository = notificationRepository;
+        _templateRenderer = templateRenderer;
     }
 
     public NotificationChannel Channel => NotificationChannel.InApp;
 
     public async Task<ChannelSendResult> SendAsync(NotificationRequest request, long recipientUserId)
     {
+        // COMM-06: if the request names a template, render it for in-app; otherwise
+        // (and if the template isn't found) use the literal Title/Message.
+        var title = request.Title;
+        var message = request.Message;
+        if (!string.IsNullOrWhiteSpace(request.TemplateKey))
+        {
+            var vars = request.Variables != null ? new Dictionary<string, string>(request.Variables) : null;
+            var rendered = await _templateRenderer.RenderAsync(
+                request.TemplateKey, NotificationChannel.InApp, request.Language, vars);
+            if (rendered.Found)
+            {
+                title = rendered.Title;
+                message = rendered.Body;
+            }
+        }
+
         var notification = new Notification(
             Guid.NewGuid(),
             request.TenantId,
             recipientUserId,
-            (request.Title ?? string.Empty).Trim(),
-            (request.Message ?? string.Empty).Trim(),
+            (title ?? string.Empty).Trim(),
+            (message ?? string.Empty).Trim(),
             request.Type)
         {
             Priority = request.Priority
