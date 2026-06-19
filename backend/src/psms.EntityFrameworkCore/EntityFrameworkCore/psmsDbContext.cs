@@ -288,6 +288,11 @@ public class psmsDbContext : AbpZeroDbContext<Tenant, Role, User, psmsDbContext>
     /// </summary>
     public DbSet<NotificationDeliveryLog> NotificationDeliveryLogs { get; set; }
 
+    /// <summary>
+    /// COMM-04: registered push device tokens per user
+    /// </summary>
+    public DbSet<UserDeviceToken> UserDeviceTokens { get; set; }
+
     /* ==================== SA Specific Module ==================== */
 
     /// <summary>
@@ -605,6 +610,17 @@ public class psmsDbContext : AbpZeroDbContext<Tenant, Role, User, psmsDbContext>
         modelBuilder.Entity<NotificationDeliveryLog>()
             .HasIndex(d => new { d.TenantId, d.IdempotencyKey, d.Channel, d.RecipientUserId })
             .HasDatabaseName("IX_NotificationDeliveryLogs_Idempotency");
+
+        // COMM-04: a push token is unique (one row per physical token); also index
+        // by user for "all my devices" lookups.
+        modelBuilder.Entity<UserDeviceToken>()
+            .HasIndex(t => t.Token)
+            .IsUnique()
+            .HasDatabaseName("IX_UserDeviceTokens_Token");
+
+        modelBuilder.Entity<UserDeviceToken>()
+            .HasIndex(t => t.UserId)
+            .HasDatabaseName("IX_UserDeviceTokens_UserId");
     }
 
     private void ConfigureSASpecificModule(ModelBuilder modelBuilder)
