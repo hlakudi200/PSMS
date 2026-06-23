@@ -30,10 +30,17 @@ public class psmsApplicationModule : AbpModule
         IocManager.Register<IFileStorageService, SupabaseStorageService>(Abp.Dependency.DependencyLifeStyle.Transient);
         IocManager.Register<ILiveKitTokenService, LiveKitTokenService>(Abp.Dependency.DependencyLifeStyle.Transient);
 
-        // COMM-07: the WhatsApp gateway defaults to a graceful no-op. A real provider
-        // (Meta/CM.com/Clickatell) replaces this single registration once configured.
+        // COMM-07/08/09/10: each external channel gateway defaults to a graceful no-op.
+        // A real provider replaces the single registration here once configured — see
+        // backend/docs/communication-channel-config.md.
         IocManager.Register<psms.Communication.Channels.WhatsApp.IWhatsAppGateway,
             psms.Communication.Channels.WhatsApp.NotConfiguredWhatsAppGateway>(Abp.Dependency.DependencyLifeStyle.Transient);
+        IocManager.Register<psms.Communication.Channels.Sms.ISmsGateway,
+            psms.Communication.Channels.Sms.NotConfiguredSmsGateway>(Abp.Dependency.DependencyLifeStyle.Transient);
+        IocManager.Register<psms.Communication.Channels.Email.IEmailGateway,
+            psms.Communication.Channels.Email.NotConfiguredEmailGateway>(Abp.Dependency.DependencyLifeStyle.Transient);
+        IocManager.Register<psms.Communication.Channels.Push.IPushGateway,
+            psms.Communication.Channels.Push.NotConfiguredPushGateway>(Abp.Dependency.DependencyLifeStyle.Transient);
 
         // COMM-01: register every notification channel provider against the shared
         // INotificationChannelProvider interface so the dispatcher can discover them
