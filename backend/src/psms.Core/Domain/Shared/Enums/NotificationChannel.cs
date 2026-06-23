@@ -1,9 +1,9 @@
 namespace psms.Domain.Shared.Enums
 {
     /// <summary>
-    /// COMM-01: the delivery channels a notification can be dispatched on. In-app
-    /// is the only one wired today; Email/Sms/Push/WhatsApp are added as channel
-    /// providers in later Communication-epic tickets without changing call sites.
+    /// COMM-01: the delivery channels a notification can be dispatched on. Each has a
+    /// channel provider; the dispatcher's routing policy (COMM-11) decides which are
+    /// used per request. In-app is the inbox of record (always, consent-exempt).
     /// </summary>
     public enum NotificationChannel
     {
