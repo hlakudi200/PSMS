@@ -42,6 +42,11 @@ public class psmsApplicationModule : AbpModule
         IocManager.Register<psms.Communication.Channels.Push.IPushGateway,
             psms.Communication.Channels.Push.NotConfiguredPushGateway>(Abp.Dependency.DependencyLifeStyle.Transient);
 
+        // COMM-11: the channel routing policy (default classifies/orders the request's
+        // opted-in channels into always-send + cascade).
+        IocManager.Register<psms.Communication.Dispatch.Routing.INotificationRoutingPolicy,
+            psms.Communication.Dispatch.Routing.DefaultNotificationRoutingPolicy>(Abp.Dependency.DependencyLifeStyle.Transient);
+
         // COMM-01: register every notification channel provider against the shared
         // INotificationChannelProvider interface so the dispatcher can discover them
         // all (IIocResolver.ResolveAll). Providers are plain classes (no marker

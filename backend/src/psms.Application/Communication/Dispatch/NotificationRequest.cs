@@ -52,6 +52,13 @@ public class NotificationRequest
     /// <summary>COMM-06: substitution values for the template's {{placeholders}}.</summary>
     public IDictionary<string, string> Variables { get; set; }
 
+    /// <summary>
+    /// COMM-11: the channels this notification opts into. Null/empty = in-app only
+    /// (so a manual create never fans out). The routing policy classifies + orders
+    /// these into always-send (in-app, push) vs the cascade (WhatsApp→SMS→Email).
+    /// </summary>
+    public IReadOnlyList<NotificationChannel> RequestedChannels { get; set; }
+
     /// <summary>Convenience for the common single-recipient case.</summary>
     public static NotificationRequest ForUser(
         int? tenantId, long userId, NotificationType type, string title, string message)
