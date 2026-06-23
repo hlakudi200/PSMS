@@ -58,11 +58,15 @@ public class NotificationTemplateRenderer : INotificationTemplateRenderer, ITran
         if (template == null)
             return RenderedTemplate.NotFound();
 
+        // For the Email channel the body is HTML, so variable values are HTML-encoded
+        // to prevent markup/script injection. The subject (Title) is plain text.
+        var htmlEncodeBody = channel == NotificationChannel.Email;
+
         return new RenderedTemplate
         {
             Found = true,
-            Title = Substitute(template.Title, variables),
-            Body = Substitute(template.Body, variables),
+            Title = Substitute(template.Title, variables, false),
+            Body = Substitute(template.Body, variables, htmlEncodeBody),
             ProviderTemplateName = template.ProviderTemplateName,
             ProviderParameterKeys = template.ProviderParameterKeys,
             Language = template.Language,
@@ -70,14 +74,17 @@ public class NotificationTemplateRenderer : INotificationTemplateRenderer, ITran
         };
     }
 
-    private static string Substitute(string text, IReadOnlyDictionary<string, string> variables)
+    private static string Substitute(string text, IReadOnlyDictionary<string, string> variables, bool htmlEncode)
     {
         if (string.IsNullOrEmpty(text)) return text;
         return PlaceholderRegex.Replace(text, match =>
         {
             var key = match.Groups[1].Value;
             if (variables != null && variables.TryGetValue(key, out var value))
-                return value ?? string.Empty;
+            {
+                var v = value ?? string.Empty;
+                return htmlEncode ? System.Net.WebUtility.HtmlEncode(v) : v;
+            }
             // Unknown placeholder → blank, so a missing variable never leaks "{{x}}".
             return string.Empty;
         });
