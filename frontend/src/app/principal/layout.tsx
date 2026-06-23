@@ -69,6 +69,7 @@ const menuItems = [
     children: [
       { key: '/principal/announcements', icon: <NotificationOutlined />, label: 'Announcements' },
       { key: '/principal/messages', icon: <MessageOutlined />, label: 'Messages' },
+      { key: '/principal/communication', icon: <BarChartOutlined />, label: 'Delivery Analytics' },
     ],
   },
   {
