@@ -12,6 +12,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { ProtectedRoute } from '@/components/shared/ProtectedRoute';
 import { useAuthActions, useAuthState } from '@/providers/auth';
 import { useBrandingState } from '@/providers/branding';
+import { getReadableForeground } from '@/utils/theme-config';
 import NotificationBell from '@/components/shared/NotificationBell';
 
 const { Header, Sider, Content } = Layout;
@@ -97,6 +98,11 @@ function ShellLayout({
   // per-ROLE identity colour (roleColors.Principal etc.), not the school's.
   // The school's brand lands on the header chrome and the sidebar logo.
   const { branding } = useBrandingState();
+
+  // The header background is an arbitrary tenant colour, so its foreground has
+  // to be derived — a school picking a pale secondary would otherwise get
+  // white-on-white across every portal.
+  const headerForeground = getReadableForeground(branding.secondaryColor);
 
   // A configured subtitle wins; otherwise show the school's name so every
   // portal identifies the school it belongs to.
@@ -273,17 +279,17 @@ function ShellLayout({
               icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
               onClick={() => setCollapsedPersist(!collapsed)}
               aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-              style={{ color: '#FFFFFF', fontSize: 16 }}
+              style={{ color: headerForeground, fontSize: 16 }}
             />
-            <Text style={{ color: '#FFFFFF', fontSize: 18, fontWeight: 600 }}>
+            <Text style={{ color: headerForeground, fontSize: 18, fontWeight: 600 }}>
               {headerTitle}
             </Text>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
             {showNotificationBadge && <NotificationBell />}
-            {/* Translucent white rather than a fixed light blue — the header
-                behind it is now an arbitrary tenant colour. */}
-            <Text style={{ color: 'rgba(255, 255, 255, 0.85)', fontSize: 13 }}>
+            {/* Derived from the header colour, slightly muted — the header
+                behind it is an arbitrary tenant colour. */}
+            <Text style={{ color: headerForeground, opacity: 0.85, fontSize: 13 }}>
               {currentUser?.name} {currentUser?.surname}
               {showRoleInHeader && ` (${currentRole})`}
             </Text>

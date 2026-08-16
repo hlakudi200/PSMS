@@ -65,10 +65,23 @@ export const BrandingProvider = ({
   const instanceRef = useRef(getAxiosInstance());
   const instance = instanceRef.current;
 
+  // Monotonic token for branding reads. Every load and every reset claims the
+  // next value; a response only applies if its claim is still current.
+  //
+  // Without this, three things go wrong: clearing the login page's school field
+  // resets the palette but an already-issued response repaints the old school
+  // over it; two lookups typed in quick succession apply in completion order
+  // rather than input order; and a load in flight when the session ends repaints
+  // the previous tenant after sign-out.
+  const requestSeq = useRef(0);
+  const claimRequest = () => (requestSeq.current += 1);
+  const isCurrent = (claim: number) => requestSeq.current === claim;
+
   // Branding follows the session: load on sign-in, revert on sign-out.
   const { jwtToken } = useAuthState();
 
   const loadBranding = useCallback(async () => {
+    const claim = claimRequest();
     dispatch(loadBrandingPending());
     try {
       // Nobody asked for this fetch, so its failure must not throw a modal in
@@ -76,6 +89,8 @@ export const BrandingProvider = ({
       const response = await instance.get(`${ENDPOINT}/Get`, {
         suppressErrorModal: true,
       });
+      if (!isCurrent(claim)) return;
+
       const result = response.data?.result;
       dispatch(
         loadBrandingSuccess({
@@ -84,6 +99,7 @@ export const BrandingProvider = ({
         })
       );
     } catch (error) {
+      if (!isCurrent(claim)) return;
       // Non-fatal: the app keeps whatever palette is already in state.
       console.error("Failed to load branding:", error);
       dispatch(loadBrandingError());
@@ -94,6 +110,7 @@ export const BrandingProvider = ({
     async (tenancyName: string) => {
       if (!tenancyName?.trim()) return;
 
+      const claim = claimRequest();
       dispatch(loadBrandingPending());
       try {
         // Fires on every pause in typing — a modal per failed keystroke burst
@@ -102,6 +119,8 @@ export const BrandingProvider = ({
           params: { tenancyName: tenancyName.trim() },
           suppressErrorModal: true,
         });
+        if (!isCurrent(claim)) return;
+
         dispatch(
           loadBrandingSuccess({
             branding: toBranding(response.data?.result),
@@ -109,6 +128,7 @@ export const BrandingProvider = ({
           })
         );
       } catch (error) {
+        if (!isCurrent(claim)) return;
         console.error("Failed to load public branding:", error);
         dispatch(loadBrandingError());
       }
@@ -121,6 +141,9 @@ export const BrandingProvider = ({
       dispatch(saveBrandingPending());
       try {
         const response = await instance.put(`${ENDPOINT}/Update`, input);
+        // A save is user-initiated and authoritative: claim the sequence so a
+        // background load issued earlier cannot land on top of it.
+        claimRequest();
         dispatch(
           saveBrandingSuccess({ branding: toBranding(response.data?.result) })
         );
@@ -166,6 +189,9 @@ export const BrandingProvider = ({
           assetType: ASSET_TYPE_VALUE[assetType],
           objectKey: ticket.objectKey,
         });
+        // A save is user-initiated and authoritative: claim the sequence so a
+        // background load issued earlier cannot land on top of it.
+        claimRequest();
         dispatch(
           saveBrandingSuccess({ branding: toBranding(response.data?.result) })
         );
@@ -186,6 +212,9 @@ export const BrandingProvider = ({
         const response = await instance.post(`${ENDPOINT}/ClearAsset`, {
           assetType: ASSET_TYPE_VALUE[assetType],
         });
+        // A save is user-initiated and authoritative: claim the sequence so a
+        // background load issued earlier cannot land on top of it.
+        claimRequest();
         dispatch(
           saveBrandingSuccess({ branding: toBranding(response.data?.result) })
         );
@@ -200,6 +229,9 @@ export const BrandingProvider = ({
   );
 
   const resetBranding = useCallback(() => {
+    // Claim the sequence so any in-flight load is discarded rather than
+    // repainting the palette we are clearing.
+    claimRequest();
     dispatch(resetBrandingAction());
   }, []);
 
@@ -212,7 +244,9 @@ export const BrandingProvider = ({
       loadBranding();
     } else {
       // Signed out — drop the previous school's palette so the next login
-      // screen doesn't briefly wear it.
+      // screen doesn't briefly wear it. Claims the sequence too, so a load
+      // still in flight when the token cleared cannot repaint it afterwards.
+      claimRequest();
       dispatch(resetBrandingAction());
     }
   }, [jwtToken, loadBranding]);

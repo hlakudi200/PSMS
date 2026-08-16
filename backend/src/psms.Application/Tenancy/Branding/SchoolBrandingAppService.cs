@@ -99,6 +99,9 @@ public class SchoolBrandingAppService : ApplicationService, ISchoolBrandingAppSe
 
         var normalised = tenancyName.Trim();
 
+        // AbpTenants is host-owned, so the tenant itself is always resolved
+        // host-side.
+        int tenantId;
         using (CurrentUnitOfWork.SetTenantId(null))
         {
             var tenant = await _tenantRepository
@@ -108,9 +111,22 @@ public class SchoolBrandingAppService : ApplicationService, ISchoolBrandingAppSe
             if (tenant == null)
                 return BuildDefaultPublicDto();
 
+            tenantId = tenant.Id;
+        }
+
+        // Read the branding AS that tenant, not host-side. Tenants share the
+        // host database today, so this is equivalent — but a tenant with its
+        // own ConnectionString (still supported by CreateTenantDto) keeps its
+        // branding in its own database, where a host-side read would never
+        // find it and the login page would silently fall back to defaults.
+        //
+        // Still not steerable by an Abp-TenantId header: the id comes from the
+        // tenancy name resolved above, never from the request.
+        using (CurrentUnitOfWork.SetTenantId(tenantId))
+        {
             var branding = await _brandingRepository
                 .GetAll()
-                .FirstOrDefaultAsync(b => b.TenantId == tenant.Id);
+                .FirstOrDefaultAsync(b => b.TenantId == tenantId);
 
             if (branding == null)
                 return BuildDefaultPublicDto();
@@ -285,11 +301,31 @@ public class SchoolBrandingAppService : ApplicationService, ISchoolBrandingAppSe
         if (branding != null)
             return branding;
 
-        branding = new SchoolBranding(Guid.NewGuid(), tenantId);
-        await _brandingRepository.InsertAsync(branding);
-        await CurrentUnitOfWork.SaveChangesAsync();
+        try
+        {
+            branding = new SchoolBranding(Guid.NewGuid(), tenantId);
+            await _brandingRepository.InsertAsync(branding);
+            await CurrentUnitOfWork.SaveChangesAsync();
+            return branding;
+        }
+        catch (DbUpdateException)
+        {
+            // Two concurrent first-writes for a tenant with no row (Save
+            // Branding while a logo's SetAsset is in flight, or two admin tabs)
+            // both see null and both insert; the loser hits
+            // IX_SchoolBrandings_TenantId. That is a benign race, not a 500 —
+            // the row the winner created is exactly what we wanted, so re-read
+            // it. Untracked because the failed insert is still in the change
+            // tracker.
+            var existing = await _brandingRepository
+                .GetAll()
+                .AsNoTracking()
+                .FirstOrDefaultAsync(b => b.TenantId == tenantId);
 
-        return branding;
+            if (existing == null) throw;
+
+            return existing;
+        }
     }
 
     private void ValidateExtension(BrandingAssetType assetType, string fileNameOrKey)
@@ -328,8 +364,25 @@ public class SchoolBrandingAppService : ApplicationService, ISchoolBrandingAppSe
     {
         var dto = ObjectMapper.Map<SchoolBrandingDto>(branding);
         dto.SchoolName = ResolveSchoolName(branding.SchoolName);
+        dto.IsConfigured = HasCustomBranding(branding);
         return dto;
     }
+
+    /// <summary>
+    /// Whether the tenant has actually chosen anything, as opposed to still
+    /// carrying the seeded defaults. Deliberately not "a row exists" — tenant
+    /// provisioning seeds a defaults-only row for every new school, so that
+    /// test would be true for everyone and the UI's "using default branding"
+    /// hint would never show.
+    /// </summary>
+    private static bool HasCustomBranding(SchoolBranding branding)
+        => !string.Equals(branding.PrimaryColor, BrandingDefaults.PrimaryColor,
+               StringComparison.OrdinalIgnoreCase)
+           || !string.Equals(branding.SecondaryColor, BrandingDefaults.SecondaryColor,
+               StringComparison.OrdinalIgnoreCase)
+           || !string.IsNullOrWhiteSpace(branding.SchoolName)
+           || !string.IsNullOrWhiteSpace(branding.LogoUrl)
+           || !string.IsNullOrWhiteSpace(branding.FaviconUrl);
 
     private static SchoolBrandingDto BuildDefaultDto(int? tenantId) => new()
     {

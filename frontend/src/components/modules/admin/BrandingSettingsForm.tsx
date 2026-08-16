@@ -15,6 +15,7 @@ import {
 import { DeleteOutlined, UploadOutlined } from '@ant-design/icons';
 import { z } from 'zod';
 import { useBrandingActions, useBrandingState } from '@/providers/branding';
+import { getReadableForeground } from '@/utils/theme-config';
 import type { BrandingAssetType } from '@/providers/branding/context';
 
 const { Text } = Typography;
@@ -36,16 +37,23 @@ const brandingSchema = z.object({
 /** AC 2: logo is PNG/JPG, at most 2MB. */
 const LOGO_MAX_BYTES = 2 * 1024 * 1024;
 const LOGO_ACCEPT = ['image/png', 'image/jpeg'];
+const LOGO_EXTENSIONS = ['.png', '.jpg', '.jpeg'];
 
 const FAVICON_MAX_BYTES = 512 * 1024;
 const FAVICON_ACCEPT = ['image/png', 'image/x-icon', 'image/vnd.microsoft.icon'];
+const FAVICON_EXTENSIONS = ['.png', '.ico'];
 
 /**
- * Ant Design's ColorPicker can hand back 8-digit (alpha) hex in lower case.
- * The API accepts "#RRGGBB" only, so trim and normalise before it leaves here.
+ * Normalises an Ant Design ColorPicker value to the "#RRGGBB" the API accepts.
+ *
+ * Read from `color.toHexString()`, NOT ColorPicker's second onChange argument —
+ * that one is `color.toCssString()`, which returns `rgb(0, 102, 204)`, not hex.
+ * toHexString still yields lower case, and 8 digits when alpha < 1, so trim to
+ * 7 and upper-case. (`disabledAlpha` is set on both pickers, so the alpha case
+ * should not arise; the slice is a belt-and-braces guard.)
  */
-const normaliseHex = (value: string): string =>
-  (value || '').slice(0, 7).toUpperCase();
+const normaliseHex = (color: { toHexString: () => string }): string =>
+  (color.toHexString() || '').slice(0, 7).toUpperCase();
 
 interface AssetRowProps {
   label: string;
@@ -170,9 +178,11 @@ export default function BrandingSettingsForm() {
   const watchedSchoolName = Form.useWatch('schoolName', form);
 
   const handleSave = async () => {
+    // primaryColor/secondaryColor are already normalised by the pickers above;
+    // the schema is the last guard before the request goes out.
     const result = brandingSchema.safeParse({
-      primaryColor: normaliseHex(primaryColor),
-      secondaryColor: normaliseHex(secondaryColor),
+      primaryColor,
+      secondaryColor,
       schoolName: (form.getFieldValue('schoolName') ?? '').trim(),
     });
 
@@ -202,10 +212,21 @@ export default function BrandingSettingsForm() {
     assetType: BrandingAssetType,
     file: File,
     maxBytes: number,
-    acceptedTypes: string[]
+    acceptedTypes: string[],
+    acceptedExtensions: string[]
   ) => {
-    if (!acceptedTypes.includes(file.type)) {
-      message.error(`${assetType} must be one of: ${acceptedTypes.join(', ')}`);
+    // Browsers routinely report an empty file.type for .ico (no registry/OS
+    // mapping). Rejecting on that alone would refuse a favicon the server
+    // happily accepts, so fall back to the extension when the type is blank.
+    const extension = file.name.slice(file.name.lastIndexOf('.')).toLowerCase();
+    const typeOk = file.type
+      ? acceptedTypes.includes(file.type)
+      : acceptedExtensions.includes(extension);
+
+    if (!typeOk) {
+      message.error(
+        `${assetType} must be one of: ${acceptedExtensions.join(', ')}`
+      );
       return;
     }
     if (file.size > maxBytes) {
@@ -257,7 +278,7 @@ export default function BrandingSettingsForm() {
               value={primaryColor}
               disabledAlpha
               showText
-              onChange={(_, hex) => setPrimaryColor(normaliseHex(hex))}
+              onChange={(color) => setPrimaryColor(normaliseHex(color))}
             />
           </Form.Item>
 
@@ -270,7 +291,7 @@ export default function BrandingSettingsForm() {
               value={secondaryColor}
               disabledAlpha
               showText
-              onChange={(_, hex) => setSecondaryColor(normaliseHex(hex))}
+              onChange={(color) => setSecondaryColor(normaliseHex(color))}
             />
           </Form.Item>
         </Space>
@@ -291,13 +312,19 @@ export default function BrandingSettingsForm() {
               padding: '0 16px',
             }}
           >
-            <span style={{ color: '#FFFFFF', fontSize: 14, fontWeight: 600 }}>
+            <span
+              style={{
+                color: getReadableForeground(secondaryColor),
+                fontSize: 14,
+                fontWeight: 600,
+              }}
+            >
               {watchedSchoolName || branding.schoolName}
             </span>
             <span
               style={{
                 background: primaryColor,
-                color: '#FFFFFF',
+                color: getReadableForeground(primaryColor),
                 fontSize: 12,
                 padding: '4px 12px',
                 borderRadius: 2,
@@ -316,7 +343,9 @@ export default function BrandingSettingsForm() {
           previewHeight={40}
           busy={busy}
           onSelect={(file) =>
-            handleAssetSelect('Logo', file, LOGO_MAX_BYTES, LOGO_ACCEPT)
+            handleAssetSelect(
+              'Logo', file, LOGO_MAX_BYTES, LOGO_ACCEPT, LOGO_EXTENSIONS
+            )
           }
           onClear={() => handleAssetClear('Logo')}
         />
@@ -329,7 +358,9 @@ export default function BrandingSettingsForm() {
           previewHeight={24}
           busy={busy}
           onSelect={(file) =>
-            handleAssetSelect('Favicon', file, FAVICON_MAX_BYTES, FAVICON_ACCEPT)
+            handleAssetSelect(
+              'Favicon', file, FAVICON_MAX_BYTES, FAVICON_ACCEPT, FAVICON_EXTENSIONS
+            )
           }
           onClear={() => handleAssetClear('Favicon')}
         />

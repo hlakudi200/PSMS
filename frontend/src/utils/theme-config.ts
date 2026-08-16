@@ -474,6 +474,32 @@ const BASE_PRIMARY = "#0066CC";
 const BASE_TINT_STRONG = "#BAE7FF"; // selected rows / menu items
 const BASE_TINT_SOFT = "#E6F7FF"; // hover states
 
+/**
+ * Picks a readable foreground for an arbitrary tenant background.
+ *
+ * The header, the login image panel and the settings preview all sit on
+ * `secondaryColor`, which a school is free to set to anything. Hard-coding
+ * white there makes a pale choice (#FFFFFF, #FFF4CC) unreadable across every
+ * portal, with nothing rejecting it. Uses WCAG relative luminance.
+ */
+export const getReadableForeground = (hex: string): string => {
+  const value = (hex || "").replace("#", "");
+  if (value.length < 6) return "#FFFFFF";
+
+  const channel = (offset: number) => {
+    const srgb = parseInt(value.slice(offset, offset + 2), 16) / 255;
+    return srgb <= 0.03928
+      ? srgb / 12.92
+      : Math.pow((srgb + 0.055) / 1.055, 2.4);
+  };
+
+  const luminance =
+    0.2126 * channel(0) + 0.7152 * channel(2) + 0.0722 * channel(4);
+
+  // 0.179 is the crossover where white and black text give equal contrast.
+  return luminance > 0.179 ? "#1F1F1F" : "#FFFFFF";
+};
+
 /** Mixes a #RRGGBB colour toward white. `amount` 0 = unchanged, 1 = white. */
 const tintTowardWhite = (hex: string, amount: number): string => {
   const value = hex.replace("#", "");
@@ -534,6 +560,8 @@ const rebrandComponents = (
 export const getPsmsTheme = (branding?: IThemeBranding): ThemeConfig => {
   if (!branding) return psmsTheme;
 
+  const components = rebrandComponents(psmsTheme.components, branding);
+
   return {
     ...psmsTheme,
     token: {
@@ -541,7 +569,15 @@ export const getPsmsTheme = (branding?: IThemeBranding): ThemeConfig => {
       colorPrimary: branding.primaryColor,
       colorLink: branding.primaryColor,
     },
-    components: rebrandComponents(psmsTheme.components, branding),
+    components: {
+      ...components,
+      Layout: {
+        ...(components?.Layout ?? {}),
+        // The header sits on secondaryColor, so its default foreground has to
+        // be derived rather than left as a hard-coded white.
+        headerColor: getReadableForeground(branding.secondaryColor),
+      },
+    },
   };
 };
 
@@ -557,6 +593,7 @@ export const buildBrandingCssVariables = (branding: IThemeBranding): string => `
       --psms-secondary: ${branding.secondaryColor};
       --psms-primary-tint: ${tintTowardWhite(branding.primaryColor, 0.9)};
       --psms-primary-tint-strong: ${tintTowardWhite(branding.primaryColor, 0.73)};
+      --psms-on-secondary: ${getReadableForeground(branding.secondaryColor)};
     }
   `;
 
