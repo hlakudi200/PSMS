@@ -26,7 +26,7 @@ export default function LoginPage() {
   const { isPending, isSuccess, isError, currentRole } = useAuthState();
   const { loginUser, resetStateFlags } = useAuthActions();
   const { branding } = useBrandingState();
-  const { loadPublicBranding } = useBrandingActions();
+  const { loadPublicBranding, resetBranding } = useBrandingActions();
   const [form] = Form.useForm();
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -41,14 +41,25 @@ export default function LoginPage() {
       const trimmed = tenancyName.trim();
 
       if (debounceRef.current) clearTimeout(debounceRef.current);
-      if (!trimmed || trimmed === lookedUpTenancy) return;
+
+      // Emptying the field must drop the last school's identity too, or the
+      // page keeps showing their logo, name and colours next to a blank box.
+      if (!trimmed) {
+        if (lookedUpTenancy !== null) {
+          setLookedUpTenancy(null);
+          resetBranding();
+        }
+        return;
+      }
+
+      if (trimmed === lookedUpTenancy) return;
 
       debounceRef.current = setTimeout(() => {
         setLookedUpTenancy(trimmed);
         loadPublicBranding(trimmed);
       }, BRANDING_LOOKUP_DEBOUNCE_MS);
     },
-    [loadPublicBranding, lookedUpTenancy]
+    [loadPublicBranding, resetBranding, lookedUpTenancy]
   );
 
   // Brand the page for whatever school is prefilled, and clean up any pending

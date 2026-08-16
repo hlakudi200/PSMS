@@ -50,6 +50,10 @@ const toBranding = (raw: Partial<IBranding> | undefined | null): IBranding => ({
   logoUrl: raw?.logoUrl ?? null,
   faviconUrl: raw?.faviconUrl ?? null,
   schoolName: raw?.schoolName || DEFAULT_BRANDING.schoolName,
+  // Absent from the anonymous payload, and legitimately null when unset —
+  // `?? null` keeps those two indistinguishable, which is correct here since
+  // only the settings editor reads it and it never runs unauthenticated.
+  configuredSchoolName: raw?.configuredSchoolName ?? null,
 });
 
 export const BrandingProvider = ({
@@ -67,7 +71,11 @@ export const BrandingProvider = ({
   const loadBranding = useCallback(async () => {
     dispatch(loadBrandingPending());
     try {
-      const response = await instance.get(`${ENDPOINT}/Get`);
+      // Nobody asked for this fetch, so its failure must not throw a modal in
+      // front of whatever the user is actually doing.
+      const response = await instance.get(`${ENDPOINT}/Get`, {
+        suppressErrorModal: true,
+      });
       const result = response.data?.result;
       dispatch(
         loadBrandingSuccess({
@@ -88,8 +96,11 @@ export const BrandingProvider = ({
 
       dispatch(loadBrandingPending());
       try {
+        // Fires on every pause in typing — a modal per failed keystroke burst
+        // over the login form would be intolerable.
         const response = await instance.get(`${ENDPOINT}/GetPublic`, {
           params: { tenancyName: tenancyName.trim() },
+          suppressErrorModal: true,
         });
         dispatch(
           loadBrandingSuccess({

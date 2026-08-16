@@ -53,15 +53,32 @@ export const BrandedConfigProvider = ({
       document.querySelector<HTMLLinkElement>("link[rel~='icon']");
 
     if (existing) {
-      // Restore the original href on cleanup. Read the raw attribute, not the
-      // .href property — the property resolves to an absolute URL, and for a
-      // link with no href it resolves to the page itself.
-      const previous = existing.getAttribute("href");
+      // Restore the original attributes on cleanup. Read the raw attribute,
+      // not the .href property — the property resolves to an absolute URL, and
+      // for a link with no href it resolves to the page itself.
+      //
+      // `type` and `sizes` matter as much as href: Next emits its own icon as
+      // type="image/x-icon" sizes="16x16", and leaving those in place while
+      // swapping in a tenant PNG advertises the wrong MIME type and a bogus
+      // size hint. Drop them and let the browser sniff.
+      const previous = {
+        href: existing.getAttribute("href"),
+        type: existing.getAttribute("type"),
+        sizes: existing.getAttribute("sizes"),
+      };
+
       existing.setAttribute("href", branding.faviconUrl);
+      existing.removeAttribute("type");
+      existing.removeAttribute("sizes");
 
       return () => {
-        if (previous === null) existing.removeAttribute("href");
-        else existing.setAttribute("href", previous);
+        const restore = (name: string, value: string | null) => {
+          if (value === null) existing.removeAttribute(name);
+          else existing.setAttribute(name, value);
+        };
+        restore("href", previous.href);
+        restore("type", previous.type);
+        restore("sizes", previous.sizes);
       };
     }
 

@@ -15,8 +15,14 @@ export interface IBranding {
   logoUrl?: string | null;
   /** Public favicon URL, or null for the stock icon. */
   faviconUrl?: string | null;
-  /** Display name for the sidebar, header and login page. */
+  /** Display name for the sidebar, header and login page. Always populated. */
   schoolName: string;
+  /**
+   * The name the tenant actually stored, or null if unset. Editors bind to
+   * this so that "leave blank for the default" survives a round-trip; display
+   * surfaces use {@link schoolName}. Absent from the anonymous payload.
+   */
+  configuredSchoolName?: string | null;
 }
 
 export interface IUpdateBrandingInput {
@@ -48,6 +54,7 @@ export const DEFAULT_BRANDING: IBranding = {
   logoUrl: null,
   faviconUrl: null,
   schoolName: "Private School Management System",
+  configuredSchoolName: null,
 };
 
 export interface IBrandingStateContext {

@@ -152,9 +152,18 @@ export default function BrandingSettingsForm() {
   // Ant Design's Form holds its own state, so the name field does need to be
   // pushed in when the loaded branding changes. This is not a setState call,
   // so it does not cause the cascading re-render that mirroring colours would.
+  //
+  // Keyed on configuredSchoolName (the raw stored value), NOT the resolved
+  // schoolName. Two reasons:
+  //   - uploading a logo returns fresh branding whose resolved name is the
+  //     default; keying on that would re-run this effect and wipe a name the
+  //     admin had typed but not yet saved.
+  //   - echoing the resolved fallback into the field would persist the default
+  //     as an explicit choice on the next save, so "leave blank for the
+  //     default" would only work once.
   useEffect(() => {
-    form.setFieldsValue({ schoolName: isConfigured ? branding.schoolName : '' });
-  }, [branding.schoolName, isConfigured, form]);
+    form.setFieldsValue({ schoolName: branding.configuredSchoolName ?? '' });
+  }, [branding.configuredSchoolName, form]);
 
   // Watched rather than read via getFieldValue so the live preview below
   // updates as the name is typed.

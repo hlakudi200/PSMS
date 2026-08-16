@@ -390,13 +390,13 @@ export const componentStyles = {
 
     /* Highlight row on hover - more prominent */
     .ant-table-tbody > tr:hover > td {
-      background: #E6F7FF !important;
+      background: var(--psms-primary-tint, #E6F7FF) !important;
     }
 
     /* Selected row - clear indication */
     .ant-table-tbody > tr.ant-table-row-selected > td {
-      background: #BAE7FF !important;
-      border-color: #91D5FF;
+      background: var(--psms-primary-tint-strong, #BAE7FF) !important;
+      border-color: var(--psms-primary-tint-strong, #91D5FF);
     }
 
     /* Sticky headers for long tables */
@@ -464,13 +464,69 @@ export interface IThemeBranding {
 }
 
 /**
+ * The stock blues baked into the base theme above. Anywhere one of these
+ * literals appears in a COMPONENT token it has to be swapped per tenant:
+ * Ant Design resolves component tokens ahead of the global `colorPrimary`, so
+ * overriding the global alone leaves menus, links, focused inputs, tabs,
+ * pagination and badges stubbornly blue for a school that picked red.
+ */
+const BASE_PRIMARY = "#0066CC";
+const BASE_TINT_STRONG = "#BAE7FF"; // selected rows / menu items
+const BASE_TINT_SOFT = "#E6F7FF"; // hover states
+
+/** Mixes a #RRGGBB colour toward white. `amount` 0 = unchanged, 1 = white. */
+const tintTowardWhite = (hex: string, amount: number): string => {
+  const value = hex.replace("#", "");
+  const channel = (offset: number) => {
+    const base = parseInt(value.slice(offset, offset + 2), 16);
+    return Math.round(base + (255 - base) * amount)
+      .toString(16)
+      .padStart(2, "0");
+  };
+  return `#${channel(0)}${channel(2)}${channel(4)}`.toUpperCase();
+};
+
+/**
+ * Rewrites the three stock blues wherever they appear in the component token
+ * tree. Done by value rather than by naming each of the ~13 sites so that a
+ * hard-coded blue added to the base theme later is rebranded automatically
+ * instead of silently escaping.
+ */
+const rebrandComponents = (
+  components: ThemeConfig["components"],
+  branding: IThemeBranding
+): ThemeConfig["components"] => {
+  const replacements = new Map<string, string>([
+    [BASE_PRIMARY, branding.primaryColor],
+    [BASE_TINT_STRONG, tintTowardWhite(branding.primaryColor, 0.73)],
+    [BASE_TINT_SOFT, tintTowardWhite(branding.primaryColor, 0.9)],
+  ]);
+
+  return Object.fromEntries(
+    Object.entries(components ?? {}).map(([component, tokens]) => [
+      component,
+      Object.fromEntries(
+        Object.entries(tokens as Record<string, unknown>).map(([name, value]) => [
+          name,
+          typeof value === "string"
+            ? replacements.get(value.toUpperCase()) ?? value
+            : value,
+        ])
+      ),
+    ])
+    // Object.fromEntries widens away Ant Design's per-component token types;
+    // the values themselves are untouched apart from the colour swap.
+  ) as ThemeConfig["components"];
+};
+
+/**
  * Utility function to get theme configuration.
  *
- * Called with a tenant's branding it returns the base PSMS theme with the
- * action colour swapped; called with nothing it returns the stock theme
- * unchanged, so any caller that predates branding behaves exactly as before.
+ * Called with a tenant's branding it returns the base PSMS theme rebranded;
+ * called with nothing it returns the stock theme unchanged, so any caller that
+ * predates branding behaves exactly as before.
  *
- * Note this only covers what Ant Design renders from tokens. The app chrome
+ * Note this covers only what Ant Design renders from tokens. The app chrome
  * (header, sidebar accent) is not token-driven — it reads the branding
  * directly, and non-Ant CSS reads the variables from
  * {@link buildBrandingCssVariables}.
@@ -485,6 +541,7 @@ export const getPsmsTheme = (branding?: IThemeBranding): ThemeConfig => {
       colorPrimary: branding.primaryColor,
       colorLink: branding.primaryColor,
     },
+    components: rebrandComponents(psmsTheme.components, branding),
   };
 };
 
@@ -498,6 +555,8 @@ export const buildBrandingCssVariables = (branding: IThemeBranding): string => `
     :root {
       --psms-primary: ${branding.primaryColor};
       --psms-secondary: ${branding.secondaryColor};
+      --psms-primary-tint: ${tintTowardWhite(branding.primaryColor, 0.9)};
+      --psms-primary-tint-strong: ${tintTowardWhite(branding.primaryColor, 0.73)};
     }
   `;
 

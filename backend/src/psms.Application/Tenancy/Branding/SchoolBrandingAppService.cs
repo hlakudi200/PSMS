@@ -190,9 +190,14 @@ public class SchoolBrandingAppService : ApplicationService, ISchoolBrandingAppSe
         }
 
         // Validate the REAL stored size and type, never the client's claim.
+        //
+        // The bytes are already in the bucket by this point, so a rejection has
+        // to delete them — otherwise every rejected attempt leaves a permanent,
+        // publicly-readable orphan and the caller can repeat it without bound.
         var maxBytes = input.AssetType == BrandingAssetType.Logo ? MaxLogoBytes : MaxFaviconBytes;
         if (info.SizeBytes > maxBytes)
         {
+            await TryDeleteStoredObjectAsync(input.ObjectKey, null);
             throw new UserFriendlyException(TenancyExceptionCodes.BrandingImageTooLarge,
                 $"The image is {info.SizeBytes / 1024}KB. The maximum is {maxBytes / 1024}KB.");
         }
@@ -200,6 +205,7 @@ public class SchoolBrandingAppService : ApplicationService, ISchoolBrandingAppSe
         if (!string.IsNullOrWhiteSpace(info.ContentType)
             && !info.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
         {
+            await TryDeleteStoredObjectAsync(input.ObjectKey, null);
             throw new UserFriendlyException(TenancyExceptionCodes.BrandingImageTypeNotAllowed,
                 "Only image files may be used for branding.");
         }
@@ -334,6 +340,7 @@ public class SchoolBrandingAppService : ApplicationService, ISchoolBrandingAppSe
         LogoUrl = null,
         FaviconUrl = null,
         SchoolName = BrandingDefaults.SchoolName,
+        ConfiguredSchoolName = null,
         IsConfigured = false,
     };
 

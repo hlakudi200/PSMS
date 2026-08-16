@@ -27,8 +27,20 @@ public class SchoolBrandingDto
     /// <summary>Public favicon URL, or null for the stock icon.</summary>
     public string FaviconUrl { get; set; }
 
-    /// <summary>Display name for the sidebar, header and login page.</summary>
+    /// <summary>
+    /// Display name for the sidebar, header and login page — always populated,
+    /// falling back to the default when the tenant has set none.
+    /// </summary>
     public string SchoolName { get; set; }
+
+    /// <summary>
+    /// The name the tenant actually stored, or null if it has set none.
+    /// Distinct from <see cref="SchoolName"/> so an editor can tell "unset"
+    /// apart from "deliberately named the same as the default" — binding a
+    /// form to the resolved value would silently persist the fallback as an
+    /// explicit choice on the next save.
+    /// </summary>
+    public string ConfiguredSchoolName { get; set; }
 
     /// <summary>
     /// False when these values are the PSMS defaults rather than a stored row.
