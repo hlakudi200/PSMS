@@ -49,17 +49,30 @@ export const BrandedConfigProvider = ({
   useEffect(() => {
     if (!branding.faviconUrl) return;
 
-    const link =
-      document.querySelector<HTMLLinkElement>("link[rel~='icon']") ??
-      document.head.appendChild(
-        Object.assign(document.createElement("link"), { rel: "icon" })
-      );
+    const existing =
+      document.querySelector<HTMLLinkElement>("link[rel~='icon']");
 
-    const previous = link.href;
-    link.href = branding.faviconUrl;
+    if (existing) {
+      // Restore the original href on cleanup. Read the raw attribute, not the
+      // .href property — the property resolves to an absolute URL, and for a
+      // link with no href it resolves to the page itself.
+      const previous = existing.getAttribute("href");
+      existing.setAttribute("href", branding.faviconUrl);
+
+      return () => {
+        if (previous === null) existing.removeAttribute("href");
+        else existing.setAttribute("href", previous);
+      };
+    }
+
+    // Nothing to restore — we own this element, so remove it on cleanup.
+    const created = document.createElement("link");
+    created.rel = "icon";
+    created.href = branding.faviconUrl;
+    document.head.appendChild(created);
 
     return () => {
-      link.href = previous;
+      created.remove();
     };
   }, [branding.faviconUrl]);
 

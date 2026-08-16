@@ -106,7 +106,7 @@ const AssetRow: React.FC<AssetRowProps> = ({
           accept={accept}
           showUploadList={false}
           beforeUpload={(file) => {
-            onSelect(file as unknown as File);
+            onSelect(file);
             // Returning false stops Ant Design uploading it for us — the
             // provider drives the three-step signed-URL flow instead.
             return false;
