@@ -225,7 +225,7 @@ public class SchoolBrandingAppService : ApplicationService, ISchoolBrandingAppSe
     }
 
     [AbpAuthorize(PermissionNames.Administration_Settings_Edit)]
-    public async Task<SchoolBrandingDto> RemoveAssetAsync(RemoveBrandingAssetDto input)
+    public async Task<SchoolBrandingDto> ClearAssetAsync(RemoveBrandingAssetDto input)
     {
         GetTenantIdOrThrow();
 

@@ -38,6 +38,11 @@ public interface ISchoolBrandingAppService : IApplicationService
     /// </summary>
     Task<SchoolBrandingDto> SetAssetAsync(SetBrandingAssetDto input);
 
-    /// <summary>Clears an image, reverting to the text/stock fallback.</summary>
-    Task<SchoolBrandingDto> RemoveAssetAsync(RemoveBrandingAssetDto input);
+    /// <summary>
+    /// Clears an image, reverting to the text/stock fallback. Named "Clear"
+    /// rather than "Remove" so ABP's conventional verb mapping gives this a
+    /// POST — "Remove*" would map to DELETE and force the DTO into the query
+    /// string.
+    /// </summary>
+    Task<SchoolBrandingDto> ClearAssetAsync(RemoveBrandingAssetDto input);
 }
