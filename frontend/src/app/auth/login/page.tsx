@@ -1,11 +1,19 @@
 "use client";
 
-import { useEffect } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Form, Input, Button, message } from "antd";
 import { UserOutlined, LockOutlined, BankOutlined } from "@ant-design/icons";
 import { useRouter } from "next/navigation";
 import { useAuthState, useAuthActions } from "@/providers/auth";
+import { useBrandingActions, useBrandingState } from "@/providers/branding";
 import styles from "./login.module.css";
+
+/**
+ * Issue #56, AC 6. There is no session yet, so the tenant can only come from
+ * what the user types. Wait for a pause in typing before asking the server for
+ * that school's branding — one request per school, not one per keystroke.
+ */
+const BRANDING_LOOKUP_DEBOUNCE_MS = 500;
 
 interface LoginFormValues {
   tenancyName: string;
@@ -17,11 +25,43 @@ export default function LoginPage() {
   const router = useRouter();
   const { isPending, isSuccess, isError, currentRole } = useAuthState();
   const { loginUser, resetStateFlags } = useAuthActions();
+  const { branding } = useBrandingState();
+  const { loadPublicBranding } = useBrandingActions();
   const [form] = Form.useForm();
+
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [lookedUpTenancy, setLookedUpTenancy] = useState<string | null>(null);
 
   useEffect(() => {
     resetStateFlags();
   }, [resetStateFlags]);
+
+  const scheduleBrandingLookup = useCallback(
+    (tenancyName: string) => {
+      const trimmed = tenancyName.trim();
+
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      if (!trimmed || trimmed === lookedUpTenancy) return;
+
+      debounceRef.current = setTimeout(() => {
+        setLookedUpTenancy(trimmed);
+        loadPublicBranding(trimmed);
+      }, BRANDING_LOOKUP_DEBOUNCE_MS);
+    },
+    [loadPublicBranding, lookedUpTenancy]
+  );
+
+  // Brand the page for whatever school is prefilled, and clean up any pending
+  // timer so an unmounted page never fires a request.
+  useEffect(() => {
+    const initial = form.getFieldValue("tenancyName");
+    if (initial) scheduleBrandingLookup(initial);
+
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (isSuccess && currentRole) {
@@ -82,7 +122,7 @@ export default function LoginPage() {
           alt="School"
         />
         <div className={styles.imageOverlay}>
-          <h2>Private School Management System</h2>
+          <h2>{branding.schoolName}</h2>
           <p>Empowering educators, students, and parents with seamless school administration.</p>
         </div>
       </div>
@@ -91,10 +131,17 @@ export default function LoginPage() {
       <div className={styles.formPanel}>
         <div className={styles.formContainer}>
           <div className={styles.logo}>
-            <div className={styles.logoIcon}>PSMS</div>
-            <span className={styles.logoText}>
-              Private School <span className={styles.logoTextAccent}>MS.</span>
-            </span>
+            {branding.logoUrl ? (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img
+                src={branding.logoUrl}
+                alt={`${branding.schoolName} logo`}
+                className={styles.logoImage}
+              />
+            ) : (
+              <div className={styles.logoIcon}>PSMS</div>
+            )}
+            <span className={styles.logoText}>{branding.schoolName}</span>
           </div>
 
           <h1 className={styles.heading}>Login.</h1>
@@ -115,6 +162,7 @@ export default function LoginPage() {
               <Input
                 suffix={<BankOutlined style={{ color: "#8C8C8C" }} />}
                 placeholder="School Name"
+                onChange={(e) => scheduleBrandingLookup(e.target.value)}
               />
             </Form.Item>
 

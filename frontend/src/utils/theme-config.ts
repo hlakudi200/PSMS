@@ -385,7 +385,7 @@ export const componentStyles = {
     .psms-status-active { background: #52c41a; color: white; }
     .psms-status-inactive { background: #8C8C8C; color: white; }
     .psms-status-pending { background: #faad14; color: white; }
-    .psms-status-approved { background: #0066CC; color: white; }
+    .psms-status-approved { background: var(--psms-primary, #0066CC); color: white; }
     .psms-status-rejected { background: #ff4d4f; color: white; }
 
     /* Highlight row on hover - more prominent */
@@ -415,7 +415,7 @@ export const componentStyles = {
     /* Page header - classic style */
     .psms-page-header {
       background: #FFFFFF;
-      border-bottom: 2px solid #0066CC;
+      border-bottom: 2px solid var(--psms-primary, #0066CC);
       padding: 16px 24px;
       margin-bottom: 16px;
     }
@@ -454,9 +454,52 @@ export const componentStyles = {
 };
 
 /**
- * Utility function to get theme configuration
+ * Per-tenant branding overrides applied on top of the base theme (issue #56).
  */
-export const getPsmsTheme = (): ThemeConfig => psmsTheme;
+export interface IThemeBranding {
+  /** Action colour — buttons, links, selected states. "#RRGGBB". */
+  primaryColor: string;
+  /** Chrome colour — app header background and sidebar accent. "#RRGGBB". */
+  secondaryColor: string;
+}
+
+/**
+ * Utility function to get theme configuration.
+ *
+ * Called with a tenant's branding it returns the base PSMS theme with the
+ * action colour swapped; called with nothing it returns the stock theme
+ * unchanged, so any caller that predates branding behaves exactly as before.
+ *
+ * Note this only covers what Ant Design renders from tokens. The app chrome
+ * (header, sidebar accent) is not token-driven — it reads the branding
+ * directly, and non-Ant CSS reads the variables from
+ * {@link buildBrandingCssVariables}.
+ */
+export const getPsmsTheme = (branding?: IThemeBranding): ThemeConfig => {
+  if (!branding) return psmsTheme;
+
+  return {
+    ...psmsTheme,
+    token: {
+      ...psmsTheme.token,
+      colorPrimary: branding.primaryColor,
+      colorLink: branding.primaryColor,
+    },
+  };
+};
+
+/**
+ * The `:root` custom properties that let plain CSS (see
+ * {@link componentStyles.global}) follow the tenant's palette. Every rule that
+ * consumes one keeps a literal fallback, so styles still resolve if this block
+ * is ever absent.
+ */
+export const buildBrandingCssVariables = (branding: IThemeBranding): string => `
+    :root {
+      --psms-primary: ${branding.primaryColor};
+      --psms-secondary: ${branding.secondaryColor};
+    }
+  `;
 
 /**
  * Role-based color mappings

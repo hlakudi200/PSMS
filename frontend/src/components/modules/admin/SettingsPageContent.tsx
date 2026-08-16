@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { Card, Descriptions, Tag, Select, message, Typography } from 'antd';
 import { useAuthState } from '@/providers/auth';
 import { getAxiosInstance } from '@/utils/axios-instance';
+import BrandingSettingsForm from './BrandingSettingsForm';
 
 const { Title } = Typography;
 
@@ -54,6 +55,8 @@ export default function SettingsPageContent() {
           </Descriptions.Item>
         </Descriptions>
       </Card>
+
+      <BrandingSettingsForm />
 
       <Card title="UI Theme">
         <div style={{ maxWidth: 320 }}>

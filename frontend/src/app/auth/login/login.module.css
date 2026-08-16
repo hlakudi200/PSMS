@@ -11,7 +11,9 @@
   flex: 1;
   position: relative;
   overflow: hidden;
-  background: #003D73;
+  /* Follows the tenant's secondary colour (issue #56); the literal is the
+     stock PSMS fallback for when no branding has loaded yet. */
+  background: var(--psms-secondary, #003D73);
 }
 
 .imagePanel img {
@@ -80,9 +82,17 @@
   justify-content: center;
   font-size: 28px;
   font-weight: 800;
-  color: #0066CC;
+  color: var(--psms-primary, #0066CC);
   letter-spacing: 2px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  margin-bottom: 12px;
+}
+
+/* Uploaded school logo, shown in place of the .logoIcon monogram (issue #56) */
+.logoImage {
+  max-width: 200px;
+  max-height: 88px;
+  object-fit: contain;
   margin-bottom: 12px;
 }
 
@@ -93,7 +103,7 @@
 }
 
 .logoTextAccent {
-  color: #0066CC;
+  color: var(--psms-primary, #0066CC);
 }
 
 /* Login heading */
@@ -119,13 +129,13 @@
 
 .formContainer :global(.ant-input-affix-wrapper:hover),
 .formContainer :global(.ant-input:hover) {
-  border-bottom-color: #0066CC;
+  border-bottom-color: var(--psms-primary, #0066CC);
 }
 
 .formContainer :global(.ant-input-affix-wrapper:focus),
 .formContainer :global(.ant-input-affix-wrapper-focused),
 .formContainer :global(.ant-input:focus) {
-  border-bottom-color: #0066CC;
+  border-bottom-color: var(--psms-primary, #0066CC);
   border-bottom-width: 2px;
   box-shadow: none !important;
 }
@@ -167,7 +177,7 @@
 }
 
 .help a {
-  color: #0066CC;
+  color: var(--psms-primary, #0066CC);
   text-decoration: none;
 }
 
