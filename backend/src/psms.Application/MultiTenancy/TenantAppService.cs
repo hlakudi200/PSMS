@@ -10,9 +10,11 @@ using Abp.Runtime.Security;
 using psms.Authorization;
 using psms.Authorization.Roles;
 using psms.Authorization.Users;
+using psms.Domain.Tenancy.Entities;
 using psms.Editions;
 using psms.MultiTenancy.Dto;
 using Microsoft.AspNetCore.Identity;
+using System;
 using System.Linq;
 using System.Linq.Dynamic.Core;
 using System.Threading.Tasks;
@@ -28,6 +30,7 @@ public class TenantAppService : AsyncCrudAppService<Tenant, TenantDto, int, Page
     private readonly RoleManager _roleManager;
     private readonly IAbpZeroDbMigrator _abpZeroDbMigrator;
     private readonly PsmsRolePermissionSeeder _rolePermissionSeeder;
+    private readonly IRepository<SchoolBranding, Guid> _brandingRepository;
 
     public TenantAppService(
         IRepository<Tenant, int> repository,
@@ -36,7 +39,8 @@ public class TenantAppService : AsyncCrudAppService<Tenant, TenantDto, int, Page
         UserManager userManager,
         RoleManager roleManager,
         IAbpZeroDbMigrator abpZeroDbMigrator,
-        PsmsRolePermissionSeeder rolePermissionSeeder)
+        PsmsRolePermissionSeeder rolePermissionSeeder,
+        IRepository<SchoolBranding, Guid> brandingRepository)
         : base(repository)
     {
         _tenantManager = tenantManager;
@@ -45,6 +49,7 @@ public class TenantAppService : AsyncCrudAppService<Tenant, TenantDto, int, Page
         _roleManager = roleManager;
         _abpZeroDbMigrator = abpZeroDbMigrator;
         _rolePermissionSeeder = rolePermissionSeeder;
+        _brandingRepository = brandingRepository;
     }
 
     public override async Task<TenantDto> CreateAsync(CreateTenantDto input)
@@ -94,6 +99,13 @@ public class TenantAppService : AsyncCrudAppService<Tenant, TenantDto, int, Page
 
             // Assign admin user to role!
             CheckErrors(await _userManager.AddToRoleAsync(adminUser, adminRole.Name));
+            await CurrentUnitOfWork.SaveChangesAsync();
+
+            // Issue #56: seed default branding so the new school has an editable
+            // row from day one. Tenants created before this feature have no row;
+            // SchoolBrandingAppService creates one on first write, so both paths
+            // converge without a data backfill.
+            await _brandingRepository.InsertAsync(new SchoolBranding(Guid.NewGuid(), tenant.Id));
             await CurrentUnitOfWork.SaveChangesAsync();
         }
 
