@@ -3,6 +3,21 @@ import { Modal } from "antd";
 
 const baseURL = process.env.NEXT_PUBLIC_BASE_URL;
 
+/**
+ * Per-request opt-out of the error modal below, for calls whose failure the
+ * caller handles itself and that the user never asked for. Without it a
+ * background fetch (e.g. the login page's branding lookup, which fires as the
+ * user types) throws a blocking dialog over the screen on every failure.
+ *
+ * Set it as a normal request-config field:
+ *   instance.get(url, { suppressErrorModal: true })
+ */
+declare module "axios" {
+  export interface AxiosRequestConfig {
+    suppressErrorModal?: boolean;
+  }
+}
+
 export const getAxiosInstance = () => {
   const instance = axios.create({
     baseURL: `${baseURL}`,
@@ -30,11 +45,18 @@ export const getAxiosInstance = () => {
   instance.interceptors.response.use(
     (response) => response,
     (error) => {
+      // Callers that handle their own failures opt out of every dialog below.
+      const silent = Boolean(
+        axios.isAxiosError(error) && error.config?.suppressErrorModal
+      );
+
       if (!axios.isAxiosError(error) || !error.response) {
-        Modal.error({
-          title: "Network Error",
-          content: "Unable to connect to the server. Please check your internet connection.",
-        });
+        if (!silent) {
+          Modal.error({
+            title: "Network Error",
+            content: "Unable to connect to the server. Please check your internet connection.",
+          });
+        }
         return Promise.reject(error);
       }
 
@@ -47,6 +69,13 @@ export const getAxiosInstance = () => {
         if (typeof window !== "undefined" && !window.location.pathname.includes("/auth/login")) {
           window.location.href = "/auth/login";
         }
+        return Promise.reject(error);
+      }
+
+      // 401 is handled above (it redirects regardless of `silent`, since a
+      // dead session must not be swallowed). Everything past here is purely
+      // a dialog, so an opted-out caller stops now.
+      if (silent) {
         return Promise.reject(error);
       }
 

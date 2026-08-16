@@ -20,6 +20,7 @@ using psms.Domain.Workflow.Entities;
 using psms.Domain.Discipline.Entities;
 using psms.Domain.HR.Entities;
 using psms.Domain.Activities.Entities;
+using psms.Domain.Tenancy.Entities;
 
 namespace psms.EntityFrameworkCore;
 
@@ -371,6 +372,13 @@ public class psmsDbContext : AbpZeroDbContext<Tenant, Role, User, psmsDbContext>
     public DbSet<FieldTrip> FieldTrips { get; set; }
     public DbSet<ExpenseRequest> ExpenseRequests { get; set; }
 
+    /* ==================== Tenancy Module ==================== */
+
+    /// <summary>
+    /// Per-tenant visual identity — colours, logo, display name (issue #56)
+    /// </summary>
+    public DbSet<SchoolBranding> SchoolBrandings { get; set; }
+
     public psmsDbContext(DbContextOptions<psmsDbContext> options)
         : base(options)
     {
@@ -393,6 +401,19 @@ public class psmsDbContext : AbpZeroDbContext<Tenant, Role, User, psmsDbContext>
         ConfigureCommunicationModule(modelBuilder);
         ConfigureSASpecificModule(modelBuilder);
         ConfigureWorkflowModule(modelBuilder);
+        ConfigureTenancyModule(modelBuilder);
+    }
+
+    private void ConfigureTenancyModule(ModelBuilder modelBuilder)
+    {
+        // SchoolBranding - exactly one branding row per tenant (soft-delete
+        // aware, so deleting and re-creating branding doesn't hit the index).
+        // Doubles as the lookup index for the anonymous login-page fetch.
+        modelBuilder.Entity<SchoolBranding>()
+            .HasIndex(b => b.TenantId)
+            .IsUnique()
+            .HasFilter("\"IsDeleted\" = false")
+            .HasDatabaseName("IX_SchoolBrandings_TenantId");
     }
 
     private void ConfigureDateTimeUtcConversion(ModelBuilder modelBuilder)

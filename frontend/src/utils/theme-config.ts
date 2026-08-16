@@ -385,18 +385,18 @@ export const componentStyles = {
     .psms-status-active { background: #52c41a; color: white; }
     .psms-status-inactive { background: #8C8C8C; color: white; }
     .psms-status-pending { background: #faad14; color: white; }
-    .psms-status-approved { background: #0066CC; color: white; }
+    .psms-status-approved { background: var(--psms-primary, #0066CC); color: white; }
     .psms-status-rejected { background: #ff4d4f; color: white; }
 
     /* Highlight row on hover - more prominent */
     .ant-table-tbody > tr:hover > td {
-      background: #E6F7FF !important;
+      background: var(--psms-primary-tint, #E6F7FF) !important;
     }
 
     /* Selected row - clear indication */
     .ant-table-tbody > tr.ant-table-row-selected > td {
-      background: #BAE7FF !important;
-      border-color: #91D5FF;
+      background: var(--psms-primary-tint-strong, #BAE7FF) !important;
+      border-color: var(--psms-primary-tint-strong, #91D5FF);
     }
 
     /* Sticky headers for long tables */
@@ -415,7 +415,7 @@ export const componentStyles = {
     /* Page header - classic style */
     .psms-page-header {
       background: #FFFFFF;
-      border-bottom: 2px solid #0066CC;
+      border-bottom: 2px solid var(--psms-primary, #0066CC);
       padding: 16px 24px;
       margin-bottom: 16px;
     }
@@ -454,9 +454,148 @@ export const componentStyles = {
 };
 
 /**
- * Utility function to get theme configuration
+ * Per-tenant branding overrides applied on top of the base theme (issue #56).
  */
-export const getPsmsTheme = (): ThemeConfig => psmsTheme;
+export interface IThemeBranding {
+  /** Action colour — buttons, links, selected states. "#RRGGBB". */
+  primaryColor: string;
+  /** Chrome colour — app header background and sidebar accent. "#RRGGBB". */
+  secondaryColor: string;
+}
+
+/**
+ * The stock blues baked into the base theme above. Anywhere one of these
+ * literals appears in a COMPONENT token it has to be swapped per tenant:
+ * Ant Design resolves component tokens ahead of the global `colorPrimary`, so
+ * overriding the global alone leaves menus, links, focused inputs, tabs,
+ * pagination and badges stubbornly blue for a school that picked red.
+ */
+const BASE_PRIMARY = "#0066CC";
+const BASE_TINT_STRONG = "#BAE7FF"; // selected rows / menu items
+const BASE_TINT_SOFT = "#E6F7FF"; // hover states
+
+/**
+ * Picks a readable foreground for an arbitrary tenant background.
+ *
+ * The header, the login image panel and the settings preview all sit on
+ * `secondaryColor`, which a school is free to set to anything. Hard-coding
+ * white there makes a pale choice (#FFFFFF, #FFF4CC) unreadable across every
+ * portal, with nothing rejecting it. Uses WCAG relative luminance.
+ */
+export const getReadableForeground = (hex: string): string => {
+  const value = (hex || "").replace("#", "");
+  if (value.length < 6) return "#FFFFFF";
+
+  const channel = (offset: number) => {
+    const srgb = parseInt(value.slice(offset, offset + 2), 16) / 255;
+    return srgb <= 0.03928
+      ? srgb / 12.92
+      : Math.pow((srgb + 0.055) / 1.055, 2.4);
+  };
+
+  const luminance =
+    0.2126 * channel(0) + 0.7152 * channel(2) + 0.0722 * channel(4);
+
+  // 0.179 is the crossover where white and black text give equal contrast.
+  return luminance > 0.179 ? "#1F1F1F" : "#FFFFFF";
+};
+
+/** Mixes a #RRGGBB colour toward white. `amount` 0 = unchanged, 1 = white. */
+const tintTowardWhite = (hex: string, amount: number): string => {
+  const value = hex.replace("#", "");
+  const channel = (offset: number) => {
+    const base = parseInt(value.slice(offset, offset + 2), 16);
+    return Math.round(base + (255 - base) * amount)
+      .toString(16)
+      .padStart(2, "0");
+  };
+  return `#${channel(0)}${channel(2)}${channel(4)}`.toUpperCase();
+};
+
+/**
+ * Rewrites the three stock blues wherever they appear in the component token
+ * tree. Done by value rather than by naming each of the ~13 sites so that a
+ * hard-coded blue added to the base theme later is rebranded automatically
+ * instead of silently escaping.
+ */
+const rebrandComponents = (
+  components: ThemeConfig["components"],
+  branding: IThemeBranding
+): ThemeConfig["components"] => {
+  const replacements = new Map<string, string>([
+    [BASE_PRIMARY, branding.primaryColor],
+    [BASE_TINT_STRONG, tintTowardWhite(branding.primaryColor, 0.73)],
+    [BASE_TINT_SOFT, tintTowardWhite(branding.primaryColor, 0.9)],
+  ]);
+
+  return Object.fromEntries(
+    Object.entries(components ?? {}).map(([component, tokens]) => [
+      component,
+      Object.fromEntries(
+        Object.entries(tokens as Record<string, unknown>).map(([name, value]) => [
+          name,
+          typeof value === "string"
+            ? replacements.get(value.toUpperCase()) ?? value
+            : value,
+        ])
+      ),
+    ])
+    // Object.fromEntries widens away Ant Design's per-component token types;
+    // the values themselves are untouched apart from the colour swap.
+  ) as ThemeConfig["components"];
+};
+
+/**
+ * Utility function to get theme configuration.
+ *
+ * Called with a tenant's branding it returns the base PSMS theme rebranded;
+ * called with nothing it returns the stock theme unchanged, so any caller that
+ * predates branding behaves exactly as before.
+ *
+ * Note this covers only what Ant Design renders from tokens. The app chrome
+ * (header, sidebar accent) is not token-driven — it reads the branding
+ * directly, and non-Ant CSS reads the variables from
+ * {@link buildBrandingCssVariables}.
+ */
+export const getPsmsTheme = (branding?: IThemeBranding): ThemeConfig => {
+  if (!branding) return psmsTheme;
+
+  const components = rebrandComponents(psmsTheme.components, branding);
+
+  return {
+    ...psmsTheme,
+    token: {
+      ...psmsTheme.token,
+      colorPrimary: branding.primaryColor,
+      colorLink: branding.primaryColor,
+    },
+    components: {
+      ...components,
+      Layout: {
+        ...(components?.Layout ?? {}),
+        // The header sits on secondaryColor, so its default foreground has to
+        // be derived rather than left as a hard-coded white.
+        headerColor: getReadableForeground(branding.secondaryColor),
+      },
+    },
+  };
+};
+
+/**
+ * The `:root` custom properties that let plain CSS (see
+ * {@link componentStyles.global}) follow the tenant's palette. Every rule that
+ * consumes one keeps a literal fallback, so styles still resolve if this block
+ * is ever absent.
+ */
+export const buildBrandingCssVariables = (branding: IThemeBranding): string => `
+    :root {
+      --psms-primary: ${branding.primaryColor};
+      --psms-secondary: ${branding.secondaryColor};
+      --psms-primary-tint: ${tintTowardWhite(branding.primaryColor, 0.9)};
+      --psms-primary-tint-strong: ${tintTowardWhite(branding.primaryColor, 0.73)};
+      --psms-on-secondary: ${getReadableForeground(branding.secondaryColor)};
+    }
+  `;
 
 /**
  * Role-based color mappings

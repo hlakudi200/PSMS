@@ -11,6 +11,8 @@ import {
 import { usePathname, useRouter } from 'next/navigation';
 import { ProtectedRoute } from '@/components/shared/ProtectedRoute';
 import { useAuthActions, useAuthState } from '@/providers/auth';
+import { useBrandingState } from '@/providers/branding';
+import { getReadableForeground } from '@/utils/theme-config';
 import NotificationBell from '@/components/shared/NotificationBell';
 
 const { Header, Sider, Content } = Layout;
@@ -92,6 +94,20 @@ function ShellLayout({
   const { signOut } = useAuthActions();
   const { currentUser, currentRole } = useAuthState();
 
+  // Issue #56. Note `accentColor` above is deliberately left alone — it is the
+  // per-ROLE identity colour (roleColors.Principal etc.), not the school's.
+  // The school's brand lands on the header chrome and the sidebar logo.
+  const { branding } = useBrandingState();
+
+  // The header background is an arbitrary tenant colour, so its foreground has
+  // to be derived — a school picking a pale secondary would otherwise get
+  // white-on-white across every portal.
+  const headerForeground = getReadableForeground(branding.secondaryColor);
+
+  // A configured subtitle wins; otherwise show the school's name so every
+  // portal identifies the school it belongs to.
+  const resolvedSubtitle = sidebarSubtitle ?? branding.schoolName;
+
   // Restore preference on mount (browser-only)
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -150,19 +166,37 @@ function ShellLayout({
             height: 56,
             display: 'flex',
             alignItems: 'center',
+            gap: 10,
             justifyContent: collapsed ? 'center' : 'flex-start',
             padding: collapsed ? 0 : '0 16px',
             borderBottom: '1px solid #D9D9D9',
             flexShrink: 0,
           }}
         >
+          {/* School logo (issue #56). Collapsed, the logo is all that fits —
+              so it stays visible and the text is what drops. */}
+          {branding.logoUrl && (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img
+              src={branding.logoUrl}
+              alt={`${branding.schoolName} logo`}
+              style={{
+                height: 32,
+                maxWidth: collapsed ? 40 : 72,
+                objectFit: 'contain',
+                flexShrink: 0,
+              }}
+            />
+          )}
           {!collapsed && (
-            <div>
-              <Text strong style={{ fontSize: sidebarSubtitle ? 13 : 14, color: accentColor, display: 'block' }}>
+            <div style={{ minWidth: 0 }}>
+              <Text strong style={{ fontSize: 13, color: accentColor, display: 'block' }} ellipsis>
                 {sidebarTitle}
               </Text>
-              {sidebarSubtitle && (
-                <Text style={{ fontSize: 11, color: '#595959' }}>{sidebarSubtitle}</Text>
+              {resolvedSubtitle && (
+                <Text style={{ fontSize: 11, color: '#595959' }} ellipsis>
+                  {resolvedSubtitle}
+                </Text>
               )}
             </div>
           )}
@@ -231,7 +265,7 @@ function ShellLayout({
       <Layout>
         <Header
           style={{
-            background: '#003D73',
+            background: branding.secondaryColor,
             padding: '0 24px',
             display: 'flex',
             alignItems: 'center',
@@ -245,15 +279,17 @@ function ShellLayout({
               icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
               onClick={() => setCollapsedPersist(!collapsed)}
               aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-              style={{ color: '#FFFFFF', fontSize: 16 }}
+              style={{ color: headerForeground, fontSize: 16 }}
             />
-            <Text style={{ color: '#FFFFFF', fontSize: 18, fontWeight: 600 }}>
+            <Text style={{ color: headerForeground, fontSize: 18, fontWeight: 600 }}>
               {headerTitle}
             </Text>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
             {showNotificationBadge && <NotificationBell />}
-            <Text style={{ color: '#BAE7FF', fontSize: 13 }}>
+            {/* Derived from the header colour, slightly muted — the header
+                behind it is an arbitrary tenant colour. */}
+            <Text style={{ color: headerForeground, opacity: 0.85, fontSize: 13 }}>
               {currentUser?.name} {currentUser?.surname}
               {showRoleInHeader && ` (${currentRole})`}
             </Text>
