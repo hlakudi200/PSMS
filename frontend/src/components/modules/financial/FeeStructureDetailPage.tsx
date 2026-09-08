@@ -2,6 +2,7 @@
 
 import React, { useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { usePortalBase } from '@/utils/portal-base';
 import {
   Card,
   Descriptions,
@@ -48,6 +49,7 @@ const feeStatusMap: Record<number, { label: string; color: string }> = {
 function FeeStructureDetailContent() {
   const params = useParams();
   const router = useRouter();
+  const portalBase = usePortalBase();
   const feeStructureId = params.id as string;
 
   const { feeStructure, isPending: feeLoading } = useFeeStructureState();
@@ -78,7 +80,7 @@ function FeeStructureDetailContent() {
   if (!feeLoading && !feeStructure) {
     return (
       <div style={{ padding: 24 }}>
-        <Button icon={<ArrowLeftOutlined />} onClick={() => router.push('/principal/finance')} style={{ marginBottom: 16 }}>
+        <Button icon={<ArrowLeftOutlined />} onClick={() => router.push(`${portalBase}/finance`)} style={{ marginBottom: 16 }}>
           Back to Finance
         </Button>
         <Empty description="Fee structure not found" />
@@ -146,7 +148,7 @@ function FeeStructureDetailContent() {
 
   return (
     <div style={{ padding: 24 }}>
-      <Button icon={<ArrowLeftOutlined />} onClick={() => router.push('/principal/finance')} style={{ marginBottom: 16 }}>
+      <Button icon={<ArrowLeftOutlined />} onClick={() => router.push(`${portalBase}/finance`)} style={{ marginBottom: 16 }}>
         Back to Finance
       </Button>
 

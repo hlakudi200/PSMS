@@ -2,6 +2,7 @@
 
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+import { usePortalBase } from '@/utils/portal-base';
 import { Card, Col, Row, Select, DatePicker, Statistic, Tabs, Empty, Table, Tag, Progress, Typography, Alert } from 'antd';
 import {
   CheckCircleOutlined,
@@ -178,6 +179,7 @@ function AttendanceContent() {
   const { getActiveClassesAsync } = useClassActions();
   const { currentRole } = useAuthState();
   const router = useRouter();
+  const portalBase = usePortalBase();
 
   const [selectedClassId, setSelectedClassId] = useState<string | undefined>(undefined);
   const [dateRange, setDateRange] = useState<[Dayjs, Dayjs]>([
@@ -271,7 +273,7 @@ function AttendanceContent() {
       label: 'View Details',
       icon: <EyeOutlined />,
       onClick: (record) => {
-        router.push(`/principal/attendance/${record.id}`);
+        router.push(`${portalBase}/attendance/${record.id}`);
       },
     },
   ];

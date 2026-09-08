@@ -2,6 +2,7 @@
 
 import React, { useEffect, useCallback, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { usePortalBase } from '@/utils/portal-base';
 import {
   Card,
   Descriptions,
@@ -63,13 +64,15 @@ const seasonMap: Record<number, string> = {
 
 const enrollmentStatusMap: Record<number, { label: string; color: string }> = {
   1: { label: 'Active', color: 'green' },
-  2: { label: 'Terminated', color: 'red' },
-  3: { label: 'Suspended', color: 'orange' },
+  2: { label: 'Suspended', color: 'orange' },
+  3: { label: 'Terminated', color: 'red' },
+  4: { label: 'Pending', color: 'blue' },
 };
 
 function ExtramuralsDetailContent() {
   const params = useParams();
   const router = useRouter();
+  const portalBase = usePortalBase();
   const activityId = params.id as string;
 
   const { extramuralActivity, isPending: activityPending } = useExtramuralActivityState();
@@ -107,7 +110,7 @@ function ExtramuralsDetailContent() {
   if (!activityPending && !extramuralActivity) {
     return (
       <div style={{ padding: 24 }}>
-        <Button icon={<ArrowLeftOutlined />} onClick={() => router.push('/principal/extramurals')} style={{ marginBottom: 16 }}>
+        <Button icon={<ArrowLeftOutlined />} onClick={() => router.push(`${portalBase}/extramurals`)} style={{ marginBottom: 16 }}>
           Back to Extramurals
         </Button>
         <Empty description="Activity not found" />
@@ -145,7 +148,7 @@ function ExtramuralsDetailContent() {
   return (
     <div style={{ padding: 24 }}>
       <Space style={{ marginBottom: 16 }}>
-        <Button icon={<ArrowLeftOutlined />} onClick={() => router.push('/principal/extramurals')}>
+        <Button icon={<ArrowLeftOutlined />} onClick={() => router.push(`${portalBase}/extramurals`)}>
           Back to Extramurals
         </Button>
       </Space>

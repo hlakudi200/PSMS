@@ -2,6 +2,7 @@
 
 import React, { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import { usePortalBase } from '@/utils/portal-base';
 import { message } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, EyeOutlined } from '@ant-design/icons';
 import { EnterpriseTable } from '@/components/shared/enterprise-table';
@@ -13,6 +14,7 @@ import type { ITeacher } from '@/providers/academic/shared/interfaces';
 
 function TeachersContent() {
   const router = useRouter();
+  const portalBase = usePortalBase();
   const { teachers, totalCount, isPending, isError } = useTeacherState();
   const { getAllAsync, deleteAsync, activateAsync, deactivateAsync } = useTeacherActions();
   const { currentRole } = useAuthState();
@@ -79,7 +81,7 @@ function TeachersContent() {
       key: 'view',
       label: 'View',
       icon: <EyeOutlined />,
-      onClick: (record) => { router.push(`/principal/teachers/${record.id}`); },
+      onClick: (record) => { router.push(`${portalBase}/teachers/${record.id}`); },
     },
     {
       key: 'edit',

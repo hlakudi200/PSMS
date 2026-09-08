@@ -2,6 +2,7 @@
 
 import React, { useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { usePortalBase } from '@/utils/portal-base';
 import { Card, Col, Row, Select } from 'antd';
 import { EyeOutlined } from '@ant-design/icons';
 import { EnterpriseTable } from '@/components/shared/enterprise-table';
@@ -30,6 +31,7 @@ const assessmentTypeMap: Record<number, { label: string; color: string }> = Obje
 
 function MarkSheetsContent() {
   const router = useRouter();
+  const portalBase = usePortalBase();
   const { assessments, totalCount, isPending, isError } = useAssessmentState();
   const { getAllAsync } = useAssessmentActions();
   const { currentRole } = useAuthState();
@@ -103,7 +105,7 @@ function MarkSheetsContent() {
       label: 'View Marks',
       icon: <EyeOutlined />,
       onClick: (record) => {
-        router.push(`/principal/mark-sheets/${record.id}`);
+        router.push(`${portalBase}/mark-sheets/${record.id}`);
       },
     },
   ];
