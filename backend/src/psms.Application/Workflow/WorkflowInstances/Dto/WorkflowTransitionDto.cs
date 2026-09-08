@@ -17,4 +17,10 @@ public class WorkflowTransitionDto : EntityDto<Guid>
     public string Comment { get; set; }
     public DateTime TransitionDate { get; set; }
     public string AttachmentUrl { get; set; }
+    /// <summary>WF-32: the decision payload recorded with this transition, as JSON.</summary>
+    public string DecisionJson { get; set; }
+    /// <summary>WF-30: the step was waived rather than satisfied.</summary>
+    public bool IsWaived { get; set; }
+    /// <summary>WF-30: the step's guard was overridden.</summary>
+    public bool IsGuardOverridden { get; set; }
 }

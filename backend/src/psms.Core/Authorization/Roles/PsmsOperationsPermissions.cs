@@ -29,6 +29,9 @@ public static class PsmsOperationsPermissions
             PermissionNames.Academic_Dashboard,
             PermissionNames.Academic_Dashboard_View,
 
+            // WF-30: management may override a failing step guard (reason recorded)
+            PermissionNames.Workflow_Instances_OverrideGuard,
+
             // Academic - Parents & Transfers
             PermissionNames.Academic_Parents,
             PermissionNames.Academic_Parents_View,

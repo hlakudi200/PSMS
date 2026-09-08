@@ -57,6 +57,16 @@ public class psmsApplicationModule : AbpModule
                 .WithService.Base()
                 .LifestyleTransient());
 
+        // WF-30/31/32: workflow guards, effects, decision schemas and entity handlers
+        // are discovered by base interface (WorkflowExtensionRegistry.ResolveAll) —
+        // convention registration only binds an interface that matches the class
+        // name, so they need this explicit registration.
+        IocManager.IocContainer.Register(
+            Classes.FromAssembly(thisAssembly).BasedOn<psms.Workflow.Engine.IWorkflowStepGuard>().WithService.Base().LifestyleTransient(),
+            Classes.FromAssembly(thisAssembly).BasedOn<psms.Workflow.Engine.IWorkflowStepEffect>().WithService.Base().LifestyleTransient(),
+            Classes.FromAssembly(thisAssembly).BasedOn<psms.Workflow.Engine.IWorkflowDecisionSchema>().WithService.Base().LifestyleTransient(),
+            Classes.FromAssembly(thisAssembly).BasedOn<psms.Workflow.Engine.IWorkflowEntityHandler>().WithService.Base().LifestyleTransient());
+
         Configuration.Modules.AbpAutoMapper().Configurators.Add(
             // Scan the assembly for classes which inherit from AutoMapper.Profile
             cfg => cfg.AddMaps(thisAssembly)

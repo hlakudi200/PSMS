@@ -426,6 +426,8 @@ public static class PermissionNames
     public const string Workflow_Instances_ViewHistory = "Workflow.Instances.ViewHistory";
     public const string Workflow_Instances_Recall = "Workflow.Instances.Recall";
     public const string Workflow_Instances_BatchAdvance = "Workflow.Instances.BatchAdvance";
+    /// <summary>WF-30: advance past a failing step guard with a mandatory, recorded reason.</summary>
+    public const string Workflow_Instances_OverrideGuard = "Workflow.Instances.OverrideGuard";
 
     // Delegations
     public const string Workflow_Delegations = "Workflow.Delegations";

@@ -193,6 +193,7 @@ public class PsmsRolePermissionSeeder : ITransientDependency
             PermissionNames.Workflow_Instances_ViewHistory,
             PermissionNames.Workflow_Instances_Recall,
             PermissionNames.Workflow_Instances_BatchAdvance,
+            PermissionNames.Workflow_Instances_OverrideGuard,
             PermissionNames.Workflow_Delegations,
             PermissionNames.Workflow_Delegations_View,
             PermissionNames.Workflow_Delegations_Create,

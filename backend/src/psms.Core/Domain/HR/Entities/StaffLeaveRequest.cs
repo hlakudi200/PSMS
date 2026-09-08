@@ -87,6 +87,28 @@ public class StaffLeaveRequest : FullAuditedEntity<Guid>, IMayHaveTenant, ISoftD
         Status = StaffLeaveStatus.Submitted;
     }
 
+    /// <summary>
+    /// WF-31: the Head of Department has reviewed the request (substitute and
+    /// documents in order); it now awaits the Principal.
+    /// </summary>
+    public void HodApprove()
+    {
+        if (Status != StaffLeaveStatus.Submitted)
+            throw new InvalidOperationException("Only submitted leave requests can be HOD-approved.");
+        Status = StaffLeaveStatus.HODApproved;
+    }
+
+    /// <summary>
+    /// WF-31: the approval workflow was cancelled or recalled before a decision —
+    /// return the request to the requester as a draft.
+    /// </summary>
+    public void ReopenAsDraft()
+    {
+        if (Status != StaffLeaveStatus.Submitted && Status != StaffLeaveStatus.HODApproved)
+            throw new InvalidOperationException("Only submitted or HOD-approved leave requests can be reopened.");
+        Status = StaffLeaveStatus.Draft;
+    }
+
     public void Approve(long userId)
     {
         if (Status != StaffLeaveStatus.Submitted && Status != StaffLeaveStatus.HODApproved)

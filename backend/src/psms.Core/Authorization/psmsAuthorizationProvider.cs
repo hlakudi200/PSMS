@@ -499,6 +499,7 @@ public class psmsAuthorizationProvider : AuthorizationProvider
         instances.CreateChildPermission(PermissionNames.Workflow_Instances_ViewHistory, L("ViewWorkflowHistory"));
         instances.CreateChildPermission(PermissionNames.Workflow_Instances_Recall, L("RecallWorkflow"));
         instances.CreateChildPermission(PermissionNames.Workflow_Instances_BatchAdvance, L("BatchAdvanceWorkflow"));
+        instances.CreateChildPermission(PermissionNames.Workflow_Instances_OverrideGuard, L("OverrideWorkflowGuard"));
 
         // Delegations
         var delegations = workflow.CreateChildPermission(PermissionNames.Workflow_Delegations, L("WorkflowDelegations"));

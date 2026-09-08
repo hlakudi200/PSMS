@@ -30,6 +30,14 @@ public static class WorkflowExceptionCodes
     public const string RecallNotAllowed = "WF_RECALL_NOT_ALLOWED";
     public const string UserNotAssignedToStep = "WF_USER_NOT_ASSIGNED_TO_STEP";
 
+    // WF-30/31/32: guards, effects, decisions
+    public const string ExtensionNotFound = "WF_EXTENSION_NOT_FOUND";
+    public const string GuardNotSatisfied = "WF_GUARD_NOT_SATISFIED";
+    public const string GuardOverrideNotAllowed = "WF_GUARD_OVERRIDE_NOT_ALLOWED";
+    public const string WaiveNotAllowed = "WF_WAIVE_NOT_ALLOWED";
+    public const string DecisionInvalid = "WF_DECISION_INVALID";
+    public const string EntityWriteBackFailed = "WF_ENTITY_WRITE_BACK_FAILED";
+
     // Delegations
     public const string DelegationNotFound = "WF_DELEGATION_NOT_FOUND";
     public const string DelegationOverlap = "WF_DELEGATION_OVERLAP";

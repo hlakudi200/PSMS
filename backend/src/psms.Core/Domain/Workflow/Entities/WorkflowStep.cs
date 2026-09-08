@@ -77,12 +77,44 @@ public class WorkflowStep : FullAuditedEntity<Guid>
     /// </summary>
     public int? SlaHours { get; set; }
 
+    public const int MaxExtensionKeyLength = 100;
+
     /// <summary>
-    /// Optional guard expression. If set, this step is only entered when the condition evaluates to true.
-    /// Stored as a simple key=value expression (e.g. "Amount>10000").
+    /// WF-30: key of the registered exit criterion (IWorkflowStepGuard) that must
+    /// be satisfied before a forward action leaves this step, e.g.
+    /// "application.documents-verified". Null = no criterion.
     /// </summary>
-    [StringLength(500)]
-    public string GuardExpression { get; set; }
+    [StringLength(MaxExtensionKeyLength)]
+    public string GuardKey { get; set; }
+
+    /// <summary>
+    /// WF-31: key of the registered effect (IWorkflowStepEffect) applied to the
+    /// linked record when an instance ENTERS this step, e.g.
+    /// "discipline.start-investigation". Null = none.
+    /// </summary>
+    [StringLength(MaxExtensionKeyLength)]
+    public string EntryEffectKey { get; set; }
+
+    /// <summary>
+    /// WF-31: key of the registered effect applied to the linked record when a
+    /// forward action LEAVES this step, e.g. "leave.hod-approved". Null = none.
+    /// </summary>
+    [StringLength(MaxExtensionKeyLength)]
+    public string ExitEffectKey { get; set; }
+
+    /// <summary>
+    /// WF-32: key of the registered decision schema (IWorkflowDecisionSchema)
+    /// whose fields the actor must supply when taking a forward action on this
+    /// step, e.g. "feewaiver.approval" (approved amount + notes). Null = none.
+    /// </summary>
+    [StringLength(MaxExtensionKeyLength)]
+    public string DecisionSchemaKey { get; set; }
+
+    /// <summary>
+    /// WF-30: an optional step may be WAIVED (skipped with a mandatory reason)
+    /// instead of satisfied — e.g. an interview a grade does not require.
+    /// </summary>
+    public bool IsOptional { get; set; }
 
     [ForeignKey(nameof(WorkflowDefinitionId))]
     public virtual WorkflowDefinition WorkflowDefinition { get; set; }

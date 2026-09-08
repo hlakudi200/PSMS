@@ -89,6 +89,28 @@ public class StudentTransferRequest : FullAuditedEntity<Guid>, IMayHaveTenant, I
         Status = TransferStatus.Submitted;
     }
 
+    /// <summary>
+    /// WF-31: the approval workflow entered review — the record is now with a
+    /// reviewer and can no longer be edited by the requester.
+    /// </summary>
+    public void StartReview()
+    {
+        if (Status != TransferStatus.Submitted)
+            throw new InvalidOperationException("Only submitted transfers can move to review.");
+        Status = TransferStatus.UnderReview;
+    }
+
+    /// <summary>
+    /// WF-31: the approval workflow was cancelled or recalled before a decision —
+    /// return the transfer to the requester as a draft.
+    /// </summary>
+    public void ReopenAsDraft()
+    {
+        if (Status != TransferStatus.Submitted && Status != TransferStatus.UnderReview)
+            throw new InvalidOperationException("Only submitted or in-review transfers can be reopened.");
+        Status = TransferStatus.Draft;
+    }
+
     public void Approve(long userId)
     {
         if (Status != TransferStatus.Submitted && Status != TransferStatus.UnderReview)

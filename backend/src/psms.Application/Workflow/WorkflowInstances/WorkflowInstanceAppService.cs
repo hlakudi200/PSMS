@@ -9,7 +9,9 @@ using psms.Authorization;
 using psms.Authorization.Users;
 using psms.Domain.Workflow.Entities;
 using psms.Domain.Workflow.Enums;
+using psms.Workflow.Engine;
 using psms.Workflow.Shared;
+using Newtonsoft.Json;
 using psms.Workflow.WorkflowInstances.Dto;
 using System;
 using System.Collections.Generic;
@@ -30,6 +32,7 @@ public class WorkflowInstanceAppService : ApplicationService, IWorkflowInstanceA
     private readonly UserManager _userManager;
     private readonly WorkflowEntityBridgeService _bridgeService;
     private readonly WorkflowEntitySummaryProvider _entitySummaryProvider;
+    private readonly WorkflowExtensionRegistry _extensions;
 
     public WorkflowInstanceAppService(
         IRepository<WorkflowInstance, Guid> instanceRepository,
@@ -39,8 +42,10 @@ public class WorkflowInstanceAppService : ApplicationService, IWorkflowInstanceA
         IRepository<WorkflowDelegation, Guid> delegationRepository,
         UserManager userManager,
         WorkflowEntityBridgeService bridgeService,
-        WorkflowEntitySummaryProvider entitySummaryProvider)
+        WorkflowEntitySummaryProvider entitySummaryProvider,
+        WorkflowExtensionRegistry extensions)
     {
+        _extensions = extensions;
         _instanceRepository = instanceRepository;
         _definitionRepository = definitionRepository;
         _stepRepository = stepRepository;
@@ -68,7 +73,7 @@ public class WorkflowInstanceAppService : ApplicationService, IWorkflowInstanceA
             throw new UserFriendlyException(WorkflowExceptionCodes.InstanceNotFound,
                 "Workflow instance not found.");
 
-        return ObjectMapper.Map<WorkflowInstanceDto>(instance);
+        return await ToDetailDtoAsync(instance);
     }
 
     [AbpAuthorize(PermissionNames.Workflow_Instances_View)]
@@ -91,7 +96,43 @@ public class WorkflowInstanceAppService : ApplicationService, IWorkflowInstanceA
             throw new UserFriendlyException(WorkflowExceptionCodes.InstanceNotFound,
                 "No active workflow instance found for this entity.");
 
-        return ObjectMapper.Map<WorkflowInstanceDto>(instance);
+        return await ToDetailDtoAsync(instance);
+    }
+
+    /// <summary>
+    /// WF-30/32: the detail DTO carries the current step's guard status and
+    /// decision schema so the UI can disable the forward action, list what is
+    /// missing, and render the decision fields — without a second round trip.
+    /// </summary>
+    private async Task<WorkflowInstanceDto> ToDetailDtoAsync(WorkflowInstance instance)
+    {
+        var dto = ObjectMapper.Map<WorkflowInstanceDto>(instance);
+        var step = instance.CurrentStep;
+        if (step == null || instance.Status != WorkflowStatus.InProgress) return dto;
+
+        dto.CurrentStepIsOptional = step.IsOptional;
+        dto.CurrentStepGuardKey = step.GuardKey;
+
+        if (!string.IsNullOrWhiteSpace(step.GuardKey))
+        {
+            var guard = _extensions.GetGuard(step.GuardKey, instance.EntityType);
+            var result = await guard.EvaluateAsync(instance.EntityId);
+            dto.CurrentStepGuard = new WorkflowGuardStatusDto
+            {
+                Key = guard.Key,
+                DisplayName = guard.DisplayName,
+                Satisfied = result.Satisfied,
+                Message = result.Message,
+            };
+        }
+
+        if (!string.IsNullOrWhiteSpace(step.DecisionSchemaKey))
+        {
+            var schema = _extensions.GetDecisionSchema(step.DecisionSchemaKey, instance.EntityType);
+            dto.CurrentStepDecisionSchema = WorkflowDecisionSchemaDto.From(schema);
+        }
+
+        return dto;
     }
 
     [AbpAuthorize(PermissionNames.Workflow_Instances_View)]
@@ -240,19 +281,82 @@ public class WorkflowInstanceAppService : ApplicationService, IWorkflowInstanceA
 
         var allSteps = instance.WorkflowDefinition.Steps.OrderBy(s => s.StepOrder).ToList();
         Guid? toStepId = null;
+        WorkflowStep enteredStep = null;
 
         // Forward actions (Submit / Review / Approve) all mean "this step is done —
         // pass it on": advance to the next step, or complete the workflow if this
-        // is the terminal step (or there is no next step). This is why clicking
-        // "Review" on a review step now progresses the workflow instead of sitting
-        // still. Reject routes to the configured reject step (or terminates).
-        // Revise sends the item back one step for changes (stays In Progress).
-        var isForward = input.Action == WorkflowActionType.Approve
+        // is the terminal step. WF-30: Waive is a forward action on an OPTIONAL step
+        // that skips the guard with a mandatory reason. Reject routes to the
+        // configured reject step (or terminates). Revise sends the item back one
+        // step for changes (stays In Progress).
+        var isWaive = input.Action == WorkflowActionType.Waive;
+        var isForward = isWaive
+            || input.Action == WorkflowActionType.Approve
             || input.Action == WorkflowActionType.Review
             || input.Action == WorkflowActionType.Submit;
 
+        var decision = new WorkflowDecision(input.Decision);
+        var guardOverridden = false;
+
+        if (isWaive)
+        {
+            if (!currentStep.IsOptional)
+                throw new UserFriendlyException(WorkflowExceptionCodes.WaiveNotAllowed,
+                    "This step is not optional and cannot be waived.");
+            if (string.IsNullOrWhiteSpace(input.Comment))
+                throw new UserFriendlyException(WorkflowExceptionCodes.CommentRequired,
+                    "A reason is required to waive a step.");
+        }
+        else if (isForward)
+        {
+            // WF-30: exit criterion. A failing guard blocks the advance unless the
+            // actor holds the override permission and gives a reason.
+            if (!string.IsNullOrWhiteSpace(currentStep.GuardKey))
+            {
+                var guard = _extensions.GetGuard(currentStep.GuardKey, instance.EntityType);
+                var guardResult = await guard.EvaluateAsync(instance.EntityId);
+                if (!guardResult.Satisfied)
+                {
+                    if (!input.OverrideGuard)
+                        throw new UserFriendlyException(WorkflowExceptionCodes.GuardNotSatisfied,
+                            $"{guard.DisplayName}: {guardResult.Message}");
+                    if (!await PermissionChecker.IsGrantedAsync(PermissionNames.Workflow_Instances_OverrideGuard))
+                        throw new UserFriendlyException(WorkflowExceptionCodes.GuardOverrideNotAllowed,
+                            "You are not permitted to override this step's criteria.");
+                    if (string.IsNullOrWhiteSpace(input.Comment))
+                        throw new UserFriendlyException(WorkflowExceptionCodes.CommentRequired,
+                            "A reason is required to override the step's criteria.");
+                    guardOverridden = true;
+                }
+            }
+
+            // WF-32: the step's decision fields, validated by their schema.
+            if (!string.IsNullOrWhiteSpace(currentStep.DecisionSchemaKey))
+            {
+                var schema = _extensions.GetDecisionSchema(currentStep.DecisionSchemaKey, instance.EntityType);
+                var error = schema.Validate(decision);
+                if (error != null)
+                    throw new UserFriendlyException(WorkflowExceptionCodes.DecisionInvalid, error);
+            }
+        }
+
+        var effectContext = new WorkflowEffectContext
+        {
+            TenantId = AbpSession.TenantId,
+            EntityType = instance.EntityType,
+            EntityId = instance.EntityId,
+            ActorUserId = AbpSession.UserId.Value,
+            Comment = input.Comment,
+            Decision = decision,
+        };
+
         if (isForward)
         {
+            // WF-31: exit effect of the step being left (not on waive — the work
+            // the effect records was not done).
+            if (!isWaive && !string.IsNullOrWhiteSpace(currentStep.ExitEffectKey))
+                await _extensions.GetEffect(currentStep.ExitEffectKey, instance.EntityType).ApplyAsync(effectContext);
+
             if (currentStep.IsTerminal)
             {
                 instance.Complete(AbpSession.UserId.Value, input.Comment);
@@ -264,12 +368,18 @@ public class WorkflowInstanceAppService : ApplicationService, IWorkflowInstanceA
 
                 if (nextStep == null)
                 {
+                    if (currentStep.NextStepOnApprove.HasValue)
+                        // WF-33: a configured target that does not exist is a
+                        // misconfiguration, never an implicit approval.
+                        throw new UserFriendlyException(WorkflowExceptionCodes.InvalidNextStep,
+                            $"Step '{currentStep.Name}' routes to step order {nextOrder}, which does not exist. Fix the definition.");
                     instance.Complete(AbpSession.UserId.Value, input.Comment);
                 }
                 else
                 {
                     instance.AdvanceTo(nextStep.StepOrder, nextStep.Id, nextStep.SlaHours);
                     toStepId = nextStep.Id;
+                    enteredStep = nextStep;
                 }
             }
         }
@@ -278,15 +388,12 @@ public class WorkflowInstanceAppService : ApplicationService, IWorkflowInstanceA
             if (currentStep.NextStepOnReject.HasValue)
             {
                 var rejectStep = allSteps.FirstOrDefault(s => s.StepOrder == currentStep.NextStepOnReject.Value);
-                if (rejectStep != null)
-                {
-                    instance.AdvanceTo(rejectStep.StepOrder, rejectStep.Id, rejectStep.SlaHours);
-                    toStepId = rejectStep.Id;
-                }
-                else
-                {
-                    instance.Reject(AbpSession.UserId.Value, input.Comment);
-                }
+                if (rejectStep == null)
+                    throw new UserFriendlyException(WorkflowExceptionCodes.InvalidNextStep,
+                        $"Step '{currentStep.Name}' routes rejections to step order {currentStep.NextStepOnReject.Value}, which does not exist. Fix the definition.");
+                instance.AdvanceTo(rejectStep.StepOrder, rejectStep.Id, rejectStep.SlaHours);
+                toStepId = rejectStep.Id;
+                enteredStep = rejectStep;
             }
             else
             {
@@ -307,13 +414,26 @@ public class WorkflowInstanceAppService : ApplicationService, IWorkflowInstanceA
 
             instance.AdvanceTo(previousStep.StepOrder, previousStep.Id, previousStep.SlaHours);
             toStepId = previousStep.Id;
+            enteredStep = previousStep;
         }
         else
         {
             // Cancel / Recall have their own endpoints; anything else is invalid here.
             throw new UserFriendlyException(WorkflowExceptionCodes.InvalidTransition,
-                "Invalid action. Use Submit, Review, Approve, Reject, or Send for Revision.");
+                "Invalid action. Use Submit, Review, Approve, Reject, Waive, or Send for Revision.");
         }
+
+        // WF-31: entry effect of the step being entered.
+        if (enteredStep != null && !string.IsNullOrWhiteSpace(enteredStep.EntryEffectKey))
+            await _extensions.GetEffect(enteredStep.EntryEffectKey, instance.EntityType).ApplyAsync(effectContext);
+
+        // WF-31: terminal write-back runs BEFORE the save, in the same unit of work,
+        // and propagates failures — the workflow never reads Completed/Rejected
+        // while the record is untouched.
+        if (instance.Status == WorkflowStatus.Completed)
+            await _bridgeService.OnWorkflowCompletedAsync(effectContext);
+        else if (instance.Status == WorkflowStatus.Rejected)
+            await _bridgeService.OnWorkflowRejectedAsync(effectContext);
 
         // Record the transition
         var transition = new WorkflowTransition
@@ -328,26 +448,15 @@ public class WorkflowInstanceAppService : ApplicationService, IWorkflowInstanceA
             ActorUserName = await GetCurrentUserName(),
             Comment = input.Comment,
             AttachmentUrl = input.AttachmentUrl,
-            TransitionDate = DateTime.UtcNow
+            TransitionDate = DateTime.UtcNow,
+            DecisionJson = decision.IsEmpty ? null : JsonConvert.SerializeObject(decision.Raw),
+            IsWaived = isWaive,
+            IsGuardOverridden = guardOverridden,
         };
 
         await _instanceRepository.UpdateAsync(instance);
         await _transitionRepository.InsertAsync(transition);
         await CurrentUnitOfWork.SaveChangesAsync();
-
-        // Bridge: sync workflow result to the linked domain entity
-        if (instance.Status == WorkflowStatus.Completed)
-        {
-            await _bridgeService.OnWorkflowCompletedAsync(
-                instance.EntityType, instance.EntityId, AbpSession.UserId.Value);
-            await CurrentUnitOfWork.SaveChangesAsync();
-        }
-        else if (instance.Status == WorkflowStatus.Rejected)
-        {
-            await _bridgeService.OnWorkflowRejectedAsync(
-                instance.EntityType, instance.EntityId, AbpSession.UserId.Value, input.Comment);
-            await CurrentUnitOfWork.SaveChangesAsync();
-        }
 
         return await GetAsync(instanceId);
     }
@@ -370,6 +479,10 @@ public class WorkflowInstanceAppService : ApplicationService, IWorkflowInstanceA
         {
             throw new UserFriendlyException(WorkflowExceptionCodes.InvalidTransition, ex.Message);
         }
+
+        // WF-31: a cancelled approval returns the record to its requester instead
+        // of stranding it mid-flight.
+        await _bridgeService.OnWorkflowCancelledAsync(BuildContext(instance, comment));
 
         // Record cancellation transition
         if (instance.CurrentStepId.HasValue)
@@ -415,6 +528,9 @@ public class WorkflowInstanceAppService : ApplicationService, IWorkflowInstanceA
         {
             throw new UserFriendlyException(WorkflowExceptionCodes.RecallNotAllowed, ex.Message);
         }
+
+        // WF-31: a recalled approval returns the record to its requester.
+        await _bridgeService.OnWorkflowRecalledAsync(BuildContext(instance, comment));
 
         // Record recall transition
         if (instance.CurrentStepId.HasValue)
@@ -684,6 +800,16 @@ public class WorkflowInstanceAppService : ApplicationService, IWorkflowInstanceA
     /// Validates the current user is authorized to act on the given step.
     /// Checks: specific user assignment → role match → active delegation.
     /// </summary>
+    private WorkflowEffectContext BuildContext(WorkflowInstance instance, string comment) => new()
+    {
+        TenantId = AbpSession.TenantId,
+        EntityType = instance.EntityType,
+        EntityId = instance.EntityId,
+        ActorUserId = AbpSession.UserId.Value,
+        Comment = comment,
+        Decision = WorkflowDecision.Empty,
+    };
+
     private async Task ValidateUserCanActOnStep(WorkflowStep step)
     {
         var userId = AbpSession.UserId;

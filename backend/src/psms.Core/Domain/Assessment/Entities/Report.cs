@@ -237,6 +237,23 @@ namespace psms.Domain.Assessment.Entities
         }
 
         /// <summary>
+        /// WF-31: the approver sent the report back. It returns to Generated so the
+        /// teacher can correct it and resubmit; the reason is kept as the
+        /// principal's comment so it travels with the report.
+        /// </summary>
+        public void ReturnForRevision(string reason)
+        {
+            if (Status != ReportStatus.PendingApproval)
+                throw new InvalidOperationException("Only reports pending approval can be returned for revision.");
+
+            Status = ReportStatus.Generated;
+            ApprovedByUserId = null;
+            ApprovedDate = null;
+            if (!string.IsNullOrWhiteSpace(reason))
+                PrincipalComment = reason.Length > 1000 ? reason.Substring(0, 1000) : reason;
+        }
+
+        /// <summary>
         /// Publishes the report to parent
         /// </summary>
         public void Publish()

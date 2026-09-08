@@ -8,5 +8,11 @@ public enum WorkflowActionType
     Reject = 4,
     Revise = 5,
     Cancel = 6,
-    Recall = 7
+    Recall = 7,
+
+    /// <summary>
+    /// WF-30: skip an OPTIONAL step with a mandatory reason. Behaves as a forward
+    /// action (advances to the next step) but bypasses the step's guard.
+    /// </summary>
+    Waive = 8
 }

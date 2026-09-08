@@ -26,7 +26,17 @@ public class UpdateWorkflowStepDto
     public int? SlaHours { get; set; }
     public bool ClearSlaHours { get; set; }
 
-    [StringLength(500)]
-    public string GuardExpression { get; set; }
-    public bool ClearGuardExpression { get; set; }
+    [StringLength(100)]
+    public string GuardKey { get; set; }
+    public bool ClearGuardKey { get; set; }
+    [StringLength(100)]
+    public string EntryEffectKey { get; set; }
+    public bool ClearEntryEffectKey { get; set; }
+    [StringLength(100)]
+    public string ExitEffectKey { get; set; }
+    public bool ClearExitEffectKey { get; set; }
+    [StringLength(100)]
+    public string DecisionSchemaKey { get; set; }
+    public bool ClearDecisionSchemaKey { get; set; }
+    public bool? IsOptional { get; set; }
 }

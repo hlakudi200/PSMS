@@ -27,6 +27,7 @@ import {
   WorkflowEntityType,
   WorkflowEntityTypeLabels,
   WorkflowActionTypeLabels,
+  WorkflowActionType,
 } from '@/providers/workflow/shared/interfaces';
 import type { IWorkflowTransition, IWorkflowEntitySummary } from '@/providers/workflow/shared/interfaces';
 import { message } from 'antd';
@@ -50,7 +51,18 @@ const actionColors: Record<number, string> = {
   5: 'orange',
   6: 'default',
   7: 'purple',
+  8: 'gold',
 };
+
+/** WF-32: decision payloads are stored as JSON; render them as label/value lines. */
+function parseDecision(json: string): Record<string, unknown> {
+  try {
+    const parsed = JSON.parse(json);
+    return parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : {};
+  } catch {
+    return {};
+  }
+}
 
 function DetailContent() {
   const params = useParams();
@@ -254,6 +266,18 @@ function DetailContent() {
               <Tag style={{ marginLeft: 8 }}>{wfInstance.currentStepAssignedRole}</Tag>
             )}
           </Descriptions.Item>
+          {isInProgress && wfInstance?.currentStepGuard && (
+            <Descriptions.Item label="Exit criteria" span={3}>
+              <Tag color={wfInstance.currentStepGuard.satisfied ? 'success' : 'warning'}>
+                {wfInstance.currentStepGuard.satisfied ? 'Met' : 'Not met'}
+              </Tag>
+              <Text>{wfInstance.currentStepGuard.displayName}</Text>
+              {!wfInstance.currentStepGuard.satisfied && wfInstance.currentStepGuard.message && (
+                <Text type="secondary" style={{ marginLeft: 8 }}>— {wfInstance.currentStepGuard.message}</Text>
+              )}
+              {wfInstance.currentStepIsOptional && <Tag style={{ marginLeft: 8 }}>Optional step</Tag>}
+            </Descriptions.Item>
+          )}
           <Descriptions.Item label="Step Order">{wfInstance?.currentStepOrder ?? '—'}</Descriptions.Item>
           <Descriptions.Item label="Version">{wfInstance?.workflowDefinitionVersion ?? '—'}</Descriptions.Item>
           <Descriptions.Item label="Started">
@@ -285,6 +309,8 @@ function DetailContent() {
                 <Tag color={actionColors[t.action]}>
                   {WorkflowActionTypeLabels[t.action] ?? t.action}
                 </Tag>
+                {(t.isWaived || t.action === WorkflowActionType.Waive) && <Tag color="gold">Waived</Tag>}
+                {t.isGuardOverridden && <Tag color="volcano">Criteria overridden</Tag>}
                 <Text strong>{t.fromStepName ?? '—'}</Text>
                 {t.toStepName && (
                   <>
@@ -299,6 +325,15 @@ function DetailContent() {
                 {t.comment && (
                   <div style={{ marginTop: 4, padding: '4px 8px', background: '#f5f5f5', borderRadius: 4 }}>
                     <Text italic style={{ fontSize: 12 }}>{t.comment}</Text>
+                  </div>
+                )}
+                {t.decisionJson && (
+                  <div style={{ marginTop: 4 }}>
+                    {Object.entries(parseDecision(t.decisionJson)).map(([k, v]) => (
+                      <Text key={k} style={{ fontSize: 12, display: 'block' }}>
+                        <Text type="secondary">{k}: </Text>{String(v)}
+                      </Text>
+                    ))}
                   </div>
                 )}
               </div>
@@ -317,6 +352,10 @@ function DetailContent() {
         currentStepName={wfInstance?.currentStepName}
         isCommentRequired={wfInstance?.currentStepIsCommentRequired}
         currentStepActionType={wfInstance?.currentStepActionType}
+        currentStepIsOptional={wfInstance?.currentStepIsOptional}
+        currentStepGuard={wfInstance?.currentStepGuard}
+        decisionSchema={wfInstance?.currentStepDecisionSchema}
+        canOverrideGuard={canManageInstance}
         currentStepOrder={wfInstance?.currentStepOrder}
       />
     </div>

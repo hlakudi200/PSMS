@@ -23,6 +23,7 @@ import {
   useWorkflowStepActions,
 } from '@/providers/workflow/workflow-steps';
 import { WorkflowStepFormModal } from '@/components/modals/workflow/WorkflowStepFormModal';
+import { WorkflowExtensionProvider } from '@/providers/workflow/workflow-extensions';
 import type { IWorkflowStep } from '@/providers/workflow/shared/interfaces';
 import {
   WorkflowEntityTypeLabels,
@@ -139,6 +140,32 @@ function DetailContent() {
       render: (val?: number) => val ?? '—',
     },
     {
+      title: 'Exit criteria',
+      key: 'guardKey',
+      render: (_: unknown, record: IWorkflowStep) => (
+        <Space size={4} wrap>
+          {record.guardKey ? <Tag color="geekblue">{record.guardKey}</Tag> : <Text type="secondary">—</Text>}
+          {record.isOptional && <Tag>optional</Tag>}
+        </Space>
+      ),
+    },
+    {
+      title: 'Effects / decision',
+      key: 'effects',
+      render: (_: unknown, record: IWorkflowStep) => {
+        const parts = [
+          record.entryEffectKey ? `on entry: ${record.entryEffectKey}` : null,
+          record.exitEffectKey ? `on exit: ${record.exitEffectKey}` : null,
+          record.decisionSchemaKey ? `decision: ${record.decisionSchemaKey}` : null,
+        ].filter(Boolean);
+        return parts.length ? (
+          <Space direction="vertical" size={0}>
+            {parts.map((p) => <Text key={p as string} style={{ fontSize: 12 }}>{p}</Text>)}
+          </Space>
+        ) : <Text type="secondary">—</Text>;
+      },
+    },
+    {
       title: 'Actions',
       key: 'actions',
       width: 180,
@@ -228,6 +255,7 @@ function DetailContent() {
         onClose={handleModalClose}
         editRecord={editStep}
         definitionId={id}
+        entityType={definition?.entityType}
         nextStepOrder={nextStepOrder}
       />
     </div>
@@ -238,7 +266,9 @@ export default function WorkflowDefinitionDetailPage() {
   return (
     <WorkflowDefinitionProvider>
       <WorkflowStepProvider>
-        <DetailContent />
+        <WorkflowExtensionProvider>
+          <DetailContent />
+        </WorkflowExtensionProvider>
       </WorkflowStepProvider>
     </WorkflowDefinitionProvider>
   );

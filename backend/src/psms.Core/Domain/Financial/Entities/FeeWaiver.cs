@@ -75,6 +75,28 @@ public class FeeWaiver : FullAuditedEntity<Guid>, IMayHaveTenant, ISoftDelete
         Status = FeeWaiverStatus.Submitted;
     }
 
+    /// <summary>
+    /// WF-31: the approval workflow entered review — the record is now with a
+    /// reviewer and can no longer be edited by the requester.
+    /// </summary>
+    public void StartReview()
+    {
+        if (Status != FeeWaiverStatus.Submitted)
+            throw new InvalidOperationException("Only submitted waivers can move to review.");
+        Status = FeeWaiverStatus.UnderReview;
+    }
+
+    /// <summary>
+    /// WF-31: the approval workflow was cancelled or recalled before a decision —
+    /// return the waiver to the requester as a draft.
+    /// </summary>
+    public void ReopenAsDraft()
+    {
+        if (Status != FeeWaiverStatus.Submitted && Status != FeeWaiverStatus.UnderReview)
+            throw new InvalidOperationException("Only submitted or in-review waivers can be reopened.");
+        Status = FeeWaiverStatus.Draft;
+    }
+
     public void Approve(long userId, decimal approvedAmount, string notes = null)
     {
         if (Status != FeeWaiverStatus.Submitted && Status != FeeWaiverStatus.UnderReview)

@@ -111,6 +111,18 @@ public class DisciplinaryCase : FullAuditedEntity<Guid>, IMayHaveTenant, ISoftDe
         Status = DisciplinaryStatus.Reported;
     }
 
+    /// <summary>
+    /// WF-31: the approval workflow was cancelled or recalled before a decision —
+    /// return the case to the reporter as a draft. Cases past investigation keep
+    /// their evidence and stay where they are.
+    /// </summary>
+    public void ReopenAsDraft()
+    {
+        if (Status != DisciplinaryStatus.Reported && Status != DisciplinaryStatus.UnderInvestigation)
+            throw new InvalidOperationException("Only reported or under-investigation cases can be reopened.");
+        Status = DisciplinaryStatus.Draft;
+    }
+
     public void StartInvestigation()
     {
         if (Status != DisciplinaryStatus.Reported)

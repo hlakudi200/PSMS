@@ -112,6 +112,28 @@ public class FieldTrip : FullAuditedEntity<Guid>, IMayHaveTenant, ISoftDelete
         Status = FieldTripStatus.Submitted;
     }
 
+    /// <summary>
+    /// WF-31: the approval workflow entered review — the record is now with a
+    /// reviewer and can no longer be edited by the requester.
+    /// </summary>
+    public void StartReview()
+    {
+        if (Status != FieldTripStatus.Submitted)
+            throw new InvalidOperationException("Only submitted trips can move to review.");
+        Status = FieldTripStatus.UnderReview;
+    }
+
+    /// <summary>
+    /// WF-31: the approval workflow was cancelled or recalled before a decision —
+    /// return the trip to the requester as a draft.
+    /// </summary>
+    public void ReopenAsDraft()
+    {
+        if (Status != FieldTripStatus.Submitted && Status != FieldTripStatus.UnderReview)
+            throw new InvalidOperationException("Only submitted or in-review trips can be reopened.");
+        Status = FieldTripStatus.Draft;
+    }
+
     public void Approve(long userId, decimal budget)
     {
         if (Status != FieldTripStatus.Submitted && Status != FieldTripStatus.UnderReview)
