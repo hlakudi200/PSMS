@@ -6,6 +6,8 @@ using Abp.Linq.Extensions;
 using Abp.UI;
 using Microsoft.EntityFrameworkCore;
 using psms.Authorization;
+using psms.Domain.Workflow.Enums;
+using psms.Workflow.Shared;
 using psms.Discipline.DisciplinaryCases.Dto;
 using psms.Discipline.Shared;
 using psms.Domain.Discipline.Entities;
@@ -25,13 +27,19 @@ namespace psms.Discipline.DisciplinaryCases;
 [AbpAuthorize(PermissionNames.Discipline_Cases)]
 public class DisciplinaryCaseAppService : ApplicationService, IDisciplinaryCaseAppService
 {
+    private readonly WorkflowStarterService _workflowStarter;
+    private readonly WorkflowInstanceGuard _workflowGuard;
     private readonly IRepository<DisciplinaryCase, Guid> _disciplinaryCaseRepository;
     private readonly UserManager _userManager;
 
     public DisciplinaryCaseAppService(
         IRepository<DisciplinaryCase, Guid> disciplinaryCaseRepository,
-        UserManager userManager)
+        UserManager userManager,
+        WorkflowStarterService workflowStarter,
+        WorkflowInstanceGuard workflowGuard)
     {
+        _workflowStarter = workflowStarter;
+        _workflowGuard = workflowGuard;
         _disciplinaryCaseRepository = disciplinaryCaseRepository;
         _userManager = userManager;
     }
@@ -180,6 +188,13 @@ public class DisciplinaryCaseAppService : ApplicationService, IDisciplinaryCaseA
         await _disciplinaryCaseRepository.UpdateAsync(disciplinaryCase);
         await CurrentUnitOfWork.SaveChangesAsync();
 
+        // WF-36: submitting starts the tenant's active approval workflow (no-op when
+        // none is configured — the direct approve endpoints then remain available).
+        await _workflowStarter.TryStartWorkflowAsync(
+            AbpSession.TenantId, WorkflowEntityType.Disciplinary, id,
+            AbpSession.UserId.Value, await GetCurrentUserNameAsync());
+        await CurrentUnitOfWork.SaveChangesAsync();
+
         return await GetAsync(id);
     }
 
@@ -288,6 +303,8 @@ public class DisciplinaryCaseAppService : ApplicationService, IDisciplinaryCaseA
     [AbpAuthorize(PermissionNames.Discipline_Cases_Manage)]
     public async Task<DisciplinaryCaseDto> ResolveAsync(Guid id)
     {
+        await _workflowGuard.EnsureNoActiveInstanceAsync(WorkflowEntityType.Disciplinary, id);
+
         var disciplinaryCase = await _disciplinaryCaseRepository
             .FirstOrDefaultAsync(dc => dc.Id == id && dc.TenantId == AbpSession.TenantId);
 

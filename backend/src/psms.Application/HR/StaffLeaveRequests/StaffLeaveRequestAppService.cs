@@ -6,6 +6,8 @@ using Abp.Linq.Extensions;
 using Abp.UI;
 using Microsoft.EntityFrameworkCore;
 using psms.Authorization;
+using psms.Domain.Workflow.Enums;
+using psms.Workflow.Shared;
 using psms.Authorization.Users;
 using psms.Domain.HR.Entities;
 using psms.Domain.Shared.Enums;
@@ -25,13 +27,19 @@ namespace psms.HR.StaffLeaveRequests;
 [AbpAuthorize(PermissionNames.HR_Leave)]
 public class StaffLeaveRequestAppService : ApplicationService, IStaffLeaveRequestAppService
 {
+    private readonly WorkflowStarterService _workflowStarter;
+    private readonly WorkflowInstanceGuard _workflowGuard;
     private readonly IRepository<StaffLeaveRequest, Guid> _leaveRepository;
     private readonly UserManager _userManager;
 
     public StaffLeaveRequestAppService(
         IRepository<StaffLeaveRequest, Guid> leaveRepository,
-        UserManager userManager)
+        UserManager userManager,
+        WorkflowStarterService workflowStarter,
+        WorkflowInstanceGuard workflowGuard)
     {
+        _workflowStarter = workflowStarter;
+        _workflowGuard = workflowGuard;
         _leaveRepository = leaveRepository;
         _userManager = userManager;
     }
@@ -198,12 +206,21 @@ public class StaffLeaveRequestAppService : ApplicationService, IStaffLeaveReques
         await _leaveRepository.UpdateAsync(leave);
         await CurrentUnitOfWork.SaveChangesAsync();
 
+        // WF-36: submitting starts the tenant's active approval workflow (no-op when
+        // none is configured — the direct approve endpoints then remain available).
+        await _workflowStarter.TryStartWorkflowAsync(
+            AbpSession.TenantId, WorkflowEntityType.StaffLeave, id,
+            AbpSession.UserId.Value);
+        await CurrentUnitOfWork.SaveChangesAsync();
+
         return await GetAsync(id);
     }
 
     [AbpAuthorize(PermissionNames.HR_Leave_Approve)]
     public async Task<StaffLeaveRequestDto> ApproveAsync(Guid id)
     {
+        await _workflowGuard.EnsureNoActiveInstanceAsync(WorkflowEntityType.StaffLeave, id);
+
         var leave = await _leaveRepository
             .FirstOrDefaultAsync(l => l.Id == id && l.TenantId == AbpSession.TenantId);
 
@@ -229,6 +246,8 @@ public class StaffLeaveRequestAppService : ApplicationService, IStaffLeaveReques
     [AbpAuthorize(PermissionNames.HR_Leave_Approve)]
     public async Task<StaffLeaveRequestDto> RejectAsync(Guid id, string reason)
     {
+        await _workflowGuard.EnsureNoActiveInstanceAsync(WorkflowEntityType.StaffLeave, id);
+
         var leave = await _leaveRepository
             .FirstOrDefaultAsync(l => l.Id == id && l.TenantId == AbpSession.TenantId);
 

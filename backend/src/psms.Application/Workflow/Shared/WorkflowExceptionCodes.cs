@@ -37,6 +37,8 @@ public static class WorkflowExceptionCodes
     public const string WaiveNotAllowed = "WF_WAIVE_NOT_ALLOWED";
     public const string DecisionInvalid = "WF_DECISION_INVALID";
     public const string EntityWriteBackFailed = "WF_ENTITY_WRITE_BACK_FAILED";
+    // WF-36: one approval path — direct approve/reject refused while an instance is active
+    public const string EntityHasActiveWorkflow = "WF_ENTITY_HAS_ACTIVE_WORKFLOW";
 
     // Delegations
     public const string DelegationNotFound = "WF_DELEGATION_NOT_FOUND";

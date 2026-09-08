@@ -15,6 +15,7 @@ using psms.Editions;
 using psms.MultiTenancy.Dto;
 using Microsoft.AspNetCore.Identity;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Dynamic.Core;
 using System.Threading.Tasks;
@@ -31,6 +32,7 @@ public class TenantAppService : AsyncCrudAppService<Tenant, TenantDto, int, Page
     private readonly IAbpZeroDbMigrator _abpZeroDbMigrator;
     private readonly PsmsRolePermissionSeeder _rolePermissionSeeder;
     private readonly IRepository<SchoolBranding, Guid> _brandingRepository;
+    private readonly psms.Workflow.Seed.WorkflowDefinitionSeeder _workflowSeeder;
 
     public TenantAppService(
         IRepository<Tenant, int> repository,
@@ -40,9 +42,11 @@ public class TenantAppService : AsyncCrudAppService<Tenant, TenantDto, int, Page
         RoleManager roleManager,
         IAbpZeroDbMigrator abpZeroDbMigrator,
         PsmsRolePermissionSeeder rolePermissionSeeder,
-        IRepository<SchoolBranding, Guid> brandingRepository)
+        IRepository<SchoolBranding, Guid> brandingRepository,
+        psms.Workflow.Seed.WorkflowDefinitionSeeder workflowSeeder)
         : base(repository)
     {
+        _workflowSeeder = workflowSeeder;
         _tenantManager = tenantManager;
         _editionManager = editionManager;
         _userManager = userManager;
@@ -88,6 +92,11 @@ public class TenantAppService : AsyncCrudAppService<Tenant, TenantDto, int, Page
 
             // Grant PSMS-specific permissions to other roles (Principal, Teacher, etc.)
             await _rolePermissionSeeder.SeedRolePermissionsAsync(tenant.Id);
+
+            // WF-35: the eight default approval workflows, so Submit can start one
+            // from day one (the seeder needs the explicit tenant id — the session
+            // is still the host's here).
+            await _workflowSeeder.SeedDefaultsAsync(tenant.Id);
 
             await CurrentUnitOfWork.SaveChangesAsync();
 
@@ -196,6 +205,25 @@ public class TenantAppService : AsyncCrudAppService<Tenant, TenantDto, int, Page
         {
             await _rolePermissionSeeder.GrantOperationsPermissionsToStaffRolesAsync();
             await CurrentUnitOfWork.SaveChangesAsync();
+        }
+    }
+
+    /// <summary>
+    /// WF-35: (re)apply the eight default approval workflows to an existing tenant.
+    /// Creates missing definitions and refreshes untouched version-1 defaults;
+    /// customised or in-use definitions are left alone. Idempotent; returns what
+    /// was done per entity type.
+    /// </summary>
+    [AbpAuthorize(PermissionNames.Pages_Tenants)]
+    public async Task<List<psms.Workflow.Seed.WorkflowSeedOutcome>> SeedWorkflowDefinitionsAsync(EntityDto<int> input)
+    {
+        var tenant = await _tenantManager.GetByIdAsync(input.Id);
+
+        using (CurrentUnitOfWork.SetTenantId(tenant.Id))
+        {
+            var outcomes = await _workflowSeeder.SeedDefaultsAsync(tenant.Id);
+            await CurrentUnitOfWork.SaveChangesAsync();
+            return outcomes;
         }
     }
 

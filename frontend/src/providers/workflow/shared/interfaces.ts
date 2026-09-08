@@ -73,6 +73,13 @@ export const WorkflowActionTypeLabels: Record<number, string> = {
   [WorkflowActionType.Waive]: 'Waive',
 };
 
+/**
+ * WF-35: entity types that have a seeded definition, a summary provider and a
+ * write-back handler. Attendance and Learning Material exist in the enum but
+ * have none of those, so the pickers hide them until they do.
+ */
+export const WORKFLOW_SUPPORTED_ENTITY_TYPES: number[] = [1, 2, 3, 6, 7, 8, 9, 10];
+
 export const WorkflowEntityTypeLabels: Record<number, string> = {
   [WorkflowEntityType.Application]: 'Application',
   [WorkflowEntityType.Report]: 'Report',

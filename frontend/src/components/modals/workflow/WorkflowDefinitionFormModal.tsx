@@ -5,7 +5,7 @@ import { Modal, Form, Input, Select, Switch, message } from 'antd';
 import { z } from 'zod';
 import { useWorkflowDefinitionActions } from '@/providers/workflow/workflow-definitions';
 import type { IWorkflowDefinitionList } from '@/providers/workflow/shared/interfaces';
-import { WorkflowEntityType, WorkflowEntityTypeLabels } from '@/providers/workflow/shared/interfaces';
+import { WorkflowEntityType, WorkflowEntityTypeLabels, WORKFLOW_SUPPORTED_ENTITY_TYPES } from '@/providers/workflow/shared/interfaces';
 
 const definitionSchema = z.object({
   name: z.string().min(1, 'Name is required').max(200),
@@ -20,7 +20,9 @@ interface WorkflowDefinitionFormModalProps {
   editRecord?: IWorkflowDefinitionList | null;
 }
 
-const entityTypeOptions = Object.entries(WorkflowEntityTypeLabels).map(([value, label]) => ({
+const entityTypeOptions = Object.entries(WorkflowEntityTypeLabels)
+  .filter(([value]) => WORKFLOW_SUPPORTED_ENTITY_TYPES.includes(Number(value)))
+  .map(([value, label]) => ({
   value: Number(value),
   label,
 }));

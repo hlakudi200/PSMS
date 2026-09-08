@@ -6,6 +6,8 @@ using Abp.Linq.Extensions;
 using Abp.UI;
 using Microsoft.EntityFrameworkCore;
 using psms.Authorization;
+using psms.Domain.Workflow.Enums;
+using psms.Workflow.Shared;
 using psms.Domain.Academic.Entities;
 using psms.Domain.Financial.Entities;
 using psms.Domain.Shared.Enums;
@@ -25,13 +27,19 @@ namespace psms.Financial.FeeWaivers;
 [AbpAuthorize(PermissionNames.Financial_FeeWaivers)]
 public class FeeWaiverAppService : ApplicationService, IFeeWaiverAppService
 {
+    private readonly WorkflowStarterService _workflowStarter;
+    private readonly WorkflowInstanceGuard _workflowGuard;
     private readonly IRepository<FeeWaiver, Guid> _feeWaiverRepository;
     private readonly IRepository<Student, Guid> _studentRepository;
 
     public FeeWaiverAppService(
         IRepository<FeeWaiver, Guid> feeWaiverRepository,
-        IRepository<Student, Guid> studentRepository)
+        IRepository<Student, Guid> studentRepository,
+        WorkflowStarterService workflowStarter,
+        WorkflowInstanceGuard workflowGuard)
     {
+        _workflowStarter = workflowStarter;
+        _workflowGuard = workflowGuard;
         _feeWaiverRepository = feeWaiverRepository;
         _studentRepository = studentRepository;
     }
@@ -176,12 +184,21 @@ public class FeeWaiverAppService : ApplicationService, IFeeWaiverAppService
         await _feeWaiverRepository.UpdateAsync(feeWaiver);
         await CurrentUnitOfWork.SaveChangesAsync();
 
+        // WF-36: submitting starts the tenant's active approval workflow (no-op when
+        // none is configured — the direct approve endpoints then remain available).
+        await _workflowStarter.TryStartWorkflowAsync(
+            AbpSession.TenantId, WorkflowEntityType.FeeWaiver, id,
+            AbpSession.UserId.Value);
+        await CurrentUnitOfWork.SaveChangesAsync();
+
         return await GetAsync(id);
     }
 
     [AbpAuthorize(PermissionNames.Financial_FeeWaivers_Approve)]
     public async Task<FeeWaiverDto> ApproveAsync(Guid id, decimal approvedAmount, string notes)
     {
+        await _workflowGuard.EnsureNoActiveInstanceAsync(WorkflowEntityType.FeeWaiver, id);
+
         var feeWaiver = await _feeWaiverRepository
             .FirstOrDefaultAsync(fw => fw.Id == id && fw.TenantId == AbpSession.TenantId);
 
@@ -207,6 +224,8 @@ public class FeeWaiverAppService : ApplicationService, IFeeWaiverAppService
     [AbpAuthorize(PermissionNames.Financial_FeeWaivers_Approve)]
     public async Task<FeeWaiverDto> RejectAsync(Guid id, string notes)
     {
+        await _workflowGuard.EnsureNoActiveInstanceAsync(WorkflowEntityType.FeeWaiver, id);
+
         var feeWaiver = await _feeWaiverRepository
             .FirstOrDefaultAsync(fw => fw.Id == id && fw.TenantId == AbpSession.TenantId);
 
