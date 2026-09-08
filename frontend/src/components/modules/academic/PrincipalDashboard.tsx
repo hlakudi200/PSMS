@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useState, useCallback, useMemo, KeyboardEvent } from 'react';
+import { useEffect, useState, useCallback, KeyboardEvent } from 'react';
 import { useRouter } from 'next/navigation';
+import { usePortalBase } from '@/utils/portal-base';
 import {
   Card,
   Row,
@@ -28,27 +29,14 @@ import {
   BarChartOutlined,
   DollarOutlined,
   MessageOutlined,
+  AuditOutlined,
+  FormOutlined,
+  WarningOutlined,
+  SwapOutlined,
+  EnvironmentOutlined,
+  ShoppingOutlined,
+  RightOutlined,
 } from '@ant-design/icons';
-import {
-  StudentProvider,
-  useStudentActions,
-  useStudentState,
-} from '@/providers/academic/students';
-import {
-  TeacherProvider,
-  useTeacherActions,
-  useTeacherState,
-} from '@/providers/academic/teachers';
-import {
-  ClassProvider,
-  useClassActions,
-  useClassState,
-} from '@/providers/academic/classes';
-import {
-  GradeProvider,
-  useGradeActions,
-  useGradeState,
-} from '@/providers/academic/grades';
 import {
   AttendanceProvider,
   useAttendanceActions,
@@ -65,23 +53,22 @@ import {
   useAcademicYearState,
 } from '@/providers/academic/academic_years';
 import {
-  ReportProvider,
-  useReportActions,
-  useReportState,
-} from '@/providers/assessment/reports';
-import { IGradeList } from '@/providers/academic/shared/interfaces';
+  PrincipalDashboardProvider,
+  usePrincipalDashboardActions,
+  usePrincipalDashboardState,
+} from '@/providers/dashboard/principal';
+import {
+  WorkflowDashboardProvider,
+  useWorkflowDashboardActions,
+  useWorkflowDashboardState,
+} from '@/providers/workflow/workflow-dashboard';
+import type { IGradePerformance } from '@/providers/dashboard/shared/interfaces';
 import { IAnnouncementList } from '@/providers/communication/shared/interfaces';
 import {
   AttendanceStatus,
   AnnouncementPriority,
 } from '@/providers/shared/enums';
-
-interface GradePerformance {
-  gradeId: string;
-  avgPercentage: number | null;
-  passRate: number | null;
-  reportCount: number;
-}
+import { formatZAR } from '@/utils/currency';
 
 interface WeeklyAttendanceDay {
   label: string;
@@ -89,9 +76,17 @@ interface WeeklyAttendanceDay {
   percentage: number;
 }
 
+interface AttentionItem {
+  key: string;
+  label: string;
+  description: string;
+  count: number;
+  icon: React.ReactNode;
+  path: string;
+}
+
 const { Text } = Typography;
 
-const PASS_PERCENTAGE = 50;
 const STRONG_PASS_RATE = 80;
 const MODERATE_PASS_RATE = 60;
 
@@ -149,30 +144,22 @@ function getWeekDays(): { label: string; date: string }[] {
 
 function PrincipalDashboardContent() {
   const router = useRouter();
+  const portalBase = usePortalBase();
 
   const { getCurrentAsync } = useAcademicYearActions();
   const { academicYear: currentAcademicYear, isPending: academicYearPending } = useAcademicYearState();
 
-  const { getAllAsync: getAllStudents } = useStudentActions();
-  const { totalCount: studentCount, isPending: studentsPending } = useStudentState();
+  const { getSummaryAsync } = usePrincipalDashboardActions();
+  const { summary, isPending: summaryPending, isError: summaryError } = usePrincipalDashboardState();
 
-  const { getAllAsync: getAllTeachers } = useTeacherActions();
-  const { totalCount: teacherCount, isPending: teachersPending } = useTeacherState();
-
-  const { getAllAsync: getAllClasses } = useClassActions();
-  const { classes, totalCount: classCount, isPending: classesPending } = useClassState();
-
-  const { getAllAsync: getAllGrades } = useGradeActions();
-  const { grades, isPending: gradesPending } = useGradeState();
+  const { getDashboardAsync: getWorkflowDashboard } = useWorkflowDashboardActions();
+  const { dashboard: workflowDashboard, isPending: workflowPending } = useWorkflowDashboardState();
 
   const { getAllAsync: getAllAttendance } = useAttendanceActions();
   const { attendances, isPending: attendancePending } = useAttendanceState();
 
   const { getAllAsync: getAllAnnouncements } = useAnnouncementActions();
   const { announcements, isPending: announcementsPending } = useAnnouncementState();
-
-  const { getAllAsync: getAllReports } = useReportActions();
-  const { reports, isPending: reportsPending } = useReportState();
 
   const [attendanceTodayPct, setAttendanceTodayPct] = useState<number | null>(null);
   const [weeklyAttendance, setWeeklyAttendance] = useState<WeeklyAttendanceDay[]>([]);
@@ -181,21 +168,13 @@ function PrincipalDashboardContent() {
 
   const today = formatDate(new Date());
 
-  // Initial single-page loads via providers
+  // One aggregated summary call replaces the previous per-entity page pulls
+  // (1000 reports + 500 classes) — the backend groups by grade for us.
   useEffect(() => {
     getCurrentAsync();
-    getAllStudents({ maxResultCount: 1, skipCount: 0 });
-    getAllTeachers({ maxResultCount: 1, skipCount: 0 });
-    // Classes are needed both for the count card and to map classId -> gradeId
-    // in the performance widget below, so pull a reasonable page once.
-    // Why: the backend ReportListDto exposes ClassId but not GradeId; see
-    // backend ticket T-115 to expose GradeId directly and remove this dependency.
-    getAllClasses({ maxResultCount: 500, skipCount: 0 });
-    getAllGrades({ maxResultCount: 100 });
+    getSummaryAsync();
+    getWorkflowDashboard();
     getAllAnnouncements({ isPublished: true, maxResultCount: 5 });
-    // Reports for grade-performance aggregation (no status filter — pull all
-    // reports for current tenant and aggregate any with an overall percentage).
-    getAllReports({ maxResultCount: 1000 });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -252,45 +231,81 @@ function PrincipalDashboardContent() {
     fetchWeeklyAttendance();
   }, [fetchWeeklyAttendance]);
 
-  // Aggregate grade performance from reports + classes
-  const gradePerformance = useMemo<Record<string, GradePerformance>>(() => {
-    if (!reports || !classes) return {};
-    const classToGrade = new Map<string, string>();
-    classes.forEach((c) => classToGrade.set(c.id, c.gradeId));
-
-    const acc = new Map<string, { total: number; sum: number; passCount: number }>();
-    reports.forEach((r) => {
-      const gradeId = classToGrade.get(r.classId);
-      if (!gradeId || r.overallPercentage == null) return;
-      const pct = Number(r.overallPercentage);
-      if (Number.isNaN(pct)) return;
-      const entry = acc.get(gradeId) ?? { total: 0, sum: 0, passCount: 0 };
-      entry.total += 1;
-      entry.sum += pct;
-      if (pct >= PASS_PERCENTAGE) entry.passCount += 1;
-      acc.set(gradeId, entry);
-    });
-
-    const result: Record<string, GradePerformance> = {};
-    acc.forEach((data, gradeId) => {
-      result[gradeId] = {
-        gradeId,
-        avgPercentage:
-          data.total > 0 ? Math.round((data.sum / data.total) * 10) / 10 : null,
-        passRate:
-          data.total > 0 ? Math.round((data.passCount / data.total) * 100) : null,
-        reportCount: data.total,
-      };
-    });
-    return result;
-  }, [reports, classes]);
-
   const handleCardKeyDown = (event: KeyboardEvent<HTMLDivElement>, target: string) => {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
       router.push(target);
     }
   };
+
+  const passMark = summary?.passMarkPercentage ?? 50;
+
+  const attentionItems: AttentionItem[] = [
+    {
+      key: 'approvals',
+      label: 'My approvals',
+      description: 'Workflow steps waiting for you',
+      count: workflowDashboard?.myPendingCount ?? 0,
+      icon: <AuditOutlined />,
+      path: `${portalBase}/workflow/my-approvals`,
+    },
+    {
+      key: 'admissions',
+      label: 'Admissions awaiting decision',
+      description: 'Submitted applications not yet decided',
+      count: summary?.pendingAdmissions ?? 0,
+      icon: <FormOutlined />,
+      path: `${portalBase}/admissions`,
+    },
+    {
+      key: 'discipline',
+      label: 'Open disciplinary cases',
+      description: 'Reported, under investigation or at hearing',
+      count: summary?.openDisciplinaryCases ?? 0,
+      icon: <WarningOutlined />,
+      path: `${portalBase}/disciplinary`,
+    },
+    {
+      key: 'leave',
+      label: 'Leave requests pending',
+      description: 'Submitted or HOD-approved staff leave',
+      count: summary?.pendingLeaveRequests ?? 0,
+      icon: <CalendarOutlined />,
+      path: `${portalBase}/staff-leave`,
+    },
+    {
+      key: 'transfers',
+      label: 'Student transfers pending',
+      description: 'Awaiting principal approval',
+      count: summary?.pendingTransfers ?? 0,
+      icon: <SwapOutlined />,
+      path: `${portalBase}/student-transfers`,
+    },
+    {
+      key: 'fieldTrips',
+      label: 'Field trips pending',
+      description: 'Submitted or under review',
+      count: summary?.pendingFieldTrips ?? 0,
+      icon: <EnvironmentOutlined />,
+      path: `${portalBase}/field-trips`,
+    },
+    {
+      key: 'expenses',
+      label: 'Expense requests pending',
+      description: 'Submitted or under review',
+      count: summary?.pendingExpenses ?? 0,
+      icon: <ShoppingOutlined />,
+      path: `${portalBase}/expenses`,
+    },
+    {
+      key: 'feeWaivers',
+      label: 'Fee waivers pending',
+      description: 'Submitted or under review',
+      count: summary?.pendingFeeWaivers ?? 0,
+      icon: <DollarOutlined />,
+      path: `${portalBase}/fee-waivers`,
+    },
+  ];
 
   const gradeColumns = [
     {
@@ -307,35 +322,32 @@ function PrincipalDashboardContent() {
     {
       title: 'Avg %',
       key: 'avgPct',
-      render: (_: unknown, record: IGradeList) => {
-        const perf = gradePerformance[record.id];
-        if (!perf || perf.avgPercentage == null) return <Text type="secondary">—</Text>;
-        const color = perf.avgPercentage >= PASS_PERCENTAGE ? '#3f8600' : '#cf1322';
-        return <Text strong style={{ color }}>{perf.avgPercentage}%</Text>;
+      render: (_: unknown, record: IGradePerformance) => {
+        if (record.averagePercentage == null) return <Text type="secondary">—</Text>;
+        const color = record.averagePercentage >= passMark ? '#3f8600' : '#cf1322';
+        return <Text strong style={{ color }}>{record.averagePercentage}%</Text>;
       },
     },
     {
       title: 'Pass Rate',
       key: 'passRate',
-      render: (_: unknown, record: IGradeList) => {
-        const perf = gradePerformance[record.id];
-        if (!perf || perf.passRate == null) return <Text type="secondary">—</Text>;
+      render: (_: unknown, record: IGradePerformance) => {
+        if (record.passRate == null) return <Text type="secondary">—</Text>;
         const color =
-          perf.passRate >= STRONG_PASS_RATE
+          record.passRate >= STRONG_PASS_RATE
             ? '#3f8600'
-            : perf.passRate >= MODERATE_PASS_RATE
+            : record.passRate >= MODERATE_PASS_RATE
             ? '#FAAD14'
             : '#cf1322';
-        return <Text strong style={{ color }}>{perf.passRate}%</Text>;
+        return <Text strong style={{ color }}>{record.passRate}%</Text>;
       },
     },
     {
       title: 'Reports',
       key: 'reportCount',
-      render: (_: unknown, record: IGradeList) => {
-        const perf = gradePerformance[record.id];
-        if (!perf || perf.reportCount === 0) return <Text type="secondary">—</Text>;
-        return <Tag color="blue">{perf.reportCount}</Tag>;
+      render: (_: unknown, record: IGradePerformance) => {
+        if (record.reportCount === 0) return <Text type="secondary">—</Text>;
+        return <Tag color="blue">{record.reportCount}</Tag>;
       },
     },
   ];
@@ -445,36 +457,45 @@ function PrincipalDashboardContent() {
         )}
       </Card>
 
+      {summaryError && (
+        <Alert
+          type="warning"
+          showIcon
+          message="Could not load the school summary. Counts below may be incomplete."
+          style={{ marginBottom: 16 }}
+        />
+      )}
+
       {/* Stats Grid */}
       <Row gutter={[16, 16]} style={{ marginBottom: '24px' }}>
         <Col xs={24} sm={12} lg={6}>
           {renderStatCard(
             'Total Students',
-            studentCount ?? 0,
+            summary?.totalStudents ?? 0,
             <TeamOutlined />,
             '#003D73',
-            '/principal/students',
-            studentsPending
+            `${portalBase}/students`,
+            summaryPending
           )}
         </Col>
         <Col xs={24} sm={12} lg={6}>
           {renderStatCard(
             'Teachers',
-            teacherCount ?? 0,
+            summary?.totalTeachers ?? 0,
             <UserOutlined />,
             '#52C41A',
-            '/principal/teachers',
-            teachersPending
+            `${portalBase}/teachers`,
+            summaryPending
           )}
         </Col>
         <Col xs={24} sm={12} lg={6}>
           {renderStatCard(
             'Classes',
-            classCount ?? 0,
+            summary?.totalClasses ?? 0,
             <BookOutlined />,
             '#FAAD14',
-            '/principal/classes',
-            classesPending
+            `${portalBase}/classes`,
+            summaryPending
           )}
         </Col>
         <Col xs={24} sm={12} lg={6}>
@@ -500,6 +521,59 @@ function PrincipalDashboardContent() {
       <Row gutter={[16, 16]}>
         {/* Left Column */}
         <Col xs={24} lg={16}>
+          {/* Needs your attention */}
+          <Card
+            title={
+              <span>
+                <AuditOutlined style={{ marginRight: 8 }} />
+                Needs Your Attention
+              </span>
+            }
+            extra={
+              <Button type="link" onClick={() => router.push(`${portalBase}/workflow`)}>
+                Workflow Dashboard
+              </Button>
+            }
+            variant="borderless"
+            style={{ marginBottom: '16px' }}
+          >
+            <List<AttentionItem>
+              dataSource={attentionItems}
+              loading={summaryPending || workflowPending}
+              renderItem={(item) => (
+                <List.Item
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => router.push(item.path)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => handleCardKeyDown(e, item.path)}
+                  aria-label={`${item.label}, ${item.count} pending`}
+                  extra={
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <Badge
+                        count={item.count}
+                        showZero
+                        overflowCount={999}
+                        color={item.count > 0 ? '#FAAD14' : '#d9d9d9'}
+                      />
+                      <RightOutlined style={{ color: '#8c8c8c', fontSize: 12 }} />
+                    </span>
+                  }
+                >
+                  <List.Item.Meta
+                    avatar={<span style={{ fontSize: 18, color: '#003D73' }}>{item.icon}</span>}
+                    title={<Text strong>{item.label}</Text>}
+                    description={
+                      <Text type="secondary" style={{ fontSize: 12 }}>
+                        {item.description}
+                      </Text>
+                    }
+                  />
+                </List.Item>
+              )}
+            />
+          </Card>
+
           {/* Grade Performance Overview */}
           <Card
             title={
@@ -509,22 +583,25 @@ function PrincipalDashboardContent() {
               </span>
             }
             extra={
-              <Button type="link" onClick={() => router.push('/principal/reports')}>
+              <Button type="link" onClick={() => router.push(`${portalBase}/reports`)}>
                 View Full Report
               </Button>
             }
             variant="borderless"
             style={{ marginBottom: '16px' }}
           >
-            <Table<IGradeList>
-              dataSource={grades ?? []}
+            <Table<IGradePerformance>
+              dataSource={summary?.gradePerformance ?? []}
               columns={gradeColumns}
-              rowKey="id"
-              loading={gradesPending || reportsPending || classesPending}
+              rowKey="gradeId"
+              loading={summaryPending}
               pagination={false}
               size="small"
               locale={{ emptyText: 'No grades configured' }}
             />
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              Pass rate uses a {passMark}% pass mark over reports with an overall percentage.
+            </Text>
           </Card>
 
           {/* Recent Announcements */}
@@ -536,7 +613,7 @@ function PrincipalDashboardContent() {
               </span>
             }
             extra={
-              <Button type="link" onClick={() => router.push('/principal/announcements')}>
+              <Button type="link" onClick={() => router.push(`${portalBase}/announcements`)}>
                 View All
               </Button>
             }
@@ -576,6 +653,31 @@ function PrincipalDashboardContent() {
 
         {/* Right Column */}
         <Col xs={24} lg={8}>
+          {/* Fees snapshot */}
+          <Card
+            variant="borderless"
+            style={{ marginBottom: '16px', borderTop: '4px solid #722ED1', cursor: 'pointer' }}
+            onClick={() => router.push(`${portalBase}/finance`)}
+            onKeyDown={(e) => handleCardKeyDown(e, `${portalBase}/finance`)}
+            role="button"
+            tabIndex={0}
+            aria-label="Outstanding fees, navigate"
+            hoverable
+          >
+            <Statistic
+              title="Outstanding Fees"
+              value={formatZAR(summary?.outstandingFeesTotal ?? 0)}
+              prefix={<DollarOutlined />}
+              valueStyle={{ color: '#722ED1' }}
+              loading={summaryPending}
+            />
+            {!summaryPending && (
+              <Text type="secondary" style={{ fontSize: 12 }}>
+                {summary?.overdueFeesCount ?? 0} fee{(summary?.overdueFeesCount ?? 0) === 1 ? '' : 's'} overdue
+              </Text>
+            )}
+          </Card>
+
           {/* Quick Actions */}
           <Card
             title={
@@ -591,7 +693,7 @@ function PrincipalDashboardContent() {
               block
               icon={<BarChartOutlined />}
               style={{ marginBottom: '8px', textAlign: 'left' }}
-              onClick={() => router.push('/principal/reports')}
+              onClick={() => router.push(`${portalBase}/reports`)}
             >
               View Reports
             </Button>
@@ -599,7 +701,7 @@ function PrincipalDashboardContent() {
               block
               icon={<NotificationOutlined />}
               style={{ marginBottom: '8px', textAlign: 'left' }}
-              onClick={() => router.push('/principal/announcements')}
+              onClick={() => router.push(`${portalBase}/announcements`)}
             >
               Announcements
             </Button>
@@ -607,7 +709,7 @@ function PrincipalDashboardContent() {
               block
               icon={<CalendarOutlined />}
               style={{ marginBottom: '8px', textAlign: 'left' }}
-              onClick={() => router.push('/principal/timetables')}
+              onClick={() => router.push(`${portalBase}/timetables`)}
             >
               Timetables
             </Button>
@@ -615,7 +717,7 @@ function PrincipalDashboardContent() {
               block
               icon={<TeamOutlined />}
               style={{ marginBottom: '8px', textAlign: 'left' }}
-              onClick={() => router.push('/principal/admissions')}
+              onClick={() => router.push(`${portalBase}/admissions`)}
             >
               Admissions
             </Button>
@@ -623,7 +725,7 @@ function PrincipalDashboardContent() {
               block
               icon={<DollarOutlined />}
               style={{ marginBottom: '8px', textAlign: 'left' }}
-              onClick={() => router.push('/principal/finance')}
+              onClick={() => router.push(`${portalBase}/finance`)}
             >
               Fee Management
             </Button>
@@ -631,7 +733,7 @@ function PrincipalDashboardContent() {
               block
               icon={<MessageOutlined />}
               style={{ textAlign: 'left' }}
-              onClick={() => router.push('/principal/messages')}
+              onClick={() => router.push(`${portalBase}/messages`)}
             >
               Messages
             </Button>
@@ -703,21 +805,15 @@ function PrincipalDashboardContent() {
 export default function PrincipalDashboard() {
   return (
     <AcademicYearProvider>
-      <StudentProvider>
-        <TeacherProvider>
-          <ClassProvider>
-            <GradeProvider>
-              <AttendanceProvider>
-                <AnnouncementProvider>
-                  <ReportProvider>
-                    <PrincipalDashboardContent />
-                  </ReportProvider>
-                </AnnouncementProvider>
-              </AttendanceProvider>
-            </GradeProvider>
-          </ClassProvider>
-        </TeacherProvider>
-      </StudentProvider>
+      <PrincipalDashboardProvider>
+        <WorkflowDashboardProvider>
+          <AttendanceProvider>
+            <AnnouncementProvider>
+              <PrincipalDashboardContent />
+            </AnnouncementProvider>
+          </AttendanceProvider>
+        </WorkflowDashboardProvider>
+      </PrincipalDashboardProvider>
     </AcademicYearProvider>
   );
 }
