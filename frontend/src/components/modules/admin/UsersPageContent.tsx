@@ -123,6 +123,7 @@ function UsersContent() {
     {
       key: 'activate',
       label: 'Activate',
+      requiredPermissions: ['Admin'],
       onClick: async (rows) => {
         for (const row of rows) await activateAsync(row.id);
         message.success(`${rows.length} user(s) activated`);
@@ -133,6 +134,7 @@ function UsersContent() {
       key: 'deactivate',
       label: 'Deactivate',
       danger: true,
+      requiredPermissions: ['Admin'],
       confirm: { title: 'Deactivate selected users?' },
       onClick: async (rows) => {
         for (const row of rows) await deactivateAsync(row.id);

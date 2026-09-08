@@ -52,6 +52,7 @@ function RolesContent() {
       label: 'New Role',
       icon: <PlusOutlined />,
       type: 'primary',
+      requiredPermissions: ['Admin'],
       onClick: () => { setEditRecord(null); setModalOpen(true); },
     },
   ];
@@ -61,6 +62,7 @@ function RolesContent() {
       key: 'edit',
       label: 'Edit',
       icon: <EditOutlined />,
+      requiredPermissions: ['Admin'],
       onClick: (record) => { setEditRecord(record); setModalOpen(true); },
     },
     {
@@ -68,6 +70,7 @@ function RolesContent() {
       label: 'Delete',
       icon: <DeleteOutlined />,
       danger: true,
+      requiredPermissions: ['Admin'],
       confirm: { title: 'Delete this role?', description: 'This action cannot be undone.' },
       disabled: (record) => record.isStatic,
       onClick: async (record) => {
