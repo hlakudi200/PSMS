@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { usePortalBase } from '@/utils/portal-base';
 import {
   Card,
   Descriptions,
@@ -37,6 +38,7 @@ const { Title, Text } = Typography;
 // ─── Students Roster Tab ───────────────────────────────────────
 function RosterSection({ classId }: { classId: string }) {
   const router = useRouter();
+  const portalBase = usePortalBase();
   const { studentClasses, isPending } = useStudentClassState();
   const { getByClassAsync } = useStudentClassActions();
 
@@ -69,7 +71,7 @@ function RosterSection({ classId }: { classId: string }) {
         <Button
           type="link"
           size="small"
-          onClick={() => router.push(`/principal/students/${record.studentId}`)}
+          onClick={() => router.push(`${portalBase}/students/${record.studentId}`)}
         >
           View Profile
         </Button>
@@ -195,6 +197,7 @@ function AttendanceSection({ classId }: { classId: string }) {
 function ClassDetailContent() {
   const params = useParams();
   const router = useRouter();
+  const portalBase = usePortalBase();
   const classId = params.id as string;
 
   const classState = useClassState();
@@ -216,7 +219,7 @@ function ClassDetailContent() {
   if (classState.isError || (!classState.isPending && !classData)) {
     return (
       <div style={{ padding: 24 }}>
-        <Button icon={<ArrowLeftOutlined />} onClick={() => router.push('/principal/classes')} style={{ marginBottom: 16 }}>
+        <Button icon={<ArrowLeftOutlined />} onClick={() => router.push(`${portalBase}/classes`)} style={{ marginBottom: 16 }}>
           Back to Classes
         </Button>
         <Empty description="Class not found" />
@@ -250,7 +253,7 @@ function ClassDetailContent() {
     <div style={{ padding: 24 }}>
       <Button
         icon={<ArrowLeftOutlined />}
-        onClick={() => router.push('/principal/classes')}
+        onClick={() => router.push(`${portalBase}/classes`)}
         style={{ marginBottom: 16 }}
       >
         Back to Classes

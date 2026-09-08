@@ -2,6 +2,7 @@
 
 import React, { useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { usePortalBase } from '@/utils/portal-base';
 import {
   Card,
   Tag,
@@ -39,6 +40,7 @@ const { Title, Text } = Typography;
 // ─── Classes Tab ──────────────────────────────────────────────
 function ClassesSection({ teacherId }: { teacherId: string }) {
   const router = useRouter();
+  const portalBase = usePortalBase();
   const { teacherClasses, isPending } = useTeacherClassState();
   const { getByTeacherAsync } = useTeacherClassActions();
 
@@ -67,7 +69,7 @@ function ClassesSection({ teacherId }: { teacherId: string }) {
         <Button
           type="link"
           size="small"
-          onClick={() => router.push(`/principal/classes/${record.classId}`)}
+          onClick={() => router.push(`${portalBase}/classes/${record.classId}`)}
         >
           View Class
         </Button>
@@ -129,6 +131,7 @@ function SubjectsSection({ teacherId }: { teacherId: string }) {
 function TeacherDetailContent() {
   const params = useParams();
   const router = useRouter();
+  const portalBase = usePortalBase();
   const teacherId = params.id as string;
 
   const teacherState = useTeacherState();
@@ -150,7 +153,7 @@ function TeacherDetailContent() {
   if (teacherState.isError || (!teacherState.isPending && !teacher)) {
     return (
       <div style={{ padding: 24 }}>
-        <Button icon={<ArrowLeftOutlined />} onClick={() => router.push('/principal/teachers')} style={{ marginBottom: 16 }}>
+        <Button icon={<ArrowLeftOutlined />} onClick={() => router.push(`${portalBase}/teachers`)} style={{ marginBottom: 16 }}>
           Back to Teachers
         </Button>
         <Empty description="Teacher not found" />
@@ -214,7 +217,7 @@ function TeacherDetailContent() {
     <div style={{ padding: 24 }}>
       <Button
         icon={<ArrowLeftOutlined />}
-        onClick={() => router.push('/principal/teachers')}
+        onClick={() => router.push(`${portalBase}/teachers`)}
         style={{ marginBottom: 16 }}
       >
         Back to Teachers

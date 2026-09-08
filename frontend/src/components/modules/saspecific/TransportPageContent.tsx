@@ -2,6 +2,7 @@
 
 import React, { useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import { usePortalBase } from '@/utils/portal-base';
 import { Card, Tabs } from 'antd';
 import { EyeOutlined } from '@ant-design/icons';
 import { EnterpriseTable } from '@/components/shared/enterprise-table';
@@ -27,13 +28,15 @@ const directionMap: Record<number, { label: string; color: string }> = {
 
 const enrollmentStatusMap: Record<number, { label: string; color: string }> = {
   1: { label: 'Active', color: 'green' },
-  2: { label: 'Terminated', color: 'red' },
-  3: { label: 'Suspended', color: 'orange' },
+  2: { label: 'Suspended', color: 'orange' },
+  3: { label: 'Terminated', color: 'red' },
+  4: { label: 'Pending', color: 'blue' },
 };
 
 // ─── Routes Tab ─────────────────────────────────────────────────
 function RoutesTab() {
   const router = useRouter();
+  const portalBase = usePortalBase();
   const { schoolTransports, totalCount, isPending, isError } = useSchoolTransportState();
   const { getAllAsync } = useSchoolTransportActions();
   const { currentRole } = useAuthState();
@@ -99,7 +102,7 @@ function RoutesTab() {
       label: 'View Students',
       icon: <EyeOutlined />,
       onClick: (record) => {
-        router.push(`/principal/transport/${record.id}`);
+        router.push(`${portalBase}/transport/${record.id}`);
       },
     },
   ];
@@ -163,8 +166,9 @@ function EnrollmentsTab() {
       filterable: true, filterType: 'enum',
       filterOptions: [
         { label: 'Active', value: 1 },
-        { label: 'Terminated', value: 2 },
-        { label: 'Suspended', value: 3 },
+        { label: 'Suspended', value: 2 },
+        { label: 'Terminated', value: 3 },
+        { label: 'Pending', value: 4 },
       ],
       renderType: 'status',
       renderConfig: { statusMap: enrollmentStatusMap },

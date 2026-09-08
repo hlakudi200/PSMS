@@ -2,6 +2,7 @@
 
 import React, { useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { usePortalBase } from '@/utils/portal-base';
 import {
   Card,
   Descriptions,
@@ -39,13 +40,15 @@ const directionMap: Record<number, { label: string; color: string }> = {
 
 const enrollmentStatusMap: Record<number, { label: string; color: string }> = {
   1: { label: 'Active', color: 'green' },
-  2: { label: 'Terminated', color: 'red' },
-  3: { label: 'Suspended', color: 'orange' },
+  2: { label: 'Suspended', color: 'orange' },
+  3: { label: 'Terminated', color: 'red' },
+  4: { label: 'Pending', color: 'blue' },
 };
 
 function TransportDetailContent() {
   const params = useParams();
   const router = useRouter();
+  const portalBase = usePortalBase();
   const transportId = params.id as string;
 
   const { schoolTransport, isPending: routeLoading, isError: routeError } = useSchoolTransportState();
@@ -71,7 +74,7 @@ function TransportDetailContent() {
   if (routeError || (!routeLoading && !schoolTransport)) {
     return (
       <div style={{ padding: 24 }}>
-        <Button icon={<ArrowLeftOutlined />} onClick={() => router.push('/principal/transport')} style={{ marginBottom: 16 }}>
+        <Button icon={<ArrowLeftOutlined />} onClick={() => router.push(`${portalBase}/transport`)} style={{ marginBottom: 16 }}>
           Back to Transport
         </Button>
         <Empty description="Transport route not found" />
@@ -116,7 +119,7 @@ function TransportDetailContent() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       {/* Back Button */}
       <Space>
-        <Button icon={<ArrowLeftOutlined />} onClick={() => router.push('/principal/transport')}>
+        <Button icon={<ArrowLeftOutlined />} onClick={() => router.push(`${portalBase}/transport`)}>
           Back to Transport
         </Button>
       </Space>

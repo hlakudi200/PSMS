@@ -2,6 +2,7 @@
 
 import React, { useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { usePortalBase } from '@/utils/portal-base';
 import { Card, Col, Row, Select, message } from 'antd';
 import {
   CheckCircleOutlined,
@@ -59,6 +60,7 @@ const reportTypeMap: Record<number, { label: string; color: string }> = Object.f
 
 function ReportsContent() {
   const router = useRouter();
+  const portalBase = usePortalBase();
   const { reports, totalCount, isPending, isError } = useReportState();
   const { getAllAsync, approveAsync, publishAsync, generatePdfAsync, bulkGeneratePdfsAsync } = useReportActions();
   const { academicYears } = useAcademicYearState();
@@ -149,7 +151,7 @@ function ReportsContent() {
       label: 'View Report',
       icon: <EyeOutlined />,
       onClick: (record) => {
-        router.push(`/principal/reports/${record.id}`);
+        router.push(`${portalBase}/reports/${record.id}`);
       },
     },
     {

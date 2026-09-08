@@ -2,6 +2,7 @@
 
 import React, { useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { usePortalBase } from '@/utils/portal-base';
 import {
   Card,
   Tag,
@@ -47,6 +48,7 @@ const relationshipTypeMap: Record<number, string> = {
 // ─── Children Tab ─────────────────────────────────────────────
 function ChildrenSection({ parentId }: { parentId: string }) {
   const router = useRouter();
+  const portalBase = usePortalBase();
   const { studentParents, isPending } = useStudentParentState();
   const { getByParentAsync } = useStudentParentActions();
 
@@ -84,7 +86,7 @@ function ChildrenSection({ parentId }: { parentId: string }) {
         <Button
           type="link"
           size="small"
-          onClick={() => router.push(`/principal/students/${record.studentId}`)}
+          onClick={() => router.push(`${portalBase}/students/${record.studentId}`)}
         >
           View Student
         </Button>
@@ -109,6 +111,7 @@ function ChildrenSection({ parentId }: { parentId: string }) {
 function ParentDetailContent() {
   const params = useParams();
   const router = useRouter();
+  const portalBase = usePortalBase();
   const parentId = params.id as string;
 
   const parentState = useParentState();
@@ -130,7 +133,7 @@ function ParentDetailContent() {
   if (parentState.isError || (!parentState.isPending && !parent)) {
     return (
       <div style={{ padding: 24 }}>
-        <Button icon={<ArrowLeftOutlined />} onClick={() => router.push('/principal/parents')} style={{ marginBottom: 16 }}>
+        <Button icon={<ArrowLeftOutlined />} onClick={() => router.push(`${portalBase}/parents`)} style={{ marginBottom: 16 }}>
           Back to Parents
         </Button>
         <Empty description="Parent not found" />
@@ -178,7 +181,7 @@ function ParentDetailContent() {
     <div style={{ padding: 24 }}>
       <Button
         icon={<ArrowLeftOutlined />}
-        onClick={() => router.push('/principal/parents')}
+        onClick={() => router.push(`${portalBase}/parents`)}
         style={{ marginBottom: 16 }}
       >
         Back to Parents

@@ -2,6 +2,7 @@
 
 import React, { useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { usePortalBase } from '@/utils/portal-base';
 import {
   Card,
   Descriptions,
@@ -52,6 +53,7 @@ const paymentMethodMap: Record<number, string> = {
 function PaymentDetailContent() {
   const params = useParams();
   const router = useRouter();
+  const portalBase = usePortalBase();
   const paymentId = params.id as string;
 
   const { payment, isPending: paymentLoading } = usePaymentState();
@@ -77,7 +79,7 @@ function PaymentDetailContent() {
   if (!paymentLoading && !payment) {
     return (
       <div style={{ padding: 24 }}>
-        <Button icon={<ArrowLeftOutlined />} onClick={() => router.push('/principal/finance')} style={{ marginBottom: 16 }}>
+        <Button icon={<ArrowLeftOutlined />} onClick={() => router.push(`${portalBase}/finance`)} style={{ marginBottom: 16 }}>
           Back to Finance
         </Button>
         <Empty description="Payment not found" />
@@ -117,7 +119,7 @@ function PaymentDetailContent() {
 
   return (
     <div style={{ padding: 24 }}>
-      <Button icon={<ArrowLeftOutlined />} onClick={() => router.push('/principal/finance')} style={{ marginBottom: 16 }}>
+      <Button icon={<ArrowLeftOutlined />} onClick={() => router.push(`${portalBase}/finance`)} style={{ marginBottom: 16 }}>
         Back to Finance
       </Button>
 

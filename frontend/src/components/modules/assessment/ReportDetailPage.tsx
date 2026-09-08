@@ -2,6 +2,7 @@
 
 import React, { useEffect, useCallback, useState } from 'react';
 import { useParams, useRouter, usePathname } from 'next/navigation';
+import { portalBaseFrom } from '@/utils/portal-base';
 import {
   Card,
   Descriptions,
@@ -329,17 +330,13 @@ function ReportDetailContent() {
   const canManageReport = myRoles.some((r) => managementRoles.includes(r));
   // Reports detail is reached from the principal reports list and, via the
   // workflow "View full report" link, from the teacher and admin portals.
-  const reportsPortalRoot = pathname?.startsWith('/teacher')
-    ? '/teacher'
-    : pathname?.startsWith('/admin')
-      ? '/admin'
-      : '/principal';
+  const reportsPortalRoot = portalBaseFrom(pathname);
 
   const goBack = useCallback(() => {
     // Prefer browser history; fall back to the portal's home (only the principal
     // portal has a reports list page — elsewhere reports are reached via links).
     if (typeof window !== 'undefined' && window.history.length > 1) router.back();
-    else router.push(reportsPortalRoot === '/principal' ? '/principal/reports' : reportsPortalRoot);
+    else router.push(reportsPortalRoot === '/principal' ? `${reportsPortalRoot}/reports` : reportsPortalRoot);
   }, [router, reportsPortalRoot]);
 
   const { report, isPending, isError } = useReportState();

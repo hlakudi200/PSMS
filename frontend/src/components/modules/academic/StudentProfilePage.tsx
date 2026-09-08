@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { usePortalBase } from '@/utils/portal-base';
 import {
   Card,
   Descriptions,
@@ -245,6 +246,7 @@ function FeesSection({ studentId }: { studentId: string }) {
 function StudentProfileContent() {
   const params = useParams();
   const router = useRouter();
+  const portalBase = usePortalBase();
   const studentId = params.id as string;
 
   const { student, isPending, isError } = useStudentState();
@@ -265,7 +267,7 @@ function StudentProfileContent() {
   if (isError || (!isPending && !student)) {
     return (
       <div style={{ padding: 24 }}>
-        <Button icon={<ArrowLeftOutlined />} onClick={() => router.push('/principal/students')} style={{ marginBottom: 16 }}>
+        <Button icon={<ArrowLeftOutlined />} onClick={() => router.push(`${portalBase}/students`)} style={{ marginBottom: 16 }}>
           Back to Students
         </Button>
         <Empty description="Student not found" />
@@ -302,7 +304,7 @@ function StudentProfileContent() {
     <div style={{ padding: 24 }}>
       <Button
         icon={<ArrowLeftOutlined />}
-        onClick={() => router.push('/principal/students')}
+        onClick={() => router.push(`${portalBase}/students`)}
         style={{ marginBottom: 16 }}
       >
         Back to Students

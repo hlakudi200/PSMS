@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { useParams, useRouter, usePathname } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
+import { usePortalBase } from '@/utils/portal-base';
 import {
   Card,
   Descriptions,
@@ -303,9 +304,6 @@ function FeeSection({ applicationId }: { applicationId: string }) {
 // The application detail page is reached from the principal portal and, via the
 // workflow "View full application" link, from the admin portal. Derive the portal
 // root from the path so internal links (workflow instance, Back) stay in-portal.
-function portalBaseFrom(pathname: string | null): string {
-  return pathname?.startsWith('/admin') ? '/admin' : '/principal';
-}
 
 const workflowStatusColor: Record<number, string> = {
   [WorkflowStatus.NotStarted]: 'default',
@@ -318,7 +316,7 @@ const workflowStatusColor: Record<number, string> = {
 
 function ApplicationWorkflowCardInner({ applicationId, feePaid }: { applicationId: string; feePaid: boolean }) {
   const router = useRouter();
-  const portalBase = portalBaseFrom(usePathname());
+  const portalBase = usePortalBase();
   const { instance: wfInstance } = useWorkflowInstanceState();
   const { getByEntityAsync } = useWorkflowInstanceActions();
   // Track first-fetch completion so we show a loader (not a premature "none"
@@ -395,7 +393,7 @@ function ApplicationWorkflowCard({ applicationId, feePaid }: { applicationId: st
 function ApplicationDetailContent() {
   const params = useParams();
   const router = useRouter();
-  const portalBase = portalBaseFrom(usePathname());
+  const portalBase = usePortalBase();
   const applicationId = params.id as string;
 
   const { application, isPending, isError } = useApplicationState();
@@ -409,7 +407,7 @@ function ApplicationDetailContent() {
     // Prefer browser history (e.g. came from the workflow instance); fall back to
     // the portal's home — the admin portal has no admissions list page.
     if (typeof window !== 'undefined' && window.history.length > 1) router.back();
-    else router.push(portalBase === '/admin' ? '/admin/workflow' : '/principal/admissions');
+    else router.push(portalBase === '/admin' ? '/admin/workflow' : `${portalBase}/admissions`);
   };
 
   if (isPending && !application) {

@@ -2,6 +2,7 @@
 
 import React, { useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import { usePortalBase } from '@/utils/portal-base';
 import { EyeOutlined } from '@ant-design/icons';
 import { EnterpriseTable } from '@/components/shared/enterprise-table';
 import type { ColumnConfig, TableQuery, RowAction } from '@/components/shared/enterprise-table';
@@ -14,6 +15,7 @@ function StudentsContent() {
   const { getAllAsync } = useStudentActions();
   const { currentRole } = useAuthState();
   const router = useRouter();
+  const portalBase = usePortalBase();
 
   const handleQueryChange = useCallback((query: TableQuery) => {
     getAllAsync({
@@ -70,7 +72,7 @@ function StudentsContent() {
       label: 'View Profile',
       icon: <EyeOutlined />,
       onClick: (record) => {
-        router.push(`/principal/students/${record.id}`);
+        router.push(`${portalBase}/students/${record.id}`);
       },
     },
   ];

@@ -2,6 +2,7 @@
 
 import React, { useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { usePortalBase } from '@/utils/portal-base';
 import { Card, Col, Row, Select, DatePicker, Statistic, Tabs } from 'antd';
 import {
   DollarOutlined,
@@ -87,6 +88,7 @@ const paymentMethodMap: Record<number, { label: string; color: string }> = Objec
 
 function FinanceContent() {
   const router = useRouter();
+  const portalBase = usePortalBase();
   const { feeStructures, totalCount: feeTotal, isPending: feePending, isError: feeError } = useFeeStructureState();
   const { getAllAsync: getAllFees } = useFeeStructureActions();
   const { payments, totalCount: paymentTotal, isPending: paymentPending, isError: paymentError } = usePaymentState();
@@ -184,7 +186,7 @@ function FinanceContent() {
       label: 'View Details',
       icon: <EyeOutlined />,
       onClick: (record) => {
-        router.push(`/principal/finance/${record.id}`);
+        router.push(`${portalBase}/finance/${record.id}`);
       },
     },
   ];
@@ -224,7 +226,7 @@ function FinanceContent() {
       label: 'View Details',
       icon: <EyeOutlined />,
       onClick: (record) => {
-        router.push(`/principal/payments/${record.id}`);
+        router.push(`${portalBase}/payments/${record.id}`);
       },
     },
   ];

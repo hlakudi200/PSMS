@@ -76,7 +76,7 @@ public class DefaultRolesCreator
     /// </summary>
     private static List<string> GetPrincipalPermissions()
     {
-        return new List<string>
+        var permissions = new List<string>
         {
             // Workflow - full configuration + instance management (WF-01)
             PermissionNames.Workflow,
@@ -305,6 +305,9 @@ public class DefaultRolesCreator
             PermissionNames.Pages_Users,
             PermissionNames.Pages_Roles,
         };
+
+        permissions.AddRange(PsmsOperationsPermissions.ForPrincipal());
+        return permissions;
     }
 
     /// <summary>
@@ -312,7 +315,7 @@ public class DefaultRolesCreator
     /// </summary>
     private static List<string> GetVicePrincipalPermissions()
     {
-        return new List<string>
+        var permissions = new List<string>
         {
             // Workflow - full configuration + instance management (WF-01)
             PermissionNames.Workflow,
@@ -510,6 +513,9 @@ public class DefaultRolesCreator
 
             PermissionNames.Pages_Users,
         };
+
+        permissions.AddRange(PsmsOperationsPermissions.ForVicePrincipal());
+        return permissions;
     }
 
     /// <summary>
@@ -517,7 +523,7 @@ public class DefaultRolesCreator
     /// </summary>
     private static List<string> GetHODPermissions()
     {
-        return new List<string>
+        var permissions = new List<string>
         {
             // Workflow - act on assigned approval steps (WF-01)
             PermissionNames.Workflow,
@@ -620,6 +626,9 @@ public class DefaultRolesCreator
             PermissionNames.Learning_Recordings_View,
             PermissionNames.Learning_Recordings_Upload,
         };
+
+        permissions.AddRange(PsmsOperationsPermissions.ForHOD());
+        return permissions;
     }
 
     /// <summary>
@@ -697,7 +706,7 @@ public class DefaultRolesCreator
     /// </summary>
     private static List<string> GetFinancePermissions()
     {
-        return new List<string>
+        var permissions = new List<string>
         {
             // Financial - Full access
             PermissionNames.Financial,
@@ -739,6 +748,9 @@ public class DefaultRolesCreator
             PermissionNames.Communication_Notifications,
             PermissionNames.Communication_Notifications_View,
         };
+
+        permissions.AddRange(PsmsOperationsPermissions.ForFinance());
+        return permissions;
     }
 
     /// <summary>
@@ -746,7 +758,7 @@ public class DefaultRolesCreator
     /// </summary>
     private static List<string> GetTeacherPermissions()
     {
-        return new List<string>
+        var permissions = new List<string>
         {
             // Workflow - act on assigned approval steps (WF-01)
             PermissionNames.Workflow,
@@ -838,6 +850,9 @@ public class DefaultRolesCreator
             PermissionNames.Learning_Recordings_View,
             PermissionNames.Learning_Recordings_Upload,
         };
+
+        permissions.AddRange(PsmsOperationsPermissions.ForTeacher());
+        return permissions;
     }
 
     /// <summary>

@@ -2,6 +2,7 @@
 
 import React, { useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { usePortalBase } from '@/utils/portal-base';
 import { Tabs } from "antd";
 import { EyeOutlined } from "@ant-design/icons";
 import { EnterpriseTable } from "@/components/shared/enterprise-table";
@@ -52,13 +53,15 @@ const dayOfWeekMap: Record<number, string> = {
 
 const enrollmentStatusMap: Record<number, { label: string; color: string }> = {
   1: { label: "Active", color: "green" },
-  2: { label: "Terminated", color: "red" },
-  3: { label: "Suspended", color: "orange" },
+  2: { label: "Suspended", color: "orange" },
+  3: { label: "Terminated", color: "red" },
+  4: { label: "Pending", color: "blue" },
 };
 
 // ─── Activities Tab ─────────────────────────────────────────────
 function ActivitiesTab() {
   const router = useRouter();
+  const portalBase = usePortalBase();
   const { extramuralActivities, totalCount, isPending, isError } =
     useExtramuralActivityState();
   const { getAllAsync } = useExtramuralActivityActions();
@@ -200,7 +203,7 @@ function ActivitiesTab() {
       label: "View Students",
       icon: <EyeOutlined />,
       onClick: (record) => {
-        router.push(`/principal/extramurals/${record.id}`);
+        router.push(`${portalBase}/extramurals/${record.id}`);
       },
     },
   ];

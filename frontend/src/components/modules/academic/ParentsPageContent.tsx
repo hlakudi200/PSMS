@@ -2,6 +2,7 @@
 
 import React, { useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import { usePortalBase } from '@/utils/portal-base';
 import { EyeOutlined } from '@ant-design/icons';
 import { EnterpriseTable } from '@/components/shared/enterprise-table';
 import type { ColumnConfig, TableQuery, RowAction } from '@/components/shared/enterprise-table';
@@ -11,6 +12,7 @@ import type { IParent } from '@/providers/academic/shared/interfaces';
 
 function ParentsContent() {
   const router = useRouter();
+  const portalBase = usePortalBase();
   const { parents, totalCount, isPending, isError } = useParentState();
   const { getAllAsync } = useParentActions();
   const { currentRole } = useAuthState();
@@ -38,7 +40,7 @@ function ParentsContent() {
       label: 'View Profile',
       icon: <EyeOutlined />,
       onClick: (record) => {
-        router.push(`/principal/parents/${record.id}`);
+        router.push(`${portalBase}/parents/${record.id}`);
       },
     },
   ];

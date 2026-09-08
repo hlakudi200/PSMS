@@ -2,6 +2,7 @@
 
 import React, { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import { usePortalBase } from '@/utils/portal-base';
 import { message } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, UserSwitchOutlined, EyeOutlined } from '@ant-design/icons';
 import { EnterpriseTable } from '@/components/shared/enterprise-table';
@@ -20,6 +21,7 @@ function ClassesContent() {
   const { getAllAsync, deleteAsync, activateAsync, deactivateAsync } = useClassActions();
   const { currentRole } = useAuthState();
   const router = useRouter();
+  const portalBase = usePortalBase();
   const [modalOpen, setModalOpen] = useState(false);
   const [assignTeacherOpen, setAssignTeacherOpen] = useState(false);
   const [editRecord, setEditRecord] = useState<IClass | null>(null);
@@ -92,7 +94,7 @@ function ClassesContent() {
       key: 'view',
       label: 'View Details',
       icon: <EyeOutlined />,
-      onClick: (record) => { router.push(`/principal/classes/${record.id}`); },
+      onClick: (record) => { router.push(`${portalBase}/classes/${record.id}`); },
     },
     {
       key: 'edit',

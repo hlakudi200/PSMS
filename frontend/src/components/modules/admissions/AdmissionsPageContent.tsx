@@ -2,6 +2,7 @@
 
 import React, { useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { usePortalBase } from '@/utils/portal-base';
 import { Card, Col, Row, Select, Statistic, Tabs, Tag, message } from 'antd';
 import {
   EyeOutlined,
@@ -49,6 +50,7 @@ const waitlistStatusMap: Record<string, { label: string; color: string }> = {
 
 function AdmissionsContent() {
   const router = useRouter();
+  const portalBase = usePortalBase();
   const { applications, totalCount, statistics, isPending, isError } = useApplicationState();
   const { getAllAsync, getStatisticsAsync } = useApplicationActions();
   const { admissionSettingsList, isPending: settingsPending } = useAdmissionSettingsState();
@@ -149,7 +151,7 @@ function AdmissionsContent() {
       label: 'View Application',
       icon: <EyeOutlined />,
       onClick: (record) => {
-        router.push(`/principal/admissions/${record.id}`);
+        router.push(`${portalBase}/admissions/${record.id}`);
       },
     },
   ];

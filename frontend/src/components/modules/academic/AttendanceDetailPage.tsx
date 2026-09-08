@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { usePortalBase } from '@/utils/portal-base';
 import {
   Card,
   Descriptions,
@@ -184,6 +185,7 @@ function SummarySection({ studentId }: { studentId: string }) {
 function AttendanceDetailContent() {
   const params = useParams();
   const router = useRouter();
+  const portalBase = usePortalBase();
   const attendanceId = params.id as string;
 
   const { attendance, isPending, isError } = useAttendanceState();
@@ -204,7 +206,7 @@ function AttendanceDetailContent() {
   if (isError || (!isPending && !attendance)) {
     return (
       <div style={{ padding: 24 }}>
-        <Button icon={<ArrowLeftOutlined />} onClick={() => router.push('/principal/attendance')} style={{ marginBottom: 16 }}>
+        <Button icon={<ArrowLeftOutlined />} onClick={() => router.push(`${portalBase}/attendance`)} style={{ marginBottom: 16 }}>
           Back to Attendance
         </Button>
         <Empty description="Attendance record not found" />
@@ -238,7 +240,7 @@ function AttendanceDetailContent() {
     <div style={{ padding: 24 }}>
       <Button
         icon={<ArrowLeftOutlined />}
-        onClick={() => router.push('/principal/attendance')}
+        onClick={() => router.push(`${portalBase}/attendance`)}
         style={{ marginBottom: 16 }}
       >
         Back to Attendance

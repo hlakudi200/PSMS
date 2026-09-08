@@ -129,6 +129,24 @@ public class PsmsRolePermissionSeeder : ITransientDependency
     }
 
     /// <summary>
+    /// Additively grant the operations feature groups (Parents, Transfers, Fee
+    /// Waivers, Expenses, Discipline, Staff Leave, Field Trips, Extramurals,
+    /// Transport, After Care — see <see cref="PsmsOperationsPermissions"/>) to the
+    /// staff roles of the CURRENT tenant, leaving every other grant untouched.
+    ///
+    /// Use this to backfill EXISTING tenants — NOT <see cref="SeedRolePermissionsAsync"/>,
+    /// which REPLACES a role's entire permission set. Idempotent.
+    /// </summary>
+    public async Task GrantOperationsPermissionsToStaffRolesAsync()
+    {
+        await AddPermissionsToRoleAsync(StaticRoleNames.Tenants.Principal, PsmsOperationsPermissions.ForPrincipal());
+        await AddPermissionsToRoleAsync(StaticRoleNames.Tenants.VicePrincipal, PsmsOperationsPermissions.ForVicePrincipal());
+        await AddPermissionsToRoleAsync(StaticRoleNames.Tenants.HOD, PsmsOperationsPermissions.ForHOD());
+        await AddPermissionsToRoleAsync(StaticRoleNames.Tenants.Teacher, PsmsOperationsPermissions.ForTeacher());
+        await AddPermissionsToRoleAsync(StaticRoleNames.Tenants.Finance, PsmsOperationsPermissions.ForFinance());
+    }
+
+    /// <summary>
     /// Grants the named permissions to the role and NEVER removes an existing
     /// grant (unlike SetGrantedPermissions, which replaces the whole set).
     /// GrantPermissionAsync is itself idempotent — it no-ops when the permission
@@ -199,7 +217,7 @@ public class PsmsRolePermissionSeeder : ITransientDependency
 
     private static List<string> GetPrincipalPermissions()
     {
-        return new List<string>
+        var permissions = new List<string>
         {
             // Workflow - full configuration + instance management (WF-01)
             PermissionNames.Workflow,
@@ -434,11 +452,14 @@ public class PsmsRolePermissionSeeder : ITransientDependency
             PermissionNames.Pages_Users,
             PermissionNames.Pages_Roles,
         };
+
+        permissions.AddRange(PsmsOperationsPermissions.ForPrincipal());
+        return permissions;
     }
 
     private static List<string> GetVicePrincipalPermissions()
     {
-        return new List<string>
+        var permissions = new List<string>
         {
             // Workflow - full configuration + instance management (WF-01)
             PermissionNames.Workflow,
@@ -642,11 +663,14 @@ public class PsmsRolePermissionSeeder : ITransientDependency
 
             PermissionNames.Pages_Users,
         };
+
+        permissions.AddRange(PsmsOperationsPermissions.ForVicePrincipal());
+        return permissions;
     }
 
     private static List<string> GetHODPermissions()
     {
-        return new List<string>
+        var permissions = new List<string>
         {
             // Workflow - act on assigned approval steps (WF-01)
             PermissionNames.Workflow,
@@ -753,6 +777,9 @@ public class PsmsRolePermissionSeeder : ITransientDependency
             PermissionNames.Learning_Recordings_View,
             PermissionNames.Learning_Recordings_Upload,
         };
+
+        permissions.AddRange(PsmsOperationsPermissions.ForHOD());
+        return permissions;
     }
 
     private static List<string> GetAdmissionsOfficerPermissions()
@@ -824,7 +851,7 @@ public class PsmsRolePermissionSeeder : ITransientDependency
 
     private static List<string> GetFinancePermissions()
     {
-        return new List<string>
+        var permissions = new List<string>
         {
             // Financial - Full access
             PermissionNames.Financial,
@@ -866,11 +893,14 @@ public class PsmsRolePermissionSeeder : ITransientDependency
             PermissionNames.Communication_Notifications,
             PermissionNames.Communication_Notifications_View,
         };
+
+        permissions.AddRange(PsmsOperationsPermissions.ForFinance());
+        return permissions;
     }
 
     private static List<string> GetTeacherPermissions()
     {
-        return new List<string>
+        var permissions = new List<string>
         {
             // Workflow - act on assigned approval steps (WF-01)
             PermissionNames.Workflow,
@@ -966,6 +996,9 @@ public class PsmsRolePermissionSeeder : ITransientDependency
             PermissionNames.Learning_Recordings_View,
             PermissionNames.Learning_Recordings_Upload,
         };
+
+        permissions.AddRange(PsmsOperationsPermissions.ForTeacher());
+        return permissions;
     }
 
     private static List<string> GetParentPermissions()

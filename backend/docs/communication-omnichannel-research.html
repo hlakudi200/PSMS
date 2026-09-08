@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PSMS Communication — Omnichannel Research</title>
+<style>
+  :root{
+    --bg:#0f1419; --panel:#1a212b; --panel2:#222b38; --ink:#e7edf3; --muted:#9fb0c3;
+    --line:#2c3947; --accent:#4ea1ff; --good:#39d98a; --warn:#ffb454; --bad:#ff6b6b;
+    --chip:#2a3645;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    line-height:1.55;font-size:16px}
+  .wrap{max-width:1000px;margin:0 auto;padding:32px 20px 80px}
+  header.hero{border-left:4px solid var(--accent);padding:6px 0 6px 18px;margin-bottom:8px}
+  h1{font-size:30px;line-height:1.15;margin:0 0 6px}
+  .sub{color:var(--muted);font-size:17px;margin:0}
+  h2{font-size:21px;margin:42px 0 12px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+  h3{font-size:16px;margin:22px 0 6px;color:var(--accent)}
+  p{margin:10px 0}
+  .lede{font-size:18px}
+  .callout{background:linear-gradient(180deg,#1c2735,#19222e);border:1px solid var(--line);
+    border-radius:12px;padding:18px 20px;margin:18px 0}
+  .callout.accent{border-color:#33597f}
+  .callout b{color:#fff}
+  .grid{display:grid;gap:14px}
+  @media(min-width:680px){.grid.two{grid-template-columns:1fr 1fr}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
+  .card h4{margin:0 0 6px;font-size:15px}
+  .card .num{font-size:12px;color:var(--accent);font-weight:700;letter-spacing:.04em}
+  .muted{color:var(--muted)}
+  .scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:14px 0;border:1px solid var(--line);border-radius:12px}
+  table{border-collapse:collapse;width:100%;min-width:560px;font-size:14.5px}
+  th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{background:var(--panel2);color:#cdd9e6;font-weight:600;position:sticky;top:0}
+  tr:last-child td{border-bottom:none}
+  .pill{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap}
+  .p-have{background:rgba(57,217,138,.15);color:var(--good)}
+  .p-part{background:rgba(255,180,84,.16);color:var(--warn)}
+  .p-no{background:rgba(255,107,107,.15);color:var(--bad)}
+  .chip{display:inline-block;background:var(--chip);border:1px solid var(--line);border-radius:6px;
+    padding:2px 8px;margin:2px 4px 2px 0;font-size:12.5px;color:#cfdbe8}
+  ol.steps{counter-reset:s;list-style:none;padding:0;margin:14px 0}
+  ol.steps>li{position:relative;padding:12px 14px 12px 52px;background:var(--panel);
+    border:1px solid var(--line);border-radius:10px;margin:10px 0}
+  ol.steps>li::before{counter-increment:s;content:counter(s);position:absolute;left:14px;top:12px;
+    width:26px;height:26px;border-radius:50%;background:var(--accent);color:#0b1118;
+    font-weight:700;display:flex;align-items:center;justify-content:center;font-size:14px}
+  ol.steps>li b{color:#fff}
+  .ladder{display:grid;gap:8px;margin:14px 0}
+  .rung{display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border:1px solid var(--line);
+    border-radius:10px;background:var(--panel)}
+  .rung .lv{flex:0 0 64px;font-weight:700;font-size:13px;color:var(--accent)}
+  .rung.here{border-color:var(--bad);background:#221a1c}
+  .rung.here .lv{color:var(--bad)}
+  .tag{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;
+    color:var(--bad);border:1px solid var(--bad);border-radius:5px;padding:1px 6px;margin-left:8px}
+  .diagram{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.5px;
+    white-space:pre;color:#bcd0e4}
+  .src a{color:var(--accent);text-decoration:none}
+  .src li{margin:5px 0;font-size:13.5px}
+  footer{margin-top:40px;color:var(--muted);font-size:13px;border-top:1px solid var(--line);padding-top:16px}
+  .kicker{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:700}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <div class="kicker">PSMS · Research Brief</div>
+  <h1>What it actually takes to say PSMS<br>“communicates across all channels”</h1>
+  <p class="sub">A definition, a maturity model, where PSMS sits today, and the platform you’d build to get there.</p>
+</header>
+
+<div class="callout accent">
+  <p class="lede" style="margin-top:0"><b>The short answer.</b> “All channels” is not a feature you bolt on — it’s a <b>platform capability</b>. Anyone can call a Twilio API. What lets you <i>claim</i> omnichannel is the layer underneath: one place that decides <b>who</b> to reach, on <b>which channel</b>, in <b>what order</b>, respecting <b>their consent</b>, and that <b>knows whether it actually arrived</b>.</p>
+  <p style="margin-bottom:0">PSMS today is <b>single-channel (in-app only)</b>. The database has <code>EmailSent</code>/<code>PushSent</code> columns, but nothing is wired — no email, SMS, push, or WhatsApp, no queue, no preferences, no delivery tracking. So the honest status today is <span class="pill p-no">in-app only</span>, not multi-channel.</p>
+</div>
+
+<h2>1 · Multi-channel ≠ omnichannel</h2>
+<div class="grid two">
+  <div class="card">
+    <h4>Multi-channel <span class="muted">(the easy half)</span></h4>
+    <p class="muted" style="margin-bottom:0">You <i>can</i> send on several channels, but each is its own silo with its own code, its own “to” field, no shared preferences, no idea if the others fired. Sending the same notice 4 times, 4 ways.</p>
+  </div>
+  <div class="card">
+    <h4>Omnichannel <span class="muted">(the bar)</span></h4>
+    <p class="muted" style="margin-bottom:0">One event → one decision → the right channel(s) for that person, in priority order, deduplicated, consent-checked, tracked end-to-end, with automatic fallback when a channel fails. Channels are interchangeable plugins behind one service.</p>
+  </div>
+</div>
+<p>So the research question reframes: <b>not “which channels do we add?” but “what platform makes channels interchangeable, governed, and observable?”</b> The channels are the cheap part. The 11 capabilities in §3 are the expensive, defensible part — and they’re what “scalable” really means here.</p>
+
+<h2>2 · The channels (and what they’re for)</h2>
+<p>Each channel has a job. For a South African school, the order of value is roughly <b>WhatsApp → SMS → in-app/push → email → voice</b>. WhatsApp open rates sit around <b>98%</b> and it carries PDFs/images cheaply — it’s the primary parent channel in SA, not a nice-to-have.</p>
+<div class="scroll">
+<table>
+<thead><tr><th>Channel</th><th>Best for</th><th>Notes / SA context</th><th>PSMS today</th></tr></thead>
+<tbody>
+<tr><td><b>In-app</b></td><td>Threaded messages, the record of truth, action links</td><td>Needs real-time (SignalR) + a notification centre to feel live</td><td><span class="pill p-have">have</span></td></tr>
+<tr><td><b>WhatsApp</b> (Business API)</td><td>The primary parent channel — alerts, reminders, report PDFs</td><td>Meta conversation-based pricing; template pre-approval; POPIA opt-in required; via Meta / CM.com / Clickatell</td><td><span class="pill p-no">none</span></td></tr>
+<tr><td><b>SMS</b></td><td>Universal fallback — reaches every phone, no data needed</td><td>Reliable where WhatsApp/data isn’t; Clickatell/Twilio; cost per segment</td><td><span class="pill p-no">none</span></td></tr>
+<tr><td><b>Push</b> (mobile + web)</td><td>Free, instant nudges to app users</td><td>FCM (Android/web) + APNS (iOS); needs device-token management</td><td><span class="pill p-no">none</span></td></tr>
+<tr><td><b>Email</b></td><td>Formal/long-form, attachments, statements, receipts</td><td>SendGrid / SES / Mailgun; deliverability (SPF/DKIM/DMARC)</td><td><span class="pill p-no">none</span></td></tr>
+<tr><td><b>Voice / IVR</b></td><td>Critical/emergency escalation, low-literacy reach</td><td>Optional tier; automated calls for urgent alerts</td><td><span class="pill p-no">none</span></td></tr>
+<tr><td><b>Print / postal</b></td><td>Last-resort fallback when no digital contact exists</td><td>Rare, but “true” omnichannel platforms degrade to this</td><td><span class="pill p-no">none</span></td></tr>
+</tbody>
+</table>
+</div>
+
+<h2>3 · The 11 capabilities that actually define “omnichannel”</h2>
+<p>This is the real checklist. Channels plug into these; without them you have silos, not a platform.</p>
+<div class="grid two">
+  <div class="card"><div class="num">01 · ABSTRACTION</div><h4>Channel-agnostic dispatch service</h4><p class="muted">One <code>INotificationDispatcher</code> with a provider interface per channel. App code says “notify user X about event Y” — never “call Twilio”. Adding RCS later = one new adapter, zero call-site changes.</p></div>
+  <div class="card"><div class="num">02 · ASYNC</div><h4>Queue + workers (decoupled send)</h4><p class="muted">Sending must not block the request. A message queue buffers, background workers dispatch, so a 5 000-parent announcement doesn’t time out the API. ABP Background Jobs / Hangfire / a broker.</p></div>
+  <div class="card"><div class="num">03 · IDENTITY</div><h4>Contact &amp; device resolution</h4><p class="muted">Per recipient: verified email, MSISDN, WhatsApp number, push device tokens — and the logic to resolve “what addresses does this person have?”. Today PSMS has no phone/token fields.</p></div>
+  <div class="card"><div class="num">04 · CONSENT</div><h4>Preferences &amp; opt-in/out (POPIA)</h4><p class="muted">Per-user, per-channel, per-category preferences + quiet hours + STOP handling. POPIA §69 requires opt-in for anything marketing-like and a working opt-out. This is legal, not optional.</p></div>
+  <div class="card"><div class="num">05 · TEMPLATING</div><h4>Per-channel, localized templates</h4><p class="muted">One logical message → SMS (160-char), WhatsApp (pre-approved template), email (HTML), push (title+body). Variables, and language (SA has 11 official languages — at least EN + local).</p></div>
+  <div class="card"><div class="num">06 · ORCHESTRATION</div><h4>Routing &amp; fallback cascade</h4><p class="muted">The decision layer: “try WhatsApp; if not delivered in N min or no WhatsApp consent → SMS; → email.” Priority, channel cascade, and dedup so one event never spams every channel at once.</p></div>
+  <div class="card"><div class="num">07 · DELIVERY</div><h4>Status tracking &amp; provider webhooks</h4><p class="muted">queued → sent → delivered → read → failed, fed by provider callbacks. Without this you can’t do fallback, can’t prove a parent was notified, can’t debug. Today: two boolean stubs.</p></div>
+  <div class="card"><div class="num">08 · RESILIENCE</div><h4>Retries, dead-letter, idempotency</h4><p class="muted">Transient failures retry with backoff; permanent ones dead-letter for inspection; an idempotency key stops a retry from double-sending. Rate-limiting/throttling to respect provider caps.</p></div>
+  <div class="card"><div class="num">09 · REAL-TIME</div><h4>Live in-app transport</h4><p class="muted">SignalR (already in the project, not wired) pushes the bell badge + notification centre instantly instead of polling. The in-app channel’s “delivered” event.</p></div>
+  <div class="card"><div class="num">10 · INBOUND</div><h4>Two-way messaging</h4><p class="muted">Replies and inbound WhatsApp/SMS routed back to a conversation, plus keyword handling (STOP/HELP). Turns broadcasts into conversations — and is how opt-out legally works.</p></div>
+  <div class="card"><div class="num">11 · GOVERNANCE</div><h4>Audit, analytics &amp; observability</h4><p class="muted">Who was sent what, when, on which channel, and did it land — for compliance and for tuning (open/delivery rates per channel). Structured logs: event, user, channel, status, latency.</p></div>
+</div>
+<p class="muted">Cross-cutting: <b>scheduling &amp; event triggers</b> (send at a time / on a domain event), <b>batching</b> for bulk sends, and <b>cost controls</b> (channel choice has real per-message cost in SA).</p>
+
+<h2>4 · Maturity model — where PSMS sits</h2>
+<div class="ladder">
+  <div class="rung here"><div class="lv">Level 0</div><div><b>Single-channel</b> — in-app only; messages/notifications live in the DB and are read in the app. <span class="tag">PSMS is here</span><br><span class="muted">Announcements have publish/expiry; SignalR present but unused; email/push columns are stubs.</span></div></div>
+  <div class="rung"><div class="lv">Level 1</div><div><b>Multi-channel (siloed)</b> — email + SMS + push wired, but each ad-hoc, no shared preferences, no delivery feedback.</div></div>
+  <div class="rung"><div class="lv">Level 2</div><div><b>Preference-aware</b> — one dispatch service, per-user channel preferences + consent, templates, delivery status, async queue.</div></div>
+  <div class="rung"><div class="lv">Level 3</div><div><b>Orchestrated / omnichannel</b> — routing + fallback cascade, inbound/two-way, real-time, analytics. Now you can honestly say “all channels”.</div></div>
+</div>
+
+<h2>5 · Gap analysis — PSMS vs the bar</h2>
+<div class="scroll">
+<table>
+<thead><tr><th>Capability</th><th>Status today</th><th>What exists / what’s missing</th></tr></thead>
+<tbody>
+<tr><td>In-app messages &amp; announcements</td><td><span class="pill p-have">have</span></td><td>Threaded messages, targeted announcements, read receipts — solid.</td></tr>
+<tr><td>Notification model</td><td><span class="pill p-part">partial</span></td><td>Entity + type/priority + in-app create exist; <b>no user-facing notification centre</b>, bell badge disabled.</td></tr>
+<tr><td>Channel abstraction / dispatcher</td><td><span class="pill p-no">missing</span></td><td>No dispatch service; notifications are direct DB inserts.</td></tr>
+<tr><td>Email / SMS / Push / WhatsApp</td><td><span class="pill p-no">missing</span></td><td>Zero external integrations; only <code>EmailSent</code>/<code>PushSent</code> stub columns.</td></tr>
+<tr><td>Async queue / background jobs</td><td><span class="pill p-no">missing</span></td><td>No Hangfire / ABP background jobs wired; all sync.</td></tr>
+<tr><td>Contact &amp; device-token data</td><td><span class="pill p-no">missing</span></td><td>No phone / WhatsApp / device-token fields on users.</td></tr>
+<tr><td>Preferences &amp; consent (POPIA)</td><td><span class="pill p-no">missing</span></td><td>No preference entity, no opt-in/out, no quiet hours.</td></tr>
+<tr><td>Templates / localization</td><td><span class="pill p-no">missing</span></td><td>Free-form strings; no per-channel templates, no multi-language.</td></tr>
+<tr><td>Delivery tracking + webhooks</td><td><span class="pill p-no">missing</span></td><td>Two booleans, no status lifecycle, no provider callbacks.</td></tr>
+<tr><td>Retry / fallback / orchestration</td><td><span class="pill p-no">missing</span></td><td>None.</td></tr>
+<tr><td>Real-time (SignalR)</td><td><span class="pill p-part">partial</span></td><td><code>AddSignalR()</code> is called but no hub feeds notifications; UI would poll.</td></tr>
+<tr><td>Inbound / two-way</td><td><span class="pill p-no">missing</span></td><td>No inbound webhook routing, no STOP/HELP keywords.</td></tr>
+<tr><td>Audit &amp; analytics</td><td><span class="pill p-no">missing</span></td><td>No delivery audit log, no per-channel metrics.</td></tr>
+</tbody>
+</table>
+</div>
+
+<h2>6 · Target architecture for PSMS</h2>
+<p>The shape that satisfies the checklist without rebuilding later. App code raises a <b>notification request</b>; everything else is the platform’s job.</p>
+<div class="scroll"><div class="diagram">
+ domain event / manual send
+        │
+        ▼
+ ┌─────────────────────────┐     reads
+ │  NotificationDispatcher  │◀────────────  Preferences + Consent  (per user × channel × category)
+ │  (resolve → route)       │◀────────────  Contact/Device registry (email, MSISDN, WA, tokens)
+ └───────────┬─────────────┘◀────────────  Template store (per channel + language)
+             │ enqueue
+             ▼
+        Message queue ──▶ Workers ──┬─▶ In-app (SignalR)   ┐
+        (async, retry,             ├─▶ Push  (FCM/APNS)    │  provider
+         dead-letter)              ├─▶ Email (SendGrid/SES)│  adapters
+                                   ├─▶ SMS   (Clickatell)  │  (one interface)
+                                   └─▶ WhatsApp (Meta/CM)  ┘
+             ▲                                  │
+             │   delivery status / fallback     ▼
+        Delivery log  ◀──── provider webhooks (sent/delivered/read/failed)
+        (audit + analytics + fallback cascade decisions)
+</div></div>
+<div class="grid two">
+  <div class="card"><h4>Build (yours)</h4><p class="muted">The dispatcher, preferences, contact/template stores, queue wiring, delivery log, the provider <i>interface</i>, and the in-app/SignalR adapter. This is the durable IP.</p></div>
+  <div class="card"><h4>Buy / integrate (providers)</h4><p class="muted">WhatsApp (Meta Cloud API or CM.com/Clickatell), SMS (Clickatell/Twilio), email (SendGrid/SES), push (FCM/APNS). Swappable behind the interface. Or a single CPaaS (Infobip/Twilio/CM.com) to cover several at once.</p></div>
+</div>
+
+<h2>7 · A pragmatic roadmap</h2>
+<ol class="steps">
+  <li><b>Foundations (no new channel yet).</b> Notification dispatcher + provider interface, async queue (ABP background jobs), contact/device fields on users, a delivery-status lifecycle, and the in-app notification centre + SignalR. <span class="muted">Turns Level 0 into a real platform with one channel.</span></li>
+  <li><b>Preferences &amp; consent.</b> Per-user channel/category preferences, POPIA opt-in/out, quiet hours — <i>before</i> sending on any external channel, because it’s a legal gate.</li>
+  <li><b>First external channel: WhatsApp.</b> Highest SA value (98% open, PDFs). Adapter + pre-approved templates + inbound webhook for STOP/replies + delivery webhooks.</li>
+  <li><b>SMS fallback + Email.</b> SMS as the universal fallback when WhatsApp isn’t consented/delivered; email for formal/long-form + attachments. Now the fallback cascade is real.</li>
+  <li><b>Push + orchestration + analytics.</b> Mobile/web push, the routing/fallback rules, and per-channel delivery dashboards. <span class="muted">This is when “all channels” becomes an honest claim (Level 3).</span></li>
+</ol>
+
+<div class="callout">
+  <h3 style="margin-top:0">POPIA is a hard gate, not a footnote</h3>
+  <p style="margin-bottom:0">Under South Africa’s POPIA, contacting parents on external channels needs a lawful basis and a working opt-out; anything marketing-flavoured needs explicit opt-in (§69). WhatsApp Business API <i>requires</i> recipient permission before you message them. So <b>preferences + consent (capability 04) must land before the first external send</b> — it’s sequenced into step 2 deliberately.</p>
+</div>
+
+<h2>Bottom line</h2>
+<p class="lede">To <i>claim</i> PSMS “communicates via all channels,” you don’t need every channel on day one — you need the <b>platform</b>: a channel-agnostic dispatcher, async delivery, consent/preferences, templates, delivery tracking, and fallback. Add channels as adapters into that. Today PSMS is Level 0; the roadmap above reaches Level 3 in five sequenced moves, with WhatsApp as the highest-value first channel for the SA context.</p>
+
+<div class="src">
+<h2>Sources</h2>
+<ul>
+<li><a href="https://www.smartcommunications.com/resources/guides/the-ultimate-guide-to-omnichannel-orchestration/">Smart Communications — The Ultimate Guide to Omnichannel Orchestration</a></li>
+<li><a href="https://www.infobip.com/blog/best-omnichannel-marketing-platforms">Infobip — Best omnichannel marketing platforms (2026)</a></li>
+<li><a href="https://www.nextiva.com/blog/omnichannel-communication-platforms.html">Nextiva — Omnichannel Communication Platforms: Buyer’s Guide 2026</a></li>
+<li><a href="https://www.magicbell.com/blog/notification-system-design">MagicBell — Notification System Design: Architecture &amp; Best Practices</a></li>
+<li><a href="https://www.systemdesignhandbook.com/guides/design-a-notification-system/">System Design Handbook — Design a Notification System</a></li>
+<li><a href="https://www.fyno.io/blog/a-guide-to-transactional-messaging-everything-you-need-to-know-clx4f69o90014aheonz25pfa3">Fyno — Mastering Transactional Messaging</a></li>
+<li><a href="https://wasenderapi.com/blog/whatsapp-api-for-schools-how-to-automate-parent-communication-cut-admin-work-by-80">WaSenderApi — WhatsApp API for Schools (2025)</a></li>
+<li><a href="https://themessengernetwork.co.za/blog/whatsapp-school-communication-south-africa/">The Messenger Network — SA Schools &amp; WhatsApp Parent Communication</a></li>
+<li><a href="https://www.askyazi.com/articles/whatsapp-business-api-pricing---how-south-africa-compares-globally-2025">AskYazi — WhatsApp Business API Pricing, South Africa (2025)</a></li>
+<li><a href="https://www.cm.com/en-za/whatsapp/">CM.com — WhatsApp Business API (South Africa)</a></li>
+</ul>
+</div>
+
+<footer>
+PSMS research brief · current state verified against the codebase (Communication domain, AppServices, SignalR config, frontend providers) · external practices &amp; SA context per the sources above (2025–2026). This is analysis, not an implementation — no code was changed.
+</footer>
+
+</div>
+</body>
+</html>

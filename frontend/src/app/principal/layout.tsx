@@ -25,9 +25,15 @@ import {
   EnvironmentOutlined,
   ShoppingOutlined,
   PartitionOutlined,
+  VideoCameraOutlined,
+  FolderOpenOutlined,
+  FileProtectOutlined,
+  HomeOutlined,
+  SafetyCertificateOutlined,
 } from '@ant-design/icons';
 import LayoutShell from '@/components/shared/LayoutShell';
 import { roleColors } from '@/utils/theme-config';
+import { useAuthState } from '@/providers/auth';
 
 const menuItems = [
   {
@@ -65,10 +71,19 @@ const menuItems = [
   },
   {
     type: 'group' as const,
+    label: 'Learning',
+    children: [
+      { key: '/principal/lessons', icon: <VideoCameraOutlined />, label: 'Online Lessons' },
+      { key: '/principal/materials', icon: <FolderOpenOutlined />, label: 'Learning Materials' },
+    ],
+  },
+  {
+    type: 'group' as const,
     label: 'Communication',
     children: [
       { key: '/principal/announcements', icon: <NotificationOutlined />, label: 'Announcements' },
       { key: '/principal/messages', icon: <MessageOutlined />, label: 'Messages' },
+      { key: '/principal/documents', icon: <FileProtectOutlined />, label: 'Documents' },
       { key: '/principal/communication', icon: <BarChartOutlined />, label: 'Delivery Analytics' },
     ],
   },
@@ -79,6 +94,7 @@ const menuItems = [
       { key: '/principal/timetables', icon: <ClockCircleOutlined />, label: 'Timetable' },
       { key: '/principal/transport', icon: <CarOutlined />, label: 'Transport' },
       { key: '/principal/extramurals', icon: <TrophyOutlined />, label: 'Extramurals' },
+      { key: '/principal/after-care', icon: <HomeOutlined />, label: 'After Care' },
       { key: '/principal/finance', icon: <DollarOutlined />, label: 'Finance Overview' },
       { key: '/principal/admissions', icon: <FormOutlined />, label: 'Admissions' },
     ],
@@ -96,19 +112,36 @@ const menuItems = [
       { key: '/principal/expenses', icon: <ShoppingOutlined />, label: 'Expenses' },
     ],
   },
+  {
+    type: 'group' as const,
+    label: 'Administration',
+    children: [
+      { key: '/principal/users', icon: <UserOutlined />, label: 'Users' },
+      { key: '/principal/roles', icon: <SafetyCertificateOutlined />, label: 'Roles' },
+    ],
+  },
 ];
 
+/**
+ * The management portal. The Vice Principal shares it: VP holds the same
+ * permission set as the Principal (approval steps are routed to either), and
+ * previously landed in the five-page academic portal with no route to
+ * approvals, admissions or finance.
+ */
 export default function PrincipalRootLayout({ children }: { children: React.ReactNode }) {
+  const { currentRole } = useAuthState();
+  const isVicePrincipal = currentRole?.toLowerCase() === 'viceprincipal';
+
   return (
     <LayoutShell
       config={{
         basePath: '/principal',
         sidebarTitle: 'School Management',
-        sidebarSubtitle: 'Principal Portal',
+        sidebarSubtitle: isVicePrincipal ? 'Vice Principal Portal' : 'Principal Portal',
         headerTitle: 'School Overview',
         menuItems,
-        allowedRoles: ['Principal'],
-        accentColor: roleColors.Principal,
+        allowedRoles: ['Principal', 'VicePrincipal'],
+        accentColor: isVicePrincipal ? roleColors.VicePrincipal : roleColors.Principal,
         showProfileFooter: true,
         showNotificationBadge: true,
         showRoleInHeader: false,

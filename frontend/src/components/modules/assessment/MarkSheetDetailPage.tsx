@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { usePortalBase } from '@/utils/portal-base';
 import {
   Card,
   Descriptions,
@@ -52,6 +53,7 @@ const markStatusMap: Record<number, { label: string; color: string }> = {
 function MarkSheetDetailContent() {
   const params = useParams();
   const router = useRouter();
+  const portalBase = usePortalBase();
   const assessmentId = params.id as string;
 
   const { assessment, isPending: assessmentPending, isError: assessmentError } = useAssessmentState();
@@ -98,7 +100,7 @@ function MarkSheetDetailContent() {
   if (assessmentError || (!assessmentPending && !assessment)) {
     return (
       <div style={{ padding: 24 }}>
-        <Button icon={<ArrowLeftOutlined />} onClick={() => router.push('/principal/mark-sheets')} style={{ marginBottom: 16 }}>
+        <Button icon={<ArrowLeftOutlined />} onClick={() => router.push(`${portalBase}/mark-sheets`)} style={{ marginBottom: 16 }}>
           Back to Mark Sheets
         </Button>
         <Empty description="Assessment not found" />
@@ -155,7 +157,7 @@ function MarkSheetDetailContent() {
       {/* Back button */}
       <Button
         icon={<ArrowLeftOutlined />}
-        onClick={() => router.push('/principal/mark-sheets')}
+        onClick={() => router.push(`${portalBase}/mark-sheets`)}
         style={{ marginBottom: 16 }}
       >
         Back to Mark Sheets
