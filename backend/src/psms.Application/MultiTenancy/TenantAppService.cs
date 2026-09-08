@@ -179,6 +179,26 @@ public class TenantAppService : AsyncCrudAppService<Tenant, TenantDto, int, Page
         }
     }
 
+    /// <summary>
+    /// Additively grant the operations feature groups (Parents, Transfers, Fee
+    /// Waivers, Expenses, Discipline, Staff Leave, Field Trips, Extramurals,
+    /// Transport, After Care) to an existing tenant's staff roles without
+    /// disturbing their other grants. Safe to run on live, customised tenants —
+    /// unlike <see cref="SeedRolePermissionsAsync"/> which replaces the full set.
+    /// Idempotent.
+    /// </summary>
+    [AbpAuthorize(PermissionNames.Pages_Tenants)]
+    public async Task GrantOperationsPermissionsAsync(EntityDto<int> input)
+    {
+        var tenant = await _tenantManager.GetByIdAsync(input.Id);
+
+        using (CurrentUnitOfWork.SetTenantId(tenant.Id))
+        {
+            await _rolePermissionSeeder.GrantOperationsPermissionsToStaffRolesAsync();
+            await CurrentUnitOfWork.SaveChangesAsync();
+        }
+    }
+
     private void CheckErrors(IdentityResult identityResult)
     {
         identityResult.CheckErrors(LocalizationManager);
