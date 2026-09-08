@@ -1,7 +1,7 @@
 import axios from "axios";
 import { Modal } from "antd";
 
-const baseURL = process.env.NEXT_PUBLIC_BASE_URL;
+const baseURL = process.env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:21021";
 
 /**
  * Per-request opt-out of the error modal below, for calls whose failure the
