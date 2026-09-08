@@ -11,6 +11,7 @@ import {
 } from '@/providers/learning/learning_materials';
 import { useAuthState } from '@/providers/auth';
 import type { ILearningMaterialList } from '@/providers/learning/shared/interfaces';
+import { formatBytes } from '@/utils/format-bytes';
 
 const { Text } = Typography;
 
@@ -25,18 +26,6 @@ const MATERIAL_TYPE_META: Record<number, { label: string; color: string }> = {
   7: { label: 'Image', color: 'green' },
   8: { label: 'Interactive', color: 'geekblue' },
 };
-
-function formatBytes(bytes?: number): string {
-  if (bytes == null || bytes <= 0) return '—';
-  const units = ['B', 'KB', 'MB', 'GB'];
-  let value = bytes;
-  let unit = 0;
-  while (value >= 1024 && unit < units.length - 1) {
-    value /= 1024;
-    unit += 1;
-  }
-  return `${value.toFixed(unit === 0 ? 0 : 1)} ${units[unit]}`;
-}
 
 /**
  * School-wide, read-only view of learning materials across every class and

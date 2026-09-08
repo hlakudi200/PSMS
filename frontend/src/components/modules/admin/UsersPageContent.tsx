@@ -82,6 +82,7 @@ function UsersContent() {
     {
       key: 'new',
       label: 'New User',
+      requiredPermissions: ['Admin', 'Principal'],
       icon: <PlusOutlined />,
       type: 'primary',
       onClick: () => { setEditRecord(null); setModalOpen(true); },
@@ -92,12 +93,14 @@ function UsersContent() {
     {
       key: 'edit',
       label: 'Edit',
+      requiredPermissions: ['Admin', 'Principal'],
       icon: <EditOutlined />,
       onClick: (record) => { setEditRecord(record); setModalOpen(true); },
     },
     {
       key: 'resetPassword',
       label: 'Reset Password',
+      requiredPermissions: ['Admin', 'Principal'],
       icon: <KeyOutlined />,
       onClick: (record) => {
         setResetUserId(record.id);
@@ -108,6 +111,7 @@ function UsersContent() {
     {
       key: 'delete',
       label: 'Delete',
+      requiredPermissions: ['Admin', 'Principal'],
       icon: <DeleteOutlined />,
       danger: true,
       confirm: { title: 'Delete this user?', description: 'This action cannot be undone.' },

@@ -206,6 +206,10 @@ public class psmsAuthorizationProvider : AuthorizationProvider
         calendar.CreateChildPermission(PermissionNames.Academic_Calendar_View, L("ViewCalendar"));
         calendar.CreateChildPermission(PermissionNames.Academic_Calendar_Manage, L("ManageCalendar"));
         calendar.CreateChildPermission(PermissionNames.Academic_AcademicYears_Manage, L("ManageAcademicYears"));
+
+        // Management dashboard (cross-module aggregates: finance, HR, discipline, admissions)
+        var dashboard = academic.CreateChildPermission(PermissionNames.Academic_Dashboard, L("Dashboard"));
+        dashboard.CreateChildPermission(PermissionNames.Academic_Dashboard_View, L("ViewManagementDashboard"));
         calendar.CreateChildPermission(PermissionNames.Academic_Terms_Manage, L("ManageTerms"));
 
         // Student Transfers
@@ -263,6 +267,8 @@ public class psmsAuthorizationProvider : AuthorizationProvider
         var feeWaivers = financial.CreateChildPermission(PermissionNames.Financial_FeeWaivers, L("FeeWaivers"));
         feeWaivers.CreateChildPermission(PermissionNames.Financial_FeeWaivers_View, L("ViewFeeWaivers"));
         feeWaivers.CreateChildPermission(PermissionNames.Financial_FeeWaivers_Create, L("CreateFeeWaiver"));
+        feeWaivers.CreateChildPermission(PermissionNames.Financial_FeeWaivers_Edit, L("EditFeeWaiver"));
+        feeWaivers.CreateChildPermission(PermissionNames.Financial_FeeWaivers_Delete, L("DeleteFeeWaiver"));
         feeWaivers.CreateChildPermission(PermissionNames.Financial_FeeWaivers_Approve, L("ApproveFeeWaiver"));
 
         // Expenses

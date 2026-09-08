@@ -433,10 +433,13 @@ export enum TransportDirection {
   Both = 3,
 }
 
+// Mirrors backend psms.Domain.Shared.Enums.EnrollmentStatus (shared by transport,
+// extramural and after-care enrolments).
 export enum TransportEnrollmentStatus {
   Active = 1,
-  Terminated = 2,
-  Suspended = 3,
+  Suspended = 2,
+  Terminated = 3,
+  Pending = 4,
 }
 
 export enum ExtramuralCategory {
@@ -497,8 +500,9 @@ export const transportDirectionLabels: Record<number, string> = {
 
 export const transportEnrollmentStatusLabels: Record<number, string> = {
   [TransportEnrollmentStatus.Active]: 'Active',
-  [TransportEnrollmentStatus.Terminated]: 'Terminated',
   [TransportEnrollmentStatus.Suspended]: 'Suspended',
+  [TransportEnrollmentStatus.Terminated]: 'Terminated',
+  [TransportEnrollmentStatus.Pending]: 'Pending',
 };
 
 export const extramuralCategoryLabels: Record<number, string> = {

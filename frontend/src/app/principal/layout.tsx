@@ -35,7 +35,7 @@ import LayoutShell from '@/components/shared/LayoutShell';
 import { roleColors } from '@/utils/theme-config';
 import { useAuthState } from '@/providers/auth';
 
-const menuItems = [
+const buildMenuItems = (isVicePrincipal: boolean) => [
   {
     key: '/principal',
     icon: <DashboardOutlined />,
@@ -117,20 +117,24 @@ const menuItems = [
     label: 'Administration',
     children: [
       { key: '/principal/users', icon: <UserOutlined />, label: 'Users' },
-      { key: '/principal/roles', icon: <SafetyCertificateOutlined />, label: 'Roles' },
+      // RoleAppService is gated on Pages.Roles, which the Vice Principal does not hold.
+      ...(isVicePrincipal
+        ? []
+        : [{ key: '/principal/roles', icon: <SafetyCertificateOutlined />, label: 'Roles' }]),
     ],
   },
 ];
 
 /**
- * The management portal. The Vice Principal shares it: VP holds the same
- * permission set as the Principal (approval steps are routed to either), and
- * previously landed in the five-page academic portal with no route to
- * approvals, admissions or finance.
+ * The management portal. The Vice Principal shares it: the VP holds the same
+ * operational permissions as the Principal (approval steps are routed to
+ * either) minus a few administration grants, and previously landed in the
+ * five-page academic portal with no route to approvals, admissions or finance.
  */
 export default function PrincipalRootLayout({ children }: { children: React.ReactNode }) {
   const { currentRole } = useAuthState();
   const isVicePrincipal = currentRole?.toLowerCase() === 'viceprincipal';
+  const menuItems = React.useMemo(() => buildMenuItems(isVicePrincipal), [isVicePrincipal]);
 
   return (
     <LayoutShell

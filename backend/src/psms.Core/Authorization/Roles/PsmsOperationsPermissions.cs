@@ -25,6 +25,10 @@ public static class PsmsOperationsPermissions
     {
         return new List<string>
         {
+            // Management dashboard (cross-module aggregates)
+            PermissionNames.Academic_Dashboard,
+            PermissionNames.Academic_Dashboard_View,
+
             // Academic - Parents & Transfers
             PermissionNames.Academic_Parents,
             PermissionNames.Academic_Parents_View,

@@ -23,10 +23,10 @@ const optionalText = (max: number) =>
 
 const afterCareSchema = z
   .object({
-    academicYearId: z.string().min(1, 'Academic year is required'),
+    academicYearId: z.string({ error: 'Academic year is required' }).min(1, 'Academic year is required'),
     programName: z.string().min(1, 'Programme name is required').max(200),
     description: optionalText(2000),
-    afterCareType: z.number().int().min(1, 'Programme type is required'),
+    afterCareType: z.number({ error: 'Programme type is required' }).int().min(1, 'Programme type is required'),
     location: optionalText(200),
     startTime: z.string().regex(/^\d{2}:\d{2}:\d{2}$/, 'Start time is required'),
     endTime: z.string().regex(/^\d{2}:\d{2}:\d{2}$/, 'End time is required'),

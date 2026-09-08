@@ -165,18 +165,30 @@ function PrincipalDashboardContent() {
   const [weeklyAttendance, setWeeklyAttendance] = useState<WeeklyAttendanceDay[]>([]);
   const [weeklyLoading, setWeeklyLoading] = useState(true);
   const [weeklyError, setWeeklyError] = useState<string | null>(null);
+  const [yearResolved, setYearResolved] = useState(false);
 
   const today = formatDate(new Date());
+
+  useEffect(() => {
+    let cancelled = false;
+    // Resolve the current year first so the summary (classes, reports, per-grade
+    // counts) is scoped to it; the attention queue is school-wide regardless.
+    Promise.resolve(getCurrentAsync()).then(() => {
+      if (!cancelled) setYearResolved(true);
+    });
+    getWorkflowDashboard();
+    getAllAnnouncements({ isPublished: true, maxResultCount: 5 });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // One aggregated summary call replaces the previous per-entity page pulls
   // (1000 reports + 500 classes) — the backend groups by grade for us.
   useEffect(() => {
-    getCurrentAsync();
-    getSummaryAsync();
-    getWorkflowDashboard();
-    getAllAnnouncements({ isPublished: true, maxResultCount: 5 });
+    if (!yearResolved) return;
+    getSummaryAsync(currentAcademicYear?.id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [yearResolved, currentAcademicYear?.id]);
 
   // Single weekly attendance range query, then bucket by date
   const fetchWeeklyAttendance = useCallback(async () => {

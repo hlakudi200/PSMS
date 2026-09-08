@@ -22,6 +22,7 @@ const STATUS_META: Record<number, { label: string; color: string }> = {
   2: { label: 'In progress', color: 'gold' },
   3: { label: 'Completed', color: 'green' },
   4: { label: 'Cancelled', color: 'red' },
+  5: { label: 'Rescheduled', color: 'orange' },
 };
 const STATUS_IN_PROGRESS = 2;
 

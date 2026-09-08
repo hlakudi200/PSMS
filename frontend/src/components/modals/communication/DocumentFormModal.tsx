@@ -38,8 +38,8 @@ const documentSchema = z.object({
   fileSizeBytes: z.number().int().min(0, 'Size must be 0 or greater'),
   contentType: optionalText(100),
   category: optionalText(50),
-  documentType: z.number().int().min(1, 'Document type is required'),
-  targetAudience: z.number().int().min(1, 'Audience is required'),
+  documentType: z.number({ error: 'Document type is required' }).int().min(1, 'Document type is required'),
+  targetAudience: z.number({ error: 'Audience is required' }).int().min(1, 'Audience is required'),
   academicYearId: z.string().optional(),
 });
 
@@ -104,7 +104,13 @@ export const DocumentFormModal: React.FC<DocumentFormModalProps> = ({
       }
       setLoading(true);
       if (isEdit) {
-        await updateAsync(editRecord!.id, result.data);
+        // The backend treats an absent academicYearId as "no change"; an explicit
+        // flag is needed to clear a year that was previously assigned.
+        const hadYear = !!document?.academicYearId && document.id === editRecord!.id;
+        await updateAsync(editRecord!.id, {
+          ...result.data,
+          clearAcademicYearId: hadYear && !result.data.academicYearId ? true : undefined,
+        });
       } else {
         await createAsync(result.data);
       }
