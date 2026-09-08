@@ -301,9 +301,6 @@ function FeeSection({ applicationId }: { applicationId: string }) {
 // Surfaces the application's approval workflow inline, so the principal can see
 // what stage it's at and jump straight to taking action. Self-contained in its
 // own WorkflowInstanceProvider so it doesn't touch the admissions state.
-// The application detail page is reached from the principal portal and, via the
-// workflow "View full application" link, from the admin portal. Derive the portal
-// root from the path so internal links (workflow instance, Back) stay in-portal.
 
 const workflowStatusColor: Record<number, string> = {
   [WorkflowStatus.NotStarted]: 'default',

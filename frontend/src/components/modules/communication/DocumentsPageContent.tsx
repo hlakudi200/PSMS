@@ -20,6 +20,7 @@ import {
   DOCUMENT_AUDIENCE_OPTIONS,
 } from '@/components/modals/communication/DocumentFormModal';
 import type { IDocumentList } from '@/providers/communication/shared/interfaces';
+import { formatBytes } from '@/utils/format-bytes';
 
 const { Text } = Typography;
 
@@ -38,18 +39,6 @@ const typeStatusMap = Object.fromEntries(
 const audienceStatusMap = Object.fromEntries(
   DOCUMENT_AUDIENCE_OPTIONS.map((o) => [o.value, { label: o.label, color: AUDIENCE_COLORS[o.value] ?? 'default' }])
 );
-
-function formatBytes(bytes?: number): string {
-  if (bytes == null || bytes <= 0) return '—';
-  const units = ['B', 'KB', 'MB', 'GB'];
-  let value = bytes;
-  let unit = 0;
-  while (value >= 1024 && unit < units.length - 1) {
-    value /= 1024;
-    unit += 1;
-  }
-  return `${value.toFixed(unit === 0 ? 0 : 1)} ${units[unit]}`;
-}
 
 /**
  * Shared school documents (policies, forms, newsletters, handbooks …) that are
@@ -197,7 +186,8 @@ function DocumentsContent() {
       label: 'Delete',
       icon: <DeleteOutlined />,
       danger: true,
-      requiredPermissions: MANAGE_ROLES,
+      // Communication.Documents.Delete is not in the Vice Principal grant set.
+      requiredPermissions: ['Admin', 'Principal'],
       confirm: { title: 'Delete this document?', description: 'This action cannot be undone.' },
       onClick: async (record) => {
         try {

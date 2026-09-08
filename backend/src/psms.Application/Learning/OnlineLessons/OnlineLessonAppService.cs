@@ -663,12 +663,18 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
                 .FirstOrDefaultAsync(s => s.UserId == AbpSession.UserId.Value
                                        && s.TenantId == AbpSession.TenantId);
             if (student == null)
-                throw new UserFriendlyException(LearningExceptionCodes.LiveClassNotAvailable,
-                    "Only the class teacher and enrolled students can join this live class.");
-
+            {
+                // Management observers (Principal / VP / HOD / Admin, i.e. anyone with
+                // school-wide student visibility) may watch a live lesson as a
+                // subscribe-only viewer — the same grants a student gets.
+                var isObserver = await PermissionChecker.IsGrantedAsync(PermissionNames.Academic_Students_ViewAll);
+                if (!isObserver)
+                    throw new UserFriendlyException(LearningExceptionCodes.LiveClassNotAvailable,
+                        "Only the class teacher and enrolled students can join this live class.");
+            }
             // Null-safe: if the ClassSubject is somehow unavailable, treat as
             // not-enrolled rather than throwing a raw NRE.
-            if (student.CurrentClassId != lesson.ClassSubject?.ClassId)
+            else if (student.CurrentClassId != lesson.ClassSubject?.ClassId)
                 throw new UserFriendlyException(LearningExceptionCodes.LiveClassNotAvailable,
                     "You are not enrolled in this class.");
         }

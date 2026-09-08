@@ -20,6 +20,8 @@ export default function UnauthorizedPage() {
         break;
       case "principal":
       case "viceprincipal":
+        router.push("/principal");
+        break;
       case "hod":
         router.push("/academic");
         break;

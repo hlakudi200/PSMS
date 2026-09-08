@@ -174,6 +174,10 @@ public static class PermissionNames
     public const string Academic_Calendar_View = "Academic.Calendar.View";
     public const string Academic_Calendar_Manage = "Academic.Calendar.Manage";
     public const string Academic_AcademicYears_Manage = "Academic.AcademicYears.Manage";
+
+    // Management dashboard — cross-module aggregates, management roles only
+    public const string Academic_Dashboard = "Academic.Dashboard";
+    public const string Academic_Dashboard_View = "Academic.Dashboard.View";
     public const string Academic_Terms_Manage = "Academic.Terms.Manage";
 
     #endregion
