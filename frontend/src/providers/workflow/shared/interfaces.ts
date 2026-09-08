@@ -106,6 +106,12 @@ export interface IWorkflowDefinition {
   steps: IWorkflowStep[];
   creationTime: string;
   lastModificationTime?: string;
+  /** WF-33: steps are locked while workflows run on this definition; clone to change them. */
+  hasActiveInstances?: boolean;
+}
+
+export interface ICloneWorkflowDefinition {
+  name?: string;
 }
 
 export interface IWorkflowDefinitionList {
@@ -116,6 +122,8 @@ export interface IWorkflowDefinitionList {
   version: number;
   stepCount: number;
   creationTime: string;
+  /** WF-33: steps are locked while workflows run on this definition. */
+  hasActiveInstances?: boolean;
 }
 
 export interface ICreateWorkflowDefinition {
@@ -343,6 +351,8 @@ export interface IWorkflowInstanceList {
   startedDate?: string;
   completedDate?: string;
   creationTime: string;
+  /** WF-34: only the creator may Recall. */
+  creatorUserId?: number;
 }
 
 export interface IStartWorkflow {

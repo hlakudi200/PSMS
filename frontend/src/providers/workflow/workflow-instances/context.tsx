@@ -32,7 +32,7 @@ export interface IWorkflowInstanceActionContext {
   advanceAsync: (id: string, input: IAdvanceWorkflow) => void;
   cancelAsync: (id: string, comment?: string) => void;
   recallAsync: (id: string, comment?: string) => void;
-  batchAdvanceAsync: (input: IBatchAdvance) => void;
+  batchAdvanceAsync: (input: IBatchAdvance) => Promise<IBatchAdvanceResult | undefined>;
   getHistoryAsync: (instanceId: string) => void;
   getPendingForRoleAsync: (roleName: string, input?: IPagedAndSortedResultRequest) => void;
   getMyPendingAsync: (input?: IPagedAndSortedResultRequest) => void;

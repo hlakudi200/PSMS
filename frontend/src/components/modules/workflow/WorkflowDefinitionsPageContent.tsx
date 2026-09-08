@@ -2,7 +2,7 @@
 
 import React, { useState, useCallback } from 'react';
 import { message } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, EyeOutlined, CheckOutlined, StopOutlined } from '@ant-design/icons';
+import { PlusOutlined, EditOutlined, DeleteOutlined, EyeOutlined, CheckOutlined, StopOutlined, CopyOutlined } from '@ant-design/icons';
 import { EnterpriseTable } from '@/components/shared/enterprise-table';
 import type { ColumnConfig, TableQuery, RowAction, ToolbarAction } from '@/components/shared/enterprise-table';
 import { WorkflowDefinitionProvider, useWorkflowDefinitionState, useWorkflowDefinitionActions } from '@/providers/workflow/workflow-definitions';
@@ -15,7 +15,7 @@ import { useWorkflowBasePath } from './useWorkflowBasePath';
 
 function DefinitionsContent() {
   const { definitions, totalCount, isPending, isError } = useWorkflowDefinitionState();
-  const { getAllAsync, deleteAsync, activateAsync, deactivateAsync } = useWorkflowDefinitionActions();
+  const { getAllAsync, deleteAsync, activateAsync, deactivateAsync, cloneAsync } = useWorkflowDefinitionActions();
   const { currentRole } = useAuthState();
   const router = useRouter();
   const base = useWorkflowBasePath();
@@ -96,6 +96,19 @@ function DefinitionsContent() {
       icon: <EditOutlined />,
       requiredPermissions: ['Admin', 'Principal'],
       onClick: (record) => { setEditRecord(record); setModalOpen(true); },
+    },
+    {
+      key: 'clone',
+      label: 'Clone as new version',
+      icon: <CopyOutlined />,
+      requiredPermissions: ['Admin', 'Principal'],
+      onClick: async (record) => {
+        const clone = await cloneAsync(record.id);
+        if (clone) {
+          message.success(`Cloned as "${clone.name}" (inactive). Edit its steps, then activate it.`);
+          router.push(`${base}/definitions/${clone.id}`);
+        }
+      },
     },
     {
       key: 'activate',

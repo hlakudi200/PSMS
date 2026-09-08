@@ -15,4 +15,5 @@ public interface IWorkflowDefinitionAppService : IApplicationService
     Task DeleteAsync(Guid id);
     Task<WorkflowDefinitionDto> ActivateAsync(Guid id);
     Task<WorkflowDefinitionDto> DeactivateAsync(Guid id);
+    Task<WorkflowDefinitionDto> CloneAsync(Guid id, CloneWorkflowDefinitionDto input);
 }

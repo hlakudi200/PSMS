@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useCallback } from 'react';
-import { message } from 'antd';
+import { message, Modal, Input, Typography } from 'antd';
 import {
   PlusOutlined,
   EyeOutlined,
@@ -33,7 +33,7 @@ import { useWorkflowBasePath } from './useWorkflowBasePath';
 function InstancesContent() {
   const { instances, totalCount, isPending, isError } = useWorkflowInstanceState();
   const { getAllAsync, cancelAsync, recallAsync, batchAdvanceAsync, getOverdueAsync, getPendingForRoleAsync } = useWorkflowInstanceActions();
-  const { currentRole } = useAuthState();
+  const { currentRole, currentUser } = useAuthState();
   const router = useRouter();
   const base = useWorkflowBasePath();
   const [startModalOpen, setStartModalOpen] = useState(false);
@@ -198,7 +198,9 @@ function InstancesContent() {
       key: 'recall',
       label: 'Recall',
       icon: <UndoOutlined />,
-      visible: (record) => record.status === WorkflowStatus.InProgress,
+      // WF-34: the server only lets the creator recall; don't advertise it to others.
+      visible: (record) => record.status === WorkflowStatus.InProgress
+        && record.creatorUserId != null && record.creatorUserId === currentUser?.id,
       confirm: { title: 'Recall this workflow?', description: 'Only the creator can recall.' },
       onClick: async (record) => {
         await recallAsync(record.id);
@@ -208,47 +210,58 @@ function InstancesContent() {
     },
   ];
 
+  // WF-34: batch actions carry a comment (steps may require one) and report the
+  // per-instance outcome instead of a blanket success. Steps with unmet exit
+  // criteria or decision fields fail individually and are listed.
+  const runBatch = (rows: IWorkflowInstanceList[], action: number, verb: string) => {
+    const inProgressIds = rows.filter((r) => r.status === WorkflowStatus.InProgress).map((r) => r.id);
+    if (inProgressIds.length === 0) {
+      message.warning('No in-progress workflows selected');
+      return;
+    }
+    let comment = '';
+    Modal.confirm({
+      title: `${verb} ${inProgressIds.length} workflow(s)?`,
+      content: (
+        <div style={{ marginTop: 12 }}>
+          <Typography.Text type="secondary">Comment (applied to every selected workflow; required by some steps)</Typography.Text>
+          <Input.TextArea rows={3} maxLength={2000} onChange={(e) => { comment = e.target.value; }} />
+        </div>
+      ),
+      okText: verb,
+      onOk: async () => {
+        const result = await batchAdvanceAsync({ instanceIds: inProgressIds, action, comment: comment || undefined });
+        if (!result) return;
+        if (result.failedCount === 0) {
+          message.success(`${verb}d ${result.successCount} workflow(s)`);
+        } else {
+          Modal.warning({
+            title: `${result.successCount} succeeded, ${result.failedCount} failed`,
+            content: (
+              <ul style={{ paddingLeft: 18, marginTop: 8 }}>
+                {result.failures.map((fl) => (
+                  <li key={fl.instanceId}><Typography.Text code>{fl.instanceId.split('-')[0]}…</Typography.Text> {fl.error}</li>
+                ))}
+              </ul>
+            ),
+          });
+        }
+        refreshData();
+      },
+    });
+  };
+
   const bulkActions: BulkAction<IWorkflowInstanceList>[] = [
     {
       key: 'batchApprove',
       label: 'Batch Approve',
-      confirm: { title: 'Approve all selected workflows?' },
-      onClick: async (rows) => {
-        const inProgressIds = rows
-          .filter((r) => r.status === WorkflowStatus.InProgress)
-          .map((r) => r.id);
-        if (inProgressIds.length === 0) {
-          message.warning('No in-progress workflows selected');
-          return;
-        }
-        await batchAdvanceAsync({
-          instanceIds: inProgressIds,
-          action: 3, // Approve
-        });
-        message.success(`Batch approve submitted for ${inProgressIds.length} workflow(s)`);
-        refreshData();
-      },
+      onClick: (rows) => runBatch(rows, 3, 'Approve'),
     },
     {
       key: 'batchReject',
       label: 'Batch Reject',
       danger: true,
-      confirm: { title: 'Reject all selected workflows?' },
-      onClick: async (rows) => {
-        const inProgressIds = rows
-          .filter((r) => r.status === WorkflowStatus.InProgress)
-          .map((r) => r.id);
-        if (inProgressIds.length === 0) {
-          message.warning('No in-progress workflows selected');
-          return;
-        }
-        await batchAdvanceAsync({
-          instanceIds: inProgressIds,
-          action: 4, // Reject
-        });
-        message.success(`Batch reject submitted for ${inProgressIds.length} workflow(s)`);
-        refreshData();
-      },
+      onClick: (rows) => runBatch(rows, 4, 'Reject'),
     },
   ];
 

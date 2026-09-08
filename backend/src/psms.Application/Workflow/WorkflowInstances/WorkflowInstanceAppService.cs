@@ -33,6 +33,7 @@ public class WorkflowInstanceAppService : ApplicationService, IWorkflowInstanceA
     private readonly WorkflowEntityBridgeService _bridgeService;
     private readonly WorkflowEntitySummaryProvider _entitySummaryProvider;
     private readonly WorkflowExtensionRegistry _extensions;
+    private readonly WorkflowActorResolver _actors;
 
     public WorkflowInstanceAppService(
         IRepository<WorkflowInstance, Guid> instanceRepository,
@@ -43,8 +44,10 @@ public class WorkflowInstanceAppService : ApplicationService, IWorkflowInstanceA
         UserManager userManager,
         WorkflowEntityBridgeService bridgeService,
         WorkflowEntitySummaryProvider entitySummaryProvider,
-        WorkflowExtensionRegistry extensions)
+        WorkflowExtensionRegistry extensions,
+        WorkflowActorResolver actors)
     {
+        _actors = actors;
         _extensions = extensions;
         _instanceRepository = instanceRepository;
         _definitionRepository = definitionRepository;
@@ -135,7 +138,8 @@ public class WorkflowInstanceAppService : ApplicationService, IWorkflowInstanceA
         return dto;
     }
 
-    [AbpAuthorize(PermissionNames.Workflow_Instances_View)]
+    /// <summary>WF-34: tenant-wide list — requires ViewAll (approvers use GetMyPending).</summary>
+    [AbpAuthorize(PermissionNames.Workflow_Instances_ViewAll)]
     public async Task<PagedResultDto<WorkflowInstanceListDto>> GetAllAsync(GetWorkflowInstancesInput input)
     {
         var query = _instanceRepository
@@ -189,6 +193,14 @@ public class WorkflowInstanceAppService : ApplicationService, IWorkflowInstanceA
             if (definition == null)
                 throw new UserFriendlyException(WorkflowExceptionCodes.DefinitionNotFound,
                     "Workflow definition not found.");
+            // WF-33: never start on an inactive definition or one for another entity type —
+            // it would route through the wrong roles and write back to the wrong record.
+            if (!definition.IsActive)
+                throw new UserFriendlyException(WorkflowExceptionCodes.NoActiveDefinition,
+                    "That workflow definition is not active. Activate it first or start on the active one.");
+            if (definition.EntityType != input.EntityType)
+                throw new UserFriendlyException(WorkflowExceptionCodes.InvalidTransition,
+                    $"Definition '{definition.Name}' is for {definition.EntityType}, not {input.EntityType}.");
         }
         else
         {
@@ -272,7 +284,7 @@ public class WorkflowInstanceAppService : ApplicationService, IWorkflowInstanceA
                 "Current step not found.");
 
         // Role/user validation — ensure current user is authorized for this step
-        await ValidateUserCanActOnStep(currentStep);
+        await ValidateUserCanActOnStep(currentStep, instance.EntityType);
 
         // Comment-required validation
         if (currentStep.IsCommentRequired && string.IsNullOrWhiteSpace(input.Comment))
@@ -588,7 +600,7 @@ public class WorkflowInstanceAppService : ApplicationService, IWorkflowInstanceA
         return result;
     }
 
-    [AbpAuthorize(PermissionNames.Workflow_Instances_View)]
+    [AbpAuthorize(PermissionNames.Workflow_Instances_ViewAll)]
     public async Task<PagedResultDto<WorkflowInstanceListDto>> GetOverdueAsync(PagedAndSortedResultRequestDto input)
     {
         var now = DateTime.UtcNow;
@@ -636,7 +648,7 @@ public class WorkflowInstanceAppService : ApplicationService, IWorkflowInstanceA
         return ObjectMapper.Map<List<WorkflowTransitionDto>>(transitions);
     }
 
-    [AbpAuthorize(PermissionNames.Workflow_Instances_View)]
+    [AbpAuthorize(PermissionNames.Workflow_Instances_ViewAll)]
     public async Task<PagedResultDto<WorkflowInstanceListDto>> GetPendingForRoleAsync(
         string roleName, PagedAndSortedResultRequestDto input)
     {
@@ -646,7 +658,9 @@ public class WorkflowInstanceAppService : ApplicationService, IWorkflowInstanceA
             .Include(i => i.CurrentStep)
             .Where(i => i.TenantId == AbpSession.TenantId
                 && i.Status == WorkflowStatus.InProgress
-                && i.CurrentStep.AssignedRole == roleName);
+                && i.CurrentStep.AssignedRole.ToLower() == roleName.ToLower()
+                // WF-34: a step pinned to another user is not pending for the role at large
+                && (i.CurrentStep.AssignedUserId == null || i.CurrentStep.AssignedUserId == AbpSession.UserId));
 
         var totalCount = await query.CountAsync();
 
@@ -661,39 +675,25 @@ public class WorkflowInstanceAppService : ApplicationService, IWorkflowInstanceA
     }
 
     /// <summary>
-    /// WF-03: the "my tasks" list — in-progress instances whose CURRENT step is
-    /// actionable by the logged-in user. The user must hold the step's role
-    /// (case-insensitively, mirroring ValidateUserCanActOnStep) AND the step must
-    /// be either unassigned-to-a-specific-user or pinned to them. Unlike
-    /// GetPendingForRole, which matches a role tenant-wide and ignores per-user
-    /// assignment, this is scoped to the caller so e.g. a teacher only sees items
-    /// they can actually act on.
-    ///
-    /// Requiring the role on the user-pinned branch too keeps the list in lock-step
-    /// with the act-time check (WF-05): a pinned user who later loses the role is
-    /// neither shown the item nor allowed to advance it.
-    /// NOTE (v1): delegated items (acting on behalf of another user/role) are NOT
-    /// included here yet, even though ValidateUserCanActOnStep honours delegations
-    /// at action time.
+    /// WF-03/WF-34: the "my tasks" list — in-progress instances whose CURRENT step
+    /// the logged-in user may act on, decided by the same WorkflowActorResolver the
+    /// act check and the dashboard count use (direct role, pinned user, or an
+    /// in-scope delegation from someone who holds the role). The candidate set is
+    /// narrowed in SQL to the roles the user can act for, then filtered exactly and
+    /// paged in memory — a personal inbox is small, and this removes the previous
+    /// 1000-row keyword-search cap and its wrong totals.
     /// </summary>
     [AbpAuthorize(PermissionNames.Workflow_Instances_View)]
     public async Task<PagedResultDto<WorkflowInstanceListDto>> GetMyPendingAsync(
         GetMyPendingInput input)
     {
-        var userId = AbpSession.UserId;
-        if (!userId.HasValue)
+        var actor = await _actors.GetCurrentAsync();
+        if (actor == null || actor.ActionableRoles.Count == 0)
             return new PagedResultDto<WorkflowInstanceListDto>(0, new List<WorkflowInstanceListDto>());
 
-        var user = await _userManager.FindByIdAsync(userId.Value.ToString());
-        // Lower-cased so the role comparison is case-insensitive in SQL (matches
-        // the case-insensitive check in ValidateUserCanActOnStep).
-        var roles = (user != null
-                ? await _userManager.GetRolesAsync(user)
-                : new List<string>())
-            .Select(r => r.ToLower())
-            .ToList();
+        var roles = actor.ActionableRoles.Select(r => r.ToLower()).ToList();
 
-        var query = _instanceRepository
+        var candidates = await _instanceRepository
             .GetAll()
             .Include(i => i.WorkflowDefinition)
             .Include(i => i.CurrentStep)
@@ -701,59 +701,30 @@ public class WorkflowInstanceAppService : ApplicationService, IWorkflowInstanceA
                 && i.Status == WorkflowStatus.InProgress
                 && i.CurrentStep != null
                 && i.CurrentStep.AssignedRole != null
-                && roles.Contains(i.CurrentStep.AssignedRole.ToLower())
-                && (i.CurrentStep.AssignedUserId == null
-                    || i.CurrentStep.AssignedUserId == userId.Value));
-
-        var keyword = input.Keyword?.Trim();
-
-        // WF-21: a keyword must match the SubjectLabel (e.g. the student's name),
-        // which is computed post-query (WF-20), not a DB column. "My Approvals" is
-        // a personal inbox already scoped to the caller's role/user assignments, so
-        // the candidate set is small — load it, label it, then filter + page in
-        // memory. The no-keyword path keeps efficient SQL paging untouched.
-        if (string.IsNullOrEmpty(keyword))
-        {
-            var totalCount = await query.CountAsync();
-
-            var items = await query
-                .OrderBy(input.Sorting ?? "StartedDate ASC")
-                .PageBy(input)
-                .ToListAsync();
-
-            var dtos = ObjectMapper.Map<List<WorkflowInstanceListDto>>(items);
-            await PopulateSubjectLabelsAsync(dtos);
-            return new PagedResultDto<WorkflowInstanceListDto>(totalCount, dtos);
-        }
-
-        // Defensive ceiling: "my pending" is a personal inbox, so this is far
-        // above any realistic count — it only bounds the pathological case (an
-        // account holding many roles in a very large tenant) so keyword search
-        // can't materialise an unbounded result set.
-        const int MyPendingSearchScanLimit = 1000;
-
-        var candidates = await query
+                && roles.Contains(i.CurrentStep.AssignedRole.ToLower()))
             .OrderBy(input.Sorting ?? "StartedDate ASC")
-            .Take(MyPendingSearchScanLimit)
             .ToListAsync();
 
-        var all = ObjectMapper.Map<List<WorkflowInstanceListDto>>(candidates);
+        var actionable = candidates
+            .Where(i => WorkflowActorResolver.CanAct(actor, i.CurrentStep, i.EntityType))
+            .ToList();
+
+        var all = ObjectMapper.Map<List<WorkflowInstanceListDto>>(actionable);
         await PopulateSubjectLabelsAsync(all);
 
-        var k = keyword.ToLowerInvariant();
-        var filtered = all
-            .Where(d =>
-                (!string.IsNullOrEmpty(d.SubjectLabel) && d.SubjectLabel.ToLowerInvariant().Contains(k))
-                || (!string.IsNullOrEmpty(d.WorkflowDefinitionName) && d.WorkflowDefinitionName.ToLowerInvariant().Contains(k))
-                || (!string.IsNullOrEmpty(d.CurrentStepName) && d.CurrentStepName.ToLowerInvariant().Contains(k)))
-            .ToList();
+        var keyword = input.Keyword?.Trim();
+        if (!string.IsNullOrEmpty(keyword))
+        {
+            var k = keyword.ToLowerInvariant();
+            all = all.Where(d =>
+                    (!string.IsNullOrEmpty(d.SubjectLabel) && d.SubjectLabel.ToLowerInvariant().Contains(k))
+                    || (!string.IsNullOrEmpty(d.WorkflowDefinitionName) && d.WorkflowDefinitionName.ToLowerInvariant().Contains(k))
+                    || (!string.IsNullOrEmpty(d.CurrentStepName) && d.CurrentStepName.ToLowerInvariant().Contains(k)))
+                .ToList();
+        }
 
-        var paged = filtered
-            .Skip(input.SkipCount)
-            .Take(input.MaxResultCount)
-            .ToList();
-
-        return new PagedResultDto<WorkflowInstanceListDto>(filtered.Count, paged);
+        var paged = all.Skip(input.SkipCount).Take(input.MaxResultCount).ToList();
+        return new PagedResultDto<WorkflowInstanceListDto>(all.Count, paged);
     }
 
     /// <summary>
@@ -810,92 +781,20 @@ public class WorkflowInstanceAppService : ApplicationService, IWorkflowInstanceA
         Decision = WorkflowDecision.Empty,
     };
 
-    private async Task ValidateUserCanActOnStep(WorkflowStep step)
+    /// <summary>WF-34: one resolver decides act rights for the act check, My Approvals and the dashboard.</summary>
+    private async Task ValidateUserCanActOnStep(WorkflowStep step, WorkflowEntityType entityType)
     {
-        var userId = AbpSession.UserId;
-        if (!userId.HasValue)
+        var actor = await _actors.GetCurrentAsync();
+        if (actor == null)
             throw new UserFriendlyException(WorkflowExceptionCodes.UnauthorizedAction,
                 "You must be logged in to perform this action.");
 
-        // If step is assigned to a specific user
-        if (step.AssignedUserId.HasValue)
-        {
-            if (step.AssignedUserId.Value == userId.Value)
-            {
-                // WF-05: config-time guarantees the assignee held the role, but a
-                // role can be revoked afterwards — re-check so a stale assignee
-                // can't act without the step's required role.
-                var assignedUser = await _userManager.FindByIdAsync(userId.Value.ToString());
-                var assignedRoles = assignedUser != null
-                    ? await _userManager.GetRolesAsync(assignedUser)
-                    : new List<string>();
-                if (assignedRoles.Any(r => r.Equals(step.AssignedRole, StringComparison.OrdinalIgnoreCase)))
-                    return;
+        if (WorkflowActorResolver.CanAct(actor, step, entityType)) return;
 
-                throw new UserFriendlyException(WorkflowExceptionCodes.AssignedUserMissingRole,
-                    $"You no longer hold the required role '{step.AssignedRole}' for this step.");
-            }
-
-            // Check if current user has an active delegation from the assigned user
-            if (await HasActiveDelegationFromUser(step.AssignedUserId.Value, userId.Value, null, null))
-                return;
-
-            throw new UserFriendlyException(WorkflowExceptionCodes.UserNotAssignedToStep,
-                "This step is assigned to a specific user. You are not authorized to act on it.");
-        }
-
-        // Validate by role
-        var user = await _userManager.FindByIdAsync(userId.Value.ToString());
-        if (user == null)
-            throw new UserFriendlyException(WorkflowExceptionCodes.UnauthorizedAction,
-                "User not found.");
-
-        var roles = await _userManager.GetRolesAsync(user);
-        if (roles.Any(r => r.Equals(step.AssignedRole, StringComparison.OrdinalIgnoreCase)))
-            return;
-
-        // Check if someone with the required role delegated to the current user
-        if (await HasActiveDelegationForRole(userId.Value, step.AssignedRole))
-            return;
-
-        throw new UserFriendlyException(WorkflowExceptionCodes.UserNotAssignedToStep,
-            $"You do not have the required role '{step.AssignedRole}' to act on this step.");
-    }
-
-    /// <summary>
-    /// Checks if there's an active delegation from a specific user to the current user.
-    /// </summary>
-    private async Task<bool> HasActiveDelegationFromUser(
-        long delegatorUserId, long delegateUserId,
-        WorkflowEntityType? entityType, string role)
-    {
-        var now = DateTime.UtcNow;
-        return await _delegationRepository
-            .GetAll()
-            .AnyAsync(d => d.TenantId == AbpSession.TenantId
-                && d.DelegatorUserId == delegatorUserId
-                && d.DelegateUserId == delegateUserId
-                && d.IsActive
-                && d.StartDate <= now
-                && d.EndDate >= now
-                && (!d.EntityType.HasValue || !entityType.HasValue || d.EntityType == entityType)
-                && (d.AssignedRole == null || role == null || d.AssignedRole == role));
-    }
-
-    /// <summary>
-    /// Checks if any user with the required role has delegated to the current user.
-    /// </summary>
-    private async Task<bool> HasActiveDelegationForRole(long delegateUserId, string requiredRole)
-    {
-        var now = DateTime.UtcNow;
-        return await _delegationRepository
-            .GetAll()
-            .AnyAsync(d => d.TenantId == AbpSession.TenantId
-                && d.DelegateUserId == delegateUserId
-                && d.IsActive
-                && d.StartDate <= now
-                && d.EndDate >= now
-                && (d.AssignedRole == null || d.AssignedRole == requiredRole));
+        var code = step.AssignedUserId == actor.UserId
+            ? WorkflowExceptionCodes.AssignedUserMissingRole
+            : WorkflowExceptionCodes.UserNotAssignedToStep;
+        throw new UserFriendlyException(code, WorkflowActorResolver.ExplainDenial(actor, step));
     }
 
     private async Task<string> GetCurrentUserName()

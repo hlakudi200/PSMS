@@ -55,7 +55,7 @@ public class WorkflowInstance : FullAuditedEntity<Guid>, IMayHaveTenant
     /// True when the current step has exceeded its SLA deadline.
     /// </summary>
     [System.ComponentModel.DataAnnotations.Schema.NotMapped]
-    public bool IsOverdue => CurrentStepDueDate.HasValue && DateTime.UtcNow > CurrentStepDueDate.Value;
+    public bool IsOverdue => Status == WorkflowStatus.InProgress && CurrentStepDueDate.HasValue && DateTime.UtcNow > CurrentStepDueDate.Value;
 
     public DateTime? StartedDate { get; set; }
     public DateTime? CompletedDate { get; set; }
@@ -102,6 +102,7 @@ public class WorkflowInstance : FullAuditedEntity<Guid>, IMayHaveTenant
         CompletedDate = DateTime.UtcNow;
         CompletedByUserId = userId;
         CompletionComment = comment;
+        CurrentStepDueDate = null; // WF-33: a finished workflow has no deadline
     }
 
     public void Reject(long userId, string comment)
@@ -113,6 +114,7 @@ public class WorkflowInstance : FullAuditedEntity<Guid>, IMayHaveTenant
         CompletedDate = DateTime.UtcNow;
         CompletedByUserId = userId;
         CompletionComment = comment;
+        CurrentStepDueDate = null; // WF-33
     }
 
     public void Cancel(long userId, string comment)
