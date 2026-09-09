@@ -25,6 +25,7 @@ public class WorkflowStarterService : ITransientDependency
     private readonly IRepository<WorkflowTransition, Guid> _transitionRepository;
     private readonly IUnitOfWorkManager _unitOfWorkManager;
     private readonly UserManager _userManager;
+    private readonly WorkflowNotifier _notifier;
     public ILogger Logger { get; set; } = NullLogger.Instance;
 
     public WorkflowStarterService(
@@ -32,8 +33,10 @@ public class WorkflowStarterService : ITransientDependency
         IRepository<WorkflowDefinition, Guid> definitionRepository,
         IRepository<WorkflowTransition, Guid> transitionRepository,
         IUnitOfWorkManager unitOfWorkManager,
-        UserManager userManager)
+        UserManager userManager,
+        WorkflowNotifier notifier)
     {
+        _notifier = notifier;
         _userManager = userManager;
         _instanceRepository = instanceRepository;
         _definitionRepository = definitionRepository;
@@ -132,6 +135,7 @@ public class WorkflowStarterService : ITransientDependency
 
         await _instanceRepository.InsertAsync(instance);
         await _transitionRepository.InsertAsync(transition);
+        await _notifier.StepAssignedAsync(instance, firstStep, definition.Name, $"wf-start-{instance.Id}"); // WF-37
         await _unitOfWorkManager.Current.SaveChangesAsync();
 
         Logger.Info($"Auto-started {entityType} workflow {instance.Id} for entity {entityId}.");

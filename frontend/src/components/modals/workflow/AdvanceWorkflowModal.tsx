@@ -119,7 +119,10 @@ export const AdvanceWorkflowModal: React.FC<AdvanceWorkflowModalProps> = ({
   const isForward = selectedAction != null && FORWARD_ACTIONS.has(selectedAction);
   const isWaive = selectedAction === WorkflowActionType.Waive;
   const guardBlocks = isForward && currentStepGuard && !currentStepGuard.satisfied;
-  const needsComment = !!isCommentRequired || isWaive || (guardBlocks && !!overrideChecked);
+  const isReject = selectedAction === WorkflowActionType.Reject;
+  // A rejection always needs a reason: the handlers store the comment as the record's
+  // rejection reason (admissions requires at least 50 characters, ADM-020).
+  const needsComment = !!isCommentRequired || isWaive || isReject || (guardBlocks && !!overrideChecked);
   const showDecision = isForward && !!decisionSchema && decisionSchema.fields.length > 0;
 
   useEffect(() => {
@@ -136,7 +139,7 @@ export const AdvanceWorkflowModal: React.FC<AdvanceWorkflowModalProps> = ({
       const values = form.getFieldsValue();
 
       if (needsComment && !values.comment?.trim()) {
-        form.setFields([{ name: 'comment', errors: [isWaive ? 'A reason is required to waive this step' : 'Comment is required for this step'] }]);
+        form.setFields([{ name: 'comment', errors: [isWaive ? 'A reason is required to waive this step' : isReject ? 'Give the reason for rejecting (admissions needs at least 50 characters)' : 'Comment is required for this step'] }]);
         return;
       }
       if (guardBlocks && !values.overrideGuard) {
@@ -230,7 +233,7 @@ export const AdvanceWorkflowModal: React.FC<AdvanceWorkflowModalProps> = ({
         )}
 
         <Form.Item
-          label={isWaive ? 'Reason for waiving' : 'Comment'}
+          label={isWaive ? 'Reason for waiving' : isReject ? 'Reason for rejecting' : 'Comment'}
           name="comment"
           rules={needsComment ? [{ required: true, message: 'Comment is required' }] : []}
         >
