@@ -1,13 +1,14 @@
 'use client';
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Card, Table, Tag, Button, Drawer, Spin, Space, message } from 'antd';
+import { Table, Tag, Drawer, Spin, Empty, Typography, Descriptions, message } from 'antd';
 import {
   EyeOutlined,
   CheckCircleOutlined,
   StopOutlined,
   ThunderboltOutlined,
+  PlusOutlined,
 } from '@ant-design/icons';
 import { EnterpriseTable } from '@/components/shared/enterprise-table';
 import type { ColumnConfig, TableQuery, RowAction, BulkAction, ToolbarAction } from '@/components/shared/enterprise-table';
@@ -18,8 +19,27 @@ import { TeacherProvider } from '@/providers/academic/teachers';
 import { useAuthState } from '@/providers/auth';
 import { TimetableSlotEditModal } from '@/components/modals/academic/TimetableSlotEditModal';
 import type { ITimetableList, ITimetableSlotList } from '@/providers/academic/shared/interfaces';
+import styles from './timetable.module.css';
 
-const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+const { Text } = Typography;
+
+const WEEKDAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+
+/** "08:00:00" -> "08:00"; tolerates a missing value. */
+const hhmm = (time?: string) => time?.slice(0, 5) ?? '';
+
+const timeRange = (slot?: ITimetableSlotList) =>
+  slot ? `${hhmm(slot.startTime)}–${hhmm(slot.endTime)}` : '';
+
+interface ScheduleRow extends Record<string, unknown> {
+  key: number;
+  period: number;
+  /** Time range shared by the slots in this period, when they agree. */
+  periodTime: string;
+  /** Raw start/end of that shared range, used to prefill a new slot in this period. */
+  periodStart?: string;
+  periodEnd?: string;
+}
 
 function TimetablesContent() {
   const router = useRouter();
@@ -36,6 +56,8 @@ function TimetablesContent() {
   const [slotModalDay, setSlotModalDay] = useState(1);
   const [slotModalPeriod, setSlotModalPeriod] = useState(1);
   const [editingSlot, setEditingSlot] = useState<ITimetableSlotList | null>(null);
+  // Times the rest of this period already runs at, so a new slot starts prefilled.
+  const [slotDefaults, setSlotDefaults] = useState<{ startTime?: string; endTime?: string }>({});
 
   const handleQueryChange = useCallback((query: TableQuery) => {
     setLastQuery(query);
@@ -62,10 +84,16 @@ function TimetablesContent() {
     setSelectedTimetable(null);
   };
 
-  const handleCellClick = (day: number, period: number, slot?: ITimetableSlotList) => {
+  const handleCellClick = (
+    day: number,
+    period: number,
+    slot?: ITimetableSlotList,
+    defaults?: { startTime?: string; endTime?: string }
+  ) => {
     setSlotModalDay(day);
     setSlotModalPeriod(period);
     setEditingSlot(slot ?? null);
+    setSlotDefaults(defaults ?? {});
     setSlotModalOpen(true);
   };
 
@@ -200,7 +228,8 @@ function TimetablesContent() {
   ];
 
   // Group slots by day for the weekly grid
-  const slotsByDay = (timetableSlots ?? []).reduce<Record<number, ITimetableSlotList[]>>((acc, slot) => {
+  const slots = timetableSlots ?? [];
+  const slotsByDay = slots.reduce<Record<number, ITimetableSlotList[]>>((acc, slot) => {
     if (!acc[slot.dayOfWeek]) acc[slot.dayOfWeek] = [];
     acc[slot.dayOfWeek].push(slot);
     acc[slot.dayOfWeek].sort((a, b) => a.periodNumber - b.periodNumber);
@@ -209,64 +238,85 @@ function TimetablesContent() {
 
   // Find max periods across all days — default to 8 so an empty timetable
   // still shows a fillable grid rather than nothing to click on.
-  const maxPeriods = Math.max(
-    8,
-    ...(timetableSlots ?? []).map(s => s.periodNumber),
-  );
+  const maxPeriods = Math.max(8, ...slots.map(s => s.periodNumber));
 
-  // Build table columns for weekly grid
+  // Build rows first: each carries the time range its slots share, so the grid
+  // prints the time once in the period column instead of in all five cells.
+  const scheduleData: ScheduleRow[] = Array.from({ length: maxPeriods }, (_, i) => {
+    const period = i + 1;
+    const row = { key: period, period, periodTime: '' } as ScheduleRow;
+    const inPeriod: ITimetableSlotList[] = [];
+    for (let d = 1; d <= 5; d++) {
+      const slot = slotsByDay[d]?.find(s => s.periodNumber === period);
+      row[`day${d}`] = slot;
+      if (slot) inPeriod.push(slot);
+    }
+    const ranges = new Set(inPeriod.map(timeRange));
+    if (ranges.size === 1) {
+      row.periodTime = [...ranges][0];
+      row.periodStart = inPeriod[0].startTime;
+      row.periodEnd = inPeriod[0].endTime;
+    }
+    return row;
+  });
+
   const scheduleColumns = [
     {
       title: 'Period',
       dataIndex: 'period',
       key: 'period',
-      width: 70,
-      render: (val: number) => <strong>P{val}</strong>,
+      width: 92,
+      render: (period: number, row: ScheduleRow) => (
+        <>
+          <span className={styles.periodNumber}>Period {period}</span>
+          {row.periodTime && <span className={styles.periodTime}>{row.periodTime}</span>}
+        </>
+      ),
     },
-    ...dayNames.slice(0, 5).map((day, idx) => ({
+    ...WEEKDAY_NAMES.map((day, idx) => ({
       title: day,
       dataIndex: `day${idx + 1}`,
       key: `day${idx + 1}`,
-      render: (slot: ITimetableSlotList | undefined, row: Record<string, unknown>) => {
-        const onClick = () => handleCellClick(idx + 1, row.period as number, slot);
+      render: (slot: ITimetableSlotList | undefined, row: ScheduleRow) => {
+        const dayOfWeek = idx + 1;
+        const label = slot
+          ? `Edit ${slot.subjectName ?? 'lesson'}, ${day} period ${row.period}`
+          : `Add a lesson for ${day} period ${row.period}`;
+        // Only repeat the time in the cell when it differs from the row's.
+        const ownTime = slot && timeRange(slot) !== row.periodTime ? timeRange(slot) : '';
 
-        if (!slot) {
-          return (
-            <div onClick={onClick} style={{ cursor: 'pointer', minHeight: 24, color: '#bfbfbf' }}>
-              + Add
-            </div>
-          );
-        }
         return (
-          <div onClick={onClick} style={{ cursor: 'pointer', fontSize: 12, lineHeight: 1.4 }}>
-            <strong>{slot.subjectName ?? 'N/A'}</strong>
-            <br />
-            <span style={{ color: '#595959' }}>{slot.teacherName ?? ''}</span>
-            {slot.roomNumber && (
+          <button
+            type="button"
+            className={styles.cell}
+            aria-label={label}
+            onClick={() => handleCellClick(dayOfWeek, row.period, slot, {
+              startTime: row.periodStart,
+              endTime: row.periodEnd,
+            })}
+          >
+            {slot ? (
               <>
-                <br />
-                <Tag style={{ fontSize: 11, marginTop: 2 }}>{slot.roomNumber}</Tag>
+                <span className={styles.subject}>{slot.subjectName ?? 'Unassigned subject'}</span>
+                <span className={styles.teacher}>{slot.teacherName ?? 'No teacher'}</span>
+                {(slot.roomNumber || ownTime) && (
+                  <span className={styles.meta}>
+                    {slot.roomNumber && <Tag style={{ margin: 0, fontSize: 11 }}>{slot.roomNumber}</Tag>}
+                    {ownTime}
+                  </span>
+                )}
               </>
+            ) : (
+              <span className={styles.empty}>
+                <PlusOutlined style={{ marginRight: 4 }} />
+                Add
+              </span>
             )}
-            <br />
-            <span style={{ color: '#8c8c8c', fontSize: 11 }}>
-              {slot.startTime?.slice(0, 5)} - {slot.endTime?.slice(0, 5)}
-            </span>
-          </div>
+          </button>
         );
       },
     })),
   ];
-
-  // Build rows for the weekly grid
-  const scheduleData = Array.from({ length: maxPeriods }, (_, i) => {
-    const period = i + 1;
-    const row: Record<string, unknown> = { key: period, period };
-    for (let d = 1; d <= 5; d++) {
-      row[`day${d}`] = slotsByDay[d]?.find(s => s.periodNumber === period);
-    }
-    return row;
-  });
 
   return (
     <>
@@ -292,32 +342,52 @@ function TimetablesContent() {
       />
 
       <Drawer
-        title={
-          <Space>
-            <span>Weekly Schedule</span>
-            {selectedTimetable && (
-              <Tag color={selectedTimetable.isActive ? 'green' : 'default'}>
-                {selectedTimetable.className} — {selectedTimetable.isActive ? 'Active' : 'Inactive'}
-              </Tag>
-            )}
-          </Space>
-        }
+        title={selectedTimetable ? `${selectedTimetable.className} — weekly schedule` : 'Weekly schedule'}
         open={drawerOpen}
         onClose={handleDrawerClose}
-        width={820}
+        width={880}
         styles={{ body: { padding: 16 } }}
       >
+        {selectedTimetable && (
+          <Descriptions size="small" column={{ xs: 1, sm: 3 }} style={{ marginBottom: 16 }}>
+            <Descriptions.Item label="Status">
+              <Tag color={selectedTimetable.isActive ? 'green' : 'default'} style={{ margin: 0 }}>
+                {selectedTimetable.isActive ? 'Active' : 'Inactive'}
+              </Tag>
+            </Descriptions.Item>
+            <Descriptions.Item label="Effective from">
+              {new Date(selectedTimetable.effectiveDate).toLocaleDateString('en-ZA', {
+                day: 'numeric', month: 'short', year: 'numeric',
+              })}
+            </Descriptions.Item>
+            <Descriptions.Item label="Periods filled">{slots.length}</Descriptions.Item>
+          </Descriptions>
+        )}
+
         {slotsLoading ? (
           <Spin style={{ display: 'block', margin: '60px auto' }} />
         ) : (
-          <Table
-            columns={scheduleColumns}
-            dataSource={scheduleData}
-            pagination={false}
-            size="small"
-            bordered
-            scroll={{ x: 700 }}
-          />
+          <>
+            {slots.length === 0 && (
+              <Empty
+                image={Empty.PRESENTED_IMAGE_SIMPLE}
+                description="Nothing scheduled yet — pick a period below to add the first lesson."
+                style={{ marginBottom: 8 }}
+              />
+            )}
+            <Table<ScheduleRow>
+              columns={scheduleColumns}
+              dataSource={scheduleData}
+              pagination={false}
+              size="small"
+              bordered
+              scroll={{ x: 760 }}
+            />
+            <Text type="secondary" style={{ display: 'block', marginTop: 12, fontSize: 12 }}>
+              Select any period to add, edit or remove a lesson. Clashes with the teacher&apos;s
+              other classes are rejected when you save.
+            </Text>
+          </>
         )}
       </Drawer>
 
@@ -326,9 +396,12 @@ function TimetablesContent() {
           open={slotModalOpen}
           onClose={handleSlotModalClose}
           timetableId={selectedTimetable.id}
+          className={selectedTimetable.className}
           dayOfWeek={slotModalDay}
           periodNumber={slotModalPeriod}
           existingSlot={editingSlot}
+          defaultStartTime={slotDefaults.startTime}
+          defaultEndTime={slotDefaults.endTime}
         />
       )}
     </>

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Modal, Form, Select, Input, TimePicker, Button, Space, message } from 'antd';
+import { Modal, Form, Select, Input, TimePicker, Button, Space, Row, Col, Typography, message } from 'antd';
 import { DeleteOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { z } from 'zod';
@@ -13,8 +13,13 @@ import {
 } from '@/providers/academic/timetable_slots';
 import type { ITimetableSlotList } from '@/providers/academic/shared/interfaces';
 
+const { Text } = Typography;
+
 const TIME_FORMAT = 'HH:mm';
 const TIMESPAN_FORMAT = 'HH:mm:ss';
+
+/** dayOfWeek is 1-based from Monday, matching the backend and the grid. */
+const DAY_NAMES = ['', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
 const slotSchema = z
   .object({
@@ -33,19 +38,27 @@ interface TimetableSlotEditModalProps {
   open: boolean;
   onClose: (refreshData?: boolean) => void;
   timetableId: string;
+  /** Shown in the modal so the actor knows which class they are editing. */
+  className?: string;
   dayOfWeek: number;
   periodNumber: number;
   /** Present when editing an existing slot; absent when filling an empty cell. */
   existingSlot?: ITimetableSlotList | null;
+  /** Times the rest of this period runs at, used to prefill a new slot. */
+  defaultStartTime?: string;
+  defaultEndTime?: string;
 }
 
 export const TimetableSlotEditModal: React.FC<TimetableSlotEditModalProps> = ({
   open,
   onClose,
   timetableId,
+  className,
   dayOfWeek,
   periodNumber,
   existingSlot,
+  defaultStartTime,
+  defaultEndTime,
 }) => {
   const [form] = Form.useForm();
   const isEdit = !!existingSlot;
@@ -67,9 +80,15 @@ export const TimetableSlotEditModal: React.FC<TimetableSlotEditModalProps> = ({
       getAsync(existingSlot.id);
     } else {
       form.resetFields();
+      // Start a new slot on the same times the rest of the period runs at, so the
+      // common case is one subject + one teacher away from done.
+      form.setFieldsValue({
+        startTime: defaultStartTime ? dayjs(defaultStartTime, TIMESPAN_FORMAT) : undefined,
+        endTime: defaultEndTime ? dayjs(defaultEndTime, TIMESPAN_FORMAT) : undefined,
+      });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, existingSlot?.id]);
+  }, [open, existingSlot?.id, defaultStartTime, defaultEndTime]);
 
   // Full slot detail (with subjectId/teacherId — the list DTO only has names)
   // arrives async after getAsync above resolves; populate once it matches.
@@ -160,24 +179,34 @@ export const TimetableSlotEditModal: React.FC<TimetableSlotEditModalProps> = ({
 
   return (
     <Modal
-      title={isEdit ? 'Edit Slot' : 'Add Slot'}
+      title={isEdit ? 'Edit lesson' : 'Add lesson'}
       open={open}
       onCancel={() => onClose()}
       destroyOnClose
       footer={
-        <Space>
-          {isEdit && (
-            <Button danger icon={<DeleteOutlined />} onClick={handleDelete} style={{ marginRight: 'auto' }}>
-              Remove
+        // Space is inline-flex, so margin-auto inside it cannot push Remove to the
+        // far edge — the footer itself has to be the flex container.
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span>
+            {isEdit && (
+              <Button danger icon={<DeleteOutlined />} onClick={handleDelete}>
+                Remove
+              </Button>
+            )}
+          </span>
+          <Space>
+            <Button onClick={() => onClose()}>Cancel</Button>
+            <Button type="primary" onClick={handleSubmit} loading={loading}>
+              {isEdit ? 'Save' : 'Add'}
             </Button>
-          )}
-          <Button onClick={() => onClose()}>Cancel</Button>
-          <Button type="primary" onClick={handleSubmit} loading={loading}>
-            {isEdit ? 'Save' : 'Add'}
-          </Button>
-        </Space>
+          </Space>
+        </div>
       }
     >
+      <Text type="secondary" style={{ display: 'block', marginTop: 8 }}>
+        {[className, DAY_NAMES[dayOfWeek], `period ${periodNumber}`].filter(Boolean).join(' · ')}
+      </Text>
+
       <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
         <Form.Item label="Subject" name="subjectId" rules={[{ required: true }]}>
           <Select options={subjectOptions} placeholder="Select subject" showSearch optionFilterProp="label" />
@@ -185,14 +214,19 @@ export const TimetableSlotEditModal: React.FC<TimetableSlotEditModalProps> = ({
         <Form.Item label="Teacher" name="teacherId" rules={[{ required: true }]}>
           <Select options={teacherOptions} placeholder="Select teacher" showSearch optionFilterProp="label" />
         </Form.Item>
-        <Space.Compact block>
-          <Form.Item label="Start Time" name="startTime" rules={[{ required: true }]} style={{ width: '50%' }}>
-            <TimePicker style={{ width: '100%' }} format={TIME_FORMAT} minuteStep={5} />
-          </Form.Item>
-          <Form.Item label="End Time" name="endTime" rules={[{ required: true }]} style={{ width: '50%' }}>
-            <TimePicker style={{ width: '100%' }} format={TIME_FORMAT} minuteStep={5} />
-          </Form.Item>
-        </Space.Compact>
+        {/* Row/Col rather than Space.Compact: compact collapses the two labels. */}
+        <Row gutter={16}>
+          <Col span={12}>
+            <Form.Item label="Start time" name="startTime" rules={[{ required: true }]}>
+              <TimePicker style={{ width: '100%' }} format={TIME_FORMAT} minuteStep={5} />
+            </Form.Item>
+          </Col>
+          <Col span={12}>
+            <Form.Item label="End time" name="endTime" rules={[{ required: true }]}>
+              <TimePicker style={{ width: '100%' }} format={TIME_FORMAT} minuteStep={5} />
+            </Form.Item>
+          </Col>
+        </Row>
         <Form.Item label="Room" name="roomNumber">
           <Input placeholder="e.g. B12" maxLength={50} />
         </Form.Item>
