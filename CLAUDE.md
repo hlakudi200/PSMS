@@ -5,6 +5,7 @@
 When writing code for this project, follow the patterns documented in `.claude/skills/psms-patterns.md`. This covers:
 - **Backend:** Entity, AppService, DTO, Mapper, Interface, ExceptionCodes, and Permission patterns (ASP.NET Boilerplate)
 - **Frontend:** Provider (Context + useReducer + redux-actions), Form Modal (Zod + Ant Design), Page Content (EnterpriseTable), TypeScript interfaces, and API patterns (Next.js 16 + Ant Design v6)
+- **Mobile UI:** Follow `.claude/skills/psms-mobile-ui-architecture/SKILL.md` for every screen, navigation, or mobile feature change.
 
 ## Frontend Form Components
 
