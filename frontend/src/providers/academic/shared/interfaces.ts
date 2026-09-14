@@ -978,12 +978,15 @@ export interface IGenerateTimetablesInput {
   periodsPerDay: number;
   periodStartTime: string;
   periodDurationMinutes: number;
+  breakAfterPeriods?: number[];
+  breakDurationMinutes?: number;
 }
 
 export interface IGeneratedClassTimetable {
   classId: string;
   className: string;
-  timetableId: string;
+  /** Null when nothing was requested, or nothing at all could be placed. */
+  timetableId: string | null;
   slotsPlaced: number;
   slotsRequested: number;
 }
@@ -1004,4 +1007,5 @@ export interface IGenerateTimetablesResult {
   totalClasses: number;
   totalSlotsPlaced: number;
   totalSlotsRequested: number;
+  message?: string;
 }

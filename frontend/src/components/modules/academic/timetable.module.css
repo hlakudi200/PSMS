@@ -82,6 +82,16 @@
   color: var(--ant-color-text-tertiary, #8c8c8c);
 }
 
+/* A break row spans the full width via colSpan; styled distinctly from a
+ * period row so it reads as a gap in the day, not a lesson. */
+.breakBar {
+  display: block;
+  text-align: center;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--ant-color-warning-text, #ad6800);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .cell,
   .empty {
