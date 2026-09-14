@@ -5,6 +5,7 @@ using psms.Authorization.Users;
 using Castle.Core.Logging;
 using Microsoft.EntityFrameworkCore;
 using psms.Domain.Workflow.Entities;
+using psms.Workflow.Engine;
 using psms.Domain.Workflow.Enums;
 using System;
 using System.Linq;
@@ -26,6 +27,7 @@ public class WorkflowStarterService : ITransientDependency
     private readonly IUnitOfWorkManager _unitOfWorkManager;
     private readonly UserManager _userManager;
     private readonly WorkflowNotifier _notifier;
+    private readonly WorkflowExtensionRegistry _extensions;
     public ILogger Logger { get; set; } = NullLogger.Instance;
 
     public WorkflowStarterService(
@@ -34,8 +36,10 @@ public class WorkflowStarterService : ITransientDependency
         IRepository<WorkflowTransition, Guid> transitionRepository,
         IUnitOfWorkManager unitOfWorkManager,
         UserManager userManager,
-        WorkflowNotifier notifier)
+        WorkflowNotifier notifier,
+        WorkflowExtensionRegistry extensions)
     {
+        _extensions = extensions;
         _notifier = notifier;
         _userManager = userManager;
         _instanceRepository = instanceRepository;
@@ -118,6 +122,21 @@ public class WorkflowStarterService : ITransientDependency
         };
 
         instance.Start(firstStep.Id);
+
+        // WF-31: the first step is ENTERED at start, so its entry effect must run
+        // here too — AdvanceAsync only sees steps entered by a later transition.
+        if (!string.IsNullOrWhiteSpace(firstStep.EntryEffectKey))
+        {
+            await _extensions.GetEffect(firstStep.EntryEffectKey, entityType).ApplyAsync(new WorkflowEffectContext
+            {
+                TenantId = tenantId,
+                EntityType = entityType,
+                EntityId = entityId,
+                ActorUserId = initiatorUserId,
+                Comment = "Workflow started.",
+                Decision = WorkflowDecision.Empty,
+            });
+        }
 
         var transition = new WorkflowTransition
         {

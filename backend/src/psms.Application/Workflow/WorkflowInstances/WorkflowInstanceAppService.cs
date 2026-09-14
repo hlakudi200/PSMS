@@ -241,6 +241,21 @@ public class WorkflowInstanceAppService : ApplicationService, IWorkflowInstanceA
 
         instance.Start(firstStep.Id);
 
+        // WF-31: the first step is ENTERED at start, so its entry effect runs here
+        // too — AdvanceAsync only sees steps entered by a later transition.
+        if (!string.IsNullOrWhiteSpace(firstStep.EntryEffectKey))
+        {
+            await _extensions.GetEffect(firstStep.EntryEffectKey, input.EntityType).ApplyAsync(new WorkflowEffectContext
+            {
+                TenantId = AbpSession.TenantId,
+                EntityType = input.EntityType,
+                EntityId = input.EntityId,
+                ActorUserId = AbpSession.UserId.Value,
+                Comment = "Workflow started.",
+                Decision = WorkflowDecision.Empty,
+            });
+        }
+
         // Create initial transition
         var transition = new WorkflowTransition
         {
