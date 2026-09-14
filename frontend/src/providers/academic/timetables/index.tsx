@@ -10,6 +10,7 @@ import {
   ICreateTimetable,
   IUpdateTimetable,
   IPagedAndSortedResultRequest,
+  IGenerateTimetablesInput,
 } from "../shared/interfaces";
 import { TimetableReducer } from "./reducer";
 import { useContext, useReducer } from "react";
@@ -38,6 +39,9 @@ import {
   deactivateTimetablePending,
   deactivateTimetableSuccess,
   deactivateTimetableError,
+  generateTimetablesPending,
+  generateTimetablesSuccess,
+  generateTimetablesError,
 } from "./actions";
 
 export const TimetableProvider = ({
@@ -174,6 +178,21 @@ export const TimetableProvider = ({
       });
   };
 
+  const generateAsync = async (input: IGenerateTimetablesInput) => {
+    dispatch(generateTimetablesPending());
+    const endpoint = `/api/services/app/Timetable/Generate`;
+    await instance
+      .post(endpoint, input)
+      .then((response) => {
+        dispatch(generateTimetablesSuccess(response.data.result));
+      })
+      .catch((error) => {
+        console.error(error);
+        dispatch(generateTimetablesError());
+        throw error;
+      });
+  };
+
   return (
     <TimetableStateContext.Provider value={state}>
       <TimetableActionContext.Provider
@@ -186,6 +205,7 @@ export const TimetableProvider = ({
           deleteAsync,
           activateAsync,
           deactivateAsync,
+          generateAsync,
         }}
       >
         {children}

@@ -1,22 +1,28 @@
 'use client';
 
 import React, { useState, useCallback, useEffect } from 'react';
-import { Card, Table, Tag, Button, Drawer, Empty, Spin, Space, message } from 'antd';
+import { useRouter } from 'next/navigation';
+import { Card, Table, Tag, Button, Drawer, Spin, Space, message } from 'antd';
 import {
   EyeOutlined,
   CheckCircleOutlined,
   StopOutlined,
+  ThunderboltOutlined,
 } from '@ant-design/icons';
 import { EnterpriseTable } from '@/components/shared/enterprise-table';
-import type { ColumnConfig, TableQuery, RowAction, BulkAction } from '@/components/shared/enterprise-table';
+import type { ColumnConfig, TableQuery, RowAction, BulkAction, ToolbarAction } from '@/components/shared/enterprise-table';
 import { TimetableProvider, useTimetableState, useTimetableActions } from '@/providers/academic/timetables';
 import { TimetableSlotProvider, useTimetableSlotState, useTimetableSlotActions } from '@/providers/academic/timetable_slots';
+import { SubjectProvider } from '@/providers/academic/subjects';
+import { TeacherProvider } from '@/providers/academic/teachers';
 import { useAuthState } from '@/providers/auth';
+import { TimetableSlotEditModal } from '@/components/modals/academic/TimetableSlotEditModal';
 import type { ITimetableList, ITimetableSlotList } from '@/providers/academic/shared/interfaces';
 
 const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
 function TimetablesContent() {
+  const router = useRouter();
   const { timetables, totalCount, isPending, isError } = useTimetableState();
   const { getAllAsync, activateAsync, deactivateAsync } = useTimetableActions();
   const { timetableSlots, isPending: slotsLoading } = useTimetableSlotState();
@@ -26,6 +32,10 @@ function TimetablesContent() {
   const [lastQuery, setLastQuery] = useState<TableQuery | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedTimetable, setSelectedTimetable] = useState<ITimetableList | null>(null);
+  const [slotModalOpen, setSlotModalOpen] = useState(false);
+  const [slotModalDay, setSlotModalDay] = useState(1);
+  const [slotModalPeriod, setSlotModalPeriod] = useState(1);
+  const [editingSlot, setEditingSlot] = useState<ITimetableSlotList | null>(null);
 
   const handleQueryChange = useCallback((query: TableQuery) => {
     setLastQuery(query);
@@ -51,6 +61,33 @@ function TimetablesContent() {
     setDrawerOpen(false);
     setSelectedTimetable(null);
   };
+
+  const handleCellClick = (day: number, period: number, slot?: ITimetableSlotList) => {
+    setSlotModalDay(day);
+    setSlotModalPeriod(period);
+    setEditingSlot(slot ?? null);
+    setSlotModalOpen(true);
+  };
+
+  const handleSlotModalClose = (refresh?: boolean) => {
+    setSlotModalOpen(false);
+    setEditingSlot(null);
+    if (refresh && selectedTimetable) {
+      getByTimetableAsync(selectedTimetable.id);
+      refreshData();
+    }
+  };
+
+  const toolbarActions: ToolbarAction[] = [
+    {
+      key: 'generate',
+      label: 'Generate Timetables',
+      icon: <ThunderboltOutlined />,
+      type: 'primary',
+      onClick: () => router.push('/principal/timetables/generate'),
+      requiredPermissions: ['Admin', 'Principal', 'VicePrincipal'],
+    },
+  ];
 
   const columns: ColumnConfig<ITimetableList>[] = [
     { key: 'className', title: 'Class', dataIndex: 'className', sortable: true },
@@ -170,9 +207,10 @@ function TimetablesContent() {
     return acc;
   }, {});
 
-  // Find max periods across all days
+  // Find max periods across all days — default to 8 so an empty timetable
+  // still shows a fillable grid rather than nothing to click on.
   const maxPeriods = Math.max(
-    1,
+    8,
     ...(timetableSlots ?? []).map(s => s.periodNumber),
   );
 
@@ -189,10 +227,18 @@ function TimetablesContent() {
       title: day,
       dataIndex: `day${idx + 1}`,
       key: `day${idx + 1}`,
-      render: (slot: ITimetableSlotList | undefined) => {
-        if (!slot) return <span style={{ color: '#bfbfbf' }}>-</span>;
+      render: (slot: ITimetableSlotList | undefined, row: Record<string, unknown>) => {
+        const onClick = () => handleCellClick(idx + 1, row.period as number, slot);
+
+        if (!slot) {
+          return (
+            <div onClick={onClick} style={{ cursor: 'pointer', minHeight: 24, color: '#bfbfbf' }}>
+              + Add
+            </div>
+          );
+        }
         return (
-          <div style={{ fontSize: 12, lineHeight: 1.4 }}>
+          <div onClick={onClick} style={{ cursor: 'pointer', fontSize: 12, lineHeight: 1.4 }}>
             <strong>{slot.subjectName ?? 'N/A'}</strong>
             <br />
             <span style={{ color: '#595959' }}>{slot.teacherName ?? ''}</span>
@@ -235,6 +281,7 @@ function TimetablesContent() {
         rowKey="id"
         rowActions={rowActions}
         bulkActions={bulkActions}
+        toolbarActions={toolbarActions}
         selectionMode="multi"
         currentUserRole={currentRole}
         exportConfig={{
@@ -262,7 +309,7 @@ function TimetablesContent() {
       >
         {slotsLoading ? (
           <Spin style={{ display: 'block', margin: '60px auto' }} />
-        ) : timetableSlots && timetableSlots.length > 0 ? (
+        ) : (
           <Table
             columns={scheduleColumns}
             dataSource={scheduleData}
@@ -271,10 +318,19 @@ function TimetablesContent() {
             bordered
             scroll={{ x: 700 }}
           />
-        ) : (
-          <Empty description="No schedule slots found for this timetable" />
         )}
       </Drawer>
+
+      {selectedTimetable && (
+        <TimetableSlotEditModal
+          open={slotModalOpen}
+          onClose={handleSlotModalClose}
+          timetableId={selectedTimetable.id}
+          dayOfWeek={slotModalDay}
+          periodNumber={slotModalPeriod}
+          existingSlot={editingSlot}
+        />
+      )}
     </>
   );
 }
@@ -283,7 +339,11 @@ export default function TimetablesPageContent() {
   return (
     <TimetableProvider>
       <TimetableSlotProvider>
-        <TimetablesContent />
+        <SubjectProvider>
+          <TeacherProvider>
+            <TimetablesContent />
+          </TeacherProvider>
+        </SubjectProvider>
       </TimetableSlotProvider>
     </TimetableProvider>
   );

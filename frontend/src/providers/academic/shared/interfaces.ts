@@ -967,3 +967,41 @@ export interface IUpdateTimetableSlot {
   teacherId?: string;
   roomNumber?: string;
 }
+
+// ============================================================
+// Timetable generation
+// ============================================================
+export interface IGenerateTimetablesInput {
+  academicYearId: string;
+  effectiveDate: string;
+  workingDays: number[];
+  periodsPerDay: number;
+  periodStartTime: string;
+  periodDurationMinutes: number;
+}
+
+export interface IGeneratedClassTimetable {
+  classId: string;
+  className: string;
+  timetableId: string;
+  slotsPlaced: number;
+  slotsRequested: number;
+}
+
+export interface IUnplacedLesson {
+  classId: string;
+  className: string;
+  subjectId: string;
+  subjectName?: string;
+  teacherId?: string;
+  teacherName?: string;
+  reason: string;
+}
+
+export interface IGenerateTimetablesResult {
+  classes: IGeneratedClassTimetable[];
+  unplaced: IUnplacedLesson[];
+  totalClasses: number;
+  totalSlotsPlaced: number;
+  totalSlotsRequested: number;
+}
