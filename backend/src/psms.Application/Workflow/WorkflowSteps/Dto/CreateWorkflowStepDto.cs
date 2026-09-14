@@ -33,6 +33,18 @@ public class CreateWorkflowStepDto
     public long? AssignedUserId { get; set; }
     public int? SlaHours { get; set; }
 
-    [StringLength(500)]
-    public string GuardExpression { get; set; }
+    /// <summary>WF-30: exit criterion key (see WorkflowExtension/GetAvailable).</summary>
+    [StringLength(100)]
+    public string GuardKey { get; set; }
+    /// <summary>WF-31: effect applied on entering the step.</summary>
+    [StringLength(100)]
+    public string EntryEffectKey { get; set; }
+    /// <summary>WF-31: effect applied when a forward action leaves the step.</summary>
+    [StringLength(100)]
+    public string ExitEffectKey { get; set; }
+    /// <summary>WF-32: decision fields the actor supplies on this step.</summary>
+    [StringLength(100)]
+    public string DecisionSchemaKey { get; set; }
+    /// <summary>WF-30: the step may be waived with a reason.</summary>
+    public bool IsOptional { get; set; }
 }

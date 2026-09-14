@@ -18,5 +18,9 @@ public class WorkflowStepDto : EntityDto<Guid>
     public bool IsCommentRequired { get; set; }
     public long? AssignedUserId { get; set; }
     public int? SlaHours { get; set; }
-    public string GuardExpression { get; set; }
+    public string GuardKey { get; set; }
+    public string EntryEffectKey { get; set; }
+    public string ExitEffectKey { get; set; }
+    public string DecisionSchemaKey { get; set; }
+    public bool IsOptional { get; set; }
 }

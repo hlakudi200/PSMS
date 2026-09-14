@@ -36,6 +36,8 @@ export enum WorkflowActionType {
   Revise = 5,
   Cancel = 6,
   Recall = 7,
+  /** WF-30: skip an optional step with a reason (forward action, bypasses the guard). */
+  Waive = 8,
 }
 
 export enum WorkflowEntityType {
@@ -68,6 +70,7 @@ export const WorkflowActionTypeLabels: Record<number, string> = {
   [WorkflowActionType.Revise]: 'Revise',
   [WorkflowActionType.Cancel]: 'Cancel',
   [WorkflowActionType.Recall]: 'Recall',
+  [WorkflowActionType.Waive]: 'Waive',
 };
 
 export const WorkflowEntityTypeLabels: Record<number, string> = {
@@ -143,7 +146,16 @@ export interface IWorkflowStep {
   isCommentRequired: boolean;
   assignedUserId?: number;
   slaHours?: number;
-  guardExpression?: string;
+  /** WF-30: exit-criterion key (see IWorkflowExtensionCatalog.guards). */
+  guardKey?: string;
+  /** WF-31: effect applied when an instance enters this step. */
+  entryEffectKey?: string;
+  /** WF-31: effect applied when a forward action leaves this step. */
+  exitEffectKey?: string;
+  /** WF-32: decision fields the actor supplies on this step. */
+  decisionSchemaKey?: string;
+  /** WF-30: the step may be waived with a reason. */
+  isOptional: boolean;
 }
 
 export interface ICreateWorkflowStep {
@@ -159,7 +171,11 @@ export interface ICreateWorkflowStep {
   isCommentRequired: boolean;
   assignedUserId?: number;
   slaHours?: number;
-  guardExpression?: string;
+  guardKey?: string;
+  entryEffectKey?: string;
+  exitEffectKey?: string;
+  decisionSchemaKey?: string;
+  isOptional: boolean;
 }
 
 export interface IUpdateWorkflowStep {
@@ -177,8 +193,61 @@ export interface IUpdateWorkflowStep {
   clearAssignedUserId?: boolean;
   slaHours?: number;
   clearSlaHours?: boolean;
-  guardExpression?: string;
-  clearGuardExpression?: boolean;
+  guardKey?: string;
+  clearGuardKey?: boolean;
+  entryEffectKey?: string;
+  clearEntryEffectKey?: boolean;
+  exitEffectKey?: string;
+  clearExitEffectKey?: boolean;
+  decisionSchemaKey?: string;
+  clearDecisionSchemaKey?: boolean;
+  isOptional?: boolean;
+}
+
+// ============================================================
+// WF-30/31/32: guards, effects, decision schemas
+// ============================================================
+export interface IWorkflowGuardStatus {
+  key: string;
+  displayName: string;
+  satisfied: boolean;
+  message?: string;
+}
+
+export interface IWorkflowDecisionOption {
+  value: string;
+  label: string;
+}
+
+export interface IWorkflowDecisionField {
+  key: string;
+  label: string;
+  /** number | text | textarea | select | date | boolean */
+  type: string;
+  required: boolean;
+  placeholder?: string;
+  min?: number;
+  max?: number;
+  options?: IWorkflowDecisionOption[];
+}
+
+export interface IWorkflowDecisionSchema {
+  key: string;
+  displayName: string;
+  fields: IWorkflowDecisionField[];
+}
+
+export interface IWorkflowExtensionItem {
+  key: string;
+  displayName: string;
+}
+
+export interface IWorkflowExtensionCatalog {
+  entityType: number;
+  guards: IWorkflowExtensionItem[];
+  effects: IWorkflowExtensionItem[];
+  decisionSchemas: IWorkflowDecisionSchema[];
+  hasEntityHandler: boolean;
 }
 
 export interface IReorderWorkflowSteps {
@@ -214,6 +283,13 @@ export interface IWorkflowInstance {
   transitions: IWorkflowTransition[];
   creationTime: string;
   lastModificationTime?: string;
+  /** WF-30: the current step may be waived instead of satisfied. */
+  currentStepIsOptional?: boolean;
+  currentStepGuardKey?: string;
+  /** WF-30: live evaluation of the current step's guard (absent when the step has none). */
+  currentStepGuard?: IWorkflowGuardStatus;
+  /** WF-32: decision fields the actor must supply on the current step (absent when none). */
+  currentStepDecisionSchema?: IWorkflowDecisionSchema;
 }
 
 export interface IWorkflowEntitySummaryField {
@@ -272,6 +348,10 @@ export interface IAdvanceWorkflow {
   action: number;
   comment?: string;
   attachmentUrl?: string;
+  /** WF-32: values for the current step's decision schema, keyed by field key. */
+  decision?: Record<string, unknown>;
+  /** WF-30: advance past a failing guard (needs Workflow.Instances.OverrideGuard + a comment). */
+  overrideGuard?: boolean;
 }
 
 export interface IBatchAdvance {
@@ -309,6 +389,12 @@ export interface IWorkflowTransition {
   comment?: string;
   transitionDate: string;
   attachmentUrl?: string;
+  /** WF-32: the decision payload recorded with this transition, as JSON. */
+  decisionJson?: string;
+  /** WF-30: the step was waived rather than satisfied. */
+  isWaived?: boolean;
+  /** WF-30: the step's guard was overridden. */
+  isGuardOverridden?: boolean;
 }
 
 // ============================================================

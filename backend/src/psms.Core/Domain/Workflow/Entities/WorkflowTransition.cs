@@ -49,6 +49,20 @@ public class WorkflowTransition : CreationAuditedEntity<Guid>, IMayHaveTenant
     [StringLength(MaxAttachmentUrlLength)]
     public string AttachmentUrl { get; set; }
 
+    /// <summary>
+    /// WF-32: the decision payload the actor supplied with this transition
+    /// (approved amount, outcome, admission decision …), serialised as JSON so the
+    /// history shows exactly what was decided. Null when the step had no schema.
+    /// </summary>
+    [Column(TypeName = "jsonb")]
+    public string DecisionJson { get; set; }
+
+    /// <summary>WF-30: the step was waived (optional step skipped with a reason) rather than satisfied.</summary>
+    public bool IsWaived { get; set; }
+
+    /// <summary>WF-30: the step's guard failed and was overridden by a user holding the override permission.</summary>
+    public bool IsGuardOverridden { get; set; }
+
     [ForeignKey(nameof(WorkflowInstanceId))]
     public virtual WorkflowInstance WorkflowInstance { get; set; }
 

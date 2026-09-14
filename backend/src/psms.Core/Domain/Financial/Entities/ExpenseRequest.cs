@@ -109,6 +109,28 @@ public class ExpenseRequest : FullAuditedEntity<Guid>, IMayHaveTenant, ISoftDele
         Status = ExpenseStatus.Submitted;
     }
 
+    /// <summary>
+    /// WF-31: the approval workflow entered review — the record is now with a
+    /// reviewer and can no longer be edited by the requester.
+    /// </summary>
+    public void StartReview()
+    {
+        if (Status != ExpenseStatus.Submitted)
+            throw new InvalidOperationException("Only submitted expenses can move to review.");
+        Status = ExpenseStatus.UnderReview;
+    }
+
+    /// <summary>
+    /// WF-31: the approval workflow was cancelled or recalled before a decision —
+    /// return the expense to the requester as a draft.
+    /// </summary>
+    public void ReopenAsDraft()
+    {
+        if (Status != ExpenseStatus.Submitted && Status != ExpenseStatus.UnderReview)
+            throw new InvalidOperationException("Only submitted or in-review expenses can be reopened.");
+        Status = ExpenseStatus.Draft;
+    }
+
     public void Approve(long userId, decimal approvedAmount)
     {
         if (Status != ExpenseStatus.Submitted && Status != ExpenseStatus.UnderReview)

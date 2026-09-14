@@ -7,6 +7,7 @@ using psms.Authorization;
 using psms.Authorization.Users;
 using psms.Domain.Workflow.Entities;
 using psms.Domain.Workflow.Enums;
+using psms.Workflow.Engine;
 using psms.Workflow.Shared;
 using psms.Workflow.WorkflowSteps.Dto;
 using System;
@@ -23,13 +24,16 @@ public class WorkflowStepAppService : ApplicationService, IWorkflowStepAppServic
     private readonly IRepository<WorkflowDefinition, Guid> _definitionRepository;
     private readonly IRepository<WorkflowInstance, Guid> _instanceRepository;
     private readonly UserManager _userManager;
+    private readonly WorkflowExtensionRegistry _extensions;
 
     public WorkflowStepAppService(
         IRepository<WorkflowStep, Guid> stepRepository,
         IRepository<WorkflowDefinition, Guid> definitionRepository,
         IRepository<WorkflowInstance, Guid> instanceRepository,
-        UserManager userManager)
+        UserManager userManager,
+        WorkflowExtensionRegistry extensions)
     {
+        _extensions = extensions;
         _stepRepository = stepRepository;
         _definitionRepository = definitionRepository;
         _instanceRepository = instanceRepository;
@@ -54,6 +58,25 @@ public class WorkflowStepAppService : ApplicationService, IWorkflowStepAppServic
             throw new UserFriendlyException(WorkflowExceptionCodes.AssignedUserMissingRole,
                 $"The selected user does not hold the step's required role '{assignedRole}'.");
     }
+
+    /// <summary>
+    /// WF-30/31/32: a step may only reference guards, effects and decision schemas
+    /// registered for the definition's entity type — a typo would otherwise block
+    /// every instance at run time.
+    /// </summary>
+    private void EnsureExtensionKeysExist(WorkflowEntityType entityType, string guardKey, string entryEffectKey, string exitEffectKey, string decisionSchemaKey)
+    {
+        if (!_extensions.GuardExists(guardKey, entityType))
+            throw new UserFriendlyException(WorkflowExceptionCodes.ExtensionNotFound, $"Unknown guard '{guardKey}' for {entityType}.");
+        if (!_extensions.EffectExists(entryEffectKey, entityType))
+            throw new UserFriendlyException(WorkflowExceptionCodes.ExtensionNotFound, $"Unknown entry effect '{entryEffectKey}' for {entityType}.");
+        if (!_extensions.EffectExists(exitEffectKey, entityType))
+            throw new UserFriendlyException(WorkflowExceptionCodes.ExtensionNotFound, $"Unknown exit effect '{exitEffectKey}' for {entityType}.");
+        if (!_extensions.DecisionSchemaExists(decisionSchemaKey, entityType))
+            throw new UserFriendlyException(WorkflowExceptionCodes.ExtensionNotFound, $"Unknown decision schema '{decisionSchemaKey}' for {entityType}.");
+    }
+
+    private static string Key(string value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim().ToLowerInvariant();
 
     [AbpAuthorize(PermissionNames.Workflow_Definitions_View)]
     public async Task<WorkflowStepDto> GetAsync(Guid id)
@@ -116,6 +139,8 @@ public class WorkflowStepAppService : ApplicationService, IWorkflowStepAppServic
         if (input.AssignedUserId.HasValue)
             await EnsureAssignedUserHoldsRoleAsync(input.AssignedUserId.Value, input.AssignedRole.Trim());
 
+        EnsureExtensionKeysExist(definition.EntityType, input.GuardKey, input.EntryEffectKey, input.ExitEffectKey, input.DecisionSchemaKey);
+
         var step = new WorkflowStep
         {
             Id = Guid.NewGuid(),
@@ -131,7 +156,11 @@ public class WorkflowStepAppService : ApplicationService, IWorkflowStepAppServic
             IsCommentRequired = input.IsCommentRequired,
             AssignedUserId = input.AssignedUserId,
             SlaHours = input.SlaHours,
-            GuardExpression = input.GuardExpression?.Trim()
+            GuardKey = Key(input.GuardKey),
+            EntryEffectKey = Key(input.EntryEffectKey),
+            ExitEffectKey = Key(input.ExitEffectKey),
+            DecisionSchemaKey = Key(input.DecisionSchemaKey),
+            IsOptional = input.IsOptional
         };
 
         await _stepRepository.InsertAsync(step);
@@ -175,8 +204,16 @@ public class WorkflowStepAppService : ApplicationService, IWorkflowStepAppServic
         if (input.ClearSlaHours) step.SlaHours = null;
         else if (input.SlaHours.HasValue) step.SlaHours = input.SlaHours;
 
-        if (input.ClearGuardExpression) step.GuardExpression = null;
-        else if (input.GuardExpression != null) step.GuardExpression = input.GuardExpression.Trim();
+        if (input.ClearGuardKey) step.GuardKey = null;
+        else if (input.GuardKey != null) step.GuardKey = Key(input.GuardKey);
+        if (input.ClearEntryEffectKey) step.EntryEffectKey = null;
+        else if (input.EntryEffectKey != null) step.EntryEffectKey = Key(input.EntryEffectKey);
+        if (input.ClearExitEffectKey) step.ExitEffectKey = null;
+        else if (input.ExitEffectKey != null) step.ExitEffectKey = Key(input.ExitEffectKey);
+        if (input.ClearDecisionSchemaKey) step.DecisionSchemaKey = null;
+        else if (input.DecisionSchemaKey != null) step.DecisionSchemaKey = Key(input.DecisionSchemaKey);
+        if (input.IsOptional.HasValue) step.IsOptional = input.IsOptional.Value;
+        EnsureExtensionKeysExist(step.WorkflowDefinition.EntityType, step.GuardKey, step.EntryEffectKey, step.ExitEffectKey, step.DecisionSchemaKey);
 
         // WF-05: validate the FINAL state — a user-pinned step (after applying any
         // role/user change above) requires that user to hold the step's role.
