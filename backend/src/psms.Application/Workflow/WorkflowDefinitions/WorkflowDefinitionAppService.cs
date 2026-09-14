@@ -241,7 +241,9 @@ public class WorkflowDefinitionAppService : ApplicationService, IWorkflowDefinit
         var name = string.IsNullOrWhiteSpace(input?.Name) ? null : input.Name.Trim();
         if (name == null)
         {
-            var baseName = System.Text.RegularExpressions.Regex.Replace(source.Name, @"s+vd+$", "");
+            // Strip a trailing " v<n>" so cloning "Admissions Approval v2" yields
+            // "Admissions Approval v3", not "Admissions Approval v2 v2".
+            var baseName = System.Text.RegularExpressions.Regex.Replace(source.Name, @"\s+v\d+$", "");
             var n = 2;
             do { name = $"{baseName} v{n++}"; }
             while (await _definitionRepository.GetAll().AnyAsync(d => d.TenantId == AbpSession.TenantId && d.Name.ToLower() == name.ToLower()));
