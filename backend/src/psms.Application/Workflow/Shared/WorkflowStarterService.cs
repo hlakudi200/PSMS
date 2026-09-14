@@ -5,6 +5,7 @@ using psms.Authorization.Users;
 using Castle.Core.Logging;
 using Microsoft.EntityFrameworkCore;
 using psms.Domain.Workflow.Entities;
+using psms.Workflow.Engine;
 using psms.Domain.Workflow.Enums;
 using System;
 using System.Linq;
@@ -25,6 +26,8 @@ public class WorkflowStarterService : ITransientDependency
     private readonly IRepository<WorkflowTransition, Guid> _transitionRepository;
     private readonly IUnitOfWorkManager _unitOfWorkManager;
     private readonly UserManager _userManager;
+    private readonly WorkflowNotifier _notifier;
+    private readonly WorkflowExtensionRegistry _extensions;
     public ILogger Logger { get; set; } = NullLogger.Instance;
 
     public WorkflowStarterService(
@@ -32,8 +35,12 @@ public class WorkflowStarterService : ITransientDependency
         IRepository<WorkflowDefinition, Guid> definitionRepository,
         IRepository<WorkflowTransition, Guid> transitionRepository,
         IUnitOfWorkManager unitOfWorkManager,
-        UserManager userManager)
+        UserManager userManager,
+        WorkflowNotifier notifier,
+        WorkflowExtensionRegistry extensions)
     {
+        _extensions = extensions;
+        _notifier = notifier;
         _userManager = userManager;
         _instanceRepository = instanceRepository;
         _definitionRepository = definitionRepository;
@@ -116,6 +123,21 @@ public class WorkflowStarterService : ITransientDependency
 
         instance.Start(firstStep.Id);
 
+        // WF-31: the first step is ENTERED at start, so its entry effect must run
+        // here too — AdvanceAsync only sees steps entered by a later transition.
+        if (!string.IsNullOrWhiteSpace(firstStep.EntryEffectKey))
+        {
+            await _extensions.GetEffect(firstStep.EntryEffectKey, entityType).ApplyAsync(new WorkflowEffectContext
+            {
+                TenantId = tenantId,
+                EntityType = entityType,
+                EntityId = entityId,
+                ActorUserId = initiatorUserId,
+                Comment = "Workflow started.",
+                Decision = WorkflowDecision.Empty,
+            });
+        }
+
         var transition = new WorkflowTransition
         {
             Id = Guid.NewGuid(),
@@ -132,6 +154,7 @@ public class WorkflowStarterService : ITransientDependency
 
         await _instanceRepository.InsertAsync(instance);
         await _transitionRepository.InsertAsync(transition);
+        await _notifier.StepAssignedAsync(instance, firstStep, definition.Name, $"wf-start-{instance.Id}"); // WF-37
         await _unitOfWorkManager.Current.SaveChangesAsync();
 
         Logger.Info($"Auto-started {entityType} workflow {instance.Id} for entity {entityId}.");

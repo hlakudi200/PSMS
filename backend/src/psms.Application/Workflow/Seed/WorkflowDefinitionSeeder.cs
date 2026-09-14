@@ -160,8 +160,11 @@ public class WorkflowDefinitionSeeder : ITransientDependency
             "HOD investigates and schedules the hearing; the hearing records the outcome; the Principal decides. Starts when a case is submitted.",
             new DefaultStep(1, "HOD Investigation", "Record investigation notes and schedule the hearing.", hod, WorkflowActionType.Review)
                 { SlaHours = 120, IsCommentRequired = true, EntryEffectKey = "discipline.start-investigation", GuardKey = "discipline.hearing-scheduled" },
+            // Not optional: resolving a case requires a recorded outcome, so waiving
+            // the hearing would strand it at the Principal step. WF-50 adds the
+            // Minor-severity shortcut (record the outcome without a hearing).
             new DefaultStep(2, "Disciplinary Hearing", "Hold the hearing and record the outcome and sanction.", vp, WorkflowActionType.Review)
-                { SlaHours = 120, IsCommentRequired = true, GuardKey = "discipline.outcome-recorded", IsOptional = true },
+                { SlaHours = 120, IsCommentRequired = true, GuardKey = "discipline.outcome-recorded" },
             new DefaultStep(3, "Principal Decision", "Confirm the outcome and resolve the case, or send it back to the hearing.", principal, WorkflowActionType.Approve)
                 { SlaHours = 72, IsTerminal = true, IsCommentRequired = true, NextStepOnReject = 2 });
 

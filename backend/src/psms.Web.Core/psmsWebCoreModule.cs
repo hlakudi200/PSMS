@@ -71,6 +71,10 @@ namespace psms
         {
             IocManager.Resolve<ApplicationPartManager>()
                 .AddApplicationPartsIfNotAddedBefore(typeof(psmsWebCoreModule).Assembly);
+
+            // WF-37: periodic SLA-breach notifications for overdue workflow steps.
+            var workerManager = IocManager.Resolve<Abp.Threading.BackgroundWorkers.IBackgroundWorkerManager>();
+            workerManager.Add(IocManager.Resolve<psms.Workflow.Shared.WorkflowSlaBreachWorker>());
         }
     }
 }

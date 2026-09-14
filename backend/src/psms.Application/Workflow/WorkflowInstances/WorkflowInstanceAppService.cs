@@ -34,6 +34,7 @@ public class WorkflowInstanceAppService : ApplicationService, IWorkflowInstanceA
     private readonly WorkflowEntitySummaryProvider _entitySummaryProvider;
     private readonly WorkflowExtensionRegistry _extensions;
     private readonly WorkflowActorResolver _actors;
+    private readonly WorkflowNotifier _notifier;
 
     public WorkflowInstanceAppService(
         IRepository<WorkflowInstance, Guid> instanceRepository,
@@ -45,8 +46,10 @@ public class WorkflowInstanceAppService : ApplicationService, IWorkflowInstanceA
         WorkflowEntityBridgeService bridgeService,
         WorkflowEntitySummaryProvider entitySummaryProvider,
         WorkflowExtensionRegistry extensions,
-        WorkflowActorResolver actors)
+        WorkflowActorResolver actors,
+        WorkflowNotifier notifier)
     {
+        _notifier = notifier;
         _actors = actors;
         _extensions = extensions;
         _instanceRepository = instanceRepository;
@@ -238,6 +241,21 @@ public class WorkflowInstanceAppService : ApplicationService, IWorkflowInstanceA
 
         instance.Start(firstStep.Id);
 
+        // WF-31: the first step is ENTERED at start, so its entry effect runs here
+        // too — AdvanceAsync only sees steps entered by a later transition.
+        if (!string.IsNullOrWhiteSpace(firstStep.EntryEffectKey))
+        {
+            await _extensions.GetEffect(firstStep.EntryEffectKey, input.EntityType).ApplyAsync(new WorkflowEffectContext
+            {
+                TenantId = AbpSession.TenantId,
+                EntityType = input.EntityType,
+                EntityId = input.EntityId,
+                ActorUserId = AbpSession.UserId.Value,
+                Comment = "Workflow started.",
+                Decision = WorkflowDecision.Empty,
+            });
+        }
+
         // Create initial transition
         var transition = new WorkflowTransition
         {
@@ -256,6 +274,9 @@ public class WorkflowInstanceAppService : ApplicationService, IWorkflowInstanceA
         await _instanceRepository.InsertAsync(instance);
         await _transitionRepository.InsertAsync(transition);
         await CurrentUnitOfWork.SaveChangesAsync();
+
+        // WF-37: tell the first step's assignees
+        await _notifier.StepAssignedAsync(instance, firstStep, definition.Name, $"wf-start-{instance.Id}");
 
         return await GetAsync(instance.Id);
     }
@@ -470,6 +491,15 @@ public class WorkflowInstanceAppService : ApplicationService, IWorkflowInstanceA
         await _transitionRepository.InsertAsync(transition);
         await CurrentUnitOfWork.SaveChangesAsync();
 
+        // WF-37: notify the next step's assignees, or the initiator of the outcome
+        var definitionName = instance.WorkflowDefinition?.Name ?? "Workflow";
+        if (enteredStep != null)
+            await _notifier.StepAssignedAsync(instance, enteredStep, definitionName, $"wf-step-{transition.Id}");
+        else if (instance.Status == WorkflowStatus.Completed)
+            await _notifier.OutcomeAsync(instance, definitionName, "approved", input.Comment, AbpSession.UserId);
+        else if (instance.Status == WorkflowStatus.Rejected)
+            await _notifier.OutcomeAsync(instance, definitionName, "rejected", input.Comment, AbpSession.UserId);
+
         return await GetAsync(instanceId);
     }
 
@@ -495,6 +525,9 @@ public class WorkflowInstanceAppService : ApplicationService, IWorkflowInstanceA
         // WF-31: a cancelled approval returns the record to its requester instead
         // of stranding it mid-flight.
         await _bridgeService.OnWorkflowCancelledAsync(BuildContext(instance, comment));
+
+        var cancelledDefinition = await _definitionRepository.FirstOrDefaultAsync(instance.WorkflowDefinitionId);
+        await _notifier.OutcomeAsync(instance, cancelledDefinition?.Name ?? "Workflow", "cancelled", comment, AbpSession.UserId);
 
         // Record cancellation transition
         if (instance.CurrentStepId.HasValue)
@@ -543,6 +576,9 @@ public class WorkflowInstanceAppService : ApplicationService, IWorkflowInstanceA
 
         // WF-31: a recalled approval returns the record to its requester.
         await _bridgeService.OnWorkflowRecalledAsync(BuildContext(instance, comment));
+
+        var recalledDefinition = await _definitionRepository.FirstOrDefaultAsync(instance.WorkflowDefinitionId);
+        await _notifier.OutcomeAsync(instance, recalledDefinition?.Name ?? "Workflow", "recalled", comment, AbpSession.UserId);
 
         // Record recall transition
         if (instance.CurrentStepId.HasValue)

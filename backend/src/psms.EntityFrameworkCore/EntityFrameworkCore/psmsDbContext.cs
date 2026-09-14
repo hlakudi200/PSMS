@@ -710,10 +710,14 @@ public class psmsDbContext : AbpZeroDbContext<Tenant, Role, User, psmsDbContext>
             .HasFilter("\"IsDeleted\" = false")
             .HasDatabaseName("IX_WorkflowDefinitions_TenantId_Name");
 
-        // WorkflowStep - unique order per definition
+        // WorkflowStep - unique order per definition. WF-35: soft-deleted steps keep
+        // their row, so without this filter a deleted step permanently reserves its
+        // order and re-creating one (or the seeder refreshing a definition's steps)
+        // hits the unique index. Mirrors IX_WorkflowDefinitions_TenantId_Name above.
         modelBuilder.Entity<WorkflowStep>()
             .HasIndex(s => new { s.WorkflowDefinitionId, s.StepOrder })
             .IsUnique()
+            .HasFilter("\"IsDeleted\" = false")
             .HasDatabaseName("IX_WorkflowSteps_DefinitionId_StepOrder");
 
         // WorkflowStep.AssignedUserId -> AbpUsers (WF-06). DB-level integrity
