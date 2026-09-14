@@ -86,6 +86,103 @@ const TEACHER_COUNT = 15;
 const PARENT_COUNT = 100;
 const STUDENT_COUNT = 150;
 
+// The school day the generated timetable is built on.
+const PERIODS_PER_DAY = 8;
+const PERIOD_START = '08:00';
+const PERIOD_MINUTES = 40;
+const BREAK_AFTER_PERIODS = [3, 6];   // first and second break
+const BREAK_MINUTES = 20;
+
+const ATTENDANCE_DAYS = 10;   // school days back from today
+const PAID_FEE_RATIO = 0.65;  // share of tuition fees that already have a payment
+
+const ANNOUNCEMENTS = [
+  { title: 'Term parent evening', type: 4, priority: 3, targetAudience: 4,
+    content: 'Parent evening is on the 14th at 18:00 in the school hall. Each grade head presents the term plan, and class teachers are available afterwards for one-on-one conversations.' },
+  { title: 'Winter sports trials', type: 3, priority: 2, targetAudience: 5,
+    content: 'Trials for netball, rugby and hockey run all of next week on the top fields. Bring your own boots and a water bottle. Sign-up sheets are outside the sports office.' },
+  { title: 'Load-shedding contingency', type: 5, priority: 4, targetAudience: 1,
+    content: 'When stage 4 or higher is scheduled during school hours the generator covers the academic block only. Aftercare continues as normal and collection times do not change.' },
+  { title: 'Stationery packs for next term', type: 7, priority: 2, targetAudience: 4,
+    content: 'Stationery packs can be ordered through the school shop until the end of the month. Orders placed after that date will only be ready in the second week of next term.' },
+  { title: 'Grade 7 leadership camp', type: 4, priority: 3, targetAudience: 1,
+    content: 'The Grade 7 leadership camp runs from Wednesday to Friday. Indemnity forms must reach the class teacher before the end of this week.' },
+  { title: 'Staff development day', type: 7, priority: 2, targetAudience: 1,
+    content: 'The school is closed to learners on the first Friday of next month for staff development. Aftercare is not available that day.' },
+];
+
+const EXTRAMURALS = [
+  { activityName: 'Netball', category: 1, activityType: 1, venue: 'Top courts', feePerTerm: 350, coachName: 'Ms Dlamini' },
+  { activityName: 'Rugby', category: 1, activityType: 1, venue: 'Main field', feePerTerm: 400, coachName: 'Mr Botha' },
+  { activityName: 'Chess club', category: 3, activityType: 2, venue: 'Library', feePerTerm: 150, coachName: 'Mr Naidoo' },
+  { activityName: 'Marimba band', category: 2, activityType: 3, venue: 'Music room', feePerTerm: 450, coachName: 'Ms Khumalo' },
+  { activityName: 'Athletics', category: 1, activityType: 2, venue: 'Track', feePerTerm: 300, coachName: 'Mr September' },
+];
+
+const TRANSPORT_ROUTES = [
+  { routeName: 'Route A — Northern suburbs', transportType: 1, capacity: 45, monthlyFee: 950,
+    vehicleNumber: 'CA 143-221', driverName: 'Mr Mokoena', areasCovered: 'Parkview, Greenside, Emmarentia' },
+  { routeName: 'Route B — Southern suburbs', transportType: 2, capacity: 22, monthlyFee: 1100,
+    vehicleNumber: 'CA 887-004', driverName: 'Mr Adams', areasCovered: 'Rondebosch, Newlands, Claremont' },
+  { routeName: 'Route C — East', transportType: 3, capacity: 15, monthlyFee: 1250,
+    vehicleNumber: 'CA 552-119', driverName: 'Ms Pillay', areasCovered: 'Observatory, Salt River' },
+];
+
+const DISCIPLINARY_CASES = [
+  { incidentCategory: 6, severity: 1, location: 'Grade block',
+    incidentDescription: 'Arrived more than twenty minutes late to first period on three consecutive days without a note from home.' },
+  { incidentCategory: 9, severity: 1, location: 'Assembly',
+    incidentDescription: 'Out of uniform for the second time this month, wearing non-regulation shoes with the summer uniform.' },
+  { incidentCategory: 1, severity: 2, location: 'Classroom 4B',
+    incidentDescription: 'Disrupted a Mathematics lesson repeatedly after two warnings, then left the classroom without permission.' },
+  { incidentCategory: 5, severity: 2, location: 'Main corridor',
+    incidentDescription: 'Broke a corridor window while kicking a ball indoors. Nobody was hurt and the learner reported it himself.' },
+  { incidentCategory: 2, severity: 3, location: 'Playground',
+    incidentDescription: 'Persistent name-calling directed at a younger learner over two weeks, reported by a playground supervisor.' },
+];
+
+const LEAVE_REQUESTS = [
+  { leaveType: 2, days: 2, reason: 'Down with flu, signed off by my doctor for two days.' },
+  { leaveType: 1, days: 5, reason: 'Family holiday booked before the term dates were published.' },
+  { leaveType: 3, days: 1, reason: 'Taking my mother to a specialist appointment in town.' },
+  { leaveType: 6, days: 3, reason: 'Sitting the final examinations for my honours degree.' },
+];
+
+const FIELD_TRIPS = [
+  { tripName: 'Science centre visit', destination: 'Cape Town Science Centre, Observatory',
+    estimatedCost: 8500, numberOfStudents: 32, numberOfChaperones: 3,
+    transportArrangement: 'Two school buses, leaving 07:30 and back by 14:00.',
+    riskAssessmentNotes: 'Indoor venue with supervised exhibits. One adult to eleven learners. The lead teacher carries the first-aid kit.',
+    emergencyPlan: 'Lead teacher holds the class list and parent contacts. Groote Schuur is eight minutes away.' },
+  { tripName: 'District athletics meet', destination: 'Green Point Athletics Stadium',
+    estimatedCost: 4200, numberOfStudents: 18, numberOfChaperones: 2,
+    transportArrangement: 'One minibus, full day.',
+    riskAssessmentNotes: 'Outdoor summer event. Learners carry water and sunscreen; shaded seating is reserved for the school.',
+    emergencyPlan: 'Event medics on site. The coach carries indemnity forms and emergency contacts.' },
+  { tripName: 'Grade 7 leadership camp', destination: 'Hawequa Camp, Wellington',
+    estimatedCost: 46000, numberOfStudents: 40, numberOfChaperones: 5,
+    transportArrangement: 'Chartered coach, three nights away.',
+    riskAssessmentNotes: 'Overnight camp with a river crossing and an obstacle course. Camp staff are accredited and a qualified lifeguard supervises all water activities.',
+    emergencyPlan: 'Two staff sleep on site. Wellington Medi-Clinic is fifteen minutes away and the camp keeps a vehicle for emergencies.' },
+];
+
+const EXPENSES = [
+  { category: 1, priority: 2, amount: 12400, vendor: 'Waltons', department: 'Foundation Phase',
+    description: 'Replacement stationery for the Foundation Phase classrooms for the coming term.' },
+  { category: 5, priority: 3, amount: 18750, vendor: 'Incredible Connection', department: 'IT',
+    description: 'Ten replacement laptop chargers and two projector lamps for the computer room.' },
+  { category: 4, priority: 4, amount: 34200, vendor: 'Cape Roofing Solutions', department: 'Facilities',
+    description: 'Emergency repair to the leaking roof above classroom 6A before the winter rain.' },
+  { category: 6, priority: 2, amount: 9600, vendor: 'Sportsmans Warehouse', department: 'Sport',
+    description: 'New netball posts and match balls for the winter season.' },
+];
+
+const WAIVERS = [
+  { waiverType: 1, share: 0.5, reason: 'Both parents were retrenched last quarter. The family has asked for relief on this year’s tuition while they look for work.' },
+  { waiverType: 2, share: 0.15, reason: 'Third sibling enrolled at the school this year, requesting the standard sibling discount.' },
+  { waiverType: 4, share: 1, reason: 'Learner placed in the top decile of the entrance assessment, requesting the academic bursary as advertised.' },
+];
+
 // ------------------------------------------------------------------ plumbing
 
 /** Deterministic PRNG so a re-run generates the same people. */
@@ -164,6 +261,19 @@ async function ensure(label, existing, createFn) {
   const record = await createFn();
   created++;
   return record;
+}
+
+/**
+ * Runs an optional section. The academic core (steps 1-12) must succeed, but the
+ * colour on top is per-module: if one endpoint is missing or rejects, report it
+ * and keep going rather than losing the rest of the run.
+ */
+async function soft(label, fn) {
+  try {
+    await fn();
+  } catch (e) {
+    console.log(`    skipped ${label}: ${e.message}`);
+  }
 }
 
 const listAll = async (service, extra = '') =>
@@ -514,6 +624,273 @@ async function main() {
     }
   }
   console.log(`    ${fees} fee structures created`);
+
+  // Everything from here is colour rather than structure: if one module is
+  // unavailable on this deployment the school is still usable, so these report
+  // and carry on instead of aborting the run.
+  const students = await listAll('Student');
+
+  // 13. Timetables -----------------------------------------------------------
+  step(13, 'Generating a timetable for every class');
+  await soft('timetables', async () => {
+    const existingTimetables = await listAll('Timetable');
+    if (existingTimetables.length > 0) {
+      console.log(`    ${existingTimetables.length} already exist — skipping generation`);
+      reused++;
+      return;
+    }
+    const result = await call('/api/services/app/Timetable/Generate', {
+      body: {
+        academicYearId: year.id,
+        effectiveDate: `${YEAR}-01-15`,
+        workingDays: [1, 2, 3, 4, 5],
+        periodsPerDay: PERIODS_PER_DAY,
+        periodStartTime: `${PERIOD_START}:00`,
+        periodDurationMinutes: PERIOD_MINUTES,
+        breakAfterPeriods: BREAK_AFTER_PERIODS,
+        breakDurationMinutes: BREAK_MINUTES,
+      },
+    });
+    created++;
+    console.log(`    ${result.totalSlotsPlaced}/${result.totalSlotsRequested} periods placed across ${result.totalClasses} classes`);
+    if (result.unplaced?.length) {
+      console.log(`    ${result.unplaced.length} lessons could not be placed — visible on the generate page`);
+    }
+    // Generated timetables are drafts; activate so the class pages show them.
+    const drafts = (result.classes ?? []).filter((c) => c.timetableId);
+    await mapPool(drafts, 4, (c) =>
+      call(`/api/services/app/Timetable/Activate?id=${c.timetableId}`).catch(() => null));
+    console.log(`    ${drafts.length} activated`);
+  });
+
+  // 14. Attendance -----------------------------------------------------------
+  step(14, `Capturing attendance for the last ${ATTENDANCE_DAYS} school days`);
+  await soft('attendance', async () => {
+    const days = [];
+    for (let back = 1; days.length < ATTENDANCE_DAYS; back++) {
+      const d = new Date();
+      d.setDate(d.getDate() - back);
+      if (d.getDay() !== 0 && d.getDay() !== 6) days.push(iso(d));
+    }
+
+    let registers = 0;
+    for (const cls of classes) {
+      const roll = students.filter((s) => s.currentClassId === cls.id);
+      if (roll.length === 0) continue;
+      const teacher = teachers[classes.indexOf(cls) % teachers.length];
+      for (const day of days) {
+        // A believable register: most present, a couple away, the odd late arrival.
+        const entries = roll.map((s) => {
+          const r = rand();
+          const status = r > 0.94 ? 2 : r > 0.90 ? 3 : r > 0.88 ? 4 : 1;
+          return {
+            studentId: s.id,
+            status,
+            notes: status === 2 ? 'Parent phoned in' : status === 4 ? 'Medical appointment' : undefined,
+          };
+        });
+        await call('/api/services/app/Attendance/BulkCapture', {
+          body: { classId: cls.id, teacherId: teacher.id, attendanceDate: day, entries },
+        });
+        registers++;
+        process.stdout.write(`    ${registers} registers\r`);
+      }
+    }
+    created += registers;
+    console.log(`    ${registers} class registers captured        `);
+  });
+
+  // 15. Announcements --------------------------------------------------------
+  step(15, `Posting ${ANNOUNCEMENTS.length} announcements`);
+  await soft('announcements', async () => {
+    const existing = await listAll('Announcement');
+    for (const a of ANNOUNCEMENTS) {
+      if (existing.find((x) => x.title === a.title)) { reused++; continue; }
+      await call('/api/services/app/Announcement/Create', {
+        body: { ...a, publishDate: iso(new Date()), sendEmailNotification: false, sendPushNotification: false },
+      });
+      created++;
+    }
+    console.log(`    done`);
+  });
+
+  // 16. Fees and payments ----------------------------------------------------
+  step(16, 'Billing tuition and recording payments');
+  await soft('fees', async () => {
+    const structures = await listAll('FeeStructure');
+    const existingFees = await listAll('StudentFee');
+    let billed = 0;
+
+    for (const structure of structures) {
+      const roll = students.filter((s) => s.currentGradeId === structure.gradeId);
+      const unbilled = roll.filter(
+        (s) => !existingFees.find((f) => f.studentId === s.id && f.feeStructureId === structure.id));
+      if (unbilled.length === 0) { reused++; continue; }
+      await call('/api/services/app/StudentFee/BulkCreate', {
+        body: { feeStructureId: structure.id, studentIds: unbilled.map((s) => s.id) },
+      });
+      billed += unbilled.length;
+      created += unbilled.length;
+      process.stdout.write(`    ${billed} fees billed\r`);
+    }
+    console.log(`    ${billed} student fees billed        `);
+
+    // Pay most of the tuition so the finance screens are not all arrears.
+    const fees = await listAll('StudentFee');
+    const payable = fees.filter((f) => (f.outstandingBalance ?? f.amountDue ?? 0) > 0);
+    const toPay = payable.filter(() => rand() < PAID_FEE_RATIO);
+    let paid = 0;
+    await mapPool(toPay, 4, async (fee) => {
+      const admissionIndex = Number(
+        (students.find((s) => s.id === fee.studentId)?.admissionNumber ?? '').split('-')[1] ?? 0);
+      const parent = parents[admissionIndex % parents.length];
+      if (!parent) return;
+      try {
+        await call('/api/services/app/Payment/Create', {
+          body: {
+            studentId: fee.studentId,
+            parentId: parent.id,
+            amount: fee.outstandingBalance ?? fee.amountDue ?? 0,
+            paymentMethod: pick([1, 2, 7, 10]),   // EFT, debit order, PayFast, Ozow
+            paymentDate: iso(new Date()),
+            paymentReference: `PMT-${pad(++paid, 5)}`,
+          },
+        });
+        created++;
+      } catch { /* a fee may already be settled on a re-run */ }
+      process.stdout.write(`    ${paid} payments\r`);
+    });
+    console.log(`    ${paid} payments recorded        `);
+  });
+
+  // 17. The SA-specific programmes -------------------------------------------
+  step(17, 'Extramurals, transport and aftercare, with learners enrolled');
+  await soft('programmes', async () => {
+    const enrolStart = `${YEAR}-01-20`;
+    const sample = (n) => students.filter(() => rand() < n / students.length);
+
+    // Extramurals
+    const existingActivities = await listAll('ExtramuralActivity');
+    for (const a of EXTRAMURALS) {
+      let activity = existingActivities.find((x) => x.activityName === a.activityName);
+      if (activity) { reused++; } else {
+        activity = await call('/api/services/app/ExtramuralActivity/Create', {
+          body: { ...a, academicYearId: year.id, maxCapacity: 30, description: `${a.activityName} at ${SCHOOL_NAME}` },
+        });
+        created++;
+      }
+      await mapPool(sample(18), 4, (s) =>
+        call('/api/services/app/StudentExtramural/Create', {
+          body: { studentId: s.id, extramuralActivityId: activity.id, academicYearId: year.id, startDate: enrolStart },
+        }).then(() => created++).catch(() => null));
+    }
+    console.log(`    ${EXTRAMURALS.length} activities with learners enrolled`);
+
+    // Transport
+    const existingRoutes = await listAll('SchoolTransport');
+    for (const r of TRANSPORT_ROUTES) {
+      let route = existingRoutes.find((x) => x.routeName === r.routeName);
+      if (route) { reused++; } else {
+        route = await call('/api/services/app/SchoolTransport/Create', {
+          body: { ...r, morningPickupTime: '06:45:00', afternoonDepartureTime: '14:30:00' },
+        });
+        created++;
+      }
+      await mapPool(sample(12), 4, (s) =>
+        call('/api/services/app/StudentTransport/Create', {
+          body: { studentId: s.id, schoolTransportId: route.id, academicYearId: year.id, direction: 3, startDate: enrolStart },
+        }).then(() => created++).catch(() => null));
+    }
+    console.log(`    ${TRANSPORT_ROUTES.length} routes with learners enrolled`);
+
+    // Aftercare
+    const existingAfterCare = await listAll('AfterCare');
+    const programmeName = 'Afternoon care';
+    let programme = existingAfterCare.find((x) => x.programName === programmeName);
+    if (programme) { reused++; } else {
+      programme = await call('/api/services/app/AfterCare/Create', {
+        body: {
+          academicYearId: year.id, programName: programmeName, afterCareType: 1,
+          location: 'Foundation Phase hall', startTime: '14:00:00', endTime: '17:30:00',
+          daysAvailable: 'Mon–Fri', capacity: 60, supervisorName: 'Ms Arendse',
+          contactPhone: '021 555 0111', includesMeals: true, includesHomeworkSupervision: true,
+          monthlyFee: 1450, activitiesIncluded: 'Homework supervision, outdoor play, reading corner',
+        },
+      });
+      created++;
+    }
+    await mapPool(sample(25), 4, (s) =>
+      call('/api/services/app/StudentAfterCare/Create', {
+        body: { studentId: s.id, afterCareId: programme.id, academicYearId: year.id, startDate: enrolStart, usualPickupTime: '17:00:00' },
+      }).then(() => created++).catch(() => null));
+    console.log(`    aftercare programme with learners enrolled`);
+  });
+
+  // 18. The approvals queue --------------------------------------------------
+  step(18, 'Raising disciplinary cases, leave, trips, expenses and waivers');
+  await soft('operations', async () => {
+    const pickStudent = () => students[Math.floor(rand() * students.length)];
+
+    const cases = await listAll('DisciplinaryCase');
+    for (const c of DISCIPLINARY_CASES) {
+      if (cases.find((x) => x.incidentDescription === c.incidentDescription)) { reused++; continue; }
+      const d = new Date(); d.setDate(d.getDate() - Math.floor(rand() * 21));
+      await call('/api/services/app/DisciplinaryCase/Create', {
+        body: { ...c, studentId: pickStudent().id, academicYearId: year.id, incidentDate: iso(d) },
+      });
+      created++;
+    }
+
+    const leaves = await listAll('StaffLeaveRequest');
+    for (const l of LEAVE_REQUESTS) {
+      if (leaves.find((x) => x.reason === l.reason)) { reused++; continue; }
+      const start = new Date(); start.setDate(start.getDate() + 7 + Math.floor(rand() * 21));
+      const end = new Date(start); end.setDate(end.getDate() + l.days - 1);
+      await call('/api/services/app/StaffLeaveRequest/Create', {
+        body: { leaveType: l.leaveType, startDate: iso(start), endDate: iso(end), reason: l.reason },
+      });
+      created++;
+    }
+
+    const trips = await listAll('FieldTrip');
+    for (const t of FIELD_TRIPS) {
+      if (trips.find((x) => x.tripName === t.tripName)) { reused++; continue; }
+      const d = new Date(); d.setDate(d.getDate() + 21 + Math.floor(rand() * 40));
+      await call('/api/services/app/FieldTrip/Create', {
+        body: {
+          ...t, academicYearId: year.id, tripDate: iso(d),
+          organizingTeacherId: teachers[Math.floor(rand() * teachers.length)].id,
+        },
+      });
+      created++;
+    }
+
+    const expenses = await listAll('ExpenseRequest');
+    for (const e of EXPENSES) {
+      if (expenses.find((x) => x.description === e.description)) { reused++; continue; }
+      const due = new Date(); due.setDate(due.getDate() + 14 + Math.floor(rand() * 30));
+      await call('/api/services/app/ExpenseRequest/Create', {
+        body: { ...e, academicYearId: year.id, requiredByDate: iso(due) },
+      });
+      created++;
+    }
+
+    const waivers = await listAll('FeeWaiver');
+    for (const w of WAIVERS) {
+      if (waivers.find((x) => x.reason === w.reason)) { reused++; continue; }
+      const student = pickStudent();
+      const grade = grades.find((g) => g.id === student.currentGradeId);
+      await call('/api/services/app/FeeWaiver/Create', {
+        body: {
+          studentId: student.id, academicYearId: year.id, waiverType: w.waiverType,
+          requestedAmount: Math.round((grade?.tuition ?? 24000) * w.share),
+          reason: w.reason,
+        },
+      });
+      created++;
+    }
+    console.log('    approvals queue populated');
+  });
 
   // Done ---------------------------------------------------------------------
   console.log(`\nDone. Created ${created}, reused ${reused}.`);
