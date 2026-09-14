@@ -21,6 +21,7 @@ import {
   WarningOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
+import { CoffeeOutlined } from '@ant-design/icons';
 import { useAuthState } from '@/providers/auth';
 import {
   TeacherProvider,
@@ -32,6 +33,7 @@ import {
   useTimetableSlotActions,
   useTimetableSlotState,
 } from '@/providers/academic/timetable_slots';
+import { detectBreaks } from '@/utils/timetable-grid';
 import type { ITimetableSlotList } from '@/providers/academic/shared/interfaces';
 
 const { Title, Text } = Typography;
@@ -69,6 +71,8 @@ interface ScheduleRow {
   periodNumber: number;
   startTime?: string;
   endTime?: string;
+  /** True for a synthetic row rendered as a full-width "Break" bar. */
+  isBreak?: boolean;
   // Slot per weekday, keyed by `day-<n>` so AntD Table dataIndex works.
   [key: `day-${number}`]: ITimetableSlotList | undefined;
 }
@@ -150,7 +154,7 @@ function TeacherScheduleContent() {
     slots.forEach((s) => periodSet.add(s.periodNumber));
     const periods = Array.from(periodSet).sort((a, b) => a - b);
 
-    return periods.map((p) => {
+    const periodRows = periods.map((p) => {
       const slotsAtPeriod = slots.filter((s) => s.periodNumber === p);
       const sample = slotsAtPeriod[0];
       const row: ScheduleRow = {
@@ -163,6 +167,18 @@ function TeacherScheduleContent() {
       });
       return row;
     });
+
+    // Breaks aren't stored data — infer them from the time gap between
+    // consecutive periods so the grid shows a "Break" bar instead of an
+    // unexplained gap.
+    const breakRows: ScheduleRow[] = detectBreaks(slots).map((b) => ({
+      periodNumber: b.sortOrder,
+      isBreak: true,
+      startTime: b.startTime,
+      endTime: b.endTime,
+    }));
+
+    return [...periodRows, ...breakRows].sort((a, b) => a.periodNumber - b.periodNumber);
     // weekDays is stable per render via showSaturday, so the deps below are
     // sufficient — including weekDays directly would cause useMemo churn.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -209,27 +225,41 @@ function TeacherScheduleContent() {
         title: 'Period',
         key: 'periodNumber',
         width: 90,
-        render: (_: unknown, row: ScheduleRow) => (
-          <div>
-            <Text strong>Period {row.periodNumber}</Text>
-            {row.startTime && (
-              <div>
-                <Text type="secondary" style={{ fontSize: 11 }}>
-                  {formatTimeShort(row.startTime)}
-                  {row.endTime ? `–${formatTimeShort(row.endTime)}` : ''}
-                </Text>
-              </div>
-            )}
-          </div>
-        ),
+        render: (_: unknown, row: ScheduleRow) => {
+          if (row.isBreak) {
+            return {
+              children: (
+                <div style={{ textAlign: 'center', fontWeight: 600, color: '#ad6800' }}>
+                  <CoffeeOutlined /> Break &nbsp;{formatTimeShort(row.startTime)}–{formatTimeShort(row.endTime)}
+                </div>
+              ),
+              props: { colSpan: weekDays.length + 1 },
+            };
+          }
+          return (
+            <div>
+              <Text strong>Period {row.periodNumber}</Text>
+              {row.startTime && (
+                <div>
+                  <Text type="secondary" style={{ fontSize: 11 }}>
+                    {formatTimeShort(row.startTime)}
+                    {row.endTime ? `–${formatTimeShort(row.endTime)}` : ''}
+                  </Text>
+                </div>
+              )}
+            </div>
+          );
+        },
       },
     ];
     weekDays.forEach((d) => {
       cols.push({
         title: DAY_LABELS_FULL[d],
         key: `day-${d}`,
-        render: (_: unknown, row: ScheduleRow) =>
-          renderSlotCell(row[`day-${d}`]),
+        render: (_: unknown, row: ScheduleRow) => {
+          if (row.isBreak) return { children: null, props: { colSpan: 0 } };
+          return renderSlotCell(row[`day-${d}`]);
+        },
       });
     });
     return cols;

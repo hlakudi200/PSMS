@@ -63,6 +63,8 @@ const generateSchema = z.object({
   periodsPerDay: z.number().min(1).max(12),
   periodStartTime: z.string().min(1, 'Please select a period start time'),
   periodDurationMinutes: z.number().min(15).max(120),
+  breakAfterPeriods: z.array(z.number()).default([]),
+  breakDurationMinutes: z.number().min(0).max(120).default(30),
 });
 
 function GenerateTimetablesContent() {
@@ -92,6 +94,8 @@ function GenerateTimetablesContent() {
         periodsPerDay: 8,
         periodStartTime: dayjs('08:00', TIME_FORMAT),
         periodDurationMinutes: 40,
+        breakAfterPeriods: [],
+        breakDurationMinutes: 30,
       });
     }
   }, [academicYears]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -99,6 +103,14 @@ function GenerateTimetablesContent() {
   const academicYearOptions = (academicYears ?? []).map((y) => ({
     value: y.id,
     label: y.isCurrent ? `${y.yearName} (Current)` : y.yearName,
+  }));
+
+  // Break-after options depend on how many periods a day has. The last
+  // period can't have a break after it (nothing follows), so it's excluded.
+  const periodsPerDayWatch = Form.useWatch('periodsPerDay', form) ?? 8;
+  const breakPeriodOptions = Array.from({ length: Math.max(0, periodsPerDayWatch - 1) }, (_, i) => ({
+    value: i + 1,
+    label: `After Period ${i + 1}`,
   }));
 
   const handleGenerate = async () => {
@@ -111,6 +123,8 @@ function GenerateTimetablesContent() {
         periodsPerDay: values.periodsPerDay,
         periodStartTime: values.periodStartTime ? dayjs(values.periodStartTime).format(TIME_FORMAT) : '',
         periodDurationMinutes: values.periodDurationMinutes,
+        breakAfterPeriods: values.breakAfterPeriods ?? [],
+        breakDurationMinutes: values.breakDurationMinutes ?? 30,
       });
 
       if (!parsed.success) {
@@ -130,6 +144,8 @@ function GenerateTimetablesContent() {
         periodsPerDay: parsed.data.periodsPerDay,
         periodStartTime: `${parsed.data.periodStartTime}:00`,
         periodDurationMinutes: parsed.data.periodDurationMinutes,
+        breakAfterPeriods: parsed.data.breakAfterPeriods,
+        breakDurationMinutes: parsed.data.breakDurationMinutes,
       });
       message.success('Timetables generated — review the drafts below before activating.');
     } catch {
@@ -138,12 +154,16 @@ function GenerateTimetablesContent() {
   };
 
   const handleActivateAll = async () => {
-    const classes = generationResult?.classes ?? [];
-    if (classes.length === 0) return;
+    // timetableId is null for a class with nothing to activate (no subjects
+    // requested, or every lesson failed to place) — only draft rows count.
+    const generated = (generationResult?.classes ?? []).filter(
+      (c): c is IGeneratedClassTimetable & { timetableId: string } => !!c.timetableId
+    );
+    if (generated.length === 0) return;
 
     setActivating(true);
     const results = await Promise.allSettled(
-      classes.map((c) => activateAsync(c.timetableId))
+      generated.map((c) => activateAsync(c.timetableId))
     );
     setActivating(false);
 
@@ -249,6 +269,27 @@ function GenerateTimetablesContent() {
               </Form.Item>
             </Col>
           </Row>
+          <Row gutter={16}>
+            <Col xs={24} md={12}>
+              <Form.Item
+                label="Breaks"
+                name="breakAfterPeriods"
+                tooltip="e.g. pick after Period 3 and after Period 6 for periods-break-periods-break-periods."
+              >
+                <Select
+                  mode="multiple"
+                  options={breakPeriodOptions}
+                  placeholder="No breaks — periods run back-to-back"
+                  allowClear
+                />
+              </Form.Item>
+            </Col>
+            <Col xs={24} md={12}>
+              <Form.Item label="Break Duration (minutes)" name="breakDurationMinutes">
+                <InputNumber style={{ width: '100%' }} min={0} max={120} step={5} />
+              </Form.Item>
+            </Col>
+          </Row>
           <div
             style={{
               display: 'flex',
@@ -276,7 +317,17 @@ function GenerateTimetablesContent() {
         </Form>
       </Card>
 
-      {generationResult && (
+      {generationResult && generationResult.message && (
+        <Alert
+          type="info"
+          showIcon
+          style={{ marginBottom: 16 }}
+          message="Nothing to generate"
+          description={generationResult.message}
+        />
+      )}
+
+      {generationResult && !generationResult.message && (
         <>
           <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
             <Col xs={24} sm={8}>
@@ -318,7 +369,7 @@ function GenerateTimetablesContent() {
                   icon={<CheckCircleOutlined />}
                   onClick={handleActivateAll}
                   loading={activating}
-                  disabled={generationResult.classes.length === 0}
+                  disabled={!generationResult.classes.some((c) => c.timetableId)}
                 >
                   Activate all drafts
                 </Button>
@@ -327,7 +378,7 @@ function GenerateTimetablesContent() {
           >
             {generationResult.classes.length > 0 ? (
               <Table
-                rowKey="timetableId"
+                rowKey="classId"
                 columns={classColumns}
                 dataSource={generationResult.classes}
                 pagination={false}

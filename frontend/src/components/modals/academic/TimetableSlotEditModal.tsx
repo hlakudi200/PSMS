@@ -44,9 +44,17 @@ interface TimetableSlotEditModalProps {
   periodNumber: number;
   /** Present when editing an existing slot; absent when filling an empty cell. */
   existingSlot?: ITimetableSlotList | null;
-  /** Times the rest of this period runs at, used to prefill a new slot. */
-  defaultStartTime?: string;
-  defaultEndTime?: string;
+  /**
+   * This period's established start/end time, taken from another day that
+   * already has this same period (or extrapolated from the timetable's
+   * period duration when none does). A period's duration is a property of
+   * its position in the school day, not of the lesson placed in it, so the
+   * time locks to this rather than staying freely editable. Absent only
+   * when this is the very first slot ever placed anywhere in the timetable,
+   * in which case time stays freely editable.
+   */
+  fixedStartTime?: string;
+  fixedEndTime?: string;
 }
 
 export const TimetableSlotEditModal: React.FC<TimetableSlotEditModalProps> = ({
@@ -57,11 +65,12 @@ export const TimetableSlotEditModal: React.FC<TimetableSlotEditModalProps> = ({
   dayOfWeek,
   periodNumber,
   existingSlot,
-  defaultStartTime,
-  defaultEndTime,
+  fixedStartTime,
+  fixedEndTime,
 }) => {
   const [form] = Form.useForm();
   const isEdit = !!existingSlot;
+  const timeLocked = !!(fixedStartTime && fixedEndTime);
 
   const { subjects } = useSubjectState();
   const { getAllAsync: getAllSubjectsAsync } = useSubjectActions();
@@ -80,25 +89,32 @@ export const TimetableSlotEditModal: React.FC<TimetableSlotEditModalProps> = ({
       getAsync(existingSlot.id);
     } else {
       form.resetFields();
-      // Start a new slot on the same times the rest of the period runs at, so the
-      // common case is one subject + one teacher away from done.
-      form.setFieldsValue({
-        startTime: defaultStartTime ? dayjs(defaultStartTime, TIMESPAN_FORMAT) : undefined,
-        endTime: defaultEndTime ? dayjs(defaultEndTime, TIMESPAN_FORMAT) : undefined,
-      });
+      // Lock a new slot to the time the rest of the period runs at, so the
+      // common case is one subject + one teacher away from done, and can't
+      // drift the period off its established time.
+      if (timeLocked) {
+        form.setFieldsValue({
+          startTime: dayjs(fixedStartTime, TIMESPAN_FORMAT),
+          endTime: dayjs(fixedEndTime, TIMESPAN_FORMAT),
+        });
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, existingSlot?.id, defaultStartTime, defaultEndTime]);
+  }, [open, existingSlot?.id]);
 
   // Full slot detail (with subjectId/teacherId — the list DTO only has names)
   // arrives async after getAsync above resolves; populate once it matches.
+  // Time is pinned to the period's established value (fixedStartTime/
+  // fixedEndTime) rather than whatever this row happens to store, so
+  // editing a slot can't drift it out of alignment with the rest of the
+  // period column.
   useEffect(() => {
     if (open && existingSlot && timetableSlot?.id === existingSlot.id) {
       form.setFieldsValue({
         subjectId: timetableSlot.subjectId,
         teacherId: timetableSlot.teacherId,
-        startTime: dayjs(timetableSlot.startTime, TIMESPAN_FORMAT),
-        endTime: dayjs(timetableSlot.endTime, TIMESPAN_FORMAT),
+        startTime: dayjs(timeLocked ? fixedStartTime : timetableSlot.startTime, TIMESPAN_FORMAT),
+        endTime: dayjs(timeLocked ? fixedEndTime : timetableSlot.endTime, TIMESPAN_FORMAT),
         roomNumber: timetableSlot.roomNumber,
       });
     }
@@ -217,13 +233,23 @@ export const TimetableSlotEditModal: React.FC<TimetableSlotEditModalProps> = ({
         {/* Row/Col rather than Space.Compact: compact collapses the two labels. */}
         <Row gutter={16}>
           <Col span={12}>
-            <Form.Item label="Start time" name="startTime" rules={[{ required: true }]}>
-              <TimePicker style={{ width: '100%' }} format={TIME_FORMAT} minuteStep={5} />
+            <Form.Item
+              label="Start time"
+              name="startTime"
+              rules={[{ required: true }]}
+              tooltip={timeLocked ? "This period's time is set by the rest of the timetable and can't be changed here." : undefined}
+            >
+              <TimePicker style={{ width: '100%' }} format={TIME_FORMAT} minuteStep={5} disabled={timeLocked} />
             </Form.Item>
           </Col>
           <Col span={12}>
-            <Form.Item label="End time" name="endTime" rules={[{ required: true }]}>
-              <TimePicker style={{ width: '100%' }} format={TIME_FORMAT} minuteStep={5} />
+            <Form.Item
+              label="End time"
+              name="endTime"
+              rules={[{ required: true }]}
+              tooltip={timeLocked ? "This period's time is set by the rest of the timetable and can't be changed here." : undefined}
+            >
+              <TimePicker style={{ width: '100%' }} format={TIME_FORMAT} minuteStep={5} disabled={timeLocked} />
             </Form.Item>
           </Col>
         </Row>

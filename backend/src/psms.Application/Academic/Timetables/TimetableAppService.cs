@@ -244,7 +244,10 @@ public class TimetableAppService : ApplicationService, ITimetableAppService
             .ToListAsync();
 
         if (classes.Count == 0)
+        {
+            result.Message = "No active classes found for the selected academic year. Create classes for this year first.";
             return result;
+        }
 
         var classIds = classes.Select(c => c.Id).ToList();
 
@@ -255,6 +258,12 @@ public class TimetableAppService : ApplicationService, ITimetableAppService
             .Where(cs => classIds.Contains(cs.ClassId) && cs.IsActive && cs.PeriodsPerWeek > 0
                 && cs.TenantId == AbpSession.TenantId)
             .ToListAsync();
+
+        if (classSubjects.Count == 0)
+        {
+            result.Message = "The classes in this academic year have no subjects with periods-per-week assigned. Set up ClassSubjects (with PeriodsPerWeek) before generating.";
+            return result;
+        }
 
         // Seed teacher-busy from every currently-active slot tenant-wide so a
         // generated draft never conflicts with a class's timetable that hasn't
@@ -351,38 +360,52 @@ public class TimetableAppService : ApplicationService, ITimetableAppService
             }
         }
 
-        var periodTimes = BuildPeriodTimes(input.PeriodStartTime, input.PeriodDurationMinutes, input.PeriodsPerDay);
+        var periodTimes = BuildPeriodTimes(
+            input.PeriodStartTime, input.PeriodDurationMinutes, input.PeriodsPerDay,
+            input.BreakAfterPeriods, input.BreakDurationMinutes);
 
-        foreach (var classGroup in placements.GroupBy(p => p.ClassId))
+        var placementsByClass = placements
+            .GroupBy(p => p.ClassId)
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        // Report every active class in the year, not just ones that got a
+        // slot placed — otherwise a class with no ClassSubjects, or one
+        // where every lesson failed to place, silently disappears from the
+        // results instead of showing "No subjects" / "Not placed".
+        foreach (var cls in classes)
         {
-            var cls = classes.First(c => c.Id == classGroup.Key);
-
-            // Draft — same as the manual CreateAsync flow: review, then ActivateAsync.
-            var timetable = new Timetable(Guid.NewGuid(), AbpSession.TenantId, cls.Id, input.EffectiveDate)
-            {
-                IsActive = false
-            };
-            await _timetableRepository.InsertAsync(timetable);
-
-            foreach (var p in classGroup)
-            {
-                var (start, end) = periodTimes[p.Period];
-                var newSlot = new TimetableSlot(Guid.NewGuid(), timetable.Id, p.Day, p.Period, start, end, p.SubjectId, p.TeacherId);
-                await _slotRepository.InsertAsync(newSlot);
-            }
-
             var requestedForClass = classSubjects.Where(cs => cs.ClassId == cls.Id).Sum(cs => cs.PeriodsPerWeek);
-            var placedForClass = classGroup.Count();
+            var classPlacements = placementsByClass.TryGetValue(cls.Id, out var list) ? list : new List<Placement>();
+
+            Guid? timetableId = null;
+            if (classPlacements.Count > 0)
+            {
+                // Draft — same as the manual CreateAsync flow: review, then ActivateAsync.
+                var timetable = new Timetable(Guid.NewGuid(), AbpSession.TenantId, cls.Id, input.EffectiveDate)
+                {
+                    IsActive = false
+                };
+                await _timetableRepository.InsertAsync(timetable);
+
+                foreach (var p in classPlacements)
+                {
+                    var (start, end) = periodTimes[p.Period];
+                    var newSlot = new TimetableSlot(Guid.NewGuid(), timetable.Id, p.Day, p.Period, start, end, p.SubjectId, p.TeacherId);
+                    await _slotRepository.InsertAsync(newSlot);
+                }
+
+                timetableId = timetable.Id;
+                result.TotalSlotsPlaced += classPlacements.Count;
+            }
 
             result.Classes.Add(new GeneratedClassTimetableDto
             {
                 ClassId = cls.Id,
                 ClassName = cls.ClassName,
-                TimetableId = timetable.Id,
-                SlotsPlaced = placedForClass,
+                TimetableId = timetableId,
+                SlotsPlaced = classPlacements.Count,
                 SlotsRequested = requestedForClass,
             });
-            result.TotalSlotsPlaced += placedForClass;
         }
 
         await CurrentUnitOfWork.SaveChangesAsync();
@@ -423,8 +446,10 @@ public class TimetableAppService : ApplicationService, ITimetableAppService
     }
 
     private static Dictionary<int, (TimeSpan Start, TimeSpan End)> BuildPeriodTimes(
-        TimeSpan startTime, int durationMinutes, int periodsPerDay)
+        TimeSpan startTime, int durationMinutes, int periodsPerDay,
+        List<int> breakAfterPeriods, int breakDurationMinutes)
     {
+        var breaks = new HashSet<int>(breakAfterPeriods ?? new List<int>());
         var times = new Dictionary<int, (TimeSpan, TimeSpan)>();
         var cursor = startTime;
         for (var period = 1; period <= periodsPerDay; period++)
@@ -432,6 +457,11 @@ public class TimetableAppService : ApplicationService, ITimetableAppService
             var end = cursor.Add(TimeSpan.FromMinutes(durationMinutes));
             times[period] = (cursor, end);
             cursor = end;
+
+            // A break after the last period just trails the day — harmless,
+            // but skip it so EffectiveDate/day-end times stay tidy.
+            if (breaks.Contains(period) && breakDurationMinutes > 0 && period < periodsPerDay)
+                cursor = cursor.Add(TimeSpan.FromMinutes(breakDurationMinutes));
         }
         return times;
     }

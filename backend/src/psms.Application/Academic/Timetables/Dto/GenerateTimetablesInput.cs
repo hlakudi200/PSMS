@@ -26,4 +26,14 @@ public class GenerateTimetablesInput
 
     [Range(15, 120)]
     public int PeriodDurationMinutes { get; set; } = 40;
+
+    /// <summary>
+    /// Period numbers after which a break is inserted (e.g. [3, 6] for
+    /// periods 1-3, a break, periods 4-6, a break, then the remaining
+    /// periods). Empty/null = no breaks, periods run back-to-back.
+    /// </summary>
+    public List<int> BreakAfterPeriods { get; set; } = new();
+
+    [Range(0, 120)]
+    public int BreakDurationMinutes { get; set; } = 30;
 }
