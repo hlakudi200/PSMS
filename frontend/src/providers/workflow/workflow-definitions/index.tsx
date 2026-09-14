@@ -7,6 +7,8 @@ import {
   WorkflowDefinitionStateContext,
 } from "./context";
 import type {
+  ICloneWorkflowDefinition,
+  IWorkflowDefinition,
   ICreateWorkflowDefinition,
   IUpdateWorkflowDefinition,
   IGetWorkflowDefinitionsInput,
@@ -147,6 +149,21 @@ export const WorkflowDefinitionProvider = ({
       });
   };
 
+  // WF-33: clone as a new inactive version (steps of a running definition are locked).
+  const cloneAsync = async (id: string, input?: ICloneWorkflowDefinition): Promise<IWorkflowDefinition | undefined> => {
+    dispatch(createDefinitionPending());
+    const endpoint = `/api/services/app/WorkflowDefinition/Clone?id=${id}`;
+    try {
+      const response = await instance.post(endpoint, input ?? {});
+      dispatch(createDefinitionSuccess(response.data.result));
+      return response.data.result as IWorkflowDefinition;
+    } catch (error) {
+      console.error(error);
+      dispatch(createDefinitionError());
+      return undefined;
+    }
+  };
+
   return (
     <WorkflowDefinitionStateContext.Provider value={state}>
       <WorkflowDefinitionActionContext.Provider
@@ -158,6 +175,7 @@ export const WorkflowDefinitionProvider = ({
           deleteAsync,
           activateAsync,
           deactivateAsync,
+          cloneAsync,
         }}
       >
         {children}

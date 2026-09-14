@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Card, Descriptions, Tag, Button, Table, Space, message, Typography, Popconfirm } from 'antd';
+import { Card, Descriptions, Tag, Button, Table, Space, message, Typography, Popconfirm, Alert } from 'antd';
 import {
   PlusOutlined,
   EditOutlined,
@@ -9,6 +9,7 @@ import {
   ArrowUpOutlined,
   ArrowDownOutlined,
   ArrowLeftOutlined,
+  CopyOutlined,
 } from '@ant-design/icons';
 import { useParams, useRouter } from 'next/navigation';
 import { useWorkflowBasePath } from './useWorkflowBasePath';
@@ -38,7 +39,7 @@ function DetailContent() {
   const base = useWorkflowBasePath();
   const id = params?.id as string;
   const { definition, isPending: defPending } = useWorkflowDefinitionState();
-  const { getAsync: getDefinition } = useWorkflowDefinitionActions();
+  const { getAsync: getDefinition, cloneAsync } = useWorkflowDefinitionActions();
   const { steps, isPending: stepsPending } = useWorkflowStepState();
   const { getByDefinitionAsync, deleteAsync: deleteStep, reorderAsync } = useWorkflowStepActions();
   const [modalOpen, setModalOpen] = useState(false);
@@ -85,6 +86,19 @@ function DetailContent() {
     await deleteStep(stepId);
     message.success('Step deleted');
     refreshSteps();
+  };
+
+  // WF-33: a running instance follows the live step rows, so the server refuses
+  // step edits while any instance is active; the UI mirrors that and offers a clone.
+  const locked = !!definition?.hasActiveInstances;
+
+  const handleClone = async () => {
+    if (!id) return;
+    const clone = await cloneAsync(id);
+    if (clone) {
+      message.success(`Cloned as "${clone.name}" (inactive). Edit its steps, then activate it.`);
+      router.push(`${base}/definitions/${clone.id}`);
+    }
   };
 
   const sortedSteps = [...(steps ?? definition?.steps ?? [])].sort(
@@ -174,18 +188,19 @@ function DetailContent() {
           <Button
             size="small"
             icon={<ArrowUpOutlined />}
-            disabled={index === 0}
+            disabled={locked || index === 0}
             onClick={() => handleMoveStep(record.id, 'up')}
           />
           <Button
             size="small"
             icon={<ArrowDownOutlined />}
-            disabled={index === sortedSteps.length - 1}
+            disabled={locked || index === sortedSteps.length - 1}
             onClick={() => handleMoveStep(record.id, 'down')}
           />
           <Button
             size="small"
             icon={<EditOutlined />}
+            disabled={locked}
             onClick={() => { setEditStep(record); setModalOpen(true); }}
           />
           <Popconfirm
@@ -193,7 +208,7 @@ function DetailContent() {
             description="Steps in use by active instances cannot be deleted."
             onConfirm={() => handleDeleteStep(record.id)}
           >
-            <Button size="small" icon={<DeleteOutlined />} danger />
+            <Button size="small" icon={<DeleteOutlined />} danger disabled={locked} />
           </Popconfirm>
         </Space>
       ),
@@ -228,16 +243,30 @@ function DetailContent() {
         </Descriptions>
       </Card>
 
+      {locked && (
+        <Alert
+          type="info"
+          showIcon
+          style={{ marginBottom: 16 }}
+          message="Steps are locked while workflows are running on this definition."
+          description="Editing them would rewire approvals mid-flight. Clone it as a new version, change the clone, then activate it — running instances finish on this version."
+          action={<Button size="small" icon={<CopyOutlined />} onClick={handleClone}>Clone as new version</Button>}
+        />
+      )}
       <Card
         title={`Steps (${sortedSteps.length})`}
         extra={
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            onClick={() => { setEditStep(null); setModalOpen(true); }}
-          >
-            Add Step
-          </Button>
+          <Space>
+            <Button icon={<CopyOutlined />} onClick={handleClone}>Clone</Button>
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              disabled={locked}
+              onClick={() => { setEditStep(null); setModalOpen(true); }}
+            >
+              Add Step
+            </Button>
+          </Space>
         }
       >
         <Table<IWorkflowStep>

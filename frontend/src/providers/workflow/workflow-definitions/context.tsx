@@ -1,6 +1,7 @@
 'use client'
 import { createContext } from "react";
 import type {
+  ICloneWorkflowDefinition,
   IWorkflowDefinition,
   IWorkflowDefinitionList,
   ICreateWorkflowDefinition,
@@ -25,6 +26,7 @@ export interface IWorkflowDefinitionActionContext {
   deleteAsync: (id: string) => void;
   activateAsync: (id: string) => void;
   deactivateAsync: (id: string) => void;
+  cloneAsync: (id: string, input?: ICloneWorkflowDefinition) => Promise<IWorkflowDefinition | undefined>;
 }
 
 export const INITIAL_STATE: IWorkflowDefinitionStateContext = {

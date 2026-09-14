@@ -22,14 +22,30 @@ namespace psms.Workflow.WorkflowDefinitions;
 public class WorkflowDefinitionAppService : ApplicationService, IWorkflowDefinitionAppService
 {
     private readonly IRepository<WorkflowDefinition, Guid> _definitionRepository;
-    private readonly IRepository<WorkflowInstance, Guid> _instanceRepository;
+        private readonly IRepository<WorkflowInstance, Guid> _instanceRepository;
+    private readonly IRepository<WorkflowStep, Guid> _stepRepository;
 
     public WorkflowDefinitionAppService(
         IRepository<WorkflowDefinition, Guid> definitionRepository,
-        IRepository<WorkflowInstance, Guid> instanceRepository)
+        IRepository<WorkflowInstance, Guid> instanceRepository,
+        IRepository<WorkflowStep, Guid> stepRepository)
     {
         _definitionRepository = definitionRepository;
         _instanceRepository = instanceRepository;
+        _stepRepository = stepRepository;
+    }
+
+    private async Task<HashSet<Guid>> DefinitionsWithActiveInstancesAsync(IEnumerable<Guid> definitionIds)
+    {
+        var ids = definitionIds.ToList();
+        var active = await _instanceRepository.GetAll()
+            .Where(i => i.TenantId == AbpSession.TenantId
+                && ids.Contains(i.WorkflowDefinitionId)
+                && (i.Status == WorkflowStatus.NotStarted || i.Status == WorkflowStatus.InProgress))
+            .Select(i => i.WorkflowDefinitionId)
+            .Distinct()
+            .ToListAsync();
+        return active.ToHashSet();
     }
 
     [AbpAuthorize(PermissionNames.Workflow_Definitions_View)]
@@ -40,11 +56,13 @@ public class WorkflowDefinitionAppService : ApplicationService, IWorkflowDefinit
             .Include(d => d.Steps.OrderBy(s => s.StepOrder))
             .FirstOrDefaultAsync(d => d.Id == id && d.TenantId == AbpSession.TenantId);
 
-        if (definition == null)
+                if (definition == null)
             throw new UserFriendlyException(WorkflowExceptionCodes.DefinitionNotFound,
                 "Workflow definition not found.");
 
-        return ObjectMapper.Map<WorkflowDefinitionDto>(definition);
+        var dto = ObjectMapper.Map<WorkflowDefinitionDto>(definition);
+        dto.HasActiveInstances = (await DefinitionsWithActiveInstancesAsync(new[] { id })).Contains(id);
+        return dto;
     }
 
     [AbpAuthorize(PermissionNames.Workflow_Definitions_View)]
@@ -66,9 +84,10 @@ public class WorkflowDefinitionAppService : ApplicationService, IWorkflowDefinit
             .PageBy(input)
             .ToListAsync();
 
-        return new PagedResultDto<WorkflowDefinitionListDto>(
-            totalCount,
-            ObjectMapper.Map<List<WorkflowDefinitionListDto>>(items));
+        var dtos = ObjectMapper.Map<List<WorkflowDefinitionListDto>>(items);
+        var locked = await DefinitionsWithActiveInstancesAsync(items.Select(d => d.Id));
+        foreach (var dto in dtos) dto.HasActiveInstances = locked.Contains(dto.Id);
+        return new PagedResultDto<WorkflowDefinitionListDto>(totalCount, dtos);
     }
 
     [AbpAuthorize(PermissionNames.Workflow_Definitions_Create)]
@@ -200,6 +219,77 @@ public class WorkflowDefinitionAppService : ApplicationService, IWorkflowDefinit
         await CurrentUnitOfWork.SaveChangesAsync();
 
         return await GetAsync(id);
+    }
+
+    /// <summary>
+    /// WF-33: copy a definition (and every step, with its routing, guards, effects
+    /// and decision schema) as a new INACTIVE definition. Running instances keep
+    /// following the original; edit the clone, then Activate it so new instances
+    /// start on the new version.
+    /// </summary>
+    [AbpAuthorize(PermissionNames.Workflow_Definitions_Create)]
+    public async Task<WorkflowDefinitionDto> CloneAsync(Guid id, CloneWorkflowDefinitionDto input)
+    {
+        var source = await _definitionRepository
+            .GetAll()
+            .Include(d => d.Steps)
+            .FirstOrDefaultAsync(d => d.Id == id && d.TenantId == AbpSession.TenantId);
+        if (source == null)
+            throw new UserFriendlyException(WorkflowExceptionCodes.DefinitionNotFound,
+                "Workflow definition not found.");
+
+        var name = string.IsNullOrWhiteSpace(input?.Name) ? null : input.Name.Trim();
+        if (name == null)
+        {
+            var baseName = System.Text.RegularExpressions.Regex.Replace(source.Name, @"s+vd+$", "");
+            var n = 2;
+            do { name = $"{baseName} v{n++}"; }
+            while (await _definitionRepository.GetAll().AnyAsync(d => d.TenantId == AbpSession.TenantId && d.Name.ToLower() == name.ToLower()));
+        }
+        else if (await _definitionRepository.GetAll().AnyAsync(d => d.TenantId == AbpSession.TenantId && d.Name.ToLower() == name.ToLower()))
+        {
+            throw new UserFriendlyException(WorkflowExceptionCodes.DefinitionNameDuplicate,
+                "A workflow definition with this name already exists.");
+        }
+
+        var clone = new WorkflowDefinition
+        {
+            Id = Guid.NewGuid(),
+            TenantId = AbpSession.TenantId,
+            Name = name,
+            Description = source.Description,
+            EntityType = source.EntityType,
+            IsActive = false,
+        };
+        await _definitionRepository.InsertAsync(clone);
+
+        foreach (var s in source.Steps)
+        {
+            await _stepRepository.InsertAsync(new WorkflowStep
+            {
+                Id = Guid.NewGuid(),
+                WorkflowDefinitionId = clone.Id,
+                StepOrder = s.StepOrder,
+                Name = s.Name,
+                Description = s.Description,
+                AssignedRole = s.AssignedRole,
+                ActionType = s.ActionType,
+                IsTerminal = s.IsTerminal,
+                NextStepOnApprove = s.NextStepOnApprove,
+                NextStepOnReject = s.NextStepOnReject,
+                IsCommentRequired = s.IsCommentRequired,
+                AssignedUserId = s.AssignedUserId,
+                SlaHours = s.SlaHours,
+                GuardKey = s.GuardKey,
+                EntryEffectKey = s.EntryEffectKey,
+                ExitEffectKey = s.ExitEffectKey,
+                DecisionSchemaKey = s.DecisionSchemaKey,
+                IsOptional = s.IsOptional,
+            });
+        }
+
+        await CurrentUnitOfWork.SaveChangesAsync();
+        return await GetAsync(clone.Id);
     }
 
     private async Task DeactivateOthersForEntityType(WorkflowEntityType entityType)

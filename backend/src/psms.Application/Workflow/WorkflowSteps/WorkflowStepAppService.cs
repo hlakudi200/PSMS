@@ -76,6 +76,23 @@ public class WorkflowStepAppService : ApplicationService, IWorkflowStepAppServic
             throw new UserFriendlyException(WorkflowExceptionCodes.ExtensionNotFound, $"Unknown decision schema '{decisionSchemaKey}' for {entityType}.");
     }
 
+    /// <summary>
+    /// WF-33: a running instance reads the LIVE step rows, so editing steps under it
+    /// would rewire an approval mid-flight. Steps are locked while any instance of
+    /// the definition is active; make changes on a clone (WorkflowDefinition/Clone)
+    /// and activate that instead.
+    /// </summary>
+    private async Task EnsureNoActiveInstancesAsync(Guid definitionId)
+    {
+        var active = await _instanceRepository.GetAll().AnyAsync(i =>
+            i.WorkflowDefinitionId == definitionId
+            && i.TenantId == AbpSession.TenantId
+            && (i.Status == WorkflowStatus.NotStarted || i.Status == WorkflowStatus.InProgress));
+        if (active)
+            throw new UserFriendlyException(WorkflowExceptionCodes.DefinitionHasActiveInstancesCannotModifySteps,
+                "This definition has workflows in progress, so its steps are locked. Clone it as a new version, edit the clone, then activate it.");
+    }
+
     private static string Key(string value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim().ToLowerInvariant();
 
     [AbpAuthorize(PermissionNames.Workflow_Definitions_View)]
@@ -124,6 +141,8 @@ public class WorkflowStepAppService : ApplicationService, IWorkflowStepAppServic
         if (definition == null)
             throw new UserFriendlyException(WorkflowExceptionCodes.DefinitionNotFound,
                 "Workflow definition not found.");
+
+        await EnsureNoActiveInstancesAsync(definition.Id);
 
         // Check duplicate step order
         var orderExists = await _stepRepository
@@ -184,6 +203,8 @@ public class WorkflowStepAppService : ApplicationService, IWorkflowStepAppServic
         if (step == null)
             throw new UserFriendlyException(WorkflowExceptionCodes.StepNotFound,
                 "Workflow step not found.");
+
+        await EnsureNoActiveInstancesAsync(step.WorkflowDefinitionId);
 
         if (input.Name != null) step.Name = input.Name.Trim();
         if (input.Description != null) step.Description = input.Description.Trim();
@@ -253,6 +274,18 @@ public class WorkflowStepAppService : ApplicationService, IWorkflowStepAppServic
             throw new UserFriendlyException(WorkflowExceptionCodes.StepInUseByInstances,
                 "Cannot delete a step that is currently active in a workflow instance.");
 
+        await EnsureNoActiveInstancesAsync(step.WorkflowDefinitionId);
+
+        // WF-33: another step routing to this one by order would be left pointing at nothing.
+        var referencedBy = await _stepRepository.GetAll()
+            .Where(s => s.WorkflowDefinitionId == step.WorkflowDefinitionId && s.Id != step.Id
+                && (s.NextStepOnApprove == step.StepOrder || s.NextStepOnReject == step.StepOrder))
+            .Select(s => s.Name)
+            .ToListAsync();
+        if (referencedBy.Count > 0)
+            throw new UserFriendlyException(WorkflowExceptionCodes.InvalidNextStep,
+                $"Step '{step.Name}' is the next-step target of: {string.Join(", ", referencedBy)}. Re-route those steps first.");
+
         // Bump definition version
         step.WorkflowDefinition.BumpVersion();
 
@@ -282,13 +315,26 @@ public class WorkflowStepAppService : ApplicationService, IWorkflowStepAppServic
             throw new UserFriendlyException(WorkflowExceptionCodes.InvalidNextStep,
                 "Step IDs do not match the steps in this definition.");
 
-        // Assign new order
-        for (var i = 0; i < input.StepIds.Count; i++)
-        {
-            var step = steps.First(s => s.Id == input.StepIds[i]);
-            step.StepOrder = i + 1;
-        }
+        await EnsureNoActiveInstancesAsync(input.WorkflowDefinitionId);
 
+        // WF-33: NextStepOnApprove / NextStepOnReject are stored as ORDERS, so they
+        // must follow their target step to its new position or the graph is rewired.
+        var oldToNew = new Dictionary<int, int>();
+        for (var i = 0; i < input.StepIds.Count; i++)
+            oldToNew[steps.First(s => s.Id == input.StepIds[i]).StepOrder] = i + 1;
+
+        foreach (var step in steps)
+        {
+            if (step.NextStepOnApprove.HasValue && oldToNew.TryGetValue(step.NextStepOnApprove.Value, out var a)) step.NextStepOnApprove = a;
+            if (step.NextStepOnReject.HasValue && oldToNew.TryGetValue(step.NextStepOnReject.Value, out var r)) step.NextStepOnReject = r;
+        }
+        // Two passes so the unique (DefinitionId, StepOrder) index is never hit mid-way.
+        foreach (var step in steps) step.StepOrder = -oldToNew[step.StepOrder];
+        await CurrentUnitOfWork.SaveChangesAsync();
+        foreach (var step in steps) step.StepOrder = -step.StepOrder;
+
+        var definition = await _definitionRepository.GetAsync(input.WorkflowDefinitionId);
+        definition.BumpVersion();
         await CurrentUnitOfWork.SaveChangesAsync();
 
         return await GetByDefinitionAsync(input.WorkflowDefinitionId);

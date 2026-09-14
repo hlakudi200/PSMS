@@ -29,4 +29,6 @@ public class WorkflowInstanceListDto : EntityDto<Guid>
     public DateTime? StartedDate { get; set; }
     public DateTime? CompletedDate { get; set; }
     public DateTime CreationTime { get; set; }
+    /// <summary>WF-34: only the creator may Recall; the UI hides the action for everyone else.</summary>
+    public long? CreatorUserId { get; set; }
 }

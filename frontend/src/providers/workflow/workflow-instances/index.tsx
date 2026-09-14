@@ -10,6 +10,7 @@ import type {
   IStartWorkflow,
   IAdvanceWorkflow,
   IBatchAdvance,
+  IBatchAdvanceResult,
   IGetWorkflowInstancesInput,
   IPagedAndSortedResultRequest,
   IWorkflowEntitySummary,
@@ -153,18 +154,18 @@ export const WorkflowInstanceProvider = ({
       });
   };
 
-  const batchAdvanceAsync = async (input: IBatchAdvance) => {
+  const batchAdvanceAsync = async (input: IBatchAdvance): Promise<IBatchAdvanceResult | undefined> => {
     dispatch(batchAdvancePending());
     const endpoint = `/api/services/app/WorkflowInstance/BatchAdvance`;
-    await instance
-      .post(endpoint, input)
-      .then((response) => {
-        dispatch(batchAdvanceSuccess(response.data.result));
-      })
-      .catch((error) => {
-        console.error(error);
-        dispatch(batchAdvanceError());
-      });
+    try {
+      const response = await instance.post(endpoint, input);
+      dispatch(batchAdvanceSuccess(response.data.result));
+      return response.data.result as IBatchAdvanceResult;
+    } catch (error) {
+      console.error(error);
+      dispatch(batchAdvanceError());
+      return undefined;
+    }
   };
 
   const getHistoryAsync = async (instanceId: string) => {

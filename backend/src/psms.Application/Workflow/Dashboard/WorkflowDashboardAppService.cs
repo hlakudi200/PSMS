@@ -7,6 +7,7 @@ using psms.Authorization.Users;
 using psms.Domain.Workflow.Entities;
 using psms.Domain.Workflow.Enums;
 using psms.Workflow.Dashboard.Dto;
+using psms.Workflow.Shared;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -21,13 +22,16 @@ public class WorkflowDashboardAppService : ApplicationService, IWorkflowDashboar
     private readonly IRepository<WorkflowTransition, Guid> _transitionRepository;
     private readonly IRepository<WorkflowDelegation, Guid> _delegationRepository;
     private readonly UserManager _userManager;
+    private readonly WorkflowActorResolver _actors;
 
     public WorkflowDashboardAppService(
         IRepository<WorkflowInstance, Guid> instanceRepository,
         IRepository<WorkflowTransition, Guid> transitionRepository,
         IRepository<WorkflowDelegation, Guid> delegationRepository,
-        UserManager userManager)
+        UserManager userManager,
+        WorkflowActorResolver actors)
     {
+        _actors = actors;
         _instanceRepository = instanceRepository;
         _transitionRepository = transitionRepository;
         _delegationRepository = delegationRepository;
@@ -148,51 +152,11 @@ public class WorkflowDashboardAppService : ApplicationService, IWorkflowDashboar
         }).ToList();
     }
 
+    /// <summary>WF-34: same rule as the act check and My Approvals (WorkflowActorResolver).</summary>
     private async Task<int> GetMyPendingCountAsync(List<WorkflowInstance> inProgressInstances, DateTime now)
     {
-        var userId = AbpSession.UserId;
-        if (!userId.HasValue) return 0;
-
-        // Get current user's roles
-        var user = await _userManager.FindByIdAsync(userId.Value.ToString());
-        var userRoles = user != null
-            ? await _userManager.GetRolesAsync(user)
-            : (IList<string>)new List<string>();
-
-        // Directly assigned to user OR user has the required role (when no specific user is assigned)
-        var directPending = inProgressInstances.Count(i =>
-            i.CurrentStep != null &&
-            (i.CurrentStep.AssignedUserId == userId.Value
-             || (!i.CurrentStep.AssignedUserId.HasValue
-                 && userRoles.Any(r => r.Equals(i.CurrentStep.AssignedRole, StringComparison.OrdinalIgnoreCase)))));
-
-        // Check delegated items
-        var activeDelegations = await _delegationRepository
-            .GetAll()
-            .Where(d => d.TenantId == AbpSession.TenantId
-                && d.DelegateUserId == userId.Value
-                && d.IsActive
-                && d.StartDate <= now
-                && d.EndDate >= now)
-            .ToListAsync();
-
-        if (!activeDelegations.Any())
-            return directPending;
-
-        // Count instances that match any active delegation but are NOT already counted
-        var delegatedCount = inProgressInstances.Count(i =>
-            i.CurrentStep != null
-            // Not already counted as direct pending
-            && i.CurrentStep.AssignedUserId != userId.Value
-            && !(
-                !i.CurrentStep.AssignedUserId.HasValue
-                && userRoles.Any(r => r.Equals(i.CurrentStep.AssignedRole, StringComparison.OrdinalIgnoreCase)))
-            // Matches a delegation
-            && activeDelegations.Any(d =>
-                (!d.EntityType.HasValue || d.EntityType.Value == i.EntityType)
-                && (string.IsNullOrEmpty(d.AssignedRole)
-                    || d.AssignedRole.Equals(i.CurrentStep.AssignedRole, StringComparison.OrdinalIgnoreCase))));
-
-        return directPending + delegatedCount;
+        var actor = await _actors.GetCurrentAsync();
+        if (actor == null) return 0;
+        return inProgressInstances.Count(i => WorkflowActorResolver.CanAct(actor, i.CurrentStep, i.EntityType));
     }
 }
