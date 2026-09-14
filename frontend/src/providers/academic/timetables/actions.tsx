@@ -1,6 +1,11 @@
 import { createAction } from "redux-actions";
 import { ITimetableStateContext } from "./context";
-import { ITimetable, ITimetableList, IPagedResult } from "../shared/interfaces";
+import {
+  ITimetable,
+  ITimetableList,
+  IPagedResult,
+  IGenerateTimetablesResult,
+} from "../shared/interfaces";
 
 export enum TimetableActionEnums {
   getTimetablesPending = "GET_TIMETABLES_PENDING",
@@ -34,6 +39,10 @@ export enum TimetableActionEnums {
   deactivateTimetablePending = "DEACTIVATE_TIMETABLE_PENDING",
   deactivateTimetableSuccess = "DEACTIVATE_TIMETABLE_SUCCESS",
   deactivateTimetableError = "DEACTIVATE_TIMETABLE_ERROR",
+
+  generateTimetablesPending = "GENERATE_TIMETABLES_PENDING",
+  generateTimetablesSuccess = "GENERATE_TIMETABLES_SUCCESS",
+  generateTimetablesError = "GENERATE_TIMETABLES_ERROR",
 }
 
 // Get All Timetables Actions
@@ -205,4 +214,29 @@ export const deactivateTimetableSuccess = createAction<ITimetableStateContext, I
 export const deactivateTimetableError = createAction<ITimetableStateContext>(
   TimetableActionEnums.deactivateTimetableError,
   () => ({ isPending: false, isSuccess: false, isError: true })
+);
+
+// Generate Timetables Actions
+export const generateTimetablesPending = createAction<ITimetableStateContext>(
+  TimetableActionEnums.generateTimetablesPending,
+  () => ({ isPending: false, isSuccess: false, isError: false, isGenerating: true })
+);
+
+export const generateTimetablesSuccess = createAction<
+  ITimetableStateContext,
+  IGenerateTimetablesResult
+>(
+  TimetableActionEnums.generateTimetablesSuccess,
+  (result: IGenerateTimetablesResult) => ({
+    isPending: false,
+    isSuccess: true,
+    isError: false,
+    isGenerating: false,
+    generationResult: result,
+  })
+);
+
+export const generateTimetablesError = createAction<ITimetableStateContext>(
+  TimetableActionEnums.generateTimetablesError,
+  () => ({ isPending: false, isSuccess: false, isError: true, isGenerating: false })
 );

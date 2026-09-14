@@ -103,6 +103,18 @@ export const TimetableReducer = handleActions<
       ...state,
       ...action.payload,
     }),
+    [TimetableActionEnums.generateTimetablesPending]: (state, action) => ({
+      ...state,
+      ...action.payload,
+    }),
+    [TimetableActionEnums.generateTimetablesSuccess]: (state, action) => ({
+      ...state,
+      ...action.payload,
+    }),
+    [TimetableActionEnums.generateTimetablesError]: (state, action) => ({
+      ...state,
+      ...action.payload,
+    }),
   },
   INITIAL_STATE
 );

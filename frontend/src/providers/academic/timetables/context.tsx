@@ -5,7 +5,9 @@ import {
   ITimetableList,
   ICreateTimetable,
   IUpdateTimetable,
-  IPagedAndSortedResultRequest
+  IPagedAndSortedResultRequest,
+  IGenerateTimetablesInput,
+  IGenerateTimetablesResult,
 } from "../shared/interfaces";
 
 export interface ITimetableStateContext {
@@ -15,6 +17,8 @@ export interface ITimetableStateContext {
   timetable?: ITimetable;
   timetables?: ITimetableList[];
   totalCount?: number;
+  isGenerating?: boolean;
+  generationResult?: IGenerateTimetablesResult;
 }
 
 export interface ITimetableActionContext {
@@ -26,6 +30,7 @@ export interface ITimetableActionContext {
   deleteAsync: (id: string) => void;
   activateAsync: (id: string) => void;
   deactivateAsync: (id: string) => void;
+  generateAsync: (input: IGenerateTimetablesInput) => void;
 }
 
 export const INITIAL_STATE: ITimetableStateContext = {

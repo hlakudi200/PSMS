@@ -22,4 +22,12 @@ public interface ITimetableAppService : IApplicationService
     /// <summary>Activates a timetable (deactivates others for same class).</summary>
     Task<TimetableDto> ActivateAsync(Guid id);
     Task<TimetableDto> DeactivateAsync(Guid id);
+
+    /// <summary>
+    /// Generates draft timetables for every active class in the given academic
+    /// year from each class's ClassSubject.PeriodsPerWeek + assigned teacher,
+    /// avoiding teacher double-booking school-wide. Created timetables are
+    /// drafts (IsActive=false) — review and ActivateAsync each one to go live.
+    /// </summary>
+    Task<GenerateTimetablesResultDto> GenerateAsync(GenerateTimetablesInput input);
 }
