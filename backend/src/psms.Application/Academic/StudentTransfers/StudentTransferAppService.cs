@@ -8,6 +8,8 @@ using Microsoft.EntityFrameworkCore;
 using psms.Academic.Shared;
 using psms.Academic.StudentTransfers.Dto;
 using psms.Authorization;
+using psms.Domain.Workflow.Enums;
+using psms.Workflow.Shared;
 using psms.Domain.Academic.Entities;
 using psms.Domain.Shared.Enums;
 using System;
@@ -24,6 +26,8 @@ namespace psms.Academic.StudentTransfers;
 [AbpAuthorize(PermissionNames.Academic_Transfers)]
 public class StudentTransferAppService : ApplicationService, IStudentTransferAppService
 {
+    private readonly WorkflowStarterService _workflowStarter;
+    private readonly WorkflowInstanceGuard _workflowGuard;
     private readonly IRepository<StudentTransferRequest, Guid> _transferRepository;
     private readonly IRepository<Student, Guid> _studentRepository;
     private readonly IRepository<AcademicYear, Guid> _academicYearRepository;
@@ -31,8 +35,12 @@ public class StudentTransferAppService : ApplicationService, IStudentTransferApp
     public StudentTransferAppService(
         IRepository<StudentTransferRequest, Guid> transferRepository,
         IRepository<Student, Guid> studentRepository,
-        IRepository<AcademicYear, Guid> academicYearRepository)
+        IRepository<AcademicYear, Guid> academicYearRepository,
+        WorkflowStarterService workflowStarter,
+        WorkflowInstanceGuard workflowGuard)
     {
+        _workflowStarter = workflowStarter;
+        _workflowGuard = workflowGuard;
         _transferRepository = transferRepository;
         _studentRepository = studentRepository;
         _academicYearRepository = academicYearRepository;
@@ -189,12 +197,21 @@ public class StudentTransferAppService : ApplicationService, IStudentTransferApp
         await _transferRepository.UpdateAsync(transfer);
         await CurrentUnitOfWork.SaveChangesAsync();
 
+        // WF-36: submitting starts the tenant's active approval workflow (no-op when
+        // none is configured — the direct approve endpoints then remain available).
+        await _workflowStarter.TryStartWorkflowAsync(
+            AbpSession.TenantId, WorkflowEntityType.StudentTransfer, id,
+            AbpSession.UserId.Value);
+        await CurrentUnitOfWork.SaveChangesAsync();
+
         return await GetAsync(id);
     }
 
     [AbpAuthorize(PermissionNames.Academic_Transfers_Approve)]
     public async Task<StudentTransferDto> ApproveAsync(Guid id)
     {
+        await _workflowGuard.EnsureNoActiveInstanceAsync(WorkflowEntityType.StudentTransfer, id);
+
         var transfer = await _transferRepository
             .FirstOrDefaultAsync(t => t.Id == id && t.TenantId == AbpSession.TenantId);
 
@@ -220,6 +237,8 @@ public class StudentTransferAppService : ApplicationService, IStudentTransferApp
     [AbpAuthorize(PermissionNames.Academic_Transfers_Approve)]
     public async Task<StudentTransferDto> RejectAsync(Guid id, string reason)
     {
+        await _workflowGuard.EnsureNoActiveInstanceAsync(WorkflowEntityType.StudentTransfer, id);
+
         var transfer = await _transferRepository
             .FirstOrDefaultAsync(t => t.Id == id && t.TenantId == AbpSession.TenantId);
 

@@ -4,7 +4,11 @@ import React, { useEffect, useState } from 'react';
 import { Modal, Form, Select, message, Typography } from 'antd';
 import { z } from 'zod';
 import { useWorkflowInstanceActions } from '@/providers/workflow/workflow-instances';
-import { WorkflowEntityTypeLabels } from '@/providers/workflow/shared/interfaces';
+import {
+  WorkflowEntityType,
+  WorkflowEntityTypeLabels,
+  WORKFLOW_SUPPORTED_ENTITY_TYPES,
+} from '@/providers/workflow/shared/interfaces';
 import type { IWorkflowDefinitionList } from '@/providers/workflow/shared/interfaces';
 import { getAxiosInstance } from '@/utils/axios-instance';
 
@@ -23,15 +27,69 @@ interface StartWorkflowModalProps {
   entityId?: string;
 }
 
-const entityTypeOptions = Object.entries(WorkflowEntityTypeLabels).map(([value, label]) => ({
-  value: Number(value),
-  label,
-}));
+// WF-35: only types with a definition, summary and write-back handler are offered.
+const entityTypeOptions = Object.entries(WorkflowEntityTypeLabels)
+  .filter(([value]) => WORKFLOW_SUPPORTED_ENTITY_TYPES.includes(Number(value)))
+  .map(([value, label]) => ({ value: Number(value), label }));
 
 interface EntityOption {
   value: string;
   label: string;
 }
+
+type ListItem = Record<string, unknown>;
+
+/**
+ * WF-35: how to list and label each entity type, and which records are in a
+ * state a workflow can legitimately start from. Submit normally starts the
+ * workflow automatically (WF-36); this modal is the admin fallback, so it only
+ * offers submitted / in-review records — never drafts or finished ones.
+ * Statuses mirror the backend enums (serialised as numbers).
+ */
+const entityApiMap: Record<number, { endpoint: string; labelFn: (item: ListItem) => string; startable: (item: ListItem) => boolean }> = {
+  [WorkflowEntityType.Application]: {
+    endpoint: '/api/services/app/Application/GetAll?MaxResultCount=200',
+    labelFn: (item) => `${item.fullName ?? `${item.firstName ?? ''} ${item.lastName ?? ''}`.trim()} (${item.applicationNumber ?? item.id})`,
+    // Submitted, UnderReview, DocumentsRequired, InterviewScheduled, AssessmentScheduled, UnderConsideration
+    startable: (item) => [2, 4, 5, 6, 7, 8].includes(Number(item.status)),
+  },
+  [WorkflowEntityType.Report]: {
+    endpoint: '/api/services/app/Report/GetAll?MaxResultCount=200',
+    labelFn: (item) => `${item.studentName ?? 'Student'} — ${item.className ?? ''} ${item.termName ?? ''}`.trim(),
+    startable: (item) => Number(item.status) === 3, // PendingApproval
+  },
+  [WorkflowEntityType.FeeWaiver]: {
+    endpoint: '/api/services/app/FeeWaiver/GetAll?MaxResultCount=200',
+    labelFn: (item) => `${item.studentName ?? 'Student'} — R${item.requestedAmount}`,
+    startable: (item) => [2, 3].includes(Number(item.status)),
+  },
+  [WorkflowEntityType.StudentTransfer]: {
+    endpoint: '/api/services/app/StudentTransfer/GetAll?MaxResultCount=200',
+    labelFn: (item) => `${item.transferNumber ?? ''} — ${item.studentName ?? 'Student'} (${item.transferType === 1 ? 'In' : 'Out'})`,
+    startable: (item) => [2, 3].includes(Number(item.status)),
+  },
+  [WorkflowEntityType.Disciplinary]: {
+    endpoint: '/api/services/app/DisciplinaryCase/GetAll?MaxResultCount=200',
+    labelFn: (item) => `${item.caseNumber ?? ''} — ${item.studentName ?? 'Student'}`,
+    // Reported, UnderInvestigation, HearingScheduled, HearingCompleted
+    startable: (item) => [2, 3, 4, 5].includes(Number(item.status)),
+  },
+  [WorkflowEntityType.StaffLeave]: {
+    endpoint: '/api/services/app/StaffLeaveRequest/GetAll?MaxResultCount=200',
+    labelFn: (item) => `${item.leaveNumber ?? ''} — ${item.userName ?? 'Staff'} (${String(item.startDate ?? '').substring(0, 10)})`,
+    startable: (item) => [2, 3].includes(Number(item.status)), // Submitted, HODApproved
+  },
+  [WorkflowEntityType.FieldTrip]: {
+    endpoint: '/api/services/app/FieldTrip/GetAll?MaxResultCount=200',
+    labelFn: (item) => `${item.tripName ?? 'Trip'} — ${item.destination ?? ''}`,
+    startable: (item) => [2, 3].includes(Number(item.status)),
+  },
+  [WorkflowEntityType.ExpenseRequest]: {
+    endpoint: '/api/services/app/ExpenseRequest/GetAll?MaxResultCount=200',
+    labelFn: (item) => `${item.requestNumber ?? ''} — R${item.amount} (${String(item.description ?? '').substring(0, 30)})`,
+    startable: (item) => [2, 3].includes(Number(item.status)),
+  },
+};
 
 export const StartWorkflowModal: React.FC<StartWorkflowModalProps> = ({
   open,
@@ -67,7 +125,9 @@ export const StartWorkflowModal: React.FC<StartWorkflowModalProps> = ({
     instance
       .get(`/api/services/app/WorkflowDefinition/GetAll?EntityType=${selectedEntityType}&MaxResultCount=50`)
       .then((response) => {
-        setDefinitions(response.data.result.items ?? []);
+        // Only an active definition can be started (the server enforces this too).
+        const items = (response.data.result.items ?? []) as IWorkflowDefinitionList[];
+        setDefinitions(items.filter((d) => d.isActive));
       })
       .catch(() => setDefinitions([]))
       .finally(() => setLoadingDefs(false));
@@ -75,52 +135,10 @@ export const StartWorkflowModal: React.FC<StartWorkflowModalProps> = ({
 
   useEffect(() => {
     if (!selectedEntityType || !open) return;
+    // A pre-selected entity (opened from a record) needs no listing.
+    if (entityId) { setEntities([{ value: entityId, label: entityId }]); return; }
     setLoadingEntities(true);
     const instance = getAxiosInstance();
-
-    // Map entity type to the correct API endpoint and label field
-    const entityApiMap: Record<number, { endpoint: string; labelFn: (item: any) => string }> = {
-      1: {
-        endpoint: '/api/services/app/Application/GetAll?MaxResultCount=100',
-        labelFn: (item) => `${item.applicantFirstName ?? ''} ${item.applicantLastName ?? ''} (${item.applicationNumber ?? item.id})`.trim(),
-      },
-      2: {
-        endpoint: '/api/services/app/Report/GetAll?MaxResultCount=100',
-        labelFn: (item) => item.reportName ?? item.title ?? `Report ${item.id?.substring(0, 8)}`,
-      },
-      3: {
-        endpoint: '/api/services/app/FeeWaiver/GetAll?MaxResultCount=100',
-        labelFn: (item) => `${item.studentName ?? 'Student'} — R${item.requestedAmount} (${item.waiverType})`,
-      },
-      4: {
-        endpoint: '/api/services/app/Attendance/GetAll?MaxResultCount=100',
-        labelFn: (item) => `${item.studentName ?? 'Student'} — ${item.attendanceDate ?? item.id?.substring(0, 8)}`,
-      },
-      5: {
-        endpoint: '/api/services/app/LearningMaterial/GetAll?MaxResultCount=100',
-        labelFn: (item) => item.title ?? item.name ?? `Material ${item.id?.substring(0, 8)}`,
-      },
-      6: {
-        endpoint: '/api/services/app/StudentTransfer/GetAll?MaxResultCount=100',
-        labelFn: (item) => `${item.transferNumber ?? ''} — ${item.studentName ?? 'Student'} (${item.transferType === 1 ? 'In' : 'Out'})`,
-      },
-      7: {
-        endpoint: '/api/services/app/DisciplinaryCase/GetAll?MaxResultCount=100',
-        labelFn: (item) => `${item.caseNumber ?? ''} — ${item.studentName ?? 'Student'}`,
-      },
-      8: {
-        endpoint: '/api/services/app/StaffLeaveRequest/GetAll?MaxResultCount=100',
-        labelFn: (item) => `${item.leaveNumber ?? ''} — ${item.userName ?? 'Staff'} (${item.startDate?.substring(0, 10)})`,
-      },
-      9: {
-        endpoint: '/api/services/app/FieldTrip/GetAll?MaxResultCount=100',
-        labelFn: (item) => `${item.tripName ?? 'Trip'} — ${item.destination ?? ''}`,
-      },
-      10: {
-        endpoint: '/api/services/app/ExpenseRequest/GetAll?MaxResultCount=100',
-        labelFn: (item) => `${item.requestNumber ?? ''} — R${item.amount} (${item.description?.substring(0, 30)})`,
-      },
-    };
 
     const config = entityApiMap[selectedEntityType];
     if (!config) {
@@ -132,23 +150,26 @@ export const StartWorkflowModal: React.FC<StartWorkflowModalProps> = ({
     instance
       .get(config.endpoint)
       .then((response) => {
-        const items = response.data.result.items ?? response.data.result ?? [];
+        const items: ListItem[] = response.data.result.items ?? response.data.result ?? [];
         setEntities(
-          items.map((item: any) => ({
-            value: item.id,
-            label: config.labelFn(item),
-          }))
+          items
+            .filter(config.startable)
+            .map((item) => ({ value: item.id as string, label: config.labelFn(item) }))
         );
       })
       .catch(() => setEntities([]))
       .finally(() => setLoadingEntities(false));
-  }, [selectedEntityType, open]);
+  }, [selectedEntityType, open, entityId]);
+
+  const definitionOptions = definitions.map((d) => ({
+    value: d.id,
+    label: `${d.name} (v${d.version})${d.isActive ? ' — Active' : ''}`,
+  }));
 
   const handleSubmit = async () => {
     try {
       const values = form.getFieldsValue();
       const result = startSchema.safeParse(values);
-
       if (!result.success) {
         const fieldErrors = result.error.issues.map(err => ({
           name: err.path as string[],
@@ -157,7 +178,6 @@ export const StartWorkflowModal: React.FC<StartWorkflowModalProps> = ({
         form.setFields(fieldErrors);
         return;
       }
-
       setLoading(true);
       await startAsync(result.data);
       message.success('Workflow started successfully');
@@ -169,11 +189,6 @@ export const StartWorkflowModal: React.FC<StartWorkflowModalProps> = ({
     }
   };
 
-  const definitionOptions = definitions.map((d) => ({
-    value: d.id,
-    label: `${d.name} (v${d.version})${d.isActive ? ' — Active' : ''}`,
-  }));
-
   return (
     <Modal
       title="Start Workflow"
@@ -184,6 +199,10 @@ export const StartWorkflowModal: React.FC<StartWorkflowModalProps> = ({
       destroyOnClose
       width={520}
     >
+      <Text type="secondary" style={{ display: 'block', marginTop: 12 }}>
+        Submitting a record normally starts its workflow automatically. Use this only for a
+        submitted record that has none, for example after a workflow was cancelled.
+      </Text>
       <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
         <Form.Item label="Entity Type" name="entityType" rules={[{ required: true }]}>
           <Select
@@ -199,7 +218,7 @@ export const StartWorkflowModal: React.FC<StartWorkflowModalProps> = ({
         <Form.Item label="Entity" name="entityId" rules={[{ required: true, message: 'Please select an entity' }]}>
           <Select
             options={entities}
-            placeholder={loadingEntities ? 'Loading...' : 'Select an entity'}
+            placeholder={loadingEntities ? 'Loading...' : 'Select a submitted record'}
             loading={loadingEntities}
             disabled={!!entityId || !selectedEntityType}
             showSearch
@@ -211,7 +230,7 @@ export const StartWorkflowModal: React.FC<StartWorkflowModalProps> = ({
                 ? <Text type="secondary">Select an entity type first</Text>
                 : loadingEntities
                   ? <Text type="secondary">Loading...</Text>
-                  : <Text type="secondary">No entities found</Text>
+                  : <Text type="secondary">No submitted records without a workflow</Text>
             }
           />
         </Form.Item>
@@ -226,7 +245,7 @@ export const StartWorkflowModal: React.FC<StartWorkflowModalProps> = ({
             notFoundContent={
               !selectedEntityType
                 ? <Text type="secondary">Select an entity type first</Text>
-                : <Text type="secondary">No definitions found</Text>
+                : <Text type="secondary">No active definition — seed or activate one first</Text>
             }
           />
         </Form.Item>

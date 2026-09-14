@@ -8,6 +8,8 @@ using Microsoft.EntityFrameworkCore;
 using psms.Activities.FieldTrips.Dto;
 using psms.Activities.Shared;
 using psms.Authorization;
+using psms.Domain.Workflow.Enums;
+using psms.Workflow.Shared;
 using psms.Domain.Activities.Entities;
 using System;
 using System.Collections.Generic;
@@ -23,11 +25,17 @@ namespace psms.Activities.FieldTrips;
 [AbpAuthorize(PermissionNames.Activities_FieldTrips)]
 public class FieldTripAppService : ApplicationService, IFieldTripAppService
 {
+    private readonly WorkflowStarterService _workflowStarter;
+    private readonly WorkflowInstanceGuard _workflowGuard;
     private readonly IRepository<FieldTrip, Guid> _fieldTripRepository;
 
     public FieldTripAppService(
-        IRepository<FieldTrip, Guid> fieldTripRepository)
+        IRepository<FieldTrip, Guid> fieldTripRepository,
+        WorkflowStarterService workflowStarter,
+        WorkflowInstanceGuard workflowGuard)
     {
+        _workflowStarter = workflowStarter;
+        _workflowGuard = workflowGuard;
         _fieldTripRepository = fieldTripRepository;
     }
 
@@ -180,12 +188,21 @@ public class FieldTripAppService : ApplicationService, IFieldTripAppService
         await _fieldTripRepository.UpdateAsync(trip);
         await CurrentUnitOfWork.SaveChangesAsync();
 
+        // WF-36: submitting starts the tenant's active approval workflow (no-op when
+        // none is configured — the direct approve endpoints then remain available).
+        await _workflowStarter.TryStartWorkflowAsync(
+            AbpSession.TenantId, WorkflowEntityType.FieldTrip, id,
+            AbpSession.UserId.Value);
+        await CurrentUnitOfWork.SaveChangesAsync();
+
         return await GetAsync(id);
     }
 
     [AbpAuthorize(PermissionNames.Activities_FieldTrips_Approve)]
     public async Task<FieldTripDto> ApproveAsync(Guid id, decimal approvedBudget)
     {
+        await _workflowGuard.EnsureNoActiveInstanceAsync(WorkflowEntityType.FieldTrip, id);
+
         var trip = await _fieldTripRepository
             .FirstOrDefaultAsync(t => t.Id == id && t.TenantId == AbpSession.TenantId);
 
@@ -211,6 +228,8 @@ public class FieldTripAppService : ApplicationService, IFieldTripAppService
     [AbpAuthorize(PermissionNames.Activities_FieldTrips_Approve)]
     public async Task<FieldTripDto> RejectAsync(Guid id, string reason)
     {
+        await _workflowGuard.EnsureNoActiveInstanceAsync(WorkflowEntityType.FieldTrip, id);
+
         var trip = await _fieldTripRepository
             .FirstOrDefaultAsync(t => t.Id == id && t.TenantId == AbpSession.TenantId);
 

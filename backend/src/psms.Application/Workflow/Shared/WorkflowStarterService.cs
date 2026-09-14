@@ -1,6 +1,7 @@
 using Abp.Dependency;
 using Abp.Domain.Repositories;
 using Abp.Domain.Uow;
+using psms.Authorization.Users;
 using Castle.Core.Logging;
 using Microsoft.EntityFrameworkCore;
 using psms.Domain.Workflow.Entities;
@@ -23,18 +24,34 @@ public class WorkflowStarterService : ITransientDependency
     private readonly IRepository<WorkflowDefinition, Guid> _definitionRepository;
     private readonly IRepository<WorkflowTransition, Guid> _transitionRepository;
     private readonly IUnitOfWorkManager _unitOfWorkManager;
+    private readonly UserManager _userManager;
     public ILogger Logger { get; set; } = NullLogger.Instance;
 
     public WorkflowStarterService(
         IRepository<WorkflowInstance, Guid> instanceRepository,
         IRepository<WorkflowDefinition, Guid> definitionRepository,
         IRepository<WorkflowTransition, Guid> transitionRepository,
-        IUnitOfWorkManager unitOfWorkManager)
+        IUnitOfWorkManager unitOfWorkManager,
+        UserManager userManager)
     {
+        _userManager = userManager;
         _instanceRepository = instanceRepository;
         _definitionRepository = definitionRepository;
         _transitionRepository = transitionRepository;
         _unitOfWorkManager = unitOfWorkManager;
+    }
+
+    /// <summary>
+    /// WF-36: convenience overload for entity Submit endpoints — resolves the
+    /// initiator's display name from the user store.
+    /// </summary>
+    public async Task<bool> TryStartWorkflowAsync(int? tenantId, WorkflowEntityType entityType, Guid entityId, long initiatorUserId)
+    {
+        var user = await _userManager.FindByIdAsync(initiatorUserId.ToString());
+        var name = user == null ? initiatorUserId.ToString()
+            : !string.IsNullOrWhiteSpace($"{user.Name} {user.Surname}".Trim()) ? $"{user.Name} {user.Surname}".Trim()
+            : user.UserName;
+        return await TryStartWorkflowAsync(tenantId, entityType, entityId, initiatorUserId, name);
     }
 
     /// <summary>

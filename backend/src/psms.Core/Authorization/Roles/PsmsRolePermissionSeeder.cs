@@ -126,6 +126,8 @@ public class PsmsRolePermissionSeeder : ITransientDependency
         await AddPermissionsToRoleAsync(StaticRoleNames.Tenants.VicePrincipal, GetWorkflowFullPermissions());
         await AddPermissionsToRoleAsync(StaticRoleNames.Tenants.HOD, GetWorkflowActPermissions());
         await AddPermissionsToRoleAsync(StaticRoleNames.Tenants.Teacher, GetWorkflowActPermissions());
+        // WF-35: the default admissions workflow assigns its first two steps to the Admissions Officer.
+        await AddPermissionsToRoleAsync(StaticRoleNames.Tenants.AdmissionsOfficer, GetWorkflowActPermissions());
     }
 
     /// <summary>

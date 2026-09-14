@@ -11,6 +11,8 @@ using psms.Assessment.Reports.Pdf;
 using psms.Assessment.ReportSubjects.Dto;
 using psms.Assessment.Shared;
 using psms.Authorization;
+using psms.Domain.Workflow.Enums;
+using psms.Workflow.Shared;
 using psms.Domain.Academic.Entities;
 using psms.Domain.Assessment.Entities;
 using psms.Domain.Shared.Enums;
@@ -40,6 +42,8 @@ public class ReportAppService : ApplicationService, IReportAppService
     private readonly IRepository<AssessmentEntity, Guid> _assessmentRepository;
     private readonly IBackgroundJobManager _backgroundJobManager;
     private readonly psms.Academic.Students.ICurrentStudentResolver _currentStudent;
+    private readonly WorkflowStarterService _workflowStarter;
+    private readonly WorkflowInstanceGuard _workflowGuard;
 
     public ReportAppService(
         IRepository<Report, Guid> reportRepository,
@@ -52,8 +56,12 @@ public class ReportAppService : ApplicationService, IReportAppService
         IRepository<ClassSubject, Guid> classSubjectRepository,
         IRepository<AssessmentEntity, Guid> assessmentRepository,
         IBackgroundJobManager backgroundJobManager,
-        psms.Academic.Students.ICurrentStudentResolver currentStudent)
+        psms.Academic.Students.ICurrentStudentResolver currentStudent,
+        WorkflowStarterService workflowStarter,
+        WorkflowInstanceGuard workflowGuard)
     {
+        _workflowStarter = workflowStarter;
+        _workflowGuard = workflowGuard;
         _reportRepository = reportRepository;
         _reportSubjectRepository = reportSubjectRepository;
         _studentRepository = studentRepository;
@@ -346,12 +354,20 @@ public class ReportAppService : ApplicationService, IReportAppService
         await _reportRepository.UpdateAsync(report);
         await CurrentUnitOfWork.SaveChangesAsync();
 
+        // WF-36: submitting for approval starts the tenant's active Report Approval
+        // workflow (no-op when none is configured).
+        await _workflowStarter.TryStartWorkflowAsync(
+            AbpSession.TenantId, WorkflowEntityType.Report, id, AbpSession.UserId.Value);
+        await CurrentUnitOfWork.SaveChangesAsync();
+
         return await GetAsync(id);
     }
 
     [AbpAuthorize(PermissionNames.Assessment_ReportCards_Publish)]
     public async Task<ReportDto> ApproveAsync(Guid id)
     {
+        await _workflowGuard.EnsureNoActiveInstanceAsync(WorkflowEntityType.Report, id);
+
         var report = await _reportRepository
             .FirstOrDefaultAsync(r => r.Id == id && r.TenantId == AbpSession.TenantId);
 

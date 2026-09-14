@@ -6,6 +6,8 @@ using Abp.Linq.Extensions;
 using Abp.UI;
 using Microsoft.EntityFrameworkCore;
 using psms.Authorization;
+using psms.Domain.Workflow.Enums;
+using psms.Workflow.Shared;
 using psms.Authorization.Users;
 using psms.Domain.Financial.Entities;
 using psms.Domain.Shared.Enums;
@@ -25,13 +27,19 @@ namespace psms.Financial.ExpenseRequests;
 [AbpAuthorize(PermissionNames.Financial_Expenses)]
 public class ExpenseRequestAppService : ApplicationService, IExpenseRequestAppService
 {
+    private readonly WorkflowStarterService _workflowStarter;
+    private readonly WorkflowInstanceGuard _workflowGuard;
     private readonly IRepository<ExpenseRequest, Guid> _expenseRepository;
     private readonly UserManager _userManager;
 
     public ExpenseRequestAppService(
         IRepository<ExpenseRequest, Guid> expenseRepository,
-        UserManager userManager)
+        UserManager userManager,
+        WorkflowStarterService workflowStarter,
+        WorkflowInstanceGuard workflowGuard)
     {
+        _workflowStarter = workflowStarter;
+        _workflowGuard = workflowGuard;
         _expenseRepository = expenseRepository;
         _userManager = userManager;
     }
@@ -175,12 +183,21 @@ public class ExpenseRequestAppService : ApplicationService, IExpenseRequestAppSe
         await _expenseRepository.UpdateAsync(expense);
         await CurrentUnitOfWork.SaveChangesAsync();
 
+        // WF-36: submitting starts the tenant's active approval workflow (no-op when
+        // none is configured — the direct approve endpoints then remain available).
+        await _workflowStarter.TryStartWorkflowAsync(
+            AbpSession.TenantId, WorkflowEntityType.ExpenseRequest, id,
+            AbpSession.UserId.Value);
+        await CurrentUnitOfWork.SaveChangesAsync();
+
         return await GetAsync(id);
     }
 
     [AbpAuthorize(PermissionNames.Financial_Expenses_Approve)]
     public async Task<ExpenseRequestDto> ApproveAsync(Guid id, decimal approvedAmount)
     {
+        await _workflowGuard.EnsureNoActiveInstanceAsync(WorkflowEntityType.ExpenseRequest, id);
+
         var expense = await _expenseRepository
             .FirstOrDefaultAsync(e => e.Id == id && e.TenantId == AbpSession.TenantId);
 
@@ -206,6 +223,8 @@ public class ExpenseRequestAppService : ApplicationService, IExpenseRequestAppSe
     [AbpAuthorize(PermissionNames.Financial_Expenses_Approve)]
     public async Task<ExpenseRequestDto> RejectAsync(Guid id, string reason)
     {
+        await _workflowGuard.EnsureNoActiveInstanceAsync(WorkflowEntityType.ExpenseRequest, id);
+
         var expense = await _expenseRepository
             .FirstOrDefaultAsync(e => e.Id == id && e.TenantId == AbpSession.TenantId);
 
