@@ -22,7 +22,7 @@ import {
   Typography,
   message,
 } from 'antd';
-import { PlayCircleOutlined, CheckCircleOutlined } from '@ant-design/icons';
+import { PlayCircleOutlined, CheckCircleOutlined, ArrowLeftOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { z } from 'zod';
 import {
@@ -177,23 +177,39 @@ function GenerateTimetablesContent() {
   ];
 
   const unplacedColumns = [
-    { title: 'Class', dataIndex: 'className', key: 'className' },
-    { title: 'Subject', dataIndex: 'subjectName', key: 'subjectName' },
+    { title: 'Class', dataIndex: 'className', key: 'className', width: 140 },
+    { title: 'Subject', dataIndex: 'subjectName', key: 'subjectName', width: 160 },
     {
       title: 'Teacher',
       key: 'teacherName',
-      render: (_: unknown, r: IUnplacedLesson) => r.teacherName ?? <Text type="secondary">—</Text>,
+      width: 160,
+      render: (_: unknown, r: IUnplacedLesson) =>
+        r.teacherName ?? <Text type="secondary">Not assigned</Text>,
     },
-    { title: 'Reason', dataIndex: 'reason', key: 'reason' },
+    {
+      title: 'Why it could not be placed',
+      dataIndex: 'reason',
+      key: 'reason',
+      render: (reason: string) => <Text type="secondary">{reason}</Text>,
+    },
   ];
 
   return (
     <div>
+      <Button
+        type="link"
+        icon={<ArrowLeftOutlined />}
+        onClick={() => router.push('/principal/timetables')}
+        style={{ paddingLeft: 0, marginBottom: 4 }}
+      >
+        Back to timetables
+      </Button>
+
       <div style={{ marginBottom: 16 }}>
-        <Title level={4} style={{ margin: 0 }}>Generate Timetables</Title>
+        <Title level={4} style={{ margin: 0 }}>Generate timetables</Title>
         <Text type="secondary">
-          Builds a draft timetable for every active class from each class&apos;s subject/teacher
-          assignments and periods-per-week. Nothing goes live until you review and activate.
+          Builds a draft timetable for every active class from each class&apos;s subject and teacher
+          assignments. Nothing goes live until you review and activate.
         </Text>
       </div>
 
@@ -233,14 +249,30 @@ function GenerateTimetablesContent() {
               </Form.Item>
             </Col>
           </Row>
-          <Button
-            type="primary"
-            icon={<PlayCircleOutlined />}
-            onClick={handleGenerate}
-            loading={isGenerating}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 16,
+              flexWrap: 'wrap',
+              borderTop: '1px solid #f0f0f0',
+              paddingTop: 16,
+            }}
           >
-            Generate
-          </Button>
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              Generating again replaces the drafts from the last run. Timetables you have already
+              activated are left alone.
+            </Text>
+            <Button
+              type="primary"
+              icon={<PlayCircleOutlined />}
+              onClick={handleGenerate}
+              loading={isGenerating}
+            >
+              Generate
+            </Button>
+          </div>
         </Form>
       </Card>
 
@@ -274,10 +306,13 @@ function GenerateTimetablesContent() {
 
           <Card
             variant="borderless"
-            title="Generated class timetables (drafts)"
+            title="Draft timetables"
             style={{ marginBottom: 16 }}
             extra={
               <Space>
+                <Button onClick={() => router.push('/principal/timetables')}>
+                  Review individually
+                </Button>
                 <Button
                   type="primary"
                   icon={<CheckCircleOutlined />}
@@ -285,10 +320,7 @@ function GenerateTimetablesContent() {
                   loading={activating}
                   disabled={generationResult.classes.length === 0}
                 >
-                  Activate All Generated
-                </Button>
-                <Button onClick={() => router.push('/principal/timetables')}>
-                  Go to Timetables
+                  Activate all drafts
                 </Button>
               </Space>
             }
@@ -312,8 +344,8 @@ function GenerateTimetablesContent() {
                 type="warning"
                 showIcon
                 style={{ marginBottom: 12 }}
-                message="These lessons need manual attention"
-                description="Open the class's draft timetable from the list above and add these slots by hand, or free up periods for the teacher."
+                message="These lessons need to be placed by hand"
+                description="Open the class on the Timetables list, then pick a free period in its weekly grid. If the teacher has no room left, free a period elsewhere first."
               />
               <Table
                 rowKey={(r) => `${r.classId}-${r.subjectId}`}

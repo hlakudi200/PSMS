@@ -1,0 +1,90 @@
+/*
+ * Weekly timetable grid. Every cell is an editable target, so each one needs a
+ * real interactive affordance (hover, keyboard focus) rather than a bare div.
+ * Colours come from Ant Design's CSS variables so the grid follows the theme.
+ */
+
+.cell {
+  display: block;
+  width: 100%;
+  min-height: 62px;
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.cell:hover {
+  background-color: var(--ant-color-fill-quaternary, rgba(0, 0, 0, 0.02));
+  border-color: var(--ant-color-border, #d9d9d9);
+}
+
+.cell:focus-visible {
+  outline: none;
+  border-color: var(--ant-color-primary, #1677ff);
+  box-shadow: 0 0 0 2px var(--ant-color-primary-bg, rgba(22, 119, 255, 0.12));
+}
+
+/* An empty period: the prompt stays quiet until the cell is hovered or focused. */
+.empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ant-color-text-quaternary, #bfbfbf);
+  font-size: 12px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.cell:hover .empty,
+.cell:focus-visible .empty {
+  opacity: 1;
+}
+
+.subject {
+  display: block;
+  font-weight: 600;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.teacher {
+  display: block;
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--ant-color-text-secondary, #595959);
+  overflow-wrap: anywhere;
+}
+
+.meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--ant-color-text-tertiary, #8c8c8c);
+}
+
+/* The period column: number above the time range it runs. */
+.periodNumber {
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.periodTime {
+  display: block;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ant-color-text-tertiary, #8c8c8c);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cell,
+  .empty {
+    transition: none;
+  }
+}
