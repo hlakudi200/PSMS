@@ -39,6 +39,7 @@ public static class AssessmentExceptionCodes
     public const string MarksAlreadyReleased = "ASM_MARKS_ALREADY_RELEASED";
     public const string StudentNotInClass = "ASM_STUDENT_NOT_IN_CLASS";
     public const string CannotEditLockedMark = "ASM_CANNOT_EDIT_LOCKED_MARK";
+    public const string NoRawMarkToModerate = "ASM_NO_RAW_MARK_TO_MODERATE";
     public const string AssessmentNotPublished = "ASM_ASSESSMENT_NOT_PUBLISHED";
     public const string StudentNotFound = "ASM_STUDENT_NOT_FOUND";
     public const string DuplicateStudentInBatch = "ASM_DUPLICATE_STUDENT_IN_BATCH";

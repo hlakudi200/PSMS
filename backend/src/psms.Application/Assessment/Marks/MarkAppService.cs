@@ -440,12 +440,23 @@ public class MarkAppService : ApplicationService, IMarkAppService
     public async Task<MarkDto> ApplyModerationAsync(Guid id, decimal adjustment)
     {
         var mark = await _markRepository
+            .GetAll()
+            .Include(m => m.Assessment)
             .FirstOrDefaultAsync(m => m.Id == id && m.TenantId == AbpSession.TenantId);
 
         if (mark == null)
             throw new UserFriendlyException(AssessmentExceptionCodes.MarkNotFound, "Mark not found.");
 
-        mark.ApplyModeration(adjustment);
+        // GA-002: Cannot edit locked marks (Completed + released)
+        if (mark.Status == MarkStatus.Completed && mark.Assessment.MarksReleased)
+            throw new UserFriendlyException(AssessmentExceptionCodes.CannotEditLockedMark,
+                "Cannot edit a locked mark. Marks have been released. Use unlock first.");
+
+        if (!mark.RawMark.HasValue)
+            throw new UserFriendlyException(AssessmentExceptionCodes.NoRawMarkToModerate,
+                "Cannot apply moderation to a mark with no raw mark recorded. Record a mark first.");
+
+        mark.ApplyModeration(adjustment, mark.Assessment.MaxMarks);
         await _markRepository.UpdateAsync(mark);
         await CurrentUnitOfWork.SaveChangesAsync();
 
