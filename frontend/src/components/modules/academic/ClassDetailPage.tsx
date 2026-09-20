@@ -35,10 +35,17 @@ import type { IStudentClassList, IClassSubjectList } from '@/providers/academic/
 
 const { Title, Text } = Typography;
 
+// Only these portals mount a student profile detail route today. Gating on
+// an allowlist (rather than excluding known-absent ones) means a future
+// portal without one fails safe — no dead "View Profile" link — instead of
+// needing to remember to add it here too.
+const PORTALS_WITH_STUDENT_PROFILES = ['/principal', '/academic'];
+
 // ─── Students Roster Tab ───────────────────────────────────────
 function RosterSection({ classId }: { classId: string }) {
   const router = useRouter();
   const portalBase = usePortalBase();
+  const canViewStudentProfile = PORTALS_WITH_STUDENT_PROFILES.includes(portalBase);
   const { studentClasses, isPending } = useStudentClassState();
   const { getByClassAsync } = useStudentClassActions();
 
@@ -65,7 +72,7 @@ function RosterSection({ classId }: { classId: string }) {
       title: 'End Date', dataIndex: 'endDate', key: 'endDate',
       render: (d: string | null) => d ? dayjs(d).format('DD MMM YYYY') : '-',
     },
-    {
+    ...(canViewStudentProfile ? [{
       title: '', key: 'action', width: 100,
       render: (_: unknown, record: IStudentClassList) => (
         <Button
@@ -76,7 +83,7 @@ function RosterSection({ classId }: { classId: string }) {
           View Profile
         </Button>
       ),
-    },
+    }] : []),
   ];
 
   return (
