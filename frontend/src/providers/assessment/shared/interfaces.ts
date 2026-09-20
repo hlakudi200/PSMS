@@ -229,6 +229,10 @@ export interface IMarkList {
   status: number;
   wasAbsent: boolean;
   isReassessment: boolean;
+  teacherComment?: string;
+  feedback?: string;
+  isModerated: boolean;
+  moderationAdjustment?: number;
   assessmentName?: string;
   studentName?: string;
   studentAdmissionNumber?: string;

@@ -164,17 +164,27 @@ namespace psms.Domain.Assessment.Entities
         }
 
         /// <summary>
-        /// Applies moderation adjustment
+        /// Applies a moderation adjustment on top of the recorded raw mark
+        /// (e.g. a moderator's review credits or deducts marks after the
+        /// original submission). RawMark itself is left untouched — it's the
+        /// audit record of what was actually recorded — while Percentage/
+        /// AchievementLevel are recalculated from the adjusted effective
+        /// mark, clamped to the assessment's valid range.
         /// </summary>
-        public void ApplyModeration(decimal adjustment)
+        public void ApplyModeration(decimal adjustment, decimal maxMarks)
         {
             ModerationAdjustment = adjustment;
             IsModerated = true;
 
             if (RawMark.HasValue)
             {
-                // Recalculate percentage with moderation
-                // Note: This is a simplified approach - actual moderation logic may vary
+                var effectiveMark = RawMark.Value + adjustment;
+                if (effectiveMark < 0) effectiveMark = 0;
+                if (maxMarks > 0 && effectiveMark > maxMarks) effectiveMark = maxMarks;
+
+                Percentage = maxMarks > 0 ? (effectiveMark / maxMarks) * 100 : Percentage;
+                if (Percentage.HasValue)
+                    AchievementLevel = CalculateAchievementLevel(Percentage.Value);
             }
         }
 

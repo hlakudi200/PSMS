@@ -215,20 +215,28 @@ export const MarkProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(markAsAbsentError());
+        // Re-throw so the edit-mark modal can keep itself open on a
+        // rejection (e.g. the mark is locked) instead of reporting success.
+        throw error;
       });
   };
 
   const applyModerationAsync = async (id: string, adjustment: number) => {
     dispatch(applyModerationPending());
-    const endpoint = `/api/services/app/Mark/ApplyModeration?id=${id}`;
+    // ApplyModerationAsync(Guid id, decimal adjustment) takes two bare
+    // primitives, not a DTO — ABP's dynamic API binds those from the query
+    // string (same as `id`), not a JSON body; a body payload silently binds
+    // to decimal's default (0) instead of erroring.
+    const endpoint = `/api/services/app/Mark/ApplyModeration?id=${id}&adjustment=${adjustment}`;
     await instance
-      .post(endpoint, { adjustment })
+      .post(endpoint)
       .then((response) => {
         dispatch(applyModerationSuccess(response.data.result));
       })
       .catch((error) => {
         console.error(error);
         dispatch(applyModerationError());
+        throw error;
       });
   };
 

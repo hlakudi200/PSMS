@@ -19,7 +19,7 @@ import {
   Typography,
   message,
 } from 'antd';
-import { ArrowLeftOutlined, CommentOutlined, ImportOutlined, LockOutlined, SaveOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, CommentOutlined, EditOutlined, ImportOutlined, LockOutlined, SaveOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import {
   AssessmentProvider,
@@ -44,6 +44,7 @@ import {
 import type { IMarkList, IStudentMark } from '@/providers/assessment/shared/interfaces';
 import { ImportMarksModal } from '@/components/modals/assessment/ImportMarksModal';
 import { FeedbackEditModal } from '@/components/modals/assessment/FeedbackEditModal';
+import { EditMarkModal } from '@/components/modals/assessment/EditMarkModal';
 
 const { Title, Text } = Typography;
 
@@ -109,6 +110,7 @@ function MarkCaptureContent() {
   const [saving, setSaving] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [feedbackTarget, setFeedbackTarget] = useState<{ markId: string; studentName: string } | null>(null);
+  const [editTarget, setEditTarget] = useState<{ markId: string; studentName: string } | null>(null);
 
   // 1. Load the assessment + its existing marks.
   useEffect(() => {
@@ -303,9 +305,17 @@ function MarkCaptureContent() {
       width: 140,
       render: (_: unknown, row) => {
         if (row.existingMark) {
-          return row.existingMark.wasAbsent
-            ? <Text type="secondary">—</Text>
-            : <Text>{row.existingMark.rawMark ?? '—'}</Text>;
+          if (row.existingMark.wasAbsent) return <Text type="secondary">—</Text>;
+          return (
+            <Space size={4}>
+              <Text>{row.existingMark.rawMark ?? '—'}</Text>
+              {row.existingMark.isModerated && (
+                <Tooltip title={`Moderation adjustment: ${row.existingMark.moderationAdjustment! > 0 ? '+' : ''}${row.existingMark.moderationAdjustment}`}>
+                  <Tag color="purple" style={{ margin: 0 }}>mod</Tag>
+                </Tooltip>
+              )}
+            </Space>
+          );
         }
         return (
           <InputNumber
@@ -395,20 +405,31 @@ function MarkCaptureContent() {
       },
     },
     {
-      title: 'Feedback',
-      key: 'feedback',
-      width: 120,
+      title: 'Actions',
+      key: 'actions',
+      width: 180,
       render: (_: unknown, row) =>
         row.existingMark ? (
-          <Button
-            size="small"
-            icon={<CommentOutlined />}
-            onClick={() =>
-              setFeedbackTarget({ markId: row.existingMark!.id, studentName: row.studentName })
-            }
-          >
-            Feedback
-          </Button>
+          <Space size={4}>
+            <Button
+              size="small"
+              icon={<EditOutlined />}
+              onClick={() =>
+                setEditTarget({ markId: row.existingMark!.id, studentName: row.studentName })
+              }
+            >
+              Edit
+            </Button>
+            <Button
+              size="small"
+              icon={<CommentOutlined />}
+              onClick={() =>
+                setFeedbackTarget({ markId: row.existingMark!.id, studentName: row.studentName })
+              }
+            >
+              Feedback
+            </Button>
+          </Space>
         ) : (
           <Text type="secondary">—</Text>
         ),
@@ -476,6 +497,17 @@ function MarkCaptureContent() {
         studentName={feedbackTarget?.studentName}
         onClose={(refresh) => {
           setFeedbackTarget(null);
+          if (refresh) getByAssessmentAsync(assessmentId);
+        }}
+      />
+
+      <EditMarkModal
+        open={!!editTarget}
+        markId={editTarget?.markId ?? null}
+        studentName={editTarget?.studentName}
+        maxMarks={maxMarks}
+        onClose={(refresh) => {
+          setEditTarget(null);
           if (refresh) getByAssessmentAsync(assessmentId);
         }}
       />

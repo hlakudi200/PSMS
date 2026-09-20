@@ -17,6 +17,10 @@ public class MarkListDto : EntityDto<Guid>
     public MarkStatus Status { get; set; }
     public bool WasAbsent { get; set; }
     public bool IsReassessment { get; set; }
+    public string TeacherComment { get; set; }
+    public string Feedback { get; set; }
+    public bool IsModerated { get; set; }
+    public decimal? ModerationAdjustment { get; set; }
 
     // Flattened
     public string AssessmentName { get; set; }
