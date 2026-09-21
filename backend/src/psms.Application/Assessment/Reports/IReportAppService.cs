@@ -19,7 +19,6 @@ public interface IReportAppService : IApplicationService
     Task<BulkGenerateReportsResultDto> PreviewBulkGenerateAsync(BulkGenerateReportsInput input);
     Task<BulkGenerateReportsResultDto> BulkGenerateAsync(BulkGenerateReportsInput input);
     Task<ReportDto> SubmitForApprovalAsync(Guid id);
-    Task<ReportDto> ApproveAsync(Guid id);
     Task<ReportDto> PublishAsync(Guid id);
     Task<ReportDto> AddTeacherCommentAsync(Guid id, ReportCommentDto input);
     Task<ReportDto> AddPrincipalCommentAsync(Guid id, ReportCommentDto input);

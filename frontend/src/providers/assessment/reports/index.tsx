@@ -30,9 +30,6 @@ import {
   submitForApprovalPending,
   submitForApprovalSuccess,
   submitForApprovalError,
-  approveReportPending,
-  approveReportSuccess,
-  approveReportError,
   publishReportPending,
   publishReportSuccess,
   publishReportError,
@@ -166,21 +163,6 @@ export const ReportProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(submitForApprovalError());
-        throw error;
-      });
-  };
-
-  const approveAsync = async (id: string) => {
-    dispatch(approveReportPending());
-    const endpoint = `/api/services/app/Report/Approve?id=${id}`;
-    await instance
-      .post(endpoint)
-      .then((response) => {
-        dispatch(approveReportSuccess(response.data.result));
-      })
-      .catch((error) => {
-        console.error(error);
-        dispatch(approveReportError());
         throw error;
       });
   };
@@ -346,7 +328,6 @@ export const ReportProvider = ({
           getByStudentTermAsync,
           generateAsync,
           submitForApprovalAsync,
-          approveAsync,
           publishAsync,
           addTeacherCommentAsync,
           addPrincipalCommentAsync,

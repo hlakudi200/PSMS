@@ -107,6 +107,13 @@ public class ReportAppService : ApplicationService, IReportAppService
 
         var dto = ObjectMapper.Map<ReportDto>(report);
         dto.SubjectReports = ObjectMapper.Map<List<ReportSubjectDto>>(report.SubjectReports.OrderBy(sr => sr.Subject?.SubjectName).ToList());
+
+        // RC-09: see ReportListDto.ActiveWorkflowInstanceId.
+        var live = await _workflowStarter.GetActiveInstanceIdsAsync(
+            AbpSession.TenantId, WorkflowEntityType.Report, new[] { dto.Id });
+        if (live.TryGetValue(dto.Id, out var wfId))
+            dto.ActiveWorkflowInstanceId = wfId;
+
         return dto;
     }
 
@@ -148,9 +155,23 @@ public class ReportAppService : ApplicationService, IReportAppService
             .PageBy(input)
             .ToListAsync();
 
-        return new PagedResultDto<ReportListDto>(
-            totalCount,
-            ObjectMapper.Map<List<ReportListDto>>(items));
+        var dtos = ObjectMapper.Map<List<ReportListDto>>(items);
+
+        // RC-09: mark the rows whose approval the workflow has taken over, so the
+        // list can hide the direct Approve action instead of offering a button the
+        // server will refuse. One query for the page, not one per row.
+        var liveWorkflows = await _workflowStarter.GetActiveInstanceIdsAsync(
+            AbpSession.TenantId,
+            WorkflowEntityType.Report,
+            dtos.Select(d => d.Id).ToList());
+
+        foreach (var dto in dtos)
+        {
+            if (liveWorkflows.TryGetValue(dto.Id, out var instanceId))
+                dto.ActiveWorkflowInstanceId = instanceId;
+        }
+
+        return new PagedResultDto<ReportListDto>(totalCount, dtos);
     }
 
     [AbpAuthorize(PermissionNames.Assessment_ReportCards_View)]
@@ -185,6 +206,13 @@ public class ReportAppService : ApplicationService, IReportAppService
 
         var dto = ObjectMapper.Map<ReportDto>(report);
         dto.SubjectReports = ObjectMapper.Map<List<ReportSubjectDto>>(report.SubjectReports.OrderBy(sr => sr.Subject?.SubjectName).ToList());
+
+        // RC-09: see ReportListDto.ActiveWorkflowInstanceId.
+        var live = await _workflowStarter.GetActiveInstanceIdsAsync(
+            AbpSession.TenantId, WorkflowEntityType.Report, new[] { dto.Id });
+        if (live.TryGetValue(dto.Id, out var wfId))
+            dto.ActiveWorkflowInstanceId = wfId;
+
         return dto;
     }
 
@@ -796,63 +824,26 @@ public class ReportAppService : ApplicationService, IReportAppService
         await CurrentUnitOfWork.SaveChangesAsync();
 
         // RC-09: submitting is what puts the report in front of a reviewer, so it
-        // is what starts the approval workflow. Before this the two halves never
-        // met — the status moved to PendingApproval and no instance was ever
-        // created, so the seeded "Report Approval" definition only ran if someone
-        // started it by hand from the workflow screen.
-        //
-        // Silently skipped when the tenant has no active Report definition, which
-        // is why ApproveAsync below still exists: a school that has not seeded its
-        // workflows approves directly.
-        try
-        {
-            await _workflowStarter.TryStartWorkflowAsync(
-                AbpSession.TenantId,
-                WorkflowEntityType.Report,
-                id,
-                AbpSession.UserId.Value,
-                AbpSession.UserId.Value.ToString());
-        }
-        catch (Exception ex)
-        {
-            Logger.Warn($"Could not auto-start the approval workflow for report {id}: {ex.Message}");
-        }
+        // is what starts the approval workflow. Approval happens ONLY through the
+        // engine — there is no direct-approve endpoint — so a submit that cannot
+        // start a workflow would strand the report in PendingApproval with nobody
+        // able to act on it. Fail loudly instead; the throw rolls the status
+        // change back with the unit of work.
+        var started = await _workflowStarter.TryStartWorkflowAsync(
+            AbpSession.TenantId,
+            WorkflowEntityType.Report,
+            id,
+            AbpSession.UserId.Value,
+            AbpSession.UserId.Value.ToString());
 
-        return await GetAsync(id);
-    }
-
-    [AbpAuthorize(PermissionNames.Assessment_ReportCards_Publish)]
-    public async Task<ReportDto> ApproveAsync(Guid id)
-    {
-        var report = await _reportRepository
-            .FirstOrDefaultAsync(r => r.Id == id && r.TenantId == AbpSession.TenantId);
-
-        if (report == null)
-            throw new UserFriendlyException(AssessmentExceptionCodes.ReportNotFound, "Report not found.");
-
-        // RC-09: while an approval workflow is live, this is the bypass around it.
-        // Approving here would stamp the report approved with the reviewer's step
-        // still sitting unanswered in their inbox, and the workflow would then
-        // fail to write back because the status is no longer PendingApproval.
-        if (await _workflowStarter.HasActiveInstanceAsync(
+        if (!started && !await _workflowStarter.HasActiveInstanceAsync(
                 AbpSession.TenantId, WorkflowEntityType.Report, id))
         {
-            throw new UserFriendlyException(AssessmentExceptionCodes.ReportInApprovalWorkflow,
-                "This report is in an approval workflow. Approve it from My Approvals so the review is recorded.");
+            throw new UserFriendlyException(
+                AssessmentExceptionCodes.NoApprovalWorkflowConfigured,
+                "This school has no active report approval workflow, so there is nobody to review this report. "
+                + "Seed or activate the Report Approval workflow first.");
         }
-
-        try
-        {
-            report.Approve(AbpSession.UserId.Value);
-        }
-        catch (InvalidOperationException)
-        {
-            throw new UserFriendlyException(AssessmentExceptionCodes.InvalidReportStatusTransition,
-                "Report must be in PendingApproval status to approve.");
-        }
-
-        await _reportRepository.UpdateAsync(report);
-        await CurrentUnitOfWork.SaveChangesAsync();
 
         return await GetAsync(id);
     }

@@ -29,7 +29,6 @@ export interface IReportActionContext {
   getByStudentTermAsync: (studentId: string, termId: string, reportType: number) => void;
   generateAsync: (input: IGenerateReport) => void;
   submitForApprovalAsync: (id: string) => void;
-  approveAsync: (id: string) => void;
   publishAsync: (id: string) => void;
   addTeacherCommentAsync: (id: string, input: IReportComment) => void;
   addPrincipalCommentAsync: (id: string, input: IReportComment) => void;

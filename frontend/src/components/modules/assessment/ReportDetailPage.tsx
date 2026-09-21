@@ -343,7 +343,6 @@ function ReportDetailContent() {
   const {
     getAsync,
     submitForApprovalAsync,
-    approveAsync,
     publishAsync,
     addPrincipalCommentAsync,
     generatePdfAsync,
@@ -380,12 +379,6 @@ function ReportDetailContent() {
     } finally {
       setSubmitting(false);
     }
-  };
-
-  const handleApprove = async () => {
-    await approveAsync(reportId);
-    message.success('Report approved');
-    refresh();
   };
 
   const handlePublish = async () => {
@@ -696,18 +689,27 @@ function ReportDetailContent() {
           }
         />
       )}
-      {canManageReport && report.status === 3 && (
+      {report.status === 3 && (
         <Alert
           className="no-print"
           type="warning"
           showIcon
           style={{ marginBottom: 16 }}
           message="This report is awaiting approval."
-          description="Where an approval workflow is running, approve it from My Approvals so the review is recorded. Approving here is only available when no workflow is configured."
+          description="Approval happens in the workflow so the review is recorded against the report. Open the approval step to act on it."
           action={
-            <Popconfirm title="Approve this report?" onConfirm={handleApprove}>
-              <Button type="primary" size="small" icon={<CheckCircleOutlined />}>Approve</Button>
-            </Popconfirm>
+            report.activeWorkflowInstanceId ? (
+              <Button
+                type="primary"
+                size="small"
+                icon={<CheckCircleOutlined />}
+                onClick={() =>
+                  router.push(`${reportsPortalRoot}/workflow/instances/${report.activeWorkflowInstanceId}`)
+                }
+              >
+                Open approval
+              </Button>
+            ) : undefined
           }
         />
       )}
