@@ -3,6 +3,7 @@ using Abp.Application.Services.Dto;
 using Abp.Authorization;
 using Abp.BackgroundJobs;
 using Abp.Domain.Repositories;
+using Abp.Domain.Uow;
 using Abp.Linq.Extensions;
 using Abp.UI;
 using Microsoft.EntityFrameworkCore;
@@ -38,6 +39,7 @@ public class ReportAppService : ApplicationService, IReportAppService
     private readonly IRepository<Mark, Guid> _markRepository;
     private readonly IRepository<ClassSubject, Guid> _classSubjectRepository;
     private readonly IRepository<AssessmentEntity, Guid> _assessmentRepository;
+    private readonly IRepository<Attendance, Guid> _attendanceRepository;
     private readonly IBackgroundJobManager _backgroundJobManager;
     private readonly psms.Academic.Students.ICurrentStudentResolver _currentStudent;
     private readonly psms.Academic.Parents.ICurrentParentResolver _currentParent;
@@ -52,6 +54,7 @@ public class ReportAppService : ApplicationService, IReportAppService
         IRepository<Mark, Guid> markRepository,
         IRepository<ClassSubject, Guid> classSubjectRepository,
         IRepository<AssessmentEntity, Guid> assessmentRepository,
+        IRepository<Attendance, Guid> attendanceRepository,
         IBackgroundJobManager backgroundJobManager,
         psms.Academic.Students.ICurrentStudentResolver currentStudent,
         psms.Academic.Parents.ICurrentParentResolver currentParent)
@@ -65,6 +68,7 @@ public class ReportAppService : ApplicationService, IReportAppService
         _markRepository = markRepository;
         _classSubjectRepository = classSubjectRepository;
         _assessmentRepository = assessmentRepository;
+        _attendanceRepository = attendanceRepository;
         _backgroundJobManager = backgroundJobManager;
         _currentStudent = currentStudent;
         _currentParent = currentParent;
@@ -240,34 +244,161 @@ public class ReportAppService : ApplicationService, IReportAppService
                     "Cannot generate report. There are incomplete marks for this student in the specified term.");
         }
 
-        // Create report
-        var report = new Report(
-            Guid.NewGuid(),
-            AbpSession.TenantId,
+        var context = await LoadGenerationContextAsync(
+            input.ClassId,
+            input.TermId,
+            new[] { input.StudentId });
+
+        var report = await BuildReportAsync(
+            context,
             input.StudentId,
             input.ClassId,
             input.AcademicYearId,
             input.ReportType,
-            input.TermId)
-        {
-            DaysPresent = input.DaysPresent,
-            DaysAbsent = input.DaysAbsent,
-            DaysLate = input.DaysLate,
-            TeacherComment = input.TeacherComment
-        };
+            input.TermId,
+            input.DaysPresent,
+            input.DaysAbsent,
+            input.DaysLate,
+            input.TeacherComment);
 
-        await _reportRepository.InsertAsync(report);
-        await CurrentUnitOfWork.SaveChangesAsync();
+        return await GetAsync(report.Id);
+    }
 
-        // Auto-create ReportSubject entries for all class subjects
+    /// <summary>
+    /// Everything a generation run needs that is the same for every learner in
+    /// the class, loaded once up front.
+    /// <para>
+    /// This exists because the per-learner work used to re-query it: the class
+    /// subjects, the class headcount, and one mark query per subject per
+    /// learner. For a class of forty with eight subjects that was several
+    /// hundred round trips, all inside one open write transaction.
+    /// </para>
+    /// </summary>
+    private sealed class ReportGenerationContext
+    {
+        public List<ClassSubject> ClassSubjects { get; set; }
+
+        public int TotalStudentsInClass { get; set; }
+
+        /// <summary>
+        /// The weighted subject average per (learner, subject). A missing key
+        /// means that learner has no completed marks for that subject, which is
+        /// how a subject with no marks stays blank on the card.
+        /// </summary>
+        public Dictionary<(Guid StudentId, Guid SubjectId), decimal> SubjectAverages { get; set; }
+    }
+
+    private async Task<ReportGenerationContext> LoadGenerationContextAsync(
+        Guid classId,
+        Guid? termId,
+        IReadOnlyCollection<Guid> studentIds)
+    {
         var classSubjects = await _classSubjectRepository
             .GetAll()
             .Include(cs => cs.Subject)
             .Where(cs => cs.TenantId == AbpSession.TenantId)
-            .Where(cs => cs.ClassId == input.ClassId && cs.IsActive)
+            .Where(cs => cs.ClassId == classId && cs.IsActive)
             .ToListAsync();
 
-        foreach (var classSubject in classSubjects)
+        var totalStudentsInClass = await _studentRepository
+            .CountAsync(s => s.TenantId == AbpSession.TenantId && s.CurrentClassId == classId);
+
+        var averages = new Dictionary<(Guid, Guid), decimal>();
+
+        if (termId.HasValue && studentIds.Count > 0 && classSubjects.Count > 0)
+        {
+            var ids = studentIds.ToList();
+            var subjectIds = classSubjects.Select(cs => cs.SubjectId).Distinct().ToList();
+
+            var marks = await _markRepository
+                .GetAll()
+                .Where(m => m.TenantId == AbpSession.TenantId)
+                .Where(m => ids.Contains(m.StudentId))
+                .Where(m => m.Assessment.TermId == termId.Value)
+                .Where(m => m.Assessment.ClassSubject.ClassId == classId)
+                .Where(m => subjectIds.Contains(m.Assessment.ClassSubject.SubjectId))
+                .Where(m => m.Status == MarkStatus.Completed && m.Percentage.HasValue)
+                .Select(m => new
+                {
+                    m.StudentId,
+                    m.Assessment.ClassSubject.SubjectId,
+                    Percentage = m.Percentage.Value,
+                    m.Assessment.Weight
+                })
+                .ToListAsync();
+
+            foreach (var group in marks.GroupBy(m => (m.StudentId, m.SubjectId)))
+            {
+                var totalWeight = group.Sum(m => m.Weight);
+
+                averages[group.Key] = totalWeight > 0
+                    // Weighted average: sum(percentage * weight) / sum(weight)
+                    ? group.Sum(m => m.Percentage * m.Weight) / totalWeight
+                    // Fallback to a simple average when no weights are configured
+                    : group.Average(m => m.Percentage);
+            }
+        }
+
+        return new ReportGenerationContext
+        {
+            ClassSubjects = classSubjects,
+            TotalStudentsInClass = totalStudentsInClass,
+            SubjectAverages = averages
+        };
+    }
+
+    /// <summary>
+    /// Creates one report card and its subject rows. Shared by the
+    /// single-student <see cref="GenerateAsync"/> and the bulk path (RC-01), so
+    /// both produce identical reports — the callers differ only in how they
+    /// validate and how they handle a failure.
+    /// <para>
+    /// The caller is responsible for validating the student, class, year and
+    /// term, for duplicate prevention, and for the RE-001 completeness gate.
+    /// </para>
+    /// </summary>
+    private async Task<Report> BuildReportAsync(
+        ReportGenerationContext context,
+        Guid studentId,
+        Guid classId,
+        Guid academicYearId,
+        ReportType reportType,
+        Guid? termId,
+        int daysPresent,
+        int daysAbsent,
+        int daysLate,
+        string teacherComment)
+    {
+        var report = new Report(
+            Guid.NewGuid(),
+            AbpSession.TenantId,
+            studentId,
+            classId,
+            academicYearId,
+            reportType,
+            termId)
+        {
+            DaysPresent = daysPresent,
+            DaysAbsent = daysAbsent,
+            DaysLate = daysLate,
+            TeacherComment = teacherComment
+        };
+
+        await _reportRepository.InsertAsync(report);
+
+        // Flush the parent before inserting its subject rows. EF Core would
+        // normally order these itself from the FK graph, but this runs without
+        // test coverage and a wrong order fails the whole run, so the round trip
+        // is worth it. It is one per learner, against the several hundred this
+        // method used to cost.
+        await CurrentUnitOfWork.SaveChangesAsync();
+
+        // One ReportSubject per active class subject, carrying the mark average
+        // already computed for this learner.
+        decimal? overallTotal = null;
+        var markedSubjects = 0;
+
+        foreach (var classSubject in context.ClassSubjects)
         {
             var reportSubject = new ReportSubject(
                 Guid.NewGuid(),
@@ -277,67 +408,365 @@ public class ReportAppService : ApplicationService, IReportAppService
                 TeacherId = classSubject.TeacherId
             };
 
-            // Aggregate mark percentages for this subject/term using weighted average
-            if (input.TermId.HasValue)
+            if (context.SubjectAverages.TryGetValue((studentId, classSubject.SubjectId), out var average))
             {
-                var subjectMarks = await _markRepository
-                    .GetAll()
-                    .Include(m => m.Assessment)
-                    .Where(m => m.TenantId == AbpSession.TenantId)
-                    .Where(m => m.StudentId == input.StudentId)
-                    .Where(m => m.Assessment.TermId == input.TermId.Value)
-                    .Where(m => m.Assessment.ClassSubject.SubjectId == classSubject.SubjectId)
-                    .Where(m => m.Assessment.ClassSubject.ClassId == input.ClassId)
-                    .Where(m => m.Status == MarkStatus.Completed && m.Percentage.HasValue)
-                    .ToListAsync();
+                reportSubject.RecordMarks(average, null);
 
-                if (subjectMarks.Any())
+                if (reportSubject.FinalMark.HasValue)
                 {
-                    decimal avgPercentage;
-                    var totalWeight = subjectMarks.Sum(m => m.Assessment.Weight);
-
-                    if (totalWeight > 0)
-                    {
-                        // Weighted average: sum(percentage * weight) / sum(weight)
-                        avgPercentage = subjectMarks.Sum(m => m.Percentage.Value * m.Assessment.Weight) / totalWeight;
-                    }
-                    else
-                    {
-                        // Fallback to simple average when no weights are configured
-                        avgPercentage = subjectMarks.Average(m => m.Percentage.Value);
-                    }
-
-                    reportSubject.RecordMarks(avgPercentage, null);
+                    overallTotal = (overallTotal ?? 0m) + reportSubject.FinalMark.Value;
+                    markedSubjects++;
                 }
             }
 
             await _reportSubjectRepository.InsertAsync(reportSubject);
         }
 
-        // Calculate overall percentage from subject entries
-        await CurrentUnitOfWork.SaveChangesAsync();
-
-        // Reload and compute overall
-        var savedSubjects = await _reportSubjectRepository
-            .GetAll()
-            .Where(rs => rs.ReportId == report.Id)
-            .Where(rs => rs.FinalMark.HasValue)
-            .ToListAsync();
-
-        if (savedSubjects.Any())
+        // The overall is the mean of the subject final marks. It is computed from
+        // what was just written rather than re-read, so there is one round trip
+        // instead of a save-then-reload for every learner.
+        if (markedSubjects > 0)
         {
-            report.OverallPercentage = savedSubjects.Average(rs => rs.FinalMark.Value);
+            report.OverallPercentage = overallTotal.Value / markedSubjects;
             report.OverallAchievementLevel = CalculateAchievementLevel(report.OverallPercentage.Value);
         }
 
-        report.TotalStudentsInClass = await _studentRepository
-            .CountAsync(s => s.CurrentClassId == input.ClassId);
+        report.TotalStudentsInClass = context.TotalStudentsInClass;
 
         report.Generate();
         await _reportRepository.UpdateAsync(report);
         await CurrentUnitOfWork.SaveChangesAsync();
 
-        return await GetAsync(report.Id);
+        return report;
+    }
+
+    /// <summary>
+    /// RC-01. Shows what a bulk run would do without writing anything, so the
+    /// actor can see who is blocked before committing to a class of forty.
+    /// </summary>
+    [AbpAuthorize(PermissionNames.Assessment_ReportCards_Generate)]
+    public Task<BulkGenerateReportsResultDto> PreviewBulkGenerateAsync(BulkGenerateReportsInput input)
+    {
+        return RunBulkGenerateAsync(input, previewOnly: true);
+    }
+
+    /// <summary>
+    /// RC-01. Generates a report card for every active learner in a class.
+    /// <para>
+    /// One learner's problem does not fail the batch: an existing report is
+    /// skipped, incomplete marks block just that learner, and a failure is
+    /// recorded against that learner while the run carries on.
+    /// </para>
+    /// </summary>
+    [AbpAuthorize(PermissionNames.Assessment_ReportCards_Generate)]
+    public Task<BulkGenerateReportsResultDto> BulkGenerateAsync(BulkGenerateReportsInput input)
+    {
+        return RunBulkGenerateAsync(input, previewOnly: false);
+    }
+
+    private async Task<BulkGenerateReportsResultDto> RunBulkGenerateAsync(
+        BulkGenerateReportsInput input,
+        bool previewOnly)
+    {
+        var cls = await _classRepository
+            .FirstOrDefaultAsync(c => c.Id == input.ClassId && c.TenantId == AbpSession.TenantId);
+        if (cls == null)
+            throw new UserFriendlyException(AssessmentExceptionCodes.ReportNotFound, "Class not found.");
+
+        var academicYear = await _academicYearRepository
+            .FirstOrDefaultAsync(ay => ay.Id == input.AcademicYearId && ay.TenantId == AbpSession.TenantId);
+        if (academicYear == null)
+            throw new UserFriendlyException(AssessmentExceptionCodes.ReportNotFound, "Academic year not found.");
+
+        Term term = null;
+        if (input.TermId.HasValue)
+        {
+            term = await _termRepository
+                .FirstOrDefaultAsync(t => t.Id == input.TermId.Value && t.TenantId == AbpSession.TenantId);
+            if (term == null)
+                throw new UserFriendlyException(AssessmentExceptionCodes.ReportNotFound, "Term not found.");
+        }
+
+        var subset = input.StudentIds != null && input.StudentIds.Count > 0
+            ? input.StudentIds.Distinct().ToList()
+            : null;
+
+        var students = await _studentRepository
+            .GetAll()
+            .Where(s => s.TenantId == AbpSession.TenantId)
+            .Where(s => s.CurrentClassId == input.ClassId && s.IsActive)
+            .WhereIf(subset != null, s => subset.Contains(s.Id))
+            .OrderBy(s => s.LastName)
+            .ThenBy(s => s.FirstName)
+            .ToListAsync();
+
+        var result = new BulkGenerateReportsResultDto
+        {
+            ClassId = input.ClassId,
+            ClassName = cls.ClassName,
+            TermId = input.TermId,
+            TermName = term?.TermName,
+            IsPreview = previewOnly,
+            TotalStudents = students.Count
+        };
+
+        // A requested learner who is not an active member of this class would
+        // otherwise vanish from the result with no explanation — the caller asked
+        // for N and silently got fewer.
+        if (subset != null)
+        {
+            var found = students.Select(s => s.Id).ToHashSet();
+
+            foreach (var missing in subset.Where(id => !found.Contains(id)))
+            {
+                result.Items.Add(new BulkGenerateReportItemDto
+                {
+                    StudentId = missing,
+                    StudentName = "Unknown learner",
+                    Outcome = BulkGenerateOutcome.Failed,
+                    Message = "Not an active learner in the selected class."
+                });
+                result.FailedCount++;
+                result.TotalStudents++;
+            }
+        }
+
+        if (students.Count == 0)
+            return result;
+
+        var studentIds = students.Select(s => s.Id).ToList();
+
+        // Both lookups below are one query for the whole class rather than one
+        // per learner — a class of forty would otherwise be eighty round trips.
+        var existingReports = await _reportRepository
+            .GetAll()
+            .Where(r => r.TenantId == AbpSession.TenantId)
+            .Where(r => r.TermId == input.TermId && r.ReportType == input.ReportType)
+            .Where(r => studentIds.Contains(r.StudentId))
+            .Select(r => new { r.Id, r.StudentId })
+            .ToListAsync();
+
+        var existingByStudent = existingReports
+            .GroupBy(r => r.StudentId)
+            .ToDictionary(g => g.Key, g => g.First().Id);
+
+        // RE-001, evaluated per learner rather than for the batch: one learner
+        // with an outstanding mark must not stop the other thirty-nine.
+        var blockedStudentIds = new HashSet<Guid>();
+        if (input.TermId.HasValue)
+        {
+            var incomplete = await _markRepository
+                .GetAll()
+                .Where(m => m.TenantId == AbpSession.TenantId)
+                .Where(m => m.Assessment.TermId == input.TermId.Value)
+                .Where(m => m.Assessment.ClassSubject.ClassId == input.ClassId)
+                .Where(m => studentIds.Contains(m.StudentId))
+                .Where(m => m.Status != MarkStatus.Completed
+                    && m.Status != MarkStatus.Absent
+                    && m.Status != MarkStatus.Exempted)
+                .Select(m => m.StudentId)
+                .Distinct()
+                .ToListAsync();
+
+            blockedStudentIds = new HashSet<Guid>(incomplete);
+        }
+
+        var readingRegister = input.UseAttendanceRecords && term != null;
+        var attendanceByStudent = await ResolveAttendanceAsync(input, term, studentIds);
+
+        // Loaded once for the whole run: the class subjects, the headcount, and
+        // every learner's subject averages in a single mark query.
+        var context = previewOnly
+            ? null
+            : await LoadGenerationContextAsync(input.ClassId, input.TermId, studentIds);
+
+        foreach (var student in students)
+        {
+            var item = new BulkGenerateReportItemDto
+            {
+                StudentId = student.Id,
+                StudentName = $"{student.FirstName} {student.LastName}".Trim(),
+                AdmissionNumber = student.AdmissionNumber
+            };
+
+            if (existingByStudent.TryGetValue(student.Id, out var existingId))
+            {
+                item.Outcome = BulkGenerateOutcome.SkippedExisting;
+                item.ReportId = existingId;
+                item.Message = "A report already exists for this learner, term and report type.";
+                result.SkippedCount++;
+                result.Items.Add(item);
+                continue;
+            }
+
+            if (blockedStudentIds.Contains(student.Id))
+            {
+                item.Outcome = BulkGenerateOutcome.Blocked;
+                item.Message = "There are incomplete marks for this learner in the selected term.";
+                result.BlockedCount++;
+                result.Items.Add(item);
+                continue;
+            }
+
+            if (previewOnly)
+            {
+                item.Outcome = BulkGenerateOutcome.Eligible;
+                result.EligibleCount++;
+                result.Items.Add(item);
+                continue;
+            }
+
+            (int Present, int Absent, int Late) days;
+            string note = null;
+
+            if (attendanceByStudent.TryGetValue(student.Id, out var counted))
+            {
+                days = counted;
+            }
+            else if (readingRegister)
+            {
+                // The register was consulted and holds nothing for this learner.
+                // Zero is the honest figure — stamping the class-wide defaults on
+                // their card would invent attendance they never had.
+                days = (0, 0, 0);
+                note = "No attendance records for this term.";
+            }
+            else
+            {
+                days = (input.DefaultDaysPresent, input.DefaultDaysAbsent, input.DefaultDaysLate);
+            }
+
+            try
+            {
+                // Each learner commits on its own. Sharing the ambient transaction
+                // meant that one unique-constraint collision — two principals
+                // pressing Generate at once, or a double click — rolled back every
+                // card already generated in the run and left the connection in a
+                // failed transaction, so nothing after it could succeed either.
+                using (var uow = UnitOfWorkManager.Begin(new UnitOfWorkOptions
+                {
+                    Scope = System.Transactions.TransactionScopeOption.RequiresNew
+                }))
+                {
+                    var report = await BuildReportAsync(
+                        context,
+                        student.Id,
+                        input.ClassId,
+                        input.AcademicYearId,
+                        input.ReportType,
+                        input.TermId,
+                        days.Present,
+                        days.Absent,
+                        days.Late,
+                        teacherComment: null);
+
+                    await uow.CompleteAsync();
+
+                    item.Outcome = BulkGenerateOutcome.Generated;
+                    item.ReportId = report.Id;
+                    item.Message = note;
+                    result.GeneratedCount++;
+                }
+            }
+            catch (Exception ex)
+            {
+                // Anything from a rule violation to a collision with a concurrent
+                // run. Record it against this learner and keep going — carrying on
+                // is the whole point of the batch.
+                item.Outcome = BulkGenerateOutcome.Failed;
+                item.Message = ex is UserFriendlyException friendly
+                    ? friendly.Message
+                    : "Generation failed for this learner.";
+                result.FailedCount++;
+
+                Logger.Error(
+                    $"Bulk report generation failed for student {student.Id} in class {input.ClassId}.",
+                    ex);
+            }
+
+            result.Items.Add(item);
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Reads each learner's attendance over the term's date range, so a class of
+    /// report cards carries real attendance rather than one typed-in figure
+    /// repeated forty times.
+    /// <para>
+    /// This counts DAYS, not register rows. A school that takes a register per
+    /// subject writes several rows for one learner on one day, and counting rows
+    /// would print "days present: 320" for a forty-day term.
+    /// </para>
+    /// <para>
+    /// A late arrival still attended, so a day with a Late row counts as present
+    /// and is also reported on its own line — which is how the printed card reads
+    /// it. A day with neither a Present nor a Late row counts as absent, whatever
+    /// the reason: the card has no separate line for excused or sick leave.
+    /// Holiday rows are dropped before counting, since a holiday is not a school
+    /// day. So present + absent equals the school days registered, which is what
+    /// the PDF prints as the total.
+    /// </para>
+    /// Returns an empty map when there is no term to read a window from, or when
+    /// the caller asked for the supplied defaults instead.
+    /// </summary>
+    private async Task<Dictionary<Guid, (int Present, int Absent, int Late)>> ResolveAttendanceAsync(
+        BulkGenerateReportsInput input,
+        Term term,
+        List<Guid> studentIds)
+    {
+        var map = new Dictionary<Guid, (int Present, int Absent, int Late)>();
+
+        if (!input.UseAttendanceRecords || term == null)
+            return map;
+
+        // Registers are captured with a time component; the term boundaries are
+        // midnight. Comparing them raw drops the last day of term. Every other
+        // attendance query in the codebase normalises the same way.
+        var start = term.StartDate.Date;
+        var end = term.EndDate.Date;
+
+        var records = await _attendanceRepository
+            .GetAll()
+            .Where(a => a.TenantId == AbpSession.TenantId)
+            .Where(a => a.ClassId == input.ClassId)
+            .Where(a => studentIds.Contains(a.StudentId))
+            .Where(a => a.AttendanceDate.Date >= start && a.AttendanceDate.Date <= end)
+            .Where(a => a.Status != AttendanceStatus.Holiday)
+            .Select(a => new { a.StudentId, a.AttendanceDate, a.Status })
+            .ToListAsync();
+
+        foreach (var perStudent in records.GroupBy(r => r.StudentId))
+        {
+            var present = 0;
+            var absent = 0;
+            var late = 0;
+
+            foreach (var perDay in perStudent.GroupBy(r => r.AttendanceDate.Date))
+            {
+                var wasLate = perDay.Any(r => r.Status == AttendanceStatus.Late);
+                var attended = wasLate || perDay.Any(r => r.Status == AttendanceStatus.Present);
+
+                if (attended)
+                {
+                    present++;
+                }
+                else
+                {
+                    absent++;
+                }
+
+                if (wasLate)
+                {
+                    late++;
+                }
+            }
+
+            map[perStudent.Key] = (present, absent, late);
+        }
+
+        return map;
     }
 
     [AbpAuthorize(PermissionNames.Assessment_ReportCards_Generate)]

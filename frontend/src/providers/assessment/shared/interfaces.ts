@@ -361,6 +361,60 @@ export interface IBulkGenerateReportPdfsInput {
   termId?: string;
 }
 
+/**
+ * RC-01. Generating report cards for a whole class.
+ *
+ * Attendance comes from the register over the term's date range rather than
+ * from a typed-in figure, because one number spread across a class would put
+ * the same attendance on every report card. The defaults below are only used
+ * when there is no term to read a window from.
+ */
+export interface IBulkGenerateReports {
+  classId: string;
+  academicYearId: string;
+  reportType: number;
+  termId?: string;
+  useAttendanceRecords: boolean;
+  defaultDaysPresent: number;
+  defaultDaysAbsent: number;
+  defaultDaysLate: number;
+  /** Restrict the run to these learners. Omit for the whole class. */
+  studentIds?: string[];
+}
+
+/** Mirrors the backend BulkGenerateOutcome. */
+export enum BulkGenerateOutcome {
+  Eligible = 1,
+  Generated = 2,
+  SkippedExisting = 3,
+  Blocked = 4,
+  Failed = 5,
+}
+
+export interface IBulkGenerateReportItem {
+  studentId: string;
+  studentName: string;
+  admissionNumber?: string;
+  outcome: BulkGenerateOutcome;
+  message?: string;
+  reportId?: string;
+}
+
+export interface IBulkGenerateReportsResult {
+  classId: string;
+  className?: string;
+  termId?: string;
+  termName?: string;
+  isPreview: boolean;
+  totalStudents: number;
+  eligibleCount: number;
+  generatedCount: number;
+  skippedCount: number;
+  blockedCount: number;
+  failedCount: number;
+  items: IBulkGenerateReportItem[];
+}
+
 // ============================================================
 // ReportSubject
 // ============================================================
