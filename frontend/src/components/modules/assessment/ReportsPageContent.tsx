@@ -69,7 +69,14 @@ function ReportsContent() {
   const router = useRouter();
   const portalBase = usePortalBase();
   const { reports, totalCount, isPending, isError } = useReportState();
-  const { getAllAsync, approveAsync, publishAsync, generatePdfAsync, bulkGeneratePdfsAsync } = useReportActions();
+  const {
+    getAllAsync,
+    submitForApprovalAsync,
+    approveAsync,
+    publishAsync,
+    generatePdfAsync,
+    bulkGeneratePdfsAsync,
+  } = useReportActions();
   const { academicYears } = useAcademicYearState();
   const { getAllAsync: getAllAcademicYears } = useAcademicYearActions();
   const { terms } = useTermState();
@@ -162,6 +169,24 @@ function ReportsContent() {
       },
     },
     {
+      key: 'submitForApproval',
+      label: 'Submit for approval',
+      icon: <SendOutlined />,
+      // RC-09: this is what starts the approval workflow. Without it a generated
+      // report had no route into review at all.
+      visible: (record) => record.status === ReportStatus.Generated,
+      confirm: { title: 'Send this report for approval?' },
+      onClick: async (record) => {
+        try {
+          await submitForApprovalAsync(record.id);
+          message.success('Sent for approval');
+          refreshData();
+        } catch {
+          // Surfaced by axios interceptor
+        }
+      },
+    },
+    {
       key: 'approve',
       label: 'Approve',
       icon: <CheckCircleOutlined />,
@@ -243,6 +268,19 @@ function ReportsContent() {
   };
 
   const bulkActions: BulkAction<IReportList>[] = [
+    {
+      key: 'bulkSubmitForApproval',
+      label: 'Submit Selected for Approval',
+      confirm: { title: 'Send all selected reports for approval?' },
+      onClick: async (rows) => {
+        const eligible = rows.filter((r) => r.status === ReportStatus.Generated);
+        if (eligible.length === 0) {
+          message.warning('No reports in "Generated" status selected');
+          return;
+        }
+        await runParallel(eligible, submitForApprovalAsync, 'sent for approval', 'failed');
+      },
+    },
     {
       key: 'bulkApprove',
       label: 'Approve Selected',

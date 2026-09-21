@@ -340,9 +340,17 @@ function ReportDetailContent() {
   }, [router, reportsPortalRoot]);
 
   const { report, isPending, isError } = useReportState();
-  const { getAsync, approveAsync, publishAsync, addPrincipalCommentAsync, generatePdfAsync } = useReportActions();
+  const {
+    getAsync,
+    submitForApprovalAsync,
+    approveAsync,
+    publishAsync,
+    addPrincipalCommentAsync,
+    generatePdfAsync,
+  } = useReportActions();
 
   const [principalComment, setPrincipalComment] = useState('');
+  const [submitting, setSubmitting] = useState(false);
   const [commentSaving, setCommentSaving] = useState(false);
   const [pdfGenerating, setPdfGenerating] = useState(false);
 
@@ -357,6 +365,22 @@ function ReportDetailContent() {
   const refresh = useCallback(() => {
     getAsync(reportId);
   }, [reportId, getAsync]);
+
+  // RC-09: submitting is what starts the approval workflow server-side, which
+  // is why this is the only route into review. Nothing in the UI called it
+  // before, so a generated report had nowhere to go.
+  const handleSubmitForApproval = async () => {
+    setSubmitting(true);
+    try {
+      await submitForApprovalAsync(reportId);
+      message.success('Sent for approval');
+      refresh();
+    } catch {
+      // Surfaced by the axios error interceptor.
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const handleApprove = async () => {
     await approveAsync(reportId);
@@ -652,13 +676,34 @@ function ReportDetailContent() {
       </Space>
 
       {/* Status Banner — manage actions only for principal/vice-principal/admin */}
+      {canManageReport && report.status === 2 && (
+        <Alert
+          className="no-print"
+          type="info"
+          showIcon
+          style={{ marginBottom: 16 }}
+          message="This report is generated and has not been sent for approval."
+          description="Submitting starts the approval workflow, so the review is recorded against the report."
+          action={
+            <Popconfirm
+              title="Send this report for approval?"
+              onConfirm={handleSubmitForApproval}
+            >
+              <Button type="primary" size="small" icon={<SendOutlined />} loading={submitting}>
+                Submit for approval
+              </Button>
+            </Popconfirm>
+          }
+        />
+      )}
       {canManageReport && report.status === 3 && (
         <Alert
           className="no-print"
           type="warning"
           showIcon
           style={{ marginBottom: 16 }}
-          message="This report is awaiting your approval."
+          message="This report is awaiting approval."
+          description="Where an approval workflow is running, approve it from My Approvals so the review is recorded. Approving here is only available when no workflow is configured."
           action={
             <Popconfirm title="Approve this report?" onConfirm={handleApprove}>
               <Button type="primary" size="small" icon={<CheckCircleOutlined />}>Approve</Button>
