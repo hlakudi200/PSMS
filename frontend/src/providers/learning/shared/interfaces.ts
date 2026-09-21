@@ -47,6 +47,8 @@ export interface IPagedAndSortedResultRequest {
     viewCount: number;
     fileName?: string;
     fileSizeBytes?: number;
+    fileUrl?: string;
+    externalLink?: string;
   }
   
   export interface ICreateLearningMaterial {
@@ -146,7 +148,7 @@ export interface IPagedAndSortedResultRequest {
   // Posted after the new version's file has been uploaded directly to storage.
   export interface IUploadNewVersion {
     learningMaterialId: string;
-    changeDescription: string;
+    changeDescription?: string;
     objectKey: string;
     fileName: string;
   }

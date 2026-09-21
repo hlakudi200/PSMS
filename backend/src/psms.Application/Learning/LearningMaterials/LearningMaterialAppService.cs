@@ -548,7 +548,10 @@ public class LearningMaterialAppService : ApplicationService, ILearningMaterialA
             AbpSession.TenantId,
             material.Id,
             nextVersionNumber,
-            input.ChangeDescription.Trim(),
+            // The column has a pre-existing NOT NULL constraint (no
+            // migration for this change), so an omitted description is
+            // stored as empty rather than null.
+            input.ChangeDescription?.Trim() ?? string.Empty,
             AbpSession.UserId.Value);
 
         version.SetFile(

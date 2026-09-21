@@ -2,18 +2,26 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import {
+  Alert,
+  Checkbox,
+  DatePicker,
+  Divider,
   Form,
   Input,
   InputNumber,
   Modal,
+  Radio,
   Select,
   Upload,
   message,
 } from 'antd';
 import type { UploadFile } from 'antd';
 import { InboxOutlined } from '@ant-design/icons';
+import dayjs from 'dayjs';
 import { z } from 'zod';
 import { useLearningMaterialActions } from '@/providers/learning/learning_materials';
+import { useGradeState, useGradeActions } from '@/providers/academic/grades';
+import { useAcademicYearState, useAcademicYearActions } from '@/providers/academic/academic_years';
 import type { IClassSubjectList } from '@/providers/academic/shared/interfaces';
 
 // LearningMaterialType enum mirror — keep in sync with backend
@@ -74,18 +82,54 @@ function maxBytesForType(t: LearningMaterialType): number {
   return t === LearningMaterialType.Video ? VIDEO_MAX_BYTES : DOCUMENT_MAX_BYTES;
 }
 
+// Materials are tagged Core or Supplementary — an explicit choice (no
+// default) rather than a bare checkbox, since both states are meaningful.
+const MATERIAL_CATEGORIES = ['Core', 'Supplementary'] as const;
+
+// Up to 5 tags (ticket-specified); 30 chars/tag is our own reasonable
+// default — the ticket gives a count bound but not a per-tag length.
+const MAX_TAGS = 5;
+const MAX_TAG_LENGTH = 30;
+
 const uploadSchema = z
   .object({
     classSubjectId: z.string().min(1, 'Class & subject is required'),
-    termId: z.string().optional(),
+    // Not required: Class & subject already implies a grade
+    // (ClassSubject -> Class.GradeId on the backend), and this field isn't
+    // persisted yet anyway (see the backend TODO doc) — it's confirmatory,
+    // not load-bearing.
+    gradeId: z.string().optional(),
+    termId: z.string().min(1, 'Term is required'),
     title: z.string().min(5, 'Title must be at least 5 characters').max(200),
     description: z
       .string()
       .min(10, 'Description must be at least 10 characters')
       .max(1000),
     materialType: z.number().min(1).max(8),
+    materialCategory: z.enum(MATERIAL_CATEGORIES, {
+      message: 'Select Core or Supplementary',
+    }),
     externalLink: z.string().max(500).optional(),
     displayOrder: z.number().min(0).optional(),
+    // Not yet persisted — see the in-modal notice and
+    // backend/docs/LearningMaterial-Metadata-Backend-TODO.md.
+    tags: z
+      .array(z.string().min(1).max(MAX_TAG_LENGTH, `Each tag must be ${MAX_TAG_LENGTH} characters or fewer`))
+      .max(MAX_TAGS, `Up to ${MAX_TAGS} tags allowed`)
+      .optional(),
+    // Day-granularity, not exact-instant: a fixed grace window still fails
+    // once enough time passes between picking "Now" and actually
+    // submitting (filling in the rest of the form, uploading a file, etc).
+    // Time-of-day is only meaningful for a genuinely future calendar day;
+    // for "today" any time is accepted — matches the picker's own
+    // disabledDate, which already only blocks days before today.
+    scheduledPublishDate: z
+      .string()
+      .optional()
+      .refine((v) => !v || !dayjs(v).isBefore(dayjs(), 'day'), {
+        message: "Scheduled date can't be in the past",
+      }),
+    notifyStudents: z.boolean().optional(),
   })
   .refine(
     (d) =>
@@ -111,6 +155,10 @@ export const MaterialUploadModal: React.FC<MaterialUploadModalProps> = ({
   const [form] = Form.useForm();
   const { uploadAsync, requestUploadUrlAsync, uploadFileToStorageAsync } =
     useLearningMaterialActions();
+  const { activeGrades } = useGradeState();
+  const { getActiveGradesAsync } = useGradeActions();
+  const { academicYear } = useAcademicYearState();
+  const { getCurrentAsync: getCurrentAcademicYearAsync } = useAcademicYearActions();
   const [loading, setLoading] = useState(false);
   const [fileList, setFileList] = useState<UploadFile[]>([]);
   const [materialType, setMaterialType] = useState<LearningMaterialType>(
@@ -122,7 +170,14 @@ export const MaterialUploadModal: React.FC<MaterialUploadModalProps> = ({
       form.resetFields();
       setFileList([]);
       setMaterialType(LearningMaterialType.Document);
+      getActiveGradesAsync();
+      // Term/GetAll doesn't exist on the backend (TermAppService has no
+      // GetAllAsync method — a pre-existing bug in the terms provider, not
+      // something introduced here). AcademicYear/GetCurrent already returns
+      // the current year's full term list inline, so we use that instead.
+      getCurrentAcademicYearAsync();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, form]);
 
   const classSubjectOptions = useMemo(
@@ -132,6 +187,20 @@ export const MaterialUploadModal: React.FC<MaterialUploadModalProps> = ({
         label: `${cs.className ?? 'Class'} — ${cs.subjectName ?? 'Subject'}`,
       })),
     [classSubjects]
+  );
+
+  const gradeOptions = useMemo(
+    () => (activeGrades ?? []).map((g) => ({ value: g.id, label: g.gradeName })),
+    [activeGrades]
+  );
+
+  const termOptions = useMemo(
+    () =>
+      (academicYear?.terms ?? []).map((t) => ({
+        value: t.id,
+        label: `${t.termName}${t.isCurrent ? ' (Current)' : ''}`,
+      })),
+    [academicYear]
   );
 
   const isExternalLink = materialType === LearningMaterialType.ExternalLink;
@@ -166,6 +235,9 @@ export const MaterialUploadModal: React.FC<MaterialUploadModalProps> = ({
       const parsed = uploadSchema.safeParse({
         ...values,
         materialType,
+        scheduledPublishDate: values.scheduledPublishDate
+          ? dayjs(values.scheduledPublishDate).toISOString()
+          : undefined,
       });
       if (!parsed.success) {
         form.setFields(
@@ -205,6 +277,10 @@ export const MaterialUploadModal: React.FC<MaterialUploadModalProps> = ({
         fileName = f.name;
       }
 
+      // gradeId / materialCategory / tags / scheduledPublishDate /
+      // notifyStudents are validated above but deliberately not sent here —
+      // IUploadLearningMaterial (and the backend DTO it mirrors) has nowhere
+      // for them to go yet. See backend/docs/LearningMaterial-Metadata-Backend-TODO.md.
       await uploadAsync({
         classSubjectId: parsed.data.classSubjectId,
         termId: parsed.data.termId,
@@ -255,6 +331,29 @@ export const MaterialUploadModal: React.FC<MaterialUploadModalProps> = ({
           />
         </Form.Item>
 
+        <Form.Item
+          label="Grade"
+          name="gradeId"
+          tooltip="Optional — already implied by the class & subject you selected above."
+        >
+          <Select
+            options={gradeOptions}
+            placeholder="Select grade (optional)"
+            showSearch
+            optionFilterProp="label"
+            allowClear
+          />
+        </Form.Item>
+
+        <Form.Item label="Term" name="termId" rules={[{ required: true }]}>
+          <Select
+            options={termOptions}
+            placeholder="Select term"
+            showSearch
+            optionFilterProp="label"
+          />
+        </Form.Item>
+
         <Form.Item label="Title" name="title" rules={[{ required: true }]}>
           <Input
             placeholder="e.g. Algebra basics — Chapter 1 notes"
@@ -279,6 +378,18 @@ export const MaterialUploadModal: React.FC<MaterialUploadModalProps> = ({
             value={materialType}
             onChange={(v) => setMaterialType(v as LearningMaterialType)}
             options={materialTypeOptions}
+          />
+        </Form.Item>
+
+        <Form.Item
+          label="Category"
+          name="materialCategory"
+          rules={[{ required: true, message: 'Select Core or Supplementary' }]}
+        >
+          <Radio.Group
+            options={MATERIAL_CATEGORIES.map((c) => ({ label: c, value: c }))}
+            optionType="button"
+            buttonStyle="solid"
           />
         </Form.Item>
 
@@ -342,6 +453,48 @@ export const MaterialUploadModal: React.FC<MaterialUploadModalProps> = ({
             placeholder="0"
             style={{ width: '100%' }}
           />
+        </Form.Item>
+
+        <Divider style={{ marginTop: 8 }} />
+
+        <Alert
+          type="warning"
+          showIcon
+          message="Not saved yet"
+          description="Tags, scheduled release, and the notify option below aren't persisted by the server yet — backend support is tracked separately. Everything above this line uploads normally."
+          style={{ marginBottom: 16 }}
+        />
+
+        <Form.Item
+          label={`Tags (up to ${MAX_TAGS})`}
+          name="tags"
+          tooltip="Not saved yet — see the notice above."
+        >
+          <Select
+            mode="tags"
+            maxCount={MAX_TAGS}
+            placeholder="Type a tag and press enter"
+            tokenSeparators={[',']}
+            notFoundContent={null}
+          />
+        </Form.Item>
+
+        <Form.Item
+          label="Scheduled release date"
+          name="scheduledPublishDate"
+          tooltip="Not saved yet — see the notice above."
+        >
+          <DatePicker
+            showTime={{ format: 'HH:mm' }}
+            format="YYYY-MM-DD HH:mm"
+            style={{ width: '100%' }}
+            disabledDate={(d) => !!d && d.isBefore(dayjs(), 'day')}
+            placeholder="Publish immediately"
+          />
+        </Form.Item>
+
+        <Form.Item name="notifyStudents" valuePropName="checked">
+          <Checkbox>Notify students when published (not saved yet)</Checkbox>
         </Form.Item>
       </Form>
     </Modal>

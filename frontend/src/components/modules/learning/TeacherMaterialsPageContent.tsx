@@ -23,6 +23,7 @@ import {
 import {
   CloudOutlined,
   DatabaseOutlined,
+  DeleteOutlined,
   EditOutlined,
   EyeOutlined,
   HistoryOutlined,
@@ -44,6 +45,8 @@ import {
   useClassSubjectActions,
   useClassSubjectState,
 } from '@/providers/academic/class_subjects';
+import { GradeProvider } from '@/providers/academic/grades';
+import { AcademicYearProvider } from '@/providers/academic/academic_years';
 import {
   LearningMaterialProvider,
   useLearningMaterialActions,
@@ -132,6 +135,8 @@ function TeacherMaterialsContent() {
     getAllAsync: getAllMaterials,
     publishAsync,
     unpublishAsync,
+    deleteAsync,
+    incrementViewCountAsync,
   } = useLearningMaterialActions();
   const {
     learningMaterials,
@@ -223,6 +228,28 @@ function TeacherMaterialsContent() {
   );
   const usedFraction = totalBytes / TEACHER_STORAGE_QUOTA_BYTES;
   const overQuotaWarning = usedFraction >= QUOTA_WARNING_THRESHOLD;
+
+  const handleView = (record: ILearningMaterialList) => {
+    const url = record.fileUrl || record.externalLink;
+    if (!url) {
+      message.info('This material has no file or link to view yet.');
+      return;
+    }
+    window.open(url, '_blank', 'noopener,noreferrer');
+    // Fire-and-forget — the Views column picks up the new count on the
+    // next refresh (manual, or the next filter change).
+    incrementViewCountAsync(record.id);
+  };
+
+  const handleDelete = async (record: ILearningMaterialList) => {
+    try {
+      await deleteAsync(record.id);
+      message.success('Material deleted');
+      refreshMaterials();
+    } catch {
+      // Surfaced by axios interceptor
+    }
+  };
 
   const handleArchive = async (record: ILearningMaterialList) => {
     try {
@@ -328,9 +355,18 @@ function TeacherMaterialsContent() {
     {
       title: 'Actions',
       key: 'actions',
-      width: 240,
+      width: 320,
       render: (_: unknown, record: ILearningMaterialList) => (
         <Space size="small">
+          <Tooltip title={record.fileUrl || record.externalLink ? 'View' : 'No file or link yet'}>
+            <Button
+              size="small"
+              icon={<EyeOutlined />}
+              aria-label={`View ${record.title}`}
+              disabled={!record.fileUrl && !record.externalLink}
+              onClick={() => handleView(record)}
+            />
+          </Tooltip>
           <Tooltip title="Edit metadata">
             <Button
               size="small"
@@ -379,6 +415,22 @@ function TeacherMaterialsContent() {
               />
             </Tooltip>
           )}
+          <Popconfirm
+            title="Delete this material?"
+            description="This permanently removes the material and all of its versions. This cannot be undone."
+            onConfirm={() => handleDelete(record)}
+            okText="Delete"
+            okButtonProps={{ danger: true }}
+          >
+            <Tooltip title="Delete">
+              <Button
+                size="small"
+                danger
+                icon={<DeleteOutlined />}
+                aria-label={`Delete ${record.title}`}
+              />
+            </Tooltip>
+          </Popconfirm>
         </Space>
       ),
     },
@@ -567,7 +619,7 @@ function TeacherMaterialsContent() {
           pagination={{ pageSize: 20 }}
           size="small"
           columns={columns}
-          scroll={{ x: 920 }}
+          scroll={{ x: 1000 }}
           locale={{
             emptyText: hasClassSubjects ? (
               <Empty
@@ -625,9 +677,13 @@ export default function TeacherMaterialsPageContent() {
   return (
     <TeacherProvider>
       <ClassSubjectProvider>
-        <LearningMaterialProvider>
-          <TeacherMaterialsContent />
-        </LearningMaterialProvider>
+        <GradeProvider>
+          <AcademicYearProvider>
+            <LearningMaterialProvider>
+              <TeacherMaterialsContent />
+            </LearningMaterialProvider>
+          </AcademicYearProvider>
+        </GradeProvider>
       </ClassSubjectProvider>
     </TeacherProvider>
   );

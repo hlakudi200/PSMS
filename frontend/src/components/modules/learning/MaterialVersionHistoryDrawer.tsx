@@ -94,10 +94,6 @@ export const MaterialVersionHistoryDrawer: React.FC<
 
   const handleUpload = async () => {
     if (!material) return;
-    if (!changeDescription.trim() || changeDescription.trim().length < 5) {
-      message.error('Change description must be at least 5 characters.');
-      return;
-    }
     const file = fileList[0]?.originFileObj as File | undefined;
     if (!file) {
       message.error('Please select a file for the new version.');
@@ -113,7 +109,7 @@ export const MaterialVersionHistoryDrawer: React.FC<
       await uploadFileToStorageAsync(ticket.uploadUrl, file);
       await uploadNewVersionAsync({
         learningMaterialId: material.id,
-        changeDescription: changeDescription.trim(),
+        changeDescription: changeDescription.trim() || undefined,
         objectKey: ticket.objectKey,
         fileName: file.name,
       });
@@ -196,7 +192,7 @@ export const MaterialVersionHistoryDrawer: React.FC<
         </Text>
         <Input.TextArea
           rows={2}
-          placeholder="What changed? (5–500 characters, required)"
+          placeholder="What changed? (optional, up to 500 characters)"
           maxLength={500}
           value={changeDescription}
           onChange={(e) => setChangeDescription(e.target.value)}
@@ -220,7 +216,7 @@ export const MaterialVersionHistoryDrawer: React.FC<
             Click or drag the new file here
           </p>
           <p className="ant-upload-hint" style={{ fontSize: 11 }}>
-            Server validates type and size against the material's type
+            Server validates type and size against the material&apos;s type
             (LM-001). At most {MAX_VERSIONS_RETAINED} versions are retained
             (LM-003) — older versions are pruned automatically.
           </p>
@@ -229,7 +225,7 @@ export const MaterialVersionHistoryDrawer: React.FC<
           type="primary"
           icon={<CloudUploadOutlined />}
           loading={uploading}
-          disabled={!changeDescription.trim() || fileList.length === 0}
+          disabled={fileList.length === 0}
           onClick={handleUpload}
         >
           Upload new version
@@ -326,7 +322,9 @@ export const MaterialVersionHistoryDrawer: React.FC<
                   }
                   description={
                     <div>
-                      <Text style={{ fontSize: 13 }}>{v.changeDescription}</Text>
+                      <Text style={{ fontSize: 13 }} type={v.changeDescription ? undefined : 'secondary'}>
+                        {v.changeDescription || 'No change description provided.'}
+                      </Text>
                       <div>
                         <Text type="secondary" style={{ fontSize: 11 }}>
                           {new Date(v.creationTime).toLocaleString('en-ZA')}
