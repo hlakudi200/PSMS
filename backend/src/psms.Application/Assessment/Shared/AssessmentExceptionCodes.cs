@@ -56,6 +56,12 @@ public static class AssessmentExceptionCodes
     public const string CannotPublishUnapproved = "ASM_CANNOT_PUBLISH_UNAPPROVED";
     public const string ReportNotEditable = "ASM_REPORT_NOT_EDITABLE";
     public const string ReportNotPublished = "ASM_REPORT_NOT_PUBLISHED";
+
+    /// <summary>
+    /// A direct approval was attempted while the report's approval workflow is
+    /// still running. The reviewer's step has to be answered instead.
+    /// </summary>
+    public const string ReportInApprovalWorkflow = "ASM_REPORT_IN_APPROVAL_WORKFLOW";
     public const string MaxMarksReductionInvalid = "ASM_MAX_MARKS_REDUCTION_INVALID";
 
     // ReportSubject

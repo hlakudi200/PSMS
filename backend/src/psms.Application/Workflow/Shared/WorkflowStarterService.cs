@@ -38,6 +38,27 @@ public class WorkflowStarterService : ITransientDependency
     }
 
     /// <summary>
+    /// Whether this entity currently sits in a workflow that has not finished.
+    /// <para>
+    /// Modules use this to refuse a direct state change that would bypass a live
+    /// approval — approving a report card from the reports list, say, while its
+    /// approval workflow is still sitting in someone's inbox.
+    /// </para>
+    /// </summary>
+    public Task<bool> HasActiveInstanceAsync(
+        int? tenantId,
+        WorkflowEntityType entityType,
+        Guid entityId)
+    {
+        return _instanceRepository
+            .GetAll()
+            .AnyAsync(i => i.TenantId == tenantId
+                && i.EntityType == entityType
+                && i.EntityId == entityId
+                && (i.Status == WorkflowStatus.NotStarted || i.Status == WorkflowStatus.InProgress));
+    }
+
+    /// <summary>
     /// Starts a workflow for the given entity if an active definition exists.
     /// Silently skips if no active definition is configured or if a workflow already exists.
     /// </summary>

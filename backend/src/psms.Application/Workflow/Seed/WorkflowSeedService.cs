@@ -18,6 +18,16 @@ namespace psms.Workflow.Seed;
 [AbpAuthorize(PermissionNames.Workflow_Definitions_Create)]
 public class WorkflowSeedService : ApplicationService
 {
+    /// <summary>
+    /// Two working days on each report approval step. Report cards move in
+    /// batches at the end of a term, so the SLA is what surfaces the one class
+    /// still sitting unreviewed while the rest have gone out.
+    /// </summary>
+    private const int ReportReviewSlaHours = 48;
+
+    /// <summary>Key of the decision form rendered on the principal's step.</summary>
+    private const string ReportApprovalDecisionKey = "report.approval";
+
     private readonly IRepository<WorkflowDefinition, Guid> _definitionRepository;
     private readonly IRepository<WorkflowStep, Guid> _stepRepository;
 
@@ -129,14 +139,22 @@ public class WorkflowSeedService : ApplicationService
         }
     }
 
+    /// <summary>
+    /// RC-09. The report approval workflow, and an in-place upgrade for tenants
+    /// that were seeded before its steps carried an SLA and a decision form.
+    /// </summary>
     private async Task SeedReportApprovalWorkflow()
     {
-        var exists = await _definitionRepository
+        var existing = await _definitionRepository
             .GetAll()
-            .AnyAsync(d => d.TenantId == AbpSession.TenantId
+            .FirstOrDefaultAsync(d => d.TenantId == AbpSession.TenantId
                 && d.EntityType == WorkflowEntityType.Report);
 
-        if (exists) return;
+        if (existing != null)
+        {
+            await UpgradeReportApprovalStepsAsync(existing.Id);
+            return;
+        }
 
         var definition = new WorkflowDefinition
         {
@@ -159,8 +177,12 @@ public class WorkflowSeedService : ApplicationService
                 StepOrder = 1,
                 Name = "HOD Review",
                 Description = "Head of Department reviews the report card for accuracy.",
-                AssignedRole = "Teacher",
-                ActionType = WorkflowActionType.Review
+                // Was "Teacher", which contradicted the step's own name and sent
+                // report cards to a role holding neither Generate nor Publish.
+                AssignedRole = "HOD",
+                ActionType = WorkflowActionType.Review,
+                IsCommentRequired = true,
+                SlaHours = ReportReviewSlaHours
             },
             new WorkflowStep
             {
@@ -172,13 +194,66 @@ public class WorkflowSeedService : ApplicationService
                 AssignedRole = "Principal",
                 ActionType = WorkflowActionType.Approve,
                 IsTerminal = true,
-                NextStepOnReject = 1 // Send back to HOD
+                NextStepOnReject = 1, // Send back to HOD
+                // ReportWorkflowHandler reads "principalComment" off the decision
+                // and writes it to the report. Without the schema attached the
+                // form never rendered the field, so the handler was reading a
+                // value the UI had no way to collect.
+                DecisionSchemaKey = ReportApprovalDecisionKey,
+                SlaHours = ReportReviewSlaHours
             }
         };
 
         foreach (var step in steps)
         {
             await _stepRepository.InsertAsync(step);
+        }
+    }
+
+    /// <summary>
+    /// Brings an already-seeded Report definition up to date. The seeder is
+    /// invoked per tenant and previously bailed out whenever a definition
+    /// existed, so a school seeded earlier would never pick up the decision form
+    /// or the corrected reviewer role.
+    /// <para>
+    /// Only fills in what is missing: a school that has deliberately retuned its
+    /// own steps keeps its changes.
+    /// </para>
+    /// </summary>
+    private async Task UpgradeReportApprovalStepsAsync(Guid definitionId)
+    {
+        var steps = await _stepRepository
+            .GetAll()
+            .Where(s => s.WorkflowDefinitionId == definitionId)
+            .ToListAsync();
+
+        foreach (var step in steps)
+        {
+            var changed = false;
+
+            if (step.StepOrder == 1 && step.AssignedRole == "Teacher")
+            {
+                step.AssignedRole = "HOD";
+                changed = true;
+            }
+
+            if (step.ActionType == WorkflowActionType.Approve
+                && string.IsNullOrWhiteSpace(step.DecisionSchemaKey))
+            {
+                step.DecisionSchemaKey = ReportApprovalDecisionKey;
+                changed = true;
+            }
+
+            if (!step.SlaHours.HasValue)
+            {
+                step.SlaHours = ReportReviewSlaHours;
+                changed = true;
+            }
+
+            if (changed)
+            {
+                await _stepRepository.UpdateAsync(step);
+            }
         }
     }
 
