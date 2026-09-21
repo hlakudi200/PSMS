@@ -3,6 +3,7 @@ using Abp.Application.Services.Dto;
 using Abp.Authorization;
 using Abp.BackgroundJobs;
 using Abp.Domain.Repositories;
+using Abp.Domain.Uow;
 using Abp.Linq.Extensions;
 using Abp.UI;
 using Microsoft.EntityFrameworkCore;
@@ -227,7 +228,13 @@ public class ReportAppService : ApplicationService, IReportAppService
                     "Cannot generate report. There are incomplete marks for this student in the specified term.");
         }
 
+        var context = await LoadGenerationContextAsync(
+            input.ClassId,
+            input.TermId,
+            new[] { input.StudentId });
+
         var report = await BuildReportAsync(
+            context,
             input.StudentId,
             input.ClassId,
             input.AcademicYearId,
@@ -242,16 +249,100 @@ public class ReportAppService : ApplicationService, IReportAppService
     }
 
     /// <summary>
-    /// Creates one report card and its subject rows, pulling the marks. Shared by
-    /// the single-student <see cref="GenerateAsync"/> and the bulk path (RC-01), so
+    /// Everything a generation run needs that is the same for every learner in
+    /// the class, loaded once up front.
+    /// <para>
+    /// This exists because the per-learner work used to re-query it: the class
+    /// subjects, the class headcount, and one mark query per subject per
+    /// learner. For a class of forty with eight subjects that was several
+    /// hundred round trips, all inside one open write transaction.
+    /// </para>
+    /// </summary>
+    private sealed class ReportGenerationContext
+    {
+        public List<ClassSubject> ClassSubjects { get; set; }
+
+        public int TotalStudentsInClass { get; set; }
+
+        /// <summary>
+        /// The weighted subject average per (learner, subject). A missing key
+        /// means that learner has no completed marks for that subject, which is
+        /// how a subject with no marks stays blank on the card.
+        /// </summary>
+        public Dictionary<(Guid StudentId, Guid SubjectId), decimal> SubjectAverages { get; set; }
+    }
+
+    private async Task<ReportGenerationContext> LoadGenerationContextAsync(
+        Guid classId,
+        Guid? termId,
+        IReadOnlyCollection<Guid> studentIds)
+    {
+        var classSubjects = await _classSubjectRepository
+            .GetAll()
+            .Include(cs => cs.Subject)
+            .Where(cs => cs.TenantId == AbpSession.TenantId)
+            .Where(cs => cs.ClassId == classId && cs.IsActive)
+            .ToListAsync();
+
+        var totalStudentsInClass = await _studentRepository
+            .CountAsync(s => s.TenantId == AbpSession.TenantId && s.CurrentClassId == classId);
+
+        var averages = new Dictionary<(Guid, Guid), decimal>();
+
+        if (termId.HasValue && studentIds.Count > 0 && classSubjects.Count > 0)
+        {
+            var ids = studentIds.ToList();
+            var subjectIds = classSubjects.Select(cs => cs.SubjectId).Distinct().ToList();
+
+            var marks = await _markRepository
+                .GetAll()
+                .Where(m => m.TenantId == AbpSession.TenantId)
+                .Where(m => ids.Contains(m.StudentId))
+                .Where(m => m.Assessment.TermId == termId.Value)
+                .Where(m => m.Assessment.ClassSubject.ClassId == classId)
+                .Where(m => subjectIds.Contains(m.Assessment.ClassSubject.SubjectId))
+                .Where(m => m.Status == MarkStatus.Completed && m.Percentage.HasValue)
+                .Select(m => new
+                {
+                    m.StudentId,
+                    m.Assessment.ClassSubject.SubjectId,
+                    Percentage = m.Percentage.Value,
+                    m.Assessment.Weight
+                })
+                .ToListAsync();
+
+            foreach (var group in marks.GroupBy(m => (m.StudentId, m.SubjectId)))
+            {
+                var totalWeight = group.Sum(m => m.Weight);
+
+                averages[group.Key] = totalWeight > 0
+                    // Weighted average: sum(percentage * weight) / sum(weight)
+                    ? group.Sum(m => m.Percentage * m.Weight) / totalWeight
+                    // Fallback to a simple average when no weights are configured
+                    : group.Average(m => m.Percentage);
+            }
+        }
+
+        return new ReportGenerationContext
+        {
+            ClassSubjects = classSubjects,
+            TotalStudentsInClass = totalStudentsInClass,
+            SubjectAverages = averages
+        };
+    }
+
+    /// <summary>
+    /// Creates one report card and its subject rows. Shared by the
+    /// single-student <see cref="GenerateAsync"/> and the bulk path (RC-01), so
     /// both produce identical reports — the callers differ only in how they
     /// validate and how they handle a failure.
     /// <para>
-    /// The caller is responsible for validating the student, class, year and term,
-    /// for duplicate prevention, and for the RE-001 completeness gate.
+    /// The caller is responsible for validating the student, class, year and
+    /// term, for duplicate prevention, and for the RE-001 completeness gate.
     /// </para>
     /// </summary>
     private async Task<Report> BuildReportAsync(
+        ReportGenerationContext context,
         Guid studentId,
         Guid classId,
         Guid academicYearId,
@@ -278,17 +369,20 @@ public class ReportAppService : ApplicationService, IReportAppService
         };
 
         await _reportRepository.InsertAsync(report);
+
+        // Flush the parent before inserting its subject rows. EF Core would
+        // normally order these itself from the FK graph, but this runs without
+        // test coverage and a wrong order fails the whole run, so the round trip
+        // is worth it. It is one per learner, against the several hundred this
+        // method used to cost.
         await CurrentUnitOfWork.SaveChangesAsync();
 
-        // Auto-create ReportSubject entries for all class subjects
-        var classSubjects = await _classSubjectRepository
-            .GetAll()
-            .Include(cs => cs.Subject)
-            .Where(cs => cs.TenantId == AbpSession.TenantId)
-            .Where(cs => cs.ClassId == classId && cs.IsActive)
-            .ToListAsync();
+        // One ReportSubject per active class subject, carrying the mark average
+        // already computed for this learner.
+        decimal? overallTotal = null;
+        var markedSubjects = 0;
 
-        foreach (var classSubject in classSubjects)
+        foreach (var classSubject in context.ClassSubjects)
         {
             var reportSubject = new ReportSubject(
                 Guid.NewGuid(),
@@ -298,64 +392,30 @@ public class ReportAppService : ApplicationService, IReportAppService
                 TeacherId = classSubject.TeacherId
             };
 
-            // Aggregate mark percentages for this subject/term using weighted average
-            if (termId.HasValue)
+            if (context.SubjectAverages.TryGetValue((studentId, classSubject.SubjectId), out var average))
             {
-                var subjectMarks = await _markRepository
-                    .GetAll()
-                    .Include(m => m.Assessment)
-                    .Where(m => m.TenantId == AbpSession.TenantId)
-                    .Where(m => m.StudentId == studentId)
-                    .Where(m => m.Assessment.TermId == termId.Value)
-                    .Where(m => m.Assessment.ClassSubject.SubjectId == classSubject.SubjectId)
-                    .Where(m => m.Assessment.ClassSubject.ClassId == classId)
-                    .Where(m => m.Status == MarkStatus.Completed && m.Percentage.HasValue)
-                    .ToListAsync();
+                reportSubject.RecordMarks(average, null);
 
-                if (subjectMarks.Any())
+                if (reportSubject.FinalMark.HasValue)
                 {
-                    decimal avgPercentage;
-                    var totalWeight = subjectMarks.Sum(m => m.Assessment.Weight);
-
-                    if (totalWeight > 0)
-                    {
-                        // Weighted average: sum(percentage * weight) / sum(weight)
-                        avgPercentage = subjectMarks.Sum(m => m.Percentage.Value * m.Assessment.Weight) / totalWeight;
-                    }
-                    else
-                    {
-                        // Fallback to simple average when no weights are configured
-                        avgPercentage = subjectMarks.Average(m => m.Percentage.Value);
-                    }
-
-                    reportSubject.RecordMarks(avgPercentage, null);
+                    overallTotal = (overallTotal ?? 0m) + reportSubject.FinalMark.Value;
+                    markedSubjects++;
                 }
             }
 
             await _reportSubjectRepository.InsertAsync(reportSubject);
         }
 
-        // Calculate overall percentage from subject entries
-        await CurrentUnitOfWork.SaveChangesAsync();
-
-        // Reload and compute overall
-        var savedSubjects = await _reportSubjectRepository
-            .GetAll()
-            .Where(rs => rs.ReportId == report.Id)
-            .Where(rs => rs.FinalMark.HasValue)
-            .ToListAsync();
-
-        if (savedSubjects.Any())
+        // The overall is the mean of the subject final marks. It is computed from
+        // what was just written rather than re-read, so there is one round trip
+        // instead of a save-then-reload for every learner.
+        if (markedSubjects > 0)
         {
-            report.OverallPercentage = savedSubjects.Average(rs => rs.FinalMark.Value);
+            report.OverallPercentage = overallTotal.Value / markedSubjects;
             report.OverallAchievementLevel = CalculateAchievementLevel(report.OverallPercentage.Value);
         }
 
-        // Tenant predicate is explicit here, as it is on every other query in this
-        // service — relying on the ambient IMayHaveTenant filter alone made this
-        // one count read differently from its neighbours.
-        report.TotalStudentsInClass = await _studentRepository
-            .CountAsync(s => s.TenantId == AbpSession.TenantId && s.CurrentClassId == classId);
+        report.TotalStudentsInClass = context.TotalStudentsInClass;
 
         report.Generate();
         await _reportRepository.UpdateAsync(report);
@@ -378,9 +438,8 @@ public class ReportAppService : ApplicationService, IReportAppService
     /// RC-01. Generates a report card for every active learner in a class.
     /// <para>
     /// One learner's problem does not fail the batch: an existing report is
-    /// skipped, incomplete marks block just that learner, and an unexpected
-    /// failure is recorded against that learner and the run continues. The
-    /// caller gets a line per learner describing what happened.
+    /// skipped, incomplete marks block just that learner, and a failure is
+    /// recorded against that learner while the run carries on.
     /// </para>
     /// </summary>
     [AbpAuthorize(PermissionNames.Assessment_ReportCards_Generate)]
@@ -413,7 +472,7 @@ public class ReportAppService : ApplicationService, IReportAppService
         }
 
         var subset = input.StudentIds != null && input.StudentIds.Count > 0
-            ? input.StudentIds
+            ? input.StudentIds.Distinct().ToList()
             : null;
 
         var students = await _studentRepository
@@ -434,6 +493,27 @@ public class ReportAppService : ApplicationService, IReportAppService
             IsPreview = previewOnly,
             TotalStudents = students.Count
         };
+
+        // A requested learner who is not an active member of this class would
+        // otherwise vanish from the result with no explanation — the caller asked
+        // for N and silently got fewer.
+        if (subset != null)
+        {
+            var found = students.Select(s => s.Id).ToHashSet();
+
+            foreach (var missing in subset.Where(id => !found.Contains(id)))
+            {
+                result.Items.Add(new BulkGenerateReportItemDto
+                {
+                    StudentId = missing,
+                    StudentName = "Unknown learner",
+                    Outcome = BulkGenerateOutcome.Failed,
+                    Message = "Not an active learner in the selected class."
+                });
+                result.FailedCount++;
+                result.TotalStudents++;
+            }
+        }
 
         if (students.Count == 0)
             return result;
@@ -475,7 +555,14 @@ public class ReportAppService : ApplicationService, IReportAppService
             blockedStudentIds = new HashSet<Guid>(incomplete);
         }
 
+        var readingRegister = input.UseAttendanceRecords && term != null;
         var attendanceByStudent = await ResolveAttendanceAsync(input, term, studentIds);
+
+        // Loaded once for the whole run: the class subjects, the headcount, and
+        // every learner's subject averages in a single mark query.
+        var context = previewOnly
+            ? null
+            : await LoadGenerationContextAsync(input.ClassId, input.TermId, studentIds);
 
         foreach (var student in students)
         {
@@ -513,32 +600,72 @@ public class ReportAppService : ApplicationService, IReportAppService
                 continue;
             }
 
-            var days = attendanceByStudent.TryGetValue(student.Id, out var counted)
-                ? counted
-                : (input.DefaultDaysPresent, input.DefaultDaysAbsent, input.DefaultDaysLate);
+            (int Present, int Absent, int Late) days;
+            string note = null;
+
+            if (attendanceByStudent.TryGetValue(student.Id, out var counted))
+            {
+                days = counted;
+            }
+            else if (readingRegister)
+            {
+                // The register was consulted and holds nothing for this learner.
+                // Zero is the honest figure — stamping the class-wide defaults on
+                // their card would invent attendance they never had.
+                days = (0, 0, 0);
+                note = "No attendance records for this term.";
+            }
+            else
+            {
+                days = (input.DefaultDaysPresent, input.DefaultDaysAbsent, input.DefaultDaysLate);
+            }
 
             try
             {
-                var report = await BuildReportAsync(
-                    student.Id,
-                    input.ClassId,
-                    input.AcademicYearId,
-                    input.ReportType,
-                    input.TermId,
-                    days.Item1,
-                    days.Item2,
-                    days.Item3,
-                    teacherComment: null);
+                // Each learner commits on its own. Sharing the ambient transaction
+                // meant that one unique-constraint collision — two principals
+                // pressing Generate at once, or a double click — rolled back every
+                // card already generated in the run and left the connection in a
+                // failed transaction, so nothing after it could succeed either.
+                using (var uow = UnitOfWorkManager.Begin(new UnitOfWorkOptions
+                {
+                    Scope = System.Transactions.TransactionScopeOption.RequiresNew
+                }))
+                {
+                    var report = await BuildReportAsync(
+                        context,
+                        student.Id,
+                        input.ClassId,
+                        input.AcademicYearId,
+                        input.ReportType,
+                        input.TermId,
+                        days.Present,
+                        days.Absent,
+                        days.Late,
+                        teacherComment: null);
 
-                item.Outcome = BulkGenerateOutcome.Generated;
-                item.ReportId = report.Id;
-                result.GeneratedCount++;
+                    await uow.CompleteAsync();
+
+                    item.Outcome = BulkGenerateOutcome.Generated;
+                    item.ReportId = report.Id;
+                    item.Message = note;
+                    result.GeneratedCount++;
+                }
             }
-            catch (UserFriendlyException ex)
+            catch (Exception ex)
             {
+                // Anything from a rule violation to a collision with a concurrent
+                // run. Record it against this learner and keep going — carrying on
+                // is the whole point of the batch.
                 item.Outcome = BulkGenerateOutcome.Failed;
-                item.Message = ex.Message;
+                item.Message = ex is UserFriendlyException friendly
+                    ? friendly.Message
+                    : "Generation failed for this learner.";
                 result.FailedCount++;
+
+                Logger.Error(
+                    $"Bulk report generation failed for student {student.Id} in class {input.ClassId}.",
+                    ex);
             }
 
             result.Items.Add(item);
@@ -552,13 +679,18 @@ public class ReportAppService : ApplicationService, IReportAppService
     /// report cards carries real attendance rather than one typed-in figure
     /// repeated forty times.
     /// <para>
-    /// A late arrival still attended, so Late counts towards Present and is also
-    /// reported on its own line — which is how the printed card reads it. Excused
-    /// and SickLeave count as absent: the learner was not there, and the card has
-    /// no separate line for the reason. Holiday is excluded from both totals — it
-    /// is not a school day, so counting it either way would misstate the term.
-    /// That keeps Present + Absent equal to the school days registered, which is
-    /// what the PDF prints as the total.
+    /// This counts DAYS, not register rows. A school that takes a register per
+    /// subject writes several rows for one learner on one day, and counting rows
+    /// would print "days present: 320" for a forty-day term.
+    /// </para>
+    /// <para>
+    /// A late arrival still attended, so a day with a Late row counts as present
+    /// and is also reported on its own line — which is how the printed card reads
+    /// it. A day with neither a Present nor a Late row counts as absent, whatever
+    /// the reason: the card has no separate line for excused or sick leave.
+    /// Holiday rows are dropped before counting, since a holiday is not a school
+    /// day. So present + absent equals the school days registered, which is what
+    /// the PDF prints as the total.
     /// </para>
     /// Returns an empty map when there is no term to read a window from, or when
     /// the caller asked for the supplied defaults instead.
@@ -568,31 +700,54 @@ public class ReportAppService : ApplicationService, IReportAppService
         Term term,
         List<Guid> studentIds)
     {
-        var map = new Dictionary<Guid, (int, int, int)>();
+        var map = new Dictionary<Guid, (int Present, int Absent, int Late)>();
 
         if (!input.UseAttendanceRecords || term == null)
             return map;
+
+        // Registers are captured with a time component; the term boundaries are
+        // midnight. Comparing them raw drops the last day of term. Every other
+        // attendance query in the codebase normalises the same way.
+        var start = term.StartDate.Date;
+        var end = term.EndDate.Date;
 
         var records = await _attendanceRepository
             .GetAll()
             .Where(a => a.TenantId == AbpSession.TenantId)
             .Where(a => a.ClassId == input.ClassId)
             .Where(a => studentIds.Contains(a.StudentId))
-            .Where(a => a.AttendanceDate >= term.StartDate && a.AttendanceDate <= term.EndDate)
+            .Where(a => a.AttendanceDate.Date >= start && a.AttendanceDate.Date <= end)
             .Where(a => a.Status != AttendanceStatus.Holiday)
-            .Select(a => new { a.StudentId, a.Status })
+            .Select(a => new { a.StudentId, a.AttendanceDate, a.Status })
             .ToListAsync();
 
-        foreach (var group in records.GroupBy(r => r.StudentId))
+        foreach (var perStudent in records.GroupBy(r => r.StudentId))
         {
-            var present = group.Count(r =>
-                r.Status == AttendanceStatus.Present || r.Status == AttendanceStatus.Late);
-            var absent = group.Count(r =>
-                r.Status == AttendanceStatus.Absent
-                || r.Status == AttendanceStatus.Excused
-                || r.Status == AttendanceStatus.SickLeave);
-            var late = group.Count(r => r.Status == AttendanceStatus.Late);
-            map[group.Key] = (present, absent, late);
+            var present = 0;
+            var absent = 0;
+            var late = 0;
+
+            foreach (var perDay in perStudent.GroupBy(r => r.AttendanceDate.Date))
+            {
+                var wasLate = perDay.Any(r => r.Status == AttendanceStatus.Late);
+                var attended = wasLate || perDay.Any(r => r.Status == AttendanceStatus.Present);
+
+                if (attended)
+                {
+                    present++;
+                }
+                else
+                {
+                    absent++;
+                }
+
+                if (wasLate)
+                {
+                    late++;
+                }
+            }
+
+            map[perStudent.Key] = (present, absent, late);
         }
 
         return map;

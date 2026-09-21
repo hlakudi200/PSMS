@@ -175,6 +175,30 @@ export const ReportReducer = handleActions<
       ...state,
       ...action.payload,
     }),
+    [ReportActionEnums.previewBulkGeneratePending]: (state, action) => ({
+      ...state,
+      ...action.payload,
+    }),
+    [ReportActionEnums.previewBulkGenerateSuccess]: (state, action) => ({
+      ...state,
+      ...action.payload,
+    }),
+    [ReportActionEnums.previewBulkGenerateError]: (state, action) => ({
+      ...state,
+      ...action.payload,
+    }),
+    [ReportActionEnums.bulkGenerateReportsPending]: (state, action) => ({
+      ...state,
+      ...action.payload,
+    }),
+    [ReportActionEnums.bulkGenerateReportsSuccess]: (state, action) => ({
+      ...state,
+      ...action.payload,
+    }),
+    [ReportActionEnums.bulkGenerateReportsError]: (state, action) => ({
+      ...state,
+      ...action.payload,
+    }),
   },
   INITIAL_STATE
 );

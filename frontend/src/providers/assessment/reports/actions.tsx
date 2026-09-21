@@ -364,7 +364,15 @@ export const bulkGeneratePdfsError = createAction<IReportStateContext>(
 // state so the screen can render the per-learner outcome list.
 export const previewBulkGeneratePending = createAction<IReportStateContext>(
   ReportActionEnums.previewBulkGeneratePending,
-  () => ({ isPending: true, isSuccess: false, isError: false })
+  () => ({
+    isPending: true,
+    isSuccess: false,
+    isError: false,
+    // Drop the previous run's result: without this the screen keeps showing a
+    // finished batch on top of a fresh preview, and can never start a second
+    // one — which is the normal end-of-term flow of one class after another.
+    bulkResult: undefined,
+  })
 );
 
 export const previewBulkGenerateSuccess = createAction<
@@ -384,7 +392,12 @@ export const previewBulkGenerateError = createAction<IReportStateContext>(
 
 export const bulkGenerateReportsPending = createAction<IReportStateContext>(
   ReportActionEnums.bulkGenerateReportsPending,
-  () => ({ isPending: true, isSuccess: false, isError: false })
+  () => ({
+    isPending: true,
+    isSuccess: false,
+    isError: false,
+    bulkResult: undefined,
+  })
 );
 
 export const bulkGenerateReportsSuccess = createAction<

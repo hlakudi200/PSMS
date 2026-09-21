@@ -378,6 +378,8 @@ export interface IBulkGenerateReports {
   defaultDaysPresent: number;
   defaultDaysAbsent: number;
   defaultDaysLate: number;
+  /** Restrict the run to these learners. Omit for the whole class. */
+  studentIds?: string[];
 }
 
 /** Mirrors the backend BulkGenerateOutcome. */
