@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import {
   Alert,
   Button,
@@ -15,7 +16,6 @@ import {
   Space,
   Table,
   Tag,
-  Tooltip,
   Typography,
   message,
 } from 'antd';
@@ -85,12 +85,22 @@ interface AttendanceRow {
   existing?: IAttendanceList;
   status: number;
   notes: string;
+  // True once a previously-captured row's status/notes has been changed
+  // locally and not yet saved — drives which write path Save uses (see
+  // handleSave: dirty rows go through Update, never a second Capture).
+  dirty?: boolean;
 }
 
 function TeacherAttendanceContent() {
   const { currentUser } = useAuthState();
+  const searchParams = useSearchParams();
 
-  const [classId, setClassId] = useState<string | undefined>(undefined);
+  // Preselect the class when arriving from My Classes' "Attendance" quick
+  // link (`?classId=...`) — previously ignored, so that button silently
+  // dropped you on an empty class picker instead of the intended register.
+  const [classId, setClassId] = useState<string | undefined>(
+    () => searchParams.get('classId') ?? undefined
+  );
   const [date, setDate] = useState<Dayjs>(dayjs().startOf('day'));
   const [rows, setRows] = useState<Record<string, AttendanceRow>>({});
   const [saving, setSaving] = useState(false);
@@ -107,7 +117,7 @@ function TeacherAttendanceContent() {
   const { getByClassAsync } = useStudentClassActions();
   const { studentClasses, isPending: studentsPending, isError: studentsError } = useStudentClassState();
 
-  const { getByClassAndDateAsync, bulkCaptureAsync } = useAttendanceActions();
+  const { getByClassAndDateAsync, bulkCaptureAsync, updateAsync } = useAttendanceActions();
   const { attendances, isPending: attendancePending, isError: attendanceError } = useAttendanceState();
 
   useEffect(() => {
@@ -170,23 +180,29 @@ function TeacherAttendanceContent() {
     return map;
   }, [attendances, classId, dateKey]);
 
-  // Build rows: existing records read-only; un-recorded students default to
-  // Present and are editable.
+  // Build rows: un-recorded students default to Present; already-recorded
+  // students hydrate from the server but stay editable (T-T21 — same-day
+  // correction). A row already mid-edit (dirty, still pointing at the same
+  // existing record) keeps its local draft instead of being clobbered by
+  // this effect re-running for an unrelated reason.
   useEffect(() => {
     setRows((prev) => {
       const next: Record<string, AttendanceRow> = {};
       enrolled.forEach((sc) => {
         const existing = existingByStudent.get(sc.studentId);
+        const draft = prev[sc.studentId];
         if (existing) {
-          next[sc.studentId] = {
-            studentId: sc.studentId,
-            studentName: sc.studentName ?? 'Student',
-            existing,
-            status: existing.status,
-            notes: existing.notes ?? '',
-          };
+          next[sc.studentId] =
+            draft?.dirty && draft.existing?.id === existing.id
+              ? { ...draft, studentName: sc.studentName ?? draft.studentName }
+              : {
+                  studentId: sc.studentId,
+                  studentName: sc.studentName ?? 'Student',
+                  existing,
+                  status: existing.status,
+                  notes: existing.notes ?? '',
+                };
         } else {
-          const draft = prev[sc.studentId];
           next[sc.studentId] =
             draft && !draft.existing
               ? { ...draft, studentName: sc.studentName ?? draft.studentName }
@@ -203,11 +219,25 @@ function TeacherAttendanceContent() {
   }, [enrolled, existingByStudent]);
 
   const updateRow = useCallback((studentId: string, patch: Partial<AttendanceRow>) => {
-    setRows((prev) => ({ ...prev, [studentId]: { ...prev[studentId], ...patch } }));
+    setRows((prev) => {
+      const row = prev[studentId];
+      const updated = { ...row, ...patch };
+      // Mark dirty only when the values actually differ from the server
+      // record — flipping a status back to its original value un-dirties
+      // it, so an accidental toggle-and-toggle-back doesn't trigger a
+      // no-op Update call.
+      if (row?.existing) {
+        updated.dirty =
+          updated.status !== row.existing.status ||
+          updated.notes.trim() !== (row.existing.notes ?? '');
+      }
+      return { ...prev, [studentId]: updated };
+    });
   }, []);
 
   const rowList = useMemo(() => Object.values(rows), [rows]);
   const pendingEntries = useMemo(() => rowList.filter((r) => !r.existing), [rowList]);
+  const dirtyEntries = useMemo(() => rowList.filter((r) => r.existing && r.dirty), [rowList]);
 
   const markAllPresent = () => {
     setRows((prev) => {
@@ -221,8 +251,8 @@ function TeacherAttendanceContent() {
 
   const handleSave = async () => {
     if (locked || !classId || !teacherId) return;
-    if (pendingEntries.length === 0) {
-      message.info('No new attendance to save.');
+    if (pendingEntries.length === 0 && dirtyEntries.length === 0) {
+      message.info('No attendance changes to save.');
       return;
     }
 
@@ -234,26 +264,52 @@ function TeacherAttendanceContent() {
 
     setSaving(true);
     try {
-      await bulkCaptureAsync({
-        classId,
-        teacherId,
-        attendanceDate: dateKey,
-        entries,
-      });
-      // Save summary, e.g. "28 present, 2 absent, 1 late".
-      const counts = entries.reduce<Record<number, number>>((acc, e) => {
-        acc[e.status] = (acc[e.status] ?? 0) + 1;
-        return acc;
-      }, {});
-      const summary = Object.entries(counts)
-        .map(([s, n]) => `${n} ${(STATUS_LABEL[Number(s)] ?? 'status').toLowerCase()}`)
-        .join(', ');
-      message.success(`Saved — ${summary}`);
-      getByClassAndDateAsync(classId, dateKey);
+      // New students go through BulkCapture (one insert per student); a
+      // same-day correction to an already-captured row goes through
+      // Update instead — resubmitting it via BulkCapture would 409 on the
+      // one-record-per-student-per-day duplicate check (T-T21).
+      if (entries.length > 0) {
+        await bulkCaptureAsync({
+          classId,
+          teacherId,
+          attendanceDate: dateKey,
+          entries,
+        });
+      }
+      if (dirtyEntries.length > 0) {
+        await Promise.all(
+          dirtyEntries.map((r) =>
+            updateAsync(r.existing!.id, {
+              status: r.status,
+              notes: r.notes.trim() || undefined,
+            })
+          )
+        );
+      }
+
+      const parts: string[] = [];
+      if (entries.length > 0) {
+        const counts = entries.reduce<Record<number, number>>((acc, e) => {
+          acc[e.status] = (acc[e.status] ?? 0) + 1;
+          return acc;
+        }, {});
+        parts.push(
+          Object.entries(counts)
+            .map(([s, n]) => `${n} ${(STATUS_LABEL[Number(s)] ?? 'status').toLowerCase()}`)
+            .join(', ')
+        );
+      }
+      if (dirtyEntries.length > 0) {
+        parts.push(`${dirtyEntries.length} corrected`);
+      }
+      message.success(`Saved — ${parts.join('; ')}`);
     } catch {
       // Surfaced by the axios interceptor (locked, duplicate, etc.)
     } finally {
       setSaving(false);
+      // Always resync — even a partial failure (one write succeeded, the
+      // other didn't) should be reflected rather than left stale.
+      getByClassAndDateAsync(classId, dateKey);
     }
   };
 
@@ -271,7 +327,11 @@ function TeacherAttendanceContent() {
       render: (v: string, row) => (
         <Space>
           <Text strong>{v}</Text>
-          {row.existing && <Tag color="default">recorded</Tag>}
+          {row.existing && (
+            <Tag color={row.dirty ? 'processing' : 'default'}>
+              {row.dirty ? 'edited' : 'recorded'}
+            </Tag>
+          )}
         </Space>
       ),
     },
@@ -280,7 +340,10 @@ function TeacherAttendanceContent() {
       key: 'status',
       width: 360,
       render: (_: unknown, row) => {
-        if (row.existing) {
+        // Locked rows (past dates, viewed read-only) show a plain tag;
+        // otherwise every row is editable, including already-recorded
+        // ones — T-T21 same-day correction.
+        if (locked && row.existing) {
           const color = STATUS_COLOR[row.status] ?? 'default';
           return <Tag color={color}>{STATUS_LABEL[row.status] ?? '—'}</Tag>;
         }
@@ -298,7 +361,7 @@ function TeacherAttendanceContent() {
       title: 'Notes',
       key: 'notes',
       render: (_: unknown, row) => {
-        if (row.existing) {
+        if (locked && row.existing) {
           return row.existing.notes ? <Text type="secondary">{row.existing.notes}</Text> : <Text type="secondary">—</Text>;
         }
         return (
@@ -322,8 +385,9 @@ function TeacherAttendanceContent() {
             Class Attendance Register
           </Title>
           <Text type="secondary">
-            Mark daily attendance for your class. Registers can only be captured
-            on the day itself (AT-002) — past dates lock automatically.
+            Mark daily attendance for your class. You can correct any entry
+            for as long as it&apos;s still today (AT-002) — the register
+            locks automatically once the day ends.
           </Text>
         </div>
         <Space>
@@ -334,10 +398,13 @@ function TeacherAttendanceContent() {
             type="primary"
             icon={<SaveOutlined />}
             loading={saving}
-            disabled={locked || !classId || pendingEntries.length === 0}
+            disabled={locked || !classId || (pendingEntries.length === 0 && dirtyEntries.length === 0)}
             onClick={handleSave}
           >
-            Save register{pendingEntries.length > 0 ? ` (${pendingEntries.length})` : ''}
+            Save
+            {pendingEntries.length + dirtyEntries.length > 0
+              ? ` (${pendingEntries.length + dirtyEntries.length})`
+              : ''}
           </Button>
         </Space>
       </Space>
@@ -458,7 +525,11 @@ export default function TeacherAttendancePageContent() {
         <TeacherClassProvider>
           <StudentClassProvider>
             <AttendanceProvider>
-              <TeacherAttendanceContent />
+              {/* useSearchParams (for the ?classId= deep link) requires a
+                  Suspense boundary in the App Router. */}
+              <Suspense fallback={null}>
+                <TeacherAttendanceContent />
+              </Suspense>
             </AttendanceProvider>
           </StudentClassProvider>
         </TeacherClassProvider>

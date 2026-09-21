@@ -263,6 +263,12 @@ public class AttendanceAppService : ApplicationService, IAttendanceAppService
         if (attendance == null)
             throw new UserFriendlyException(AcademicExceptionCodes.AttendanceNotFound, "Attendance record not found.");
 
+        // T-T21: same-day correction is allowed (AttendanceDate == Today
+        // never trips this), but from the next day onward only an admin
+        // with ViewAll may correct it — the same boundary Capture uses, so
+        // a row can't be edited after its lock via this endpoint either.
+        await EnsureDateCapturableOrThrowAsync(attendance.AttendanceDate);
+
         if (input.Status.HasValue) attendance.Status = input.Status.Value;
         if (input.Notes != null) attendance.Notes = input.Notes;
 
@@ -280,6 +286,9 @@ public class AttendanceAppService : ApplicationService, IAttendanceAppService
 
         if (attendance == null)
             throw new UserFriendlyException(AcademicExceptionCodes.AttendanceNotFound, "Attendance record not found.");
+
+        // Same lock boundary as UpdateAsync — see T-T21 comment there.
+        await EnsureDateCapturableOrThrowAsync(attendance.AttendanceDate);
 
         await _attendanceRepository.DeleteAsync(attendance);
     }
@@ -326,24 +335,38 @@ public class AttendanceAppService : ApplicationService, IAttendanceAppService
     }
 
     /// <summary>
-    /// Date guard shared by single and bulk capture: the date may not be in
-    /// the future, and (AT-002 midnight lock) once the calendar day has
-    /// passed a regular teacher can no longer capture that date — only a user
-    /// with the admin-level ViewAll permission may backfill/correct a past
-    /// date. (Uses the same server-local DateTime.Today convention as the
-    /// rest of this service.)
+    /// Date guard shared by single/bulk capture AND update/delete (T-T21):
+    /// the date may not be in the future, and (AT-002 midnight lock) once
+    /// the calendar day has passed a regular teacher can no longer touch
+    /// that date — only a user with the admin-level ViewAll permission may
+    /// backfill/correct a past date. Same-day is always capturable, so
+    /// same-day correction (T-T21) falls out of this for free.
     /// </summary>
     private async Task EnsureDateCapturableOrThrowAsync(DateTime attendanceDate)
     {
-        if (attendanceDate.Date > DateTime.Today)
+        var localDate = NormalizeToLocalDate(attendanceDate);
+
+        if (localDate > DateTime.Today)
             throw new UserFriendlyException(AcademicExceptionCodes.AttendanceDateInFuture,
                 "Attendance date cannot be in the future.");
 
-        if (attendanceDate.Date < DateTime.Today
+        if (localDate < DateTime.Today
             && !await PermissionChecker.IsGrantedAsync(PermissionNames.Academic_Attendance_ViewAll))
             throw new UserFriendlyException(AcademicExceptionCodes.AttendanceLocked,
                 "Attendance for a past date is locked. Ask an administrator to capture or correct it.");
     }
+
+    /// <summary>
+    /// AttendanceDate is stored in a `timestamptz` column, so an entity
+    /// freshly built from a client's date-only string (Kind=Unspecified,
+    /// e.g. Capture/BulkCapture's input) and one just reloaded from the
+    /// database (Kind=Utc, shifted by the server's local offset — T-T21's
+    /// Update/Delete guard hits this) are not directly comparable via a
+    /// bare `.Date`. Converting only the Utc-kind case back to local before
+    /// truncating keeps both call sites correct without special-casing.
+    /// </summary>
+    private static DateTime NormalizeToLocalDate(DateTime value)
+        => value.Kind == DateTimeKind.Utc ? value.ToLocalTime().Date : value.Date;
 
     private async Task ValidateAttendanceInput(Guid studentId, Guid classId, Guid teacherId, DateTime attendanceDate, Guid? subjectId)
     {
