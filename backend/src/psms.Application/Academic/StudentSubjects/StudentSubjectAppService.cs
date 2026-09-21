@@ -26,19 +26,22 @@ public class StudentSubjectAppService : ApplicationService, IStudentSubjectAppSe
     private readonly IRepository<Subject, Guid> _subjectRepository;
     private readonly IRepository<AcademicYear, Guid> _academicYearRepository;
     private readonly psms.Academic.Students.ICurrentStudentResolver _currentStudent;
+    private readonly psms.Academic.Parents.ICurrentParentResolver _currentParent;
 
     public StudentSubjectAppService(
         IRepository<StudentSubject, Guid> studentSubjectRepository,
         IRepository<Student, Guid> studentRepository,
         IRepository<Subject, Guid> subjectRepository,
         IRepository<AcademicYear, Guid> academicYearRepository,
-        psms.Academic.Students.ICurrentStudentResolver currentStudent)
+        psms.Academic.Students.ICurrentStudentResolver currentStudent,
+        psms.Academic.Parents.ICurrentParentResolver currentParent)
     {
         _studentSubjectRepository = studentSubjectRepository;
         _studentRepository = studentRepository;
         _subjectRepository = subjectRepository;
         _academicYearRepository = academicYearRepository;
         _currentStudent = currentStudent;
+        _currentParent = currentParent;
     }
 
     [AbpAuthorize(PermissionNames.Academic_Students_View)]
@@ -47,6 +50,11 @@ public class StudentSubjectAppService : ApplicationService, IStudentSubjectAppSe
         // LC-08: a student may only read their own subject enrollments.
         var selfId = await _currentStudent.GetCurrentStudentIdAsync();
         if (selfId.HasValue && selfId.Value != studentId)
+            return new ListResultDto<StudentSubjectDto>(new List<StudentSubjectDto>());
+
+        // MOB-BE-04: a parent may only read their own children's subject enrollments.
+        var childIds = await _currentParent.GetCurrentChildStudentIdsAsync();
+        if (childIds != null && !childIds.Contains(studentId))
             return new ListResultDto<StudentSubjectDto>(new List<StudentSubjectDto>());
 
         var enrollments = await _studentSubjectRepository
@@ -87,6 +95,11 @@ public class StudentSubjectAppService : ApplicationService, IStudentSubjectAppSe
         // LC-08: a student may only read their own subject enrollments.
         var selfId = await _currentStudent.GetCurrentStudentIdAsync();
         if (selfId.HasValue && selfId.Value != studentId)
+            return new ListResultDto<StudentSubjectDto>(new List<StudentSubjectDto>());
+
+        // MOB-BE-04: a parent may only read their own children's subject enrollments.
+        var childIds = await _currentParent.GetCurrentChildStudentIdsAsync();
+        if (childIds != null && !childIds.Contains(studentId))
             return new ListResultDto<StudentSubjectDto>(new List<StudentSubjectDto>());
 
         var enrollments = await _studentSubjectRepository

@@ -17,6 +17,9 @@ public interface IStudentParentAppService : IApplicationService
     /// <summary>Gets all students linked to a parent.</summary>
     Task<ListResultDto<StudentParentDto>> GetByParentAsync(Guid parentId);
 
+    /// <summary>Gets all students linked to the current parent-portal caller.</summary>
+    Task<ListResultDto<StudentParentDto>> GetMyChildrenAsync();
+
     /// <summary>Links a student to a parent.</summary>
     Task<StudentParentDto> LinkAsync(LinkStudentParentDto input);
 

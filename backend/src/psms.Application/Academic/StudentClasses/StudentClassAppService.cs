@@ -24,19 +24,22 @@ public class StudentClassAppService : ApplicationService, IStudentClassAppServic
     private readonly IRepository<Class, Guid> _classRepository;
     private readonly IRepository<AcademicYear, Guid> _academicYearRepository;
     private readonly psms.Academic.Students.ICurrentStudentResolver _currentStudent;
+    private readonly psms.Academic.Parents.ICurrentParentResolver _currentParent;
 
     public StudentClassAppService(
         IRepository<StudentClass, Guid> studentClassRepository,
         IRepository<Student, Guid> studentRepository,
         IRepository<Class, Guid> classRepository,
         IRepository<AcademicYear, Guid> academicYearRepository,
-        psms.Academic.Students.ICurrentStudentResolver currentStudent)
+        psms.Academic.Students.ICurrentStudentResolver currentStudent,
+        psms.Academic.Parents.ICurrentParentResolver currentParent)
     {
         _studentClassRepository = studentClassRepository;
         _studentRepository = studentRepository;
         _classRepository = classRepository;
         _academicYearRepository = academicYearRepository;
         _currentStudent = currentStudent;
+        _currentParent = currentParent;
     }
 
     [AbpAuthorize(PermissionNames.Academic_Students_View)]
@@ -57,6 +60,11 @@ public class StudentClassAppService : ApplicationService, IStudentClassAppServic
         if (selfId.HasValue && selfId.Value != studentClass.StudentId)
             throw new UserFriendlyException(AcademicExceptionCodes.StudentClassNotFound, "Student class enrollment not found.");
 
+        // MOB-BE-04: a parent may only read their own children's enrollment rows.
+        var childIds = await _currentParent.GetCurrentChildStudentIdsAsync();
+        if (childIds != null && !childIds.Contains(studentClass.StudentId))
+            throw new UserFriendlyException(AcademicExceptionCodes.StudentClassNotFound, "Student class enrollment not found.");
+
         return ObjectMapper.Map<StudentClassDto>(studentClass);
     }
 
@@ -66,6 +74,11 @@ public class StudentClassAppService : ApplicationService, IStudentClassAppServic
         // LC-08: a student may only read their own enrollment history.
         var selfId = await _currentStudent.GetCurrentStudentIdAsync();
         if (selfId.HasValue && selfId.Value != studentId)
+            return new ListResultDto<StudentClassListDto>(new System.Collections.Generic.List<StudentClassListDto>());
+
+        // MOB-BE-04: a parent may only read their own children's enrollment history.
+        var childIds = await _currentParent.GetCurrentChildStudentIdsAsync();
+        if (childIds != null && !childIds.Contains(studentId))
             return new ListResultDto<StudentClassListDto>(new System.Collections.Generic.List<StudentClassListDto>());
 
         var records = await _studentClassRepository
@@ -87,6 +100,9 @@ public class StudentClassAppService : ApplicationService, IStudentClassAppServic
         // LC-08: a student must not enumerate a class roster — restrict the
         // result to their own enrollment row in that class.
         var selfId = await _currentStudent.GetCurrentStudentIdAsync();
+        // MOB-BE-04: a parent must not enumerate a class roster — restrict to
+        // their own children's enrollment rows in that class.
+        var childIds = await _currentParent.GetCurrentChildStudentIdsAsync();
 
         var records = await _studentClassRepository
             .GetAll()
@@ -95,6 +111,7 @@ public class StudentClassAppService : ApplicationService, IStudentClassAppServic
             .Include(sc => sc.AcademicYear)
             .Where(sc => sc.ClassId == classId && sc.TenantId == AbpSession.TenantId)
             .WhereIf(selfId.HasValue, sc => sc.StudentId == selfId.Value)
+            .WhereIf(childIds != null, sc => childIds.Contains(sc.StudentId))
             .OrderBy(sc => sc.Student.LastName)
             .ThenBy(sc => sc.Student.FirstName)
             .ToListAsync();
@@ -109,6 +126,11 @@ public class StudentClassAppService : ApplicationService, IStudentClassAppServic
         // LC-08: a student may only read their own current enrollment.
         var selfId = await _currentStudent.GetCurrentStudentIdAsync();
         if (selfId.HasValue && selfId.Value != studentId)
+            throw new UserFriendlyException(AcademicExceptionCodes.StudentClassNotFound, "No current class enrollment found for this student.");
+
+        // MOB-BE-04: a parent may only read their own children's current enrollment.
+        var childIds = await _currentParent.GetCurrentChildStudentIdsAsync();
+        if (childIds != null && !childIds.Contains(studentId))
             throw new UserFriendlyException(AcademicExceptionCodes.StudentClassNotFound, "No current class enrollment found for this student.");
 
         var current = await _studentClassRepository

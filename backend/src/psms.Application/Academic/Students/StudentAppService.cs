@@ -30,19 +30,22 @@ public class StudentAppService : ApplicationService, IStudentAppService
     private readonly IRepository<Class, Guid> _classRepository;
     private readonly IStudentLoginProvisioner _loginProvisioner;
     private readonly ICurrentStudentResolver _currentStudent;
+    private readonly psms.Academic.Parents.ICurrentParentResolver _currentParent;
 
     public StudentAppService(
         IRepository<Student, Guid> studentRepository,
         IRepository<Grade, Guid> gradeRepository,
         IRepository<Class, Guid> classRepository,
         IStudentLoginProvisioner loginProvisioner,
-        ICurrentStudentResolver currentStudent)
+        ICurrentStudentResolver currentStudent,
+        psms.Academic.Parents.ICurrentParentResolver currentParent)
     {
         _studentRepository = studentRepository;
         _gradeRepository = gradeRepository;
         _classRepository = classRepository;
         _loginProvisioner = loginProvisioner;
         _currentStudent = currentStudent;
+        _currentParent = currentParent;
     }
 
     /// <summary>Returns a single-item list of just the given student (LC-08 self-scope).</summary>
@@ -59,6 +62,22 @@ public class StudentAppService : ApplicationService, IStudentAppService
         return new ListResultDto<StudentListDto>(ObjectMapper.Map<List<StudentListDto>>(list));
     }
 
+    /// <summary>Returns just the given children (MOB-BE-04 parent-scope).</summary>
+    private async Task<ListResultDto<StudentListDto>> ChildrenOnlyListAsync(List<Guid> studentIds)
+    {
+        var children = await _studentRepository
+            .GetAll()
+            .Include(s => s.CurrentGrade)
+            .Include(s => s.CurrentClass)
+            .Include(s => s.ParentLinks)
+            .Where(s => studentIds.Contains(s.Id))
+            .OrderBy(s => s.LastName)
+            .ThenBy(s => s.FirstName)
+            .ToListAsync();
+
+        return new ListResultDto<StudentListDto>(ObjectMapper.Map<List<StudentListDto>>(children));
+    }
+
     [AbpAuthorize(PermissionNames.Academic_Students_View)]
     public async Task<StudentDto> GetAsync(Guid id)
     {
@@ -67,6 +86,11 @@ public class StudentAppService : ApplicationService, IStudentAppService
         // Return not-found (not forbidden) so existence isn't leaked.
         var selfStudentId = await _currentStudent.GetCurrentStudentIdAsync();
         if (selfStudentId.HasValue && selfStudentId.Value != id)
+            throw new UserFriendlyException(AcademicExceptionCodes.StudentNotFound, "Student not found.");
+
+        // MOB-BE-04: a parent may only read their own children's records.
+        var childIds = await _currentParent.GetCurrentChildStudentIdsAsync();
+        if (childIds != null && !childIds.Contains(id))
             throw new UserFriendlyException(AcademicExceptionCodes.StudentNotFound, "Student not found.");
 
         var student = await _studentRepository
@@ -92,6 +116,14 @@ public class StudentAppService : ApplicationService, IStudentAppService
         {
             var selfList = (await SelfOnlyListAsync(selfStudentId.Value)).Items.ToList();
             return new PagedResultDto<StudentListDto>(selfList.Count, selfList);
+        }
+
+        // MOB-BE-04: a parent-portal user only ever sees their own children.
+        var childIds = await _currentParent.GetCurrentChildStudentIdsAsync();
+        if (childIds != null)
+        {
+            var childList = (await ChildrenOnlyListAsync(childIds)).Items.ToList();
+            return new PagedResultDto<StudentListDto>(childList.Count, childList);
         }
 
         var query = _studentRepository
@@ -330,6 +362,9 @@ public class StudentAppService : ApplicationService, IStudentAppService
         var selfId = await _currentStudent.GetCurrentStudentIdAsync();
         if (selfId.HasValue) return await SelfOnlyListAsync(selfId.Value);
 
+        var childIds = await _currentParent.GetCurrentChildStudentIdsAsync();
+        if (childIds != null) return await ChildrenOnlyListAsync(childIds);
+
         var students = await _studentRepository
             .GetAll()
             .Include(s => s.CurrentGrade)
@@ -349,6 +384,9 @@ public class StudentAppService : ApplicationService, IStudentAppService
     {
         var selfId = await _currentStudent.GetCurrentStudentIdAsync();
         if (selfId.HasValue) return await SelfOnlyListAsync(selfId.Value);
+
+        var childIds = await _currentParent.GetCurrentChildStudentIdsAsync();
+        if (childIds != null) return await ChildrenOnlyListAsync(childIds);
 
         var students = await _studentRepository
             .GetAll()
@@ -370,6 +408,9 @@ public class StudentAppService : ApplicationService, IStudentAppService
         var selfId = await _currentStudent.GetCurrentStudentIdAsync();
         if (selfId.HasValue) return await SelfOnlyListAsync(selfId.Value);
 
+        var childIds = await _currentParent.GetCurrentChildStudentIdsAsync();
+        if (childIds != null) return await ChildrenOnlyListAsync(childIds);
+
         var students = await _studentRepository
             .GetAll()
             .Include(s => s.CurrentGrade)
@@ -389,6 +430,9 @@ public class StudentAppService : ApplicationService, IStudentAppService
     {
         var selfId = await _currentStudent.GetCurrentStudentIdAsync();
         if (selfId.HasValue) return await SelfOnlyListAsync(selfId.Value);
+
+        var childIds = await _currentParent.GetCurrentChildStudentIdsAsync();
+        if (childIds != null) return await ChildrenOnlyListAsync(childIds);
 
         IQueryable<Student> query = _studentRepository
             .GetAll()
