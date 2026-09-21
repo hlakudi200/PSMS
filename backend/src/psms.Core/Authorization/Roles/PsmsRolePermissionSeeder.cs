@@ -945,6 +945,7 @@ public class PsmsRolePermissionSeeder : ITransientDependency
             PermissionNames.Assessment_Marks_View,
             PermissionNames.Assessment_Marks_Create,
             PermissionNames.Assessment_Marks_Edit,
+            PermissionNames.Assessment_Marks_Delete,
             PermissionNames.Assessment_Marks_Publish,
             PermissionNames.Assessment_Marks_Import,
             PermissionNames.Assessment_Quizzes,

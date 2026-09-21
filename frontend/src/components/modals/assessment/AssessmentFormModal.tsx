@@ -12,17 +12,21 @@ import {
   Modal,
   Row,
   Select,
+  Skeleton,
   Typography,
   message,
 } from 'antd';
 import { z } from 'zod';
 import dayjs, { Dayjs } from 'dayjs';
-import { useAssessmentActions } from '@/providers/assessment/assessments';
+import { useAssessmentActions, useAssessmentState } from '@/providers/assessment/assessments';
 import type {
   IClassSubjectList,
   ITerm,
 } from '@/providers/academic/shared/interfaces';
-import type { ICreateAssessmentWithQuestions } from '@/providers/assessment/shared/interfaces';
+import type {
+  ICreateAssessmentWithQuestions,
+  IAssessmentList,
+} from '@/providers/assessment/shared/interfaces';
 import {
   QuestionBuilder,
   makeEmptyQuestion,
@@ -145,6 +149,14 @@ interface AssessmentFormModalProps {
   onClose: (refresh: boolean) => void;
   classSubjects: IClassSubjectList[];
   terms: ITerm[];
+  /**
+   * When set, the modal edits this assessment instead of creating a new
+   * one: ClassSubject/Term/Type become read-only (the backend's
+   * UpdateAssessmentDto doesn't accept them — see AssessmentAppService.
+   * UpdateAsync), the question builder is hidden (questions have their own
+   * management flow), and Save calls Update instead of CreateWithQuestions.
+   */
+  editRecord?: IAssessmentList | null;
 }
 
 export const AssessmentFormModal: React.FC<AssessmentFormModalProps> = ({
@@ -152,25 +164,57 @@ export const AssessmentFormModal: React.FC<AssessmentFormModalProps> = ({
   onClose,
   classSubjects,
   terms,
+  editRecord,
 }) => {
+  const isEdit = !!editRecord;
   const [form] = Form.useForm<AssessmentFormValues>();
   const [submitting, setSubmitting] = useState(false);
   const [zodErrors, setZodErrors] = useState<Record<string, string>>({});
   const [questions, setQuestions] = useState<QuestionDraft[]>([]);
   const [questionError, setQuestionError] = useState<string | null>(null);
 
-  const { createWithQuestionsAsync } = useAssessmentActions();
+  const { createWithQuestionsAsync, updateAsync, getAsync } = useAssessmentActions();
+  const { assessment, isPending: detailPending } = useAssessmentState();
 
   // Reset everything each time the modal opens so a previous draft doesn't
-  // leak in. Start with one blank question to anchor the builder.
+  // leak in. Start with one blank question to anchor the builder (create
+  // mode only — edit mode doesn't touch questions).
   useEffect(() => {
     if (open) {
       form.resetFields();
       setZodErrors({});
       setQuestionError(null);
       setQuestions([makeEmptyQuestion()]);
+      if (editRecord) getAsync(editRecord.id);
     }
-  }, [open, form]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, editRecord?.id]);
+
+  // Hydrate the form once the full record arrives. Gated on the id
+  // matching so a stale record from a previous open can't leak in.
+  useEffect(() => {
+    if (open && editRecord && assessment && assessment.id === editRecord.id) {
+      form.setFieldsValue({
+        classSubjectId: assessment.classSubjectId,
+        termId: assessment.termId,
+        name: assessment.name,
+        description: assessment.description,
+        assessmentType: assessment.assessmentType,
+        capsCategory: assessment.capsCategory ?? null,
+        maxMarks: assessment.maxMarks,
+        weight: assessment.weight,
+        passPercentage: assessment.passPercentage,
+        durationMinutes: assessment.durationMinutes ?? null,
+        instructions: assessment.instructions,
+        scheduledDate: assessment.scheduledDate ? dayjs(assessment.scheduledDate) : null,
+        dueDate: assessment.dueDate ? dayjs(assessment.dueDate) : null,
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, editRecord?.id, assessment?.id]);
+
+  const hydrated = !isEdit || (!!assessment && !!editRecord && assessment.id === editRecord.id);
+  const showSkeleton = open && isEdit && (detailPending || !hydrated);
 
   const classSubjectOptions = useMemo(
     () =>
@@ -211,50 +255,70 @@ export const AssessmentFormModal: React.FC<AssessmentFormModalProps> = ({
     }
     setZodErrors({});
 
-    const qError = validateQuestions(questions);
-    if (qError) {
-      setQuestionError(qError);
-      message.error(qError);
-      return;
-    }
+    if (!isEdit) {
+      const qError = validateQuestions(questions);
+      if (qError) {
+        setQuestionError(qError);
+        message.error(qError);
+        return;
+      }
 
-    // Mirror the server invariant: question marks can't exceed MaxMarks.
-    const totalMarks = questions.reduce((sum, q) => sum + (q.marks || 0), 0);
-    if (totalMarks > result.data.maxMarks) {
-      const msg = `Total question marks (${totalMarks}) exceed the assessment maximum (${result.data.maxMarks}).`;
-      setQuestionError(msg);
-      message.error(msg);
-      return;
+      // Mirror the server invariant: question marks can't exceed MaxMarks.
+      const totalMarks = questions.reduce((sum, q) => sum + (q.marks || 0), 0);
+      if (totalMarks > result.data.maxMarks) {
+        const msg = `Total question marks (${totalMarks}) exceed the assessment maximum (${result.data.maxMarks}).`;
+        setQuestionError(msg);
+        message.error(msg);
+        return;
+      }
     }
     setQuestionError(null);
 
     const d = result.data;
-    const payload: ICreateAssessmentWithQuestions = {
-      classSubjectId: d.classSubjectId,
-      termId: d.termId,
-      name: d.name.trim(),
-      description: d.description?.trim() || undefined,
-      assessmentType: d.assessmentType,
-      capsCategory: d.capsCategory ?? undefined,
-      maxMarks: d.maxMarks,
-      weight: d.weight,
-      passPercentage: d.passPercentage,
-      scheduledDate: d.scheduledDate ? d.scheduledDate.toISOString() : undefined,
-      dueDate: d.dueDate ? d.dueDate.toISOString() : undefined,
-      durationMinutes: d.durationMinutes ?? undefined,
-      instructions: d.instructions?.trim() || undefined,
-      questions: questions.map((q) => ({
-        questionText: q.questionText.trim(),
-        marks: q.marks,
-        options: q.options.map((o) => o.trim()),
-        correctOptionIndex: q.correctOptionIndex,
-      })),
-    };
-
     setSubmitting(true);
     try {
-      await createWithQuestionsAsync(payload);
-      message.success('Assessment created');
+      if (isEdit && editRecord) {
+        // ClassSubjectId/TermId/AssessmentType are omitted — the backend
+        // rejects (ignores, really: UpdateAssessmentDto has no such
+        // fields) changes to them once an assessment exists.
+        await updateAsync(editRecord.id, {
+          name: d.name.trim(),
+          description: d.description?.trim() || undefined,
+          capsCategory: d.capsCategory ?? undefined,
+          maxMarks: d.maxMarks,
+          weight: d.weight,
+          passPercentage: d.passPercentage,
+          scheduledDate: d.scheduledDate ? d.scheduledDate.toISOString() : undefined,
+          dueDate: d.dueDate ? d.dueDate.toISOString() : undefined,
+          durationMinutes: d.durationMinutes ?? undefined,
+          instructions: d.instructions?.trim() || undefined,
+        });
+        message.success('Assessment updated');
+      } else {
+        const payload: ICreateAssessmentWithQuestions = {
+          classSubjectId: d.classSubjectId,
+          termId: d.termId,
+          name: d.name.trim(),
+          description: d.description?.trim() || undefined,
+          assessmentType: d.assessmentType,
+          capsCategory: d.capsCategory ?? undefined,
+          maxMarks: d.maxMarks,
+          weight: d.weight,
+          passPercentage: d.passPercentage,
+          scheduledDate: d.scheduledDate ? d.scheduledDate.toISOString() : undefined,
+          dueDate: d.dueDate ? d.dueDate.toISOString() : undefined,
+          durationMinutes: d.durationMinutes ?? undefined,
+          instructions: d.instructions?.trim() || undefined,
+          questions: questions.map((q) => ({
+            questionText: q.questionText.trim(),
+            marks: q.marks,
+            options: q.options.map((o) => o.trim()),
+            correctOptionIndex: q.correctOptionIndex,
+          })),
+        };
+        await createWithQuestionsAsync(payload);
+        message.success('Assessment created');
+      }
       onClose(true);
     } catch {
       // The axios interceptor surfaces the server message (including the
@@ -267,15 +331,20 @@ export const AssessmentFormModal: React.FC<AssessmentFormModalProps> = ({
   return (
     <Modal
       open={open}
-      title="Create assessment"
-      okText="Create assessment"
+      title={isEdit ? 'Edit assessment' : 'Create assessment'}
+      okText={isEdit ? 'Save changes' : 'Create assessment'}
       onOk={handleSubmit}
       onCancel={() => onClose(false)}
       confirmLoading={submitting}
+      okButtonProps={{ disabled: showSkeleton }}
       destroyOnHidden
       width={760}
       styles={{ body: { maxHeight: '70vh', overflowY: 'auto' } }}
     >
+      {showSkeleton && <Skeleton active paragraph={{ rows: 6 }} />}
+      {/* Keep the Form mounted at all times so hydration effects never run
+          against an unconnected form — only its visibility flips. */}
+      <div style={{ display: showSkeleton ? 'none' : 'block' }}>
       <Form<AssessmentFormValues>
         form={form}
         layout="vertical"
@@ -294,12 +363,14 @@ export const AssessmentFormModal: React.FC<AssessmentFormModalProps> = ({
               rules={[{ required: true, message: 'Pick a class & subject.' }]}
               validateStatus={zodErrors.classSubjectId ? 'error' : undefined}
               help={zodErrors.classSubjectId}
+              tooltip={isEdit ? "Can't be changed after creation." : undefined}
             >
               <Select
                 placeholder="Pick a class & subject"
                 showSearch
                 optionFilterProp="label"
                 options={classSubjectOptions}
+                disabled={isEdit}
               />
             </Form.Item>
           </Col>
@@ -310,12 +381,14 @@ export const AssessmentFormModal: React.FC<AssessmentFormModalProps> = ({
               rules={[{ required: true, message: 'Pick a term.' }]}
               validateStatus={zodErrors.termId ? 'error' : undefined}
               help={zodErrors.termId}
+              tooltip={isEdit ? "Can't be changed after creation." : undefined}
             >
               <Select
                 placeholder="Pick a term"
                 showSearch
                 optionFilterProp="label"
                 options={termOptions}
+                disabled={isEdit}
               />
             </Form.Item>
           </Col>
@@ -348,8 +421,9 @@ export const AssessmentFormModal: React.FC<AssessmentFormModalProps> = ({
               rules={[{ required: true, message: 'Pick a type.' }]}
               validateStatus={zodErrors.assessmentType ? 'error' : undefined}
               help={zodErrors.assessmentType}
+              tooltip={isEdit ? "Can't be changed after creation." : undefined}
             >
-              <Select options={ASSESSMENT_TYPE_OPTIONS} />
+              <Select options={ASSESSMENT_TYPE_OPTIONS} disabled={isEdit} />
             </Form.Item>
           </Col>
           <Col xs={24} md={8}>
@@ -436,25 +510,36 @@ export const AssessmentFormModal: React.FC<AssessmentFormModalProps> = ({
         </Form.Item>
       </Form>
 
-      <Divider style={{ margin: '8px 0 16px' }} />
+      {!isEdit && (
+        <>
+          <Divider style={{ margin: '8px 0 16px' }} />
 
-      <Text type="secondary" style={{ display: 'block', marginBottom: 8, fontSize: 12 }}>
-        Build {MIN_QUESTIONS}-{MAX_QUESTIONS} multiple-choice questions. Each
-        needs {MIN_OPTIONS}-{MAX_OPTIONS} options with exactly one marked
-        correct (QA-001). The assessment and its questions are saved together.
-      </Text>
+          <Text type="secondary" style={{ display: 'block', marginBottom: 8, fontSize: 12 }}>
+            Build {MIN_QUESTIONS}-{MAX_QUESTIONS} multiple-choice questions. Each
+            needs {MIN_OPTIONS}-{MAX_OPTIONS} options with exactly one marked
+            correct (QA-001). The assessment and its questions are saved together.
+          </Text>
 
-      {questionError && (
-        <Alert
-          type="error"
-          role="alert"
-          showIcon
-          message={questionError}
-          style={{ marginBottom: 12 }}
-        />
+          {questionError && (
+            <Alert
+              type="error"
+              role="alert"
+              showIcon
+              message={questionError}
+              style={{ marginBottom: 12 }}
+            />
+          )}
+
+          <QuestionBuilder value={questions} onChange={setQuestions} />
+        </>
       )}
-
-      <QuestionBuilder value={questions} onChange={setQuestions} />
+      {isEdit && (
+        <Text type="secondary" style={{ fontSize: 12 }}>
+          Use Manage questions from the assessments table to add, edit,
+          delete, or reorder questions.
+        </Text>
+      )}
+      </div>
     </Modal>
   );
 };

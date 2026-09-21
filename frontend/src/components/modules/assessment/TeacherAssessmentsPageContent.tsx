@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   Alert,
   Button,
@@ -8,6 +9,7 @@ import {
   Col,
   Empty,
   Input,
+  Popconfirm,
   Row,
   Select,
   Space,
@@ -16,12 +18,19 @@ import {
   Tag,
   Tooltip,
   Typography,
+  message,
 } from 'antd';
 import {
+  DeleteOutlined,
+  EditOutlined,
+  EyeOutlined,
   FileDoneOutlined,
   FormOutlined,
+  InboxOutlined,
   PlusOutlined,
   ReloadOutlined,
+  SendOutlined,
+  UnorderedListOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { useAuthState } from '@/providers/auth';
@@ -50,9 +59,12 @@ import {
   useAssessmentActions,
   useAssessmentState,
 } from '@/providers/assessment/assessments';
+import { AssessmentQuestionProvider } from '@/providers/assessment/assessment_questions';
 import type { IClassSubjectList } from '@/providers/academic/shared/interfaces';
 import type { IAssessmentList } from '@/providers/assessment/shared/interfaces';
 import { AssessmentFormModal } from '@/components/modals/assessment/AssessmentFormModal';
+import { ManageQuestionsDrawer } from '@/components/modules/assessment/ManageQuestionsDrawer';
+import { MIN_QUESTIONS } from '@/components/modals/assessment/QuestionBuilder';
 
 const { Title, Text } = Typography;
 
@@ -67,8 +79,14 @@ const TYPE_LABEL: Record<number, string> = {
 };
 
 function TeacherAssessmentsContent() {
+  const router = useRouter();
   const { currentUser } = useAuthState();
   const [createOpen, setCreateOpen] = useState(false);
+  const [editRecord, setEditRecord] = useState<IAssessmentList | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
+  const [questionsRecord, setQuestionsRecord] = useState<IAssessmentList | null>(null);
+  const [questionsOpen, setQuestionsOpen] = useState(false);
+  const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
 
   const [searchKeyword, setSearchKeyword] = useState('');
   const [debouncedKeyword, setDebouncedKeyword] = useState('');
@@ -96,7 +114,13 @@ function TeacherAssessmentsContent() {
   const { getByAcademicYearAsync: getTermsByYear } = useTermActions();
   const { terms } = useTermState();
 
-  const { getAllAsync: getAllAssessments } = useAssessmentActions();
+  const {
+    getAllAsync: getAllAssessments,
+    deleteAsync,
+    publishAsync,
+    unpublishAsync,
+    releaseMarksAsync,
+  } = useAssessmentActions();
   const {
     assessments,
     isPending: assessmentsPending,
@@ -174,6 +198,58 @@ function TeacherAssessmentsContent() {
     [myAssessments]
   );
 
+  const handlePublish = async (record: IAssessmentList) => {
+    setActionLoadingId(record.id);
+    try {
+      await publishAsync(record.id);
+      message.success('Assessment published');
+      refreshAssessments();
+    } catch {
+      // Surfaced by axios interceptor
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  const handleUnpublish = async (record: IAssessmentList) => {
+    setActionLoadingId(record.id);
+    try {
+      await unpublishAsync(record.id);
+      message.success('Assessment unpublished');
+      refreshAssessments();
+    } catch {
+      // Surfaced by axios interceptor
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  const handleReleaseMarks = async (record: IAssessmentList) => {
+    setActionLoadingId(record.id);
+    try {
+      await releaseMarksAsync(record.id);
+      message.success('Marks released to students');
+      refreshAssessments();
+    } catch {
+      // Surfaced by axios interceptor
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  const handleDelete = async (record: IAssessmentList) => {
+    setActionLoadingId(record.id);
+    try {
+      await deleteAsync(record.id);
+      message.success('Assessment deleted');
+      refreshAssessments();
+    } catch {
+      // Surfaced by axios interceptor
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
   const noTeacherProfile =
     !teacherPending && !teacherError && currentUser != null && teacher === undefined;
   const loading = teacherPending || classSubjectsPending || assessmentsPending;
@@ -248,6 +324,131 @@ function TeacherAssessmentsContent() {
           {row.marksReleased && <Tag color="blue">Marks released</Tag>}
         </Space>
       ),
+    },
+    {
+      title: 'Actions',
+      key: 'actions',
+      width: 300,
+      render: (_: unknown, record: IAssessmentList) => {
+        const busy = actionLoadingId === record.id;
+        return (
+          <Space size="small">
+            <Tooltip title="View results">
+              <Button
+                size="small"
+                icon={<EyeOutlined />}
+                aria-label={`View results for ${record.name}`}
+                onClick={() => router.push(`/teacher/mark-sheets/${record.id}`)}
+              />
+            </Tooltip>
+            <Tooltip title={record.isPublished ? 'Unpublish to edit' : 'Edit'}>
+              <Button
+                size="small"
+                icon={<EditOutlined />}
+                disabled={record.isPublished}
+                aria-label={`Edit ${record.name}`}
+                onClick={() => {
+                  setEditRecord(record);
+                  setEditOpen(true);
+                }}
+              />
+            </Tooltip>
+            <Tooltip title={record.isPublished ? 'Unpublish to manage questions' : 'Manage questions'}>
+              <Button
+                size="small"
+                icon={<UnorderedListOutlined />}
+                disabled={record.isPublished}
+                aria-label={`Manage questions for ${record.name}`}
+                onClick={() => {
+                  setQuestionsRecord(record);
+                  setQuestionsOpen(true);
+                }}
+              />
+            </Tooltip>
+            {record.isPublished ? (
+              <Tooltip title={record.marksReleased ? 'Cannot unpublish once marks are released' : 'Unpublish'}>
+                <Popconfirm
+                  title="Unpublish this assessment?"
+                  description="Students will no longer be able to see it."
+                  onConfirm={() => handleUnpublish(record)}
+                  okText="Unpublish"
+                  disabled={record.marksReleased}
+                >
+                  <Button
+                    size="small"
+                    icon={<InboxOutlined />}
+                    disabled={record.marksReleased}
+                    loading={busy}
+                    aria-label={`Unpublish ${record.name}`}
+                  />
+                </Popconfirm>
+              </Tooltip>
+            ) : (
+              <Tooltip
+                title={
+                  record.questionCount < MIN_QUESTIONS
+                    ? `Add at least ${MIN_QUESTIONS} questions first`
+                    : 'Publish'
+                }
+              >
+                <Button
+                  size="small"
+                  type="primary"
+                  icon={<SendOutlined />}
+                  disabled={record.questionCount < MIN_QUESTIONS}
+                  loading={busy}
+                  aria-label={`Publish ${record.name}`}
+                  onClick={() => handlePublish(record)}
+                />
+              </Tooltip>
+            )}
+            <Tooltip
+              title={
+                record.marksReleased
+                  ? 'Marks already released'
+                  : !record.isPublished
+                  ? 'Publish first'
+                  : 'Release marks to students'
+              }
+            >
+              <Popconfirm
+                title="Release marks to students?"
+                description="Students will be able to see their marks for this assessment."
+                onConfirm={() => handleReleaseMarks(record)}
+                okText="Release"
+                disabled={!record.isPublished || record.marksReleased}
+              >
+                <Button
+                  size="small"
+                  icon={<FileDoneOutlined />}
+                  disabled={!record.isPublished || record.marksReleased}
+                  loading={busy}
+                  aria-label={`Release marks for ${record.name}`}
+                />
+              </Popconfirm>
+            </Tooltip>
+            <Tooltip title={record.markCount > 0 ? 'Remove all marks first' : 'Delete'}>
+              <Popconfirm
+                title="Delete this assessment?"
+                description="This permanently removes the assessment and its questions. This cannot be undone."
+                onConfirm={() => handleDelete(record)}
+                okText="Delete"
+                okButtonProps={{ danger: true }}
+                disabled={record.markCount > 0}
+              >
+                <Button
+                  size="small"
+                  danger
+                  icon={<DeleteOutlined />}
+                  disabled={record.markCount > 0}
+                  loading={busy}
+                  aria-label={`Delete ${record.name}`}
+                />
+              </Popconfirm>
+            </Tooltip>
+          </Space>
+        );
+      },
     },
   ];
 
@@ -384,7 +585,7 @@ function TeacherAssessmentsContent() {
           pagination={{ pageSize: 20 }}
           size="small"
           columns={columns}
-          scroll={{ x: 920 }}
+          scroll={{ x: 1300 }}
           locale={{
             emptyText: hasClassSubjects ? (
               <Empty
@@ -407,6 +608,30 @@ function TeacherAssessmentsContent() {
           if (refresh) refreshAssessments();
         }}
       />
+
+      <AssessmentFormModal
+        open={editOpen}
+        editRecord={editRecord}
+        classSubjects={classSubjects ?? []}
+        terms={terms ?? []}
+        onClose={(refresh) => {
+          setEditOpen(false);
+          setEditRecord(null);
+          if (refresh) refreshAssessments();
+        }}
+      />
+
+      <ManageQuestionsDrawer
+        open={questionsOpen}
+        assessment={questionsRecord}
+        onClose={() => {
+          setQuestionsOpen(false);
+          setQuestionsRecord(null);
+          // A question add/edit/delete changes QuestionCount, so refresh
+          // the table once the drawer closes.
+          refreshAssessments();
+        }}
+      />
     </div>
   );
 }
@@ -418,7 +643,9 @@ export default function TeacherAssessmentsPageContent() {
         <AcademicYearProvider>
           <TermProvider>
             <AssessmentProvider>
-              <TeacherAssessmentsContent />
+              <AssessmentQuestionProvider>
+                <TeacherAssessmentsContent />
+              </AssessmentQuestionProvider>
             </AssessmentProvider>
           </TermProvider>
         </AcademicYearProvider>
