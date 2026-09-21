@@ -10,8 +10,8 @@ import {
   DatePicker,
   Empty,
   Input,
+  Radio,
   Row,
-  Segmented,
   Select,
   Space,
   Table,
@@ -74,6 +74,17 @@ const STATUS_COLOR: Record<number, string> = {
   4: 'blue',
   5: 'orange',
   6: 'default',
+};
+// Same palette as STATUS_COLOR's Tag colors, as hex — AntD's Segmented
+// (and a plain Radio.Group) highlight the selected option with a white
+// pill by default, which reads as blank against a light page background.
+// Filling the selected button with its own status color instead keeps the
+// picker legible and lets a teacher scan a filled register at a glance.
+const STATUS_HEX: Record<number, string> = {
+  1: '#52c41a',
+  2: '#ff4d4f',
+  3: '#faad14',
+  4: '#1677ff',
 };
 
 const PRESENT = 1;
@@ -340,20 +351,43 @@ function TeacherAttendanceContent() {
       key: 'status',
       width: 360,
       render: (_: unknown, row) => {
-        // Locked rows (past dates, viewed read-only) show a plain tag;
-        // otherwise every row is editable, including already-recorded
-        // ones — T-T21 same-day correction.
+        // Locked rows (past dates, viewed read-only) show a plain tag —
+        // and a student nobody actually recorded that day shows "No
+        // record" rather than a disabled control pre-filled with Present,
+        // which would misleadingly look like a real capture.
         if (locked && row.existing) {
           const color = STATUS_COLOR[row.status] ?? 'default';
           return <Tag color={color}>{STATUS_LABEL[row.status] ?? '—'}</Tag>;
         }
+        if (locked && !row.existing) {
+          return <Text type="secondary">No record</Text>;
+        }
         return (
-          <Segmented
+          <Radio.Group
             value={row.status}
             disabled={locked}
-            onChange={(v) => updateRow(row.studentId, { status: Number(v) })}
-            options={STATUS_OPTIONS}
-          />
+            optionType="button"
+            buttonStyle="solid"
+            onChange={(e) => updateRow(row.studentId, { status: Number(e.target.value) })}
+          >
+            {STATUS_OPTIONS.map((opt) => (
+              <Radio.Button
+                key={opt.value}
+                value={opt.value}
+                style={
+                  row.status === opt.value
+                    ? {
+                        backgroundColor: STATUS_HEX[opt.value],
+                        borderColor: STATUS_HEX[opt.value],
+                        color: '#fff',
+                      }
+                    : undefined
+                }
+              >
+                {opt.label}
+              </Radio.Button>
+            ))}
+          </Radio.Group>
         );
       },
     },
@@ -363,6 +397,9 @@ function TeacherAttendanceContent() {
       render: (_: unknown, row) => {
         if (locked && row.existing) {
           return row.existing.notes ? <Text type="secondary">{row.existing.notes}</Text> : <Text type="secondary">—</Text>;
+        }
+        if (locked && !row.existing) {
+          return <Text type="secondary">—</Text>;
         }
         return (
           <Input
@@ -471,8 +508,8 @@ function TeacherAttendanceContent() {
           role="status"
           showIcon
           icon={<LockOutlined />}
-          message="This date is locked"
-          description="Attendance can only be captured on the day itself. Ask an administrator to capture or correct a past date."
+          message="Viewing a past register (read-only)"
+          description="Editing is only allowed on the day itself. Ask an administrator to correct a past date."
           style={{ marginBottom: 16 }}
         />
       )}
@@ -500,13 +537,20 @@ function TeacherAttendanceContent() {
               ),
             }}
             footer={() => {
-              const present = rowList.filter((r) => r.status === PRESENT).length;
-              const absent = rowList.filter((r) => r.status === ABSENT).length;
+              // On a locked (past) date, only rows with a real record count
+              // — an unrecorded student defaults to a Present-shaped draft
+              // that was never actually submitted, and tallying it would
+              // misrepresent a day the register wasn't fully taken.
+              const counted = locked ? rowList.filter((r) => r.existing) : rowList;
+              const present = counted.filter((r) => r.status === PRESENT).length;
+              const absent = counted.filter((r) => r.status === ABSENT).length;
+              const noRecord = rowList.length - counted.length;
               return (
                 <Space>
                   <CheckCircleOutlined />
                   <Text type="secondary">
-                    {present} present · {absent} absent · {rowList.length} total
+                    {present} present · {absent} absent
+                    {noRecord > 0 ? ` · ${noRecord} no record` : ''} · {rowList.length} total
                   </Text>
                 </Space>
               );

@@ -69,6 +69,9 @@ public class AttendanceAppService : ApplicationService, IAttendanceAppService
         // LC-10: a student-portal user only ever sees their own attendance.
         var selfId = await _currentStudent.GetCurrentStudentIdAsync();
 
+        DateTime? startUtc = input.StartDate.HasValue ? LocalDayRangeUtc(input.StartDate.Value).StartUtc : null;
+        DateTime? endUtcExclusive = input.EndDate.HasValue ? LocalDayRangeUtc(input.EndDate.Value).EndUtc : null;
+
         var query = _attendanceRepository
             .GetAll()
             .Include(a => a.Student)
@@ -82,8 +85,8 @@ public class AttendanceAppService : ApplicationService, IAttendanceAppService
             .WhereIf(input.ClassId.HasValue, a => a.ClassId == input.ClassId.Value)
             .WhereIf(input.StudentId.HasValue, a => a.StudentId == input.StudentId.Value)
             .WhereIf(input.TeacherId.HasValue, a => a.TeacherId == input.TeacherId.Value)
-            .WhereIf(input.StartDate.HasValue, a => a.AttendanceDate.Date >= input.StartDate.Value.Date)
-            .WhereIf(input.EndDate.HasValue, a => a.AttendanceDate.Date <= input.EndDate.Value.Date)
+            .WhereIf(startUtc.HasValue, a => a.AttendanceDate >= startUtc!.Value)
+            .WhereIf(endUtcExclusive.HasValue, a => a.AttendanceDate < endUtcExclusive!.Value)
             .WhereIf(input.Status.HasValue, a => a.Status == input.Status.Value);
 
         var totalCount = await query.CountAsync();
@@ -106,13 +109,16 @@ public class AttendanceAppService : ApplicationService, IAttendanceAppService
         if (selfId.HasValue && selfId.Value != studentId)
             return new ListResultDto<AttendanceListDto>(new System.Collections.Generic.List<AttendanceListDto>());
 
+        DateTime? startUtc = startDate.HasValue ? LocalDayRangeUtc(startDate.Value).StartUtc : null;
+        DateTime? endUtcExclusive = endDate.HasValue ? LocalDayRangeUtc(endDate.Value).EndUtc : null;
+
         var records = await _attendanceRepository
             .GetAll()
             .Include(a => a.Student)
             .Include(a => a.Class)
             .Where(a => a.StudentId == studentId && a.TenantId == AbpSession.TenantId)
-            .WhereIf(startDate.HasValue, a => a.AttendanceDate.Date >= startDate.Value.Date)
-            .WhereIf(endDate.HasValue, a => a.AttendanceDate.Date <= endDate.Value.Date)
+            .WhereIf(startUtc.HasValue, a => a.AttendanceDate >= startUtc!.Value)
+            .WhereIf(endUtcExclusive.HasValue, a => a.AttendanceDate < endUtcExclusive!.Value)
             .OrderByDescending(a => a.AttendanceDate)
             .ToListAsync();
 
@@ -126,12 +132,14 @@ public class AttendanceAppService : ApplicationService, IAttendanceAppService
         // LC-10: a student must not read a class register — restrict to their own row.
         var selfId = await _currentStudent.GetCurrentStudentIdAsync();
 
+        var (startUtc, endUtc) = LocalDayRangeUtc(date);
+
         var records = await _attendanceRepository
             .GetAll()
             .Include(a => a.Student)
             .Include(a => a.Class)
             .Where(a => a.ClassId == classId
-                && a.AttendanceDate.Date == date.Date
+                && a.AttendanceDate >= startUtc && a.AttendanceDate < endUtc
                 && a.TenantId == AbpSession.TenantId)
             .WhereIf(selfId.HasValue, a => a.StudentId == selfId.Value)
             .OrderBy(a => a.Student.LastName)
@@ -204,10 +212,11 @@ public class AttendanceAppService : ApplicationService, IAttendanceAppService
                 $"The following student(s) are not in this class: {string.Join(", ", missingStudents)}.");
 
         // Batch duplicate check
+        var (bulkDayStartUtc, bulkDayEndUtc) = LocalDayRangeUtc(input.AttendanceDate);
         var existingRecords = await _attendanceRepository
             .GetAll()
             .Where(a => a.ClassId == input.ClassId
-                && a.AttendanceDate.Date == input.AttendanceDate.Date
+                && a.AttendanceDate >= bulkDayStartUtc && a.AttendanceDate < bulkDayEndUtc
                 && a.SubjectId == input.SubjectId
                 && studentIds.Contains(a.StudentId)
                 && a.TenantId == AbpSession.TenantId)
@@ -302,11 +311,13 @@ public class AttendanceAppService : ApplicationService, IAttendanceAppService
         if (student == null)
             throw new UserFriendlyException(AcademicExceptionCodes.StudentNotFound, "Student not found.");
 
+        var summaryStartUtc = LocalDayRangeUtc(startDate).StartUtc;
+        var summaryEndUtcExclusive = LocalDayRangeUtc(endDate).EndUtc;
         var records = await _attendanceRepository
             .GetAll()
             .Where(a => a.StudentId == studentId
-                && a.AttendanceDate.Date >= startDate.Date
-                && a.AttendanceDate.Date <= endDate.Date
+                && a.AttendanceDate >= summaryStartUtc
+                && a.AttendanceDate < summaryEndUtcExclusive
                 && a.TenantId == AbpSession.TenantId)
             .ToListAsync();
 
@@ -316,12 +327,14 @@ public class AttendanceAppService : ApplicationService, IAttendanceAppService
     [AbpAuthorize(PermissionNames.Academic_Attendance_Reports)]
     public async Task<ListResultDto<AttendanceSummaryDto>> GetClassSummaryAsync(Guid classId, DateTime startDate, DateTime endDate)
     {
+        var classSummaryStartUtc = LocalDayRangeUtc(startDate).StartUtc;
+        var classSummaryEndUtcExclusive = LocalDayRangeUtc(endDate).EndUtc;
         var records = await _attendanceRepository
             .GetAll()
             .Include(a => a.Student)
             .Where(a => a.ClassId == classId
-                && a.AttendanceDate.Date >= startDate.Date
-                && a.AttendanceDate.Date <= endDate.Date
+                && a.AttendanceDate >= classSummaryStartUtc
+                && a.AttendanceDate < classSummaryEndUtcExclusive
                 && a.TenantId == AbpSession.TenantId)
             .ToListAsync();
 
@@ -368,6 +381,27 @@ public class AttendanceAppService : ApplicationService, IAttendanceAppService
     private static DateTime NormalizeToLocalDate(DateTime value)
         => value.Kind == DateTimeKind.Utc ? value.ToLocalTime().Date : value.Date;
 
+    /// <summary>
+    /// AttendanceDate is stored in a `timestamptz` column. EF Core
+    /// translates `a.AttendanceDate.Date` (an entity property access)
+    /// into a Postgres-side date truncation in the session's timezone
+    /// (UTC) rather than the server's local offset the date was captured
+    /// against — while a client-supplied calendar date on the other side
+    /// of the comparison is evaluated as a plain local value. The two
+    /// sides silently stop matching (a historical register lookup for a
+    /// date that has real data comes back empty). Converting the
+    /// requested local calendar date into its UTC instant range and
+    /// comparing the raw column against that range sidesteps the
+    /// translation ambiguity entirely — used by every query below that
+    /// filters on AttendanceDate.
+    /// </summary>
+    private static (DateTime StartUtc, DateTime EndUtc) LocalDayRangeUtc(DateTime localDate)
+    {
+        var startLocal = DateTime.SpecifyKind(localDate.Date, DateTimeKind.Local);
+        var startUtc = startLocal.ToUniversalTime();
+        return (startUtc, startUtc.AddDays(1));
+    }
+
     private async Task ValidateAttendanceInput(Guid studentId, Guid classId, Guid teacherId, DateTime attendanceDate, Guid? subjectId)
     {
         // Date guard: not future, and (AT-002) not a locked past date.
@@ -399,9 +433,10 @@ public class AttendanceAppService : ApplicationService, IAttendanceAppService
             throw new UserFriendlyException(AcademicExceptionCodes.TeacherNotFound, "Teacher not found.");
 
         // Duplicate prevention: one record per student+date+subjectId
+        var (dupDayStartUtc, dupDayEndUtc) = LocalDayRangeUtc(attendanceDate);
         var duplicate = await _attendanceRepository
             .FirstOrDefaultAsync(a => a.StudentId == studentId
-                && a.AttendanceDate.Date == attendanceDate.Date
+                && a.AttendanceDate >= dupDayStartUtc && a.AttendanceDate < dupDayEndUtc
                 && a.SubjectId == subjectId
                 && a.TenantId == AbpSession.TenantId);
 
