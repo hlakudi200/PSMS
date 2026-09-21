@@ -14,6 +14,7 @@ export enum AuthActionEnums {
   signOutUser = "SIGN_OUT_USER",
   resetStateFlagsAction = "RESET_STATE_FLAGS",
   bootstrapComplete = "BOOTSTRAP_COMPLETE",
+  setCurrentStudentId = "SET_CURRENT_STUDENT_ID",
 }
 
 export const loginUserPending = createAction<AuthPatch>(AuthActionEnums.loginUserPending, () => ({
@@ -38,6 +39,10 @@ export const getCurrentUserError = createAction<AuthPatch, string>(
   AuthActionEnums.getCurrentUserError,
   (errorMessage) => ({ isPending: false, isSuccess: false, isError: true, errorMessage, isAccessDenied: false })
 );
+export const setCurrentStudentId = createAction<AuthPatch, { currentStudentId?: string; currentClassId?: string }>(
+  AuthActionEnums.setCurrentStudentId,
+  ({ currentStudentId, currentClassId }) => ({ currentStudentId, currentClassId })
+);
 export const signOutUser = createAction<AuthPatch>(AuthActionEnums.signOutUser, () => ({
   ...INITIAL_AUTH_VALUES,
 }));
@@ -57,4 +62,6 @@ const INITIAL_AUTH_VALUES = {
   currentTenant: undefined,
   jwtToken: undefined,
   currentRole: undefined,
+  currentStudentId: undefined,
+  currentClassId: undefined,
 };
