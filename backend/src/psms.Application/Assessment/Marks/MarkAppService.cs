@@ -32,17 +32,20 @@ public class MarkAppService : ApplicationService, IMarkAppService
     private readonly IRepository<AssessmentEntity, Guid> _assessmentRepository;
     private readonly IRepository<Student, Guid> _studentRepository;
     private readonly psms.Academic.Students.ICurrentStudentResolver _currentStudent;
+    private readonly psms.Academic.Parents.ICurrentParentResolver _currentParent;
 
     public MarkAppService(
         IRepository<Mark, Guid> markRepository,
         IRepository<AssessmentEntity, Guid> assessmentRepository,
         IRepository<Student, Guid> studentRepository,
-        psms.Academic.Students.ICurrentStudentResolver currentStudent)
+        psms.Academic.Students.ICurrentStudentResolver currentStudent,
+        psms.Academic.Parents.ICurrentParentResolver currentParent)
     {
         _markRepository = markRepository;
         _assessmentRepository = assessmentRepository;
         _studentRepository = studentRepository;
         _currentStudent = currentStudent;
+        _currentParent = currentParent;
     }
 
     [AbpAuthorize(PermissionNames.Assessment_Marks_View)]
@@ -62,6 +65,11 @@ public class MarkAppService : ApplicationService, IMarkAppService
         if (selfId.HasValue && selfId.Value != mark.StudentId)
             throw new UserFriendlyException(AssessmentExceptionCodes.MarkNotFound, "Mark not found.");
 
+        // MOB-BE-04: a parent may only read their own children's marks.
+        var childIds = await _currentParent.GetCurrentChildStudentIdsAsync();
+        if (childIds != null && !childIds.Contains(mark.StudentId))
+            throw new UserFriendlyException(AssessmentExceptionCodes.MarkNotFound, "Mark not found.");
+
         return ObjectMapper.Map<MarkDto>(mark);
     }
 
@@ -70,6 +78,8 @@ public class MarkAppService : ApplicationService, IMarkAppService
     {
         // LC-10: a student-portal user only ever sees their own marks.
         var selfId = await _currentStudent.GetCurrentStudentIdAsync();
+        // MOB-BE-04: a parent only ever sees their own children's marks.
+        var childIds = await _currentParent.GetCurrentChildStudentIdsAsync();
 
         var query = _markRepository
             .GetAll()
@@ -77,6 +87,7 @@ public class MarkAppService : ApplicationService, IMarkAppService
             .Include(m => m.Student)
             .Where(m => m.TenantId == AbpSession.TenantId)
             .WhereIf(selfId.HasValue, m => m.StudentId == selfId.Value)
+            .WhereIf(childIds != null, m => childIds.Contains(m.StudentId))
             .WhereIf(input.AssessmentId.HasValue, m => m.AssessmentId == input.AssessmentId.Value)
             .WhereIf(input.StudentId.HasValue, m => m.StudentId == input.StudentId.Value)
             .WhereIf(input.ClassId.HasValue, m => m.Assessment.ClassSubject.ClassId == input.ClassId.Value)
@@ -108,6 +119,8 @@ public class MarkAppService : ApplicationService, IMarkAppService
         // LC-10: a student sees only their own mark for the assessment, not the
         // whole class score sheet.
         var selfId = await _currentStudent.GetCurrentStudentIdAsync();
+        // MOB-BE-04: a parent sees only their own children's marks for the assessment.
+        var childIds = await _currentParent.GetCurrentChildStudentIdsAsync();
 
         var items = await _markRepository
             .GetAll()
@@ -116,6 +129,7 @@ public class MarkAppService : ApplicationService, IMarkAppService
             .Where(m => m.TenantId == AbpSession.TenantId)
             .Where(m => m.AssessmentId == assessmentId)
             .WhereIf(selfId.HasValue, m => m.StudentId == selfId.Value)
+            .WhereIf(childIds != null, m => childIds.Contains(m.StudentId))
             .OrderBy(m => m.Student.LastName)
             .ThenBy(m => m.Student.FirstName)
             .ToListAsync();
@@ -130,6 +144,11 @@ public class MarkAppService : ApplicationService, IMarkAppService
         // LC-10: a student may only read their own marks.
         var selfId = await _currentStudent.GetCurrentStudentIdAsync();
         if (selfId.HasValue && selfId.Value != studentId)
+            return new ListResultDto<MarkListDto>(new System.Collections.Generic.List<MarkListDto>());
+
+        // MOB-BE-04: a parent may only read their own children's marks.
+        var childIds = await _currentParent.GetCurrentChildStudentIdsAsync();
+        if (childIds != null && !childIds.Contains(studentId))
             return new ListResultDto<MarkListDto>(new System.Collections.Generic.List<MarkListDto>());
 
         var items = await _markRepository

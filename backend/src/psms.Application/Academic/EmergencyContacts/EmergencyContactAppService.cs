@@ -21,15 +21,18 @@ public class EmergencyContactAppService : ApplicationService, IEmergencyContactA
     private readonly IRepository<EmergencyContact, Guid> _emergencyContactRepository;
     private readonly IRepository<Student, Guid> _studentRepository;
     private readonly psms.Academic.Students.ICurrentStudentResolver _currentStudent;
+    private readonly psms.Academic.Parents.ICurrentParentResolver _currentParent;
 
     public EmergencyContactAppService(
         IRepository<EmergencyContact, Guid> emergencyContactRepository,
         IRepository<Student, Guid> studentRepository,
-        psms.Academic.Students.ICurrentStudentResolver currentStudent)
+        psms.Academic.Students.ICurrentStudentResolver currentStudent,
+        psms.Academic.Parents.ICurrentParentResolver currentParent)
     {
         _emergencyContactRepository = emergencyContactRepository;
         _studentRepository = studentRepository;
         _currentStudent = currentStudent;
+        _currentParent = currentParent;
     }
 
     [AbpAuthorize(PermissionNames.Academic_Students_View)]
@@ -48,6 +51,11 @@ public class EmergencyContactAppService : ApplicationService, IEmergencyContactA
         if (selfId.HasValue && selfId.Value != contact.StudentId)
             throw new UserFriendlyException(AcademicExceptionCodes.EmergencyContactNotFound, "Emergency contact not found.");
 
+        // MOB-BE-04: a parent may only read their own children's contacts.
+        var childIds = await _currentParent.GetCurrentChildStudentIdsAsync();
+        if (childIds != null && !childIds.Contains(contact.StudentId))
+            throw new UserFriendlyException(AcademicExceptionCodes.EmergencyContactNotFound, "Emergency contact not found.");
+
         return ObjectMapper.Map<EmergencyContactDto>(contact);
     }
 
@@ -57,6 +65,11 @@ public class EmergencyContactAppService : ApplicationService, IEmergencyContactA
         // LC-08: a student may only read their own contacts.
         var selfId = await _currentStudent.GetCurrentStudentIdAsync();
         if (selfId.HasValue && selfId.Value != studentId)
+            throw new UserFriendlyException(AcademicExceptionCodes.EmergencyContactNotFound, "Emergency contact not found.");
+
+        // MOB-BE-04: a parent may only read their own children's contacts.
+        var childIds = await _currentParent.GetCurrentChildStudentIdsAsync();
+        if (childIds != null && !childIds.Contains(studentId))
             throw new UserFriendlyException(AcademicExceptionCodes.EmergencyContactNotFound, "Emergency contact not found.");
 
         var contacts = await _emergencyContactRepository

@@ -26,15 +26,18 @@ public class ReportSubjectAppService : ApplicationService, IReportSubjectAppServ
     private readonly IRepository<ReportSubject, Guid> _reportSubjectRepository;
     private readonly IRepository<Report, Guid> _reportRepository;
     private readonly psms.Academic.Students.ICurrentStudentResolver _currentStudent;
+    private readonly psms.Academic.Parents.ICurrentParentResolver _currentParent;
 
     public ReportSubjectAppService(
         IRepository<ReportSubject, Guid> reportSubjectRepository,
         IRepository<Report, Guid> reportRepository,
-        psms.Academic.Students.ICurrentStudentResolver currentStudent)
+        psms.Academic.Students.ICurrentStudentResolver currentStudent,
+        psms.Academic.Parents.ICurrentParentResolver currentParent)
     {
         _reportSubjectRepository = reportSubjectRepository;
         _reportRepository = reportRepository;
         _currentStudent = currentStudent;
+        _currentParent = currentParent;
     }
 
     [AbpAuthorize(PermissionNames.Assessment_ReportCards_View)]
@@ -60,6 +63,12 @@ public class ReportSubjectAppService : ApplicationService, IReportSubjectAppServ
             throw new UserFriendlyException(AssessmentExceptionCodes.ReportSubjectNotFound,
                 "Report subject entry not found.");
 
+        // MOB-BE-04: a parent may only read their own children's report subject entries.
+        var childIds = await _currentParent.GetCurrentChildStudentIdsAsync();
+        if (childIds != null && !childIds.Contains(reportSubject.Report.StudentId))
+            throw new UserFriendlyException(AssessmentExceptionCodes.ReportSubjectNotFound,
+                "Report subject entry not found.");
+
         return ObjectMapper.Map<ReportSubjectDto>(reportSubject);
     }
 
@@ -77,6 +86,11 @@ public class ReportSubjectAppService : ApplicationService, IReportSubjectAppServ
         // LC-10: a student may only read their own report's subject entries.
         var selfId = await _currentStudent.GetCurrentStudentIdAsync();
         if (selfId.HasValue && selfId.Value != report.StudentId)
+            throw new UserFriendlyException(AssessmentExceptionCodes.ReportNotFound, "Report not found.");
+
+        // MOB-BE-04: a parent may only read their own children's report subject entries.
+        var childIds = await _currentParent.GetCurrentChildStudentIdsAsync();
+        if (childIds != null && !childIds.Contains(report.StudentId))
             throw new UserFriendlyException(AssessmentExceptionCodes.ReportNotFound, "Report not found.");
 
         var items = await _reportSubjectRepository
