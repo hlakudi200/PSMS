@@ -21,4 +21,11 @@ public class LearningMaterialListDto : EntityDto<Guid>
     /// the teacher portal's storage-quota approximation per LM-007.
     /// </summary>
     public long? FileSizeBytes { get; set; }
+    /// <summary>
+    /// Public URL of the current file version; null for ExternalLink-only
+    /// materials. Lets list views offer a "View" action without a second
+    /// round trip to GetAsync.
+    /// </summary>
+    public string FileUrl { get; set; }
+    public string ExternalLink { get; set; }
 }

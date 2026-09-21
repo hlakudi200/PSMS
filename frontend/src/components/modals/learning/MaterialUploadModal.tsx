@@ -94,7 +94,11 @@ const MAX_TAG_LENGTH = 30;
 const uploadSchema = z
   .object({
     classSubjectId: z.string().min(1, 'Class & subject is required'),
-    gradeId: z.string().min(1, 'Grade is required'),
+    // Not required: Class & subject already implies a grade
+    // (ClassSubject -> Class.GradeId on the backend), and this field isn't
+    // persisted yet anyway (see the backend TODO doc) — it's confirmatory,
+    // not load-bearing.
+    gradeId: z.string().optional(),
     termId: z.string().min(1, 'Term is required'),
     title: z.string().min(5, 'Title must be at least 5 characters').max(200),
     description: z
@@ -113,11 +117,17 @@ const uploadSchema = z
       .array(z.string().min(1).max(MAX_TAG_LENGTH, `Each tag must be ${MAX_TAG_LENGTH} characters or fewer`))
       .max(MAX_TAGS, `Up to ${MAX_TAGS} tags allowed`)
       .optional(),
+    // Day-granularity, not exact-instant: a fixed grace window still fails
+    // once enough time passes between picking "Now" and actually
+    // submitting (filling in the rest of the form, uploading a file, etc).
+    // Time-of-day is only meaningful for a genuinely future calendar day;
+    // for "today" any time is accepted — matches the picker's own
+    // disabledDate, which already only blocks days before today.
     scheduledPublishDate: z
       .string()
       .optional()
-      .refine((v) => !v || new Date(v) > new Date(), {
-        message: 'Scheduled date must be in the future',
+      .refine((v) => !v || !dayjs(v).isBefore(dayjs(), 'day'), {
+        message: "Scheduled date can't be in the past",
       }),
     notifyStudents: z.boolean().optional(),
   })
@@ -145,7 +155,7 @@ export const MaterialUploadModal: React.FC<MaterialUploadModalProps> = ({
   const [form] = Form.useForm();
   const { uploadAsync, requestUploadUrlAsync, uploadFileToStorageAsync } =
     useLearningMaterialActions();
-  const { grades } = useGradeState();
+  const { activeGrades } = useGradeState();
   const { getActiveGradesAsync } = useGradeActions();
   const { academicYear } = useAcademicYearState();
   const { getCurrentAsync: getCurrentAcademicYearAsync } = useAcademicYearActions();
@@ -180,8 +190,8 @@ export const MaterialUploadModal: React.FC<MaterialUploadModalProps> = ({
   );
 
   const gradeOptions = useMemo(
-    () => (grades ?? []).map((g) => ({ value: g.id, label: g.gradeName })),
-    [grades]
+    () => (activeGrades ?? []).map((g) => ({ value: g.id, label: g.gradeName })),
+    [activeGrades]
   );
 
   const termOptions = useMemo(
@@ -321,12 +331,17 @@ export const MaterialUploadModal: React.FC<MaterialUploadModalProps> = ({
           />
         </Form.Item>
 
-        <Form.Item label="Grade" name="gradeId" rules={[{ required: true }]}>
+        <Form.Item
+          label="Grade"
+          name="gradeId"
+          tooltip="Optional — already implied by the class & subject you selected above."
+        >
           <Select
             options={gradeOptions}
-            placeholder="Select grade"
+            placeholder="Select grade (optional)"
             showSearch
             optionFilterProp="label"
+            allowClear
           />
         </Form.Item>
 
@@ -470,7 +485,8 @@ export const MaterialUploadModal: React.FC<MaterialUploadModalProps> = ({
           tooltip="Not saved yet — see the notice above."
         >
           <DatePicker
-            showTime
+            showTime={{ format: 'HH:mm' }}
+            format="YYYY-MM-DD HH:mm"
             style={{ width: '100%' }}
             disabledDate={(d) => !!d && d.isBefore(dayjs(), 'day')}
             placeholder="Publish immediately"

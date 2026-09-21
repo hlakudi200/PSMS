@@ -1,13 +1,28 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Form, Input, InputNumber, Modal, Select, Skeleton, message } from 'antd';
+import {
+  Divider,
+  Form,
+  Input,
+  InputNumber,
+  Modal,
+  Select,
+  Skeleton,
+  Typography,
+  Upload,
+  message,
+} from 'antd';
+import type { UploadFile } from 'antd';
+import { CloudUploadOutlined } from '@ant-design/icons';
 import { z } from 'zod';
 import {
   useLearningMaterialActions,
   useLearningMaterialState,
 } from '@/providers/learning/learning_materials';
 import type { ILearningMaterialList } from '@/providers/learning/shared/interfaces';
+
+const { Text } = Typography;
 
 // LearningMaterialType mirror — keep aligned with backend
 // psms.Domain.Shared.Enums.LearningMaterialType.
@@ -43,7 +58,10 @@ const editSchema = z.object({
     .min(10, 'Description must be at least 10 characters')
     .max(1000),
   materialType: z.number().min(1).max(8),
-  externalLink: z.string().max(500).optional(),
+  // The backend returns `null` (not omitted) for materials with no link —
+  // `.optional()` alone only accepts `undefined`, so a hydrated form with
+  // no link would fail validation and block every save.
+  externalLink: z.string().max(500).nullable().optional(),
   displayOrder: z.number().min(0).optional(),
 });
 
@@ -59,12 +77,20 @@ export const MaterialEditModal: React.FC<MaterialEditModalProps> = ({
   editRecord,
 }) => {
   const [form] = Form.useForm();
-  const { getAsync, updateAsync } = useLearningMaterialActions();
+  const {
+    getAsync,
+    updateAsync,
+    requestVersionUploadUrlAsync,
+    uploadFileToStorageAsync,
+    uploadNewVersionAsync,
+  } = useLearningMaterialActions();
   const {
     learningMaterial,
     isPending: detailPending,
   } = useLearningMaterialState();
   const [loading, setLoading] = useState(false);
+  const [replaceFileList, setReplaceFileList] = useState<UploadFile[]>([]);
+  const [replaceChangeDescription, setReplaceChangeDescription] = useState('');
 
   // Open: fire the GetAsync that loads the full material DTO. The list
   // DTO that arrives in `editRecord` doesn't include description /
@@ -72,6 +98,8 @@ export const MaterialEditModal: React.FC<MaterialEditModalProps> = ({
   useEffect(() => {
     if (open && editRecord) {
       form.resetFields();
+      setReplaceFileList([]);
+      setReplaceChangeDescription('');
       getAsync(editRecord.id);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -98,32 +126,62 @@ export const MaterialEditModal: React.FC<MaterialEditModalProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, editRecord?.id, learningMaterial?.id]);
 
+  // Save handles both metadata and, if a replacement file was picked, the
+  // file swap — one "Save changes" click does everything rather than
+  // requiring a second, separate upload action. The file swap creates a
+  // new version (preserves history / LM-003) rather than overwriting
+  // FileUrl directly — same path the version history drawer uses.
   const handleSubmit = async () => {
     if (!editRecord) return;
+    const values = form.getFieldsValue();
+    const result = editSchema.safeParse(values);
+    if (!result.success) {
+      form.setFields(
+        result.error.issues.map((err) => ({
+          name: err.path as string[],
+          errors: [err.message],
+        }))
+      );
+      return;
+    }
+
+    const replacementFile = replaceFileList[0]?.originFileObj as File | undefined;
+
+    setLoading(true);
     try {
-      const values = form.getFieldsValue();
-      const result = editSchema.safeParse(values);
-      if (!result.success) {
-        form.setFields(
-          result.error.issues.map((err) => ({
-            name: err.path as string[],
-            errors: [err.message],
-          }))
-        );
-        return;
-      }
-      setLoading(true);
       await updateAsync(editRecord.id, {
         title: result.data.title.trim(),
         description: result.data.description,
         materialType: result.data.materialType,
-        externalLink: result.data.externalLink,
+        externalLink: result.data.externalLink ?? undefined,
         displayOrder: result.data.displayOrder,
       });
-      message.success('Material updated');
+
+      if (replacementFile) {
+        const ticket = await requestVersionUploadUrlAsync({
+          learningMaterialId: editRecord.id,
+          fileName: replacementFile.name,
+        });
+        await uploadFileToStorageAsync(ticket.uploadUrl, replacementFile);
+        await uploadNewVersionAsync({
+          learningMaterialId: editRecord.id,
+          changeDescription: replaceChangeDescription.trim() || undefined,
+          objectKey: ticket.objectKey,
+          fileName: replacementFile.name,
+        });
+      }
+
+      message.success(replacementFile ? 'Material updated and file replaced' : 'Material updated');
+      setReplaceFileList([]);
+      setReplaceChangeDescription('');
       onClose(true);
-    } catch {
-      // Server errors surfaced by the axios response interceptor.
+    } catch (err) {
+      // The direct-to-storage PUT uses fetch, not axios, so its failure
+      // isn't caught by the axios interceptor — surface it here. Axios
+      // errors (with .response) are already shown by the interceptor.
+      if (!(err as { response?: unknown })?.response) {
+        message.error((err as Error)?.message || 'Save failed. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
@@ -175,6 +233,45 @@ export const MaterialEditModal: React.FC<MaterialEditModalProps> = ({
             <InputNumber min={0} style={{ width: '100%' }} />
           </Form.Item>
         </Form>
+
+        {learningMaterial?.materialType !== LearningMaterialType.ExternalLink && (
+          <>
+            <Divider style={{ marginTop: 8 }} />
+            <Text strong style={{ display: 'block', marginBottom: 8 }}>
+              Replace file
+            </Text>
+            <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 8 }}>
+              Pick a file below and it&apos;s uploaded as a new version — older
+              versions stay available in Version history — when you press
+              Save changes. Leave this empty to keep the current file.
+            </Text>
+            <Upload.Dragger
+              multiple={false}
+              maxCount={1}
+              fileList={replaceFileList}
+              beforeUpload={() => false}
+              onChange={(info) => setReplaceFileList(info.fileList)}
+              onRemove={() => setReplaceFileList([])}
+              style={{ marginBottom: 8 }}
+            >
+              <p className="ant-upload-drag-icon">
+                <CloudUploadOutlined />
+              </p>
+              <p className="ant-upload-text" style={{ fontSize: 13 }}>
+                Click or drag the replacement file here
+              </p>
+            </Upload.Dragger>
+            {replaceFileList.length > 0 && (
+              <Input.TextArea
+                rows={2}
+                placeholder="What changed? (optional, up to 500 characters)"
+                maxLength={500}
+                value={replaceChangeDescription}
+                onChange={(e) => setReplaceChangeDescription(e.target.value)}
+              />
+            )}
+          </>
+        )}
       </div>
     </Modal>
   );

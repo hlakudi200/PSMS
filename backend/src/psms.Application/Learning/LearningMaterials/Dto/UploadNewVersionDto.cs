@@ -14,10 +14,9 @@ public class UploadNewVersionDto
     public Guid LearningMaterialId { get; set; }
 
     /// <summary>
-    /// Required teacher-supplied note describing what changed (LM-003).
+    /// Optional teacher-supplied note describing what changed (LM-003).
     /// </summary>
-    [Required]
-    [StringLength(500, MinimumLength = 5)]
+    [StringLength(500)]
     public string ChangeDescription { get; set; }
 
     /// <summary>
