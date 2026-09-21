@@ -44,6 +44,8 @@ import {
   useClassSubjectActions,
   useClassSubjectState,
 } from '@/providers/academic/class_subjects';
+import { GradeProvider } from '@/providers/academic/grades';
+import { AcademicYearProvider } from '@/providers/academic/academic_years';
 import {
   LearningMaterialProvider,
   useLearningMaterialActions,
@@ -625,9 +627,13 @@ export default function TeacherMaterialsPageContent() {
   return (
     <TeacherProvider>
       <ClassSubjectProvider>
-        <LearningMaterialProvider>
-          <TeacherMaterialsContent />
-        </LearningMaterialProvider>
+        <GradeProvider>
+          <AcademicYearProvider>
+            <LearningMaterialProvider>
+              <TeacherMaterialsContent />
+            </LearningMaterialProvider>
+          </AcademicYearProvider>
+        </GradeProvider>
       </ClassSubjectProvider>
     </TeacherProvider>
   );
