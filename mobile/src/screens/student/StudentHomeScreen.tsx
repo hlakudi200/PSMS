@@ -1,12 +1,16 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text } from "react-native";
+import { router } from "expo-router";
+import { Badge, Button, Card, Screen } from "../../components";
+import { colors, spacing, typography } from "../../theme";
 import { useAuthActions, useAuthState } from "../../providers/auth";
 
 export function StudentHomeScreen() {
   const { currentUser } = useAuthState();
   const { signOut } = useAuthActions();
-  return <View style={styles.container}><Text style={styles.overline}>STUDENT PORTAL</Text><Text style={styles.title}>Welcome{currentUser?.name ? `, ${currentUser.name}` : ""}</Text><Text style={styles.copy}>Your student dashboard will appear here.</Text><Pressable accessibilityRole="button" onPress={() => void signOut()} style={styles.signOut}><Text style={styles.signOutText}>Sign out</Text></Pressable></View>;
+  const handleSignOut = async () => { await signOut(); router.dismissAll(); router.replace("/(auth)/login"); };
+  return <Screen><Badge label="STUDENT PORTAL" /><Text style={styles.title}>Welcome{currentUser?.name ? `, ${currentUser.name}` : ""}</Text><Text style={styles.copy}>Your timetable, learning, and marks are one tap away.</Text><Card><Text style={styles.cardTitle}>Getting started</Text><Text style={styles.cardCopy}>Use the tabs below to view your school day and learning progress as features become available.</Text></Card><Button onPress={() => void handleSignOut()}>Sign out</Button></Screen>;
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: "center", padding: 28 }, overline: { color: "#0066cc", fontSize: 12, fontWeight: "800", letterSpacing: 1.3 }, title: { color: "#262626", fontSize: 30, fontWeight: "800", marginTop: 10 }, copy: { color: "#595959", fontSize: 16, marginTop: 10 }, signOut: { alignSelf: "flex-start", marginTop: 28, paddingVertical: 8 }, signOutText: { color: "#0066cc", fontSize: 16, fontWeight: "800" },
+  title: { color: colors.text, fontSize: typography.title, fontWeight: "800", marginTop: spacing.lg }, copy: { color: colors.textMuted, fontSize: typography.body, lineHeight: 24, marginTop: spacing.sm, marginBottom: spacing.xl }, cardTitle: { color: colors.text, fontSize: 18, fontWeight: "800" }, cardCopy: { color: colors.textMuted, fontSize: 15, lineHeight: 22, marginTop: spacing.sm },
 });
