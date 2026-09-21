@@ -72,7 +72,6 @@ function ReportsContent() {
   const {
     getAllAsync,
     submitForApprovalAsync,
-    approveAsync,
     publishAsync,
     generatePdfAsync,
     bulkGeneratePdfsAsync,
@@ -187,20 +186,14 @@ function ReportsContent() {
       },
     },
     {
-      key: 'approve',
-      label: 'Approve',
+      key: 'openApproval',
+      label: 'Open approval',
       icon: <CheckCircleOutlined />,
-      visible: (record) => record.status === ReportStatus.PendingApproval,
-      confirm: { title: 'Approve this report card?', description: 'The report will be ready for publication.' },
-      onClick: async (record) => {
-        try {
-          await approveAsync(record.id);
-          message.success('Report approved');
-          refreshData();
-        } catch {
-          // Surfaced by axios interceptor
-        }
-      },
+      // RC-09: approval happens only in the workflow, so this opens the step
+      // rather than approving here. There is no direct-approve endpoint.
+      visible: (record) => !!record.activeWorkflowInstanceId,
+      onClick: (record) =>
+        router.push(`${portalBase}/workflow/instances/${record.activeWorkflowInstanceId}`),
     },
     {
       key: 'publish',
@@ -279,19 +272,6 @@ function ReportsContent() {
           return;
         }
         await runParallel(eligible, submitForApprovalAsync, 'sent for approval', 'failed');
-      },
-    },
-    {
-      key: 'bulkApprove',
-      label: 'Approve Selected',
-      confirm: { title: 'Approve all selected reports?' },
-      onClick: async (rows) => {
-        const eligible = rows.filter((r) => r.status === ReportStatus.PendingApproval);
-        if (eligible.length === 0) {
-          message.warning('No reports in "Pending Approval" status selected');
-          return;
-        }
-        await runParallel(eligible, approveAsync, 'approved', 'failed');
       },
     },
     {

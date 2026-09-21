@@ -58,10 +58,11 @@ public static class AssessmentExceptionCodes
     public const string ReportNotPublished = "ASM_REPORT_NOT_PUBLISHED";
 
     /// <summary>
-    /// A direct approval was attempted while the report's approval workflow is
-    /// still running. The reviewer's step has to be answered instead.
+    /// A report was submitted for approval in a school with no active report
+    /// approval workflow. Approval only happens through the engine, so there
+    /// would be nobody to review it.
     /// </summary>
-    public const string ReportInApprovalWorkflow = "ASM_REPORT_IN_APPROVAL_WORKFLOW";
+    public const string NoApprovalWorkflowConfigured = "ASM_NO_APPROVAL_WORKFLOW_CONFIGURED";
     public const string MaxMarksReductionInvalid = "ASM_MAX_MARKS_REDUCTION_INVALID";
 
     // ReportSubject

@@ -28,10 +28,6 @@ export enum ReportActionEnums {
   submitForApprovalSuccess = "SUBMIT_FOR_APPROVAL_SUCCESS",
   submitForApprovalError = "SUBMIT_FOR_APPROVAL_ERROR",
 
-  approveReportPending = "APPROVE_REPORT_PENDING",
-  approveReportSuccess = "APPROVE_REPORT_SUCCESS",
-  approveReportError = "APPROVE_REPORT_ERROR",
-
   publishReportPending = "PUBLISH_REPORT_PENDING",
   publishReportSuccess = "PUBLISH_REPORT_SUCCESS",
   publishReportError = "PUBLISH_REPORT_ERROR",
@@ -182,26 +178,6 @@ export const submitForApprovalError = createAction<IReportStateContext>(
   () => ({ isPending: false, isSuccess: false, isError: true })
 );
 
-// Approve Report Actions
-export const approveReportPending = createAction<IReportStateContext>(
-  ReportActionEnums.approveReportPending,
-  () => ({ isPending: true, isSuccess: false, isError: false })
-);
-
-export const approveReportSuccess = createAction<IReportStateContext, IReport>(
-  ReportActionEnums.approveReportSuccess,
-  (report: IReport) => ({
-    isPending: false,
-    isSuccess: true,
-    isError: false,
-    report,
-  })
-);
-
-export const approveReportError = createAction<IReportStateContext>(
-  ReportActionEnums.approveReportError,
-  () => ({ isPending: false, isSuccess: false, isError: true })
-);
 
 // Publish Report Actions
 export const publishReportPending = createAction<IReportStateContext>(

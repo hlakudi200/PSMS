@@ -67,18 +67,6 @@ export const ReportReducer = handleActions<
       ...state,
       ...action.payload,
     }),
-    [ReportActionEnums.approveReportPending]: (state, action) => ({
-      ...state,
-      ...action.payload,
-    }),
-    [ReportActionEnums.approveReportSuccess]: (state, action) => ({
-      ...state,
-      ...action.payload,
-    }),
-    [ReportActionEnums.approveReportError]: (state, action) => ({
-      ...state,
-      ...action.payload,
-    }),
     [ReportActionEnums.publishReportPending]: (state, action) => ({
       ...state,
       ...action.payload,

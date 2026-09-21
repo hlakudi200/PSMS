@@ -306,6 +306,12 @@ export interface IReport {
   promotedToGradeName?: string;
   pdfUrl?: string;
   subjectReports: IReportSubject[];
+  /**
+   * RC-09. Set while an approval workflow is running for this report. The direct
+   * Approve action is refused server-side while it is set, so the UI links to the
+   * approval instead of offering a button that can only fail.
+   */
+  activeWorkflowInstanceId?: string;
 }
 
 export interface IReportList {
@@ -328,6 +334,8 @@ export interface IReportList {
   academicYearName?: string;
   pdfUrl?: string;
   subjectCount: number;
+  /** RC-09: see IReport.activeWorkflowInstanceId. */
+  activeWorkflowInstanceId?: string;
 }
 
 export interface IGenerateReport {
