@@ -36,6 +36,10 @@ export interface IAuthStateContext {
   currentTenant?: ITenant;
   jwtToken?: string;
   currentRole?: MobileRole;
+  /** The caller's own Student.Id (Guid) — resolved once for a Student-role session; every student screen needs this to scope its own reads. */
+  currentStudentId?: string;
+  /** The caller's own CurrentClassId (Guid) — for class-scoped reads (e.g. this term's assessment list). */
+  currentClassId?: string;
 }
 
 export interface IAuthActionContext {
