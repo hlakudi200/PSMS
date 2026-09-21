@@ -52,6 +52,7 @@ export const AssessmentQuestionProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getQuestionError());
+        throw error;
       });
   };
 
@@ -68,6 +69,7 @@ export const AssessmentQuestionProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getByAssessmentError());
+        throw error;
       });
   };
 
@@ -82,6 +84,7 @@ export const AssessmentQuestionProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(createQuestionError());
+        throw error;
       });
   };
 
@@ -96,6 +99,7 @@ export const AssessmentQuestionProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(updateQuestionError());
+        throw error;
       });
   };
 
@@ -110,6 +114,7 @@ export const AssessmentQuestionProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(deleteQuestionError());
+        throw error;
       });
   };
 
@@ -124,6 +129,7 @@ export const AssessmentQuestionProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(reorderError());
+        throw error;
       });
   };
 
