@@ -7,6 +7,7 @@ import {
 } from "./context";
 import {
   IBulkGenerateReportPdfsInput,
+  IBulkGenerateReports,
   IGenerateReport,
   IGetReportsInput,
   IReportComment,
@@ -56,6 +57,12 @@ import {
   bulkGeneratePdfsPending,
   bulkGeneratePdfsSuccess,
   bulkGeneratePdfsError,
+  previewBulkGeneratePending,
+  previewBulkGenerateSuccess,
+  previewBulkGenerateError,
+  bulkGenerateReportsPending,
+  bulkGenerateReportsSuccess,
+  bulkGenerateReportsError,
 } from "./actions";
 
 export const ReportProvider = ({
@@ -283,6 +290,38 @@ export const ReportProvider = ({
       });
   };
 
+  // RC-01: shows what a bulk run would do without writing anything, so the
+  // actor can see who is blocked before committing to a whole class.
+  const previewBulkGenerateAsync = async (input: IBulkGenerateReports) => {
+    dispatch(previewBulkGeneratePending());
+    const endpoint = `/api/services/app/Report/PreviewBulkGenerate`;
+    await instance
+      .post(endpoint, input)
+      .then((response) => {
+        dispatch(previewBulkGenerateSuccess(response.data.result));
+      })
+      .catch((error) => {
+        console.error(error);
+        dispatch(previewBulkGenerateError());
+        throw error;
+      });
+  };
+
+  const bulkGenerateAsync = async (input: IBulkGenerateReports) => {
+    dispatch(bulkGenerateReportsPending());
+    const endpoint = `/api/services/app/Report/BulkGenerate`;
+    await instance
+      .post(endpoint, input)
+      .then((response) => {
+        dispatch(bulkGenerateReportsSuccess(response.data.result));
+      })
+      .catch((error) => {
+        console.error(error);
+        dispatch(bulkGenerateReportsError());
+        throw error;
+      });
+  };
+
   const deleteAsync = async (id: string) => {
     dispatch(deleteReportPending());
     const endpoint = `/api/services/app/Report/Delete?id=${id}`;
@@ -316,6 +355,8 @@ export const ReportProvider = ({
           deleteAsync,
           generatePdfAsync,
           bulkGeneratePdfsAsync,
+          previewBulkGenerateAsync,
+          bulkGenerateAsync,
         }}
       >
         {children}

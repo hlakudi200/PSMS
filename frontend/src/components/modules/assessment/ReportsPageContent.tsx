@@ -10,9 +10,16 @@ import {
   EyeOutlined,
   FilePdfOutlined,
   DownloadOutlined,
+  FileAddOutlined,
 } from '@ant-design/icons';
 import { EnterpriseTable } from '@/components/shared/enterprise-table';
-import type { ColumnConfig, TableQuery, RowAction, BulkAction } from '@/components/shared/enterprise-table';
+import type {
+  ColumnConfig,
+  TableQuery,
+  RowAction,
+  BulkAction,
+  ToolbarAction,
+} from '@/components/shared/enterprise-table';
 import { ReportProvider, useReportState, useReportActions } from '@/providers/assessment/reports';
 import { AcademicYearProvider, useAcademicYearState, useAcademicYearActions } from '@/providers/academic/academic_years';
 import { TermProvider, useTermState, useTermActions } from '@/providers/academic/terms';
@@ -204,6 +211,9 @@ function ReportsContent() {
         try {
           await generatePdfAsync(record.id);
           message.success('PDF generation started');
+          // The job writes pdfUrl asynchronously; refresh so the row stops
+          // offering to generate a PDF it has already been asked for.
+          refreshData();
         } catch {
           // Surfaced by axios interceptor
         }
@@ -262,7 +272,11 @@ function ReportsContent() {
     {
       key: 'bulkGeneratePdfs',
       label: 'Generate All PDFs',
-      confirm: { title: 'Generate PDFs for all reports matching current filters?' },
+      confirm: {
+        title: 'Generate PDFs for every class on this page?',
+        // Deliberately narrower than "matching current filters": classIds below
+        // are derived from the loaded page, not from the whole result set.
+      },
       onClick: async () => {
         if (!selectedAcademicYearId) {
           message.warning('Please select an academic year first');
@@ -288,6 +302,19 @@ function ReportsContent() {
           message.warning(`PDF generation: ${ok} class(es) started; ${fail} failed.`);
         }
       },
+    },
+  ];
+
+  // RC-02: the entry point to generation. Until this existed there was no way
+  // to create a report card from the application at all.
+  const toolbarActions: ToolbarAction[] = [
+    {
+      key: 'generateReports',
+      label: 'Generate report cards',
+      icon: <FileAddOutlined />,
+      type: 'primary',
+      onClick: () => router.push(`${portalBase}/reports/generate`),
+      requiredPermissions: ['Admin', 'Principal', 'VicePrincipal', 'HOD'],
     },
   ];
 
@@ -368,6 +395,7 @@ function ReportsContent() {
         rowKey="id"
         rowActions={rowActions}
         bulkActions={bulkActions}
+        toolbarActions={toolbarActions}
         selectionMode="multi"
         currentUserRole={currentRole}
         exportConfig={{
