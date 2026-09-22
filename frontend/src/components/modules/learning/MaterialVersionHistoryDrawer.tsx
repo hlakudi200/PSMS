@@ -145,8 +145,13 @@ export const MaterialVersionHistoryDrawer: React.FC<
     }
   };
 
+  // Video versions store a private object key (view-only), not a link, so
+  // only real http(s) URLs are downloadable here.
+  const isDownloadable = (version: ILearningMaterialVersion) =>
+    !!version.fileUrl && /^https?:\/\//i.test(version.fileUrl);
+
   const handleDownload = (version: ILearningMaterialVersion) => {
-    if (version.fileUrl) {
+    if (isDownloadable(version)) {
       window.open(version.fileUrl, '_blank', 'noopener,noreferrer');
     } else {
       message.info('This version has no downloadable file.');
@@ -283,7 +288,7 @@ export const MaterialVersionHistoryDrawer: React.FC<
                     size="small"
                     icon={<DownloadOutlined />}
                     onClick={() => handleDownload(v)}
-                    disabled={!v.fileUrl}
+                    disabled={!isDownloadable(v)}
                     aria-label={`Download v${v.versionNumber}`}
                   >
                     Download

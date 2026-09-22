@@ -63,6 +63,9 @@ export interface ILearningMaterialActionContext {
   publishAsync: (id: string) => void;
   unpublishAsync: (id: string) => void;
   incrementViewCountAsync: (id: string) => void;
+  // Video materials live in a private bucket: fetch a short-lived signed URL
+  // to stream one (view-only). Undefined when the caller may not watch it.
+  getVideoUrlAsync: (id: string) => Promise<string | undefined>;
   // T-T07 Versioning. `getVersionsAsync` populates `versions` in state;
   // `uploadNewVersionAsync` returns Promise<void> so the modal can await
   // it and only fire the success toast on actual success.

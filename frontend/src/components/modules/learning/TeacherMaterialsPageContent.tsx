@@ -32,6 +32,7 @@ import {
   ReloadOutlined,
   SendOutlined,
   UploadOutlined,
+  VideoCameraAddOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { useAuthState } from '@/providers/auth';
@@ -55,12 +56,16 @@ import {
 import type { IClassSubjectList } from '@/providers/academic/shared/interfaces';
 import type { ILearningMaterialList } from '@/providers/learning/shared/interfaces';
 import { MaterialUploadModal } from '@/components/modals/learning/MaterialUploadModal';
+import { VideoPlayerModal } from '@/components/modals/learning/VideoPlayerModal';
 import { MaterialEditModal } from '@/components/modals/learning/MaterialEditModal';
 import { MaterialVersionHistoryDrawer } from '@/components/modules/learning/MaterialVersionHistoryDrawer';
 
 const { Title, Text } = Typography;
 
 // Keep in sync with backend psms.Domain.Shared.Enums.LearningMaterialType.
+// Backend LearningMaterialType.Video — stored privately, streamed only.
+const VIDEO_MATERIAL_TYPE = 2;
+
 const materialTypeLabels: Record<number, { label: string; color: string }> = {
   1: { label: 'Document', color: 'blue' },
   2: { label: 'Video', color: 'purple' },
@@ -98,6 +103,9 @@ function formatBytes(value: number): string {
 function TeacherMaterialsContent() {
   const { currentUser } = useAuthState();
   const [uploadOpen, setUploadOpen] = useState(false);
+  const [videoUploadOpen, setVideoUploadOpen] = useState(false);
+  // Video materials play in-page from a short-lived signed URL.
+  const [playing, setPlaying] = useState<{ title: string; src: string } | null>(null);
   const [editOpen, setEditOpen] = useState(false);
   const [editRecord, setEditRecord] = useState<ILearningMaterialList | null>(null);
   const [versionsOpen, setVersionsOpen] = useState(false);
@@ -137,6 +145,7 @@ function TeacherMaterialsContent() {
     unpublishAsync,
     deleteAsync,
     incrementViewCountAsync,
+    getVideoUrlAsync,
   } = useLearningMaterialActions();
   const {
     learningMaterials,
@@ -229,7 +238,19 @@ function TeacherMaterialsContent() {
   const usedFraction = totalBytes / TEACHER_STORAGE_QUOTA_BYTES;
   const overQuotaWarning = usedFraction >= QUOTA_WARNING_THRESHOLD;
 
-  const handleView = (record: ILearningMaterialList) => {
+  const handleView = async (record: ILearningMaterialList) => {
+    // Video files are private (view-only for students), so there is no
+    // public URL to open; stream through a signed URL instead.
+    if (record.materialType === VIDEO_MATERIAL_TYPE && record.fileUrl) {
+      const src = await getVideoUrlAsync(record.id);
+      if (!src) {
+        message.error('This video could not be loaded.');
+        return;
+      }
+      setPlaying({ title: record.title, src });
+      incrementViewCountAsync(record.id);
+      return;
+    }
     const url = record.fileUrl || record.externalLink;
     if (!url) {
       message.info('This material has no file or link to view yet.');
@@ -464,6 +485,13 @@ function TeacherMaterialsContent() {
             />
           </Tooltip>
           <Button
+            icon={<VideoCameraAddOutlined />}
+            disabled={!hasClassSubjects || loading}
+            onClick={() => setVideoUploadOpen(true)}
+          >
+            Upload Video
+          </Button>
+          <Button
             type="primary"
             icon={<UploadOutlined />}
             disabled={!hasClassSubjects || loading}
@@ -645,6 +673,23 @@ function TeacherMaterialsContent() {
           if (refresh) refreshMaterials();
         }}
         classSubjects={classSubjects ?? []}
+      />
+
+      <MaterialUploadModal
+        open={videoUploadOpen}
+        videoOnly
+        onClose={(refresh) => {
+          setVideoUploadOpen(false);
+          if (refresh) refreshMaterials();
+        }}
+        classSubjects={classSubjects ?? []}
+      />
+
+      <VideoPlayerModal
+        open={!!playing}
+        title={playing?.title}
+        src={playing?.src}
+        onClose={() => setPlaying(null)}
       />
 
       <MaterialEditModal

@@ -277,6 +277,17 @@ export const LearningMaterialProvider = ({
         });
     };
 
+  const getVideoUrlAsync = async (id: string): Promise<string | undefined> => {
+    const endpoint = `/api/services/app/LearningMaterial/GetVideoUrl?id=${id}`;
+    try {
+      const response = await instance.get(endpoint);
+      return response.data.result as string;
+    } catch (error) {
+      console.error(error);
+      return undefined;
+    }
+  };
+
   // ── T-T07 Versioning ───────────────────────────────────────────────
 
   const getVersionsAsync = async (learningMaterialId: string) => {
@@ -345,6 +356,7 @@ export const LearningMaterialProvider = ({
           publishAsync,
           unpublishAsync,
           incrementViewCountAsync,
+          getVideoUrlAsync,
           getVersionsAsync,
           uploadNewVersionAsync,
           restoreVersionAsync,

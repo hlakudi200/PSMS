@@ -41,6 +41,12 @@ public interface ILearningMaterialAppService : IApplicationService
     Task IncrementViewCountAsync(Guid id);
 
     /// <summary>
+    /// Short-lived signed URL to stream a video material (view-only; video
+    /// files are kept in a private bucket).
+    /// </summary>
+    Task<string> GetVideoUrlAsync(Guid id);
+
+    /// <summary>
     /// Lists the version history for a single learning material, newest
     /// first. Used by the teacher portal's version-history drawer.
     /// </summary>
