@@ -31,6 +31,12 @@ namespace psms.Assessment.Reports;
 [AbpAuthorize(PermissionNames.Assessment_ReportCards)]
 public class ReportAppService : ApplicationService, IReportAppService
 {
+    /// <summary>
+    /// How long a report-card download link stays valid. Long enough to click
+    /// and save, short enough that a forwarded link is worthless.
+    /// </summary>
+    private const int PdfLinkLifetimeSeconds = 300;
+
     private readonly IRepository<Report, Guid> _reportRepository;
     private readonly IRepository<ReportSubject, Guid> _reportSubjectRepository;
     private readonly IRepository<Student, Guid> _studentRepository;
@@ -41,6 +47,7 @@ public class ReportAppService : ApplicationService, IReportAppService
     private readonly IRepository<ClassSubject, Guid> _classSubjectRepository;
     private readonly IRepository<AssessmentEntity, Guid> _assessmentRepository;
     private readonly IRepository<Attendance, Guid> _attendanceRepository;
+    private readonly psms.Domain.Shared.Storage.IFileStorageService _fileStorage;
     private readonly IBackgroundJobManager _backgroundJobManager;
     private readonly psms.Academic.Students.ICurrentStudentResolver _currentStudent;
     private readonly psms.Academic.Parents.ICurrentParentResolver _currentParent;
@@ -57,6 +64,7 @@ public class ReportAppService : ApplicationService, IReportAppService
         IRepository<ClassSubject, Guid> classSubjectRepository,
         IRepository<AssessmentEntity, Guid> assessmentRepository,
         IRepository<Attendance, Guid> attendanceRepository,
+        psms.Domain.Shared.Storage.IFileStorageService fileStorage,
         IBackgroundJobManager backgroundJobManager,
         psms.Academic.Students.ICurrentStudentResolver currentStudent,
         psms.Academic.Parents.ICurrentParentResolver currentParent,
@@ -72,6 +80,7 @@ public class ReportAppService : ApplicationService, IReportAppService
         _classSubjectRepository = classSubjectRepository;
         _assessmentRepository = assessmentRepository;
         _attendanceRepository = attendanceRepository;
+        _fileStorage = fileStorage;
         _backgroundJobManager = backgroundJobManager;
         _currentStudent = currentStudent;
         _currentParent = currentParent;
@@ -870,6 +879,30 @@ public class ReportAppService : ApplicationService, IReportAppService
         await _reportRepository.UpdateAsync(report);
         await CurrentUnitOfWork.SaveChangesAsync();
 
+        // RC-03: publishing is the moment a parent can see the report, and a
+        // report card with nothing to download is not much of a report card.
+        // Nothing else produced the PDF — not generate, not approve — so a
+        // report could reach Published with PdfUrl null. Enqueue it here if it
+        // has not been produced, and let a failure be a background-job failure
+        // rather than a blocked publish.
+        if (!report.HasPdf())
+        {
+            try
+            {
+                await _backgroundJobManager.EnqueueAsync<GenerateReportPdfJob, GenerateReportPdfJobArgs>(
+                    new GenerateReportPdfJobArgs
+                    {
+                        ReportId = report.Id,
+                        TenantId = AbpSession.TenantId,
+                        UserId = AbpSession.UserId ?? 0
+                    });
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn($"Could not enqueue the report PDF for {report.Id} on publish: {ex.Message}");
+            }
+        }
+
         return await GetAsync(id);
     }
 
@@ -921,8 +954,14 @@ public class ReportAppService : ApplicationService, IReportAppService
             throw new UserFriendlyException(AssessmentExceptionCodes.ReportNotFound, "Report not found.");
 
         // MOB-BE-04: a parent may only acknowledge their own children's reports.
+        // RC-11: and only a parent may acknowledge at all. The field records
+        // that the PARENT saw the report; a teacher or principal ticking it on
+        // their behalf makes the record say something that did not happen.
         var childIds = await _currentParent.GetCurrentChildStudentIdsAsync();
-        if (childIds != null && !childIds.Contains(report.StudentId))
+        if (childIds == null)
+            throw new UserFriendlyException(AssessmentExceptionCodes.NotTheParent,
+                "Only a parent linked to this learner can acknowledge their report.");
+        if (!childIds.Contains(report.StudentId))
             throw new UserFriendlyException(AssessmentExceptionCodes.ReportNotFound, "Report not found.");
 
         // Parent can only acknowledge a published report
@@ -1029,7 +1068,15 @@ public class ReportAppService : ApplicationService, IReportAppService
         return reportIds.Count;
     }
 
-    [AbpAuthorize(PermissionNames.Assessment_ReportCards_View)]
+    /// <summary>
+    /// A short-lived signed link to the report's PDF.
+    /// <para>
+    /// RC-11: gated on Download, not View. The permission was declared, seeded
+    /// to six roles and checked nowhere, which made it read like a control that
+    /// did not exist.
+    /// </para>
+    /// </summary>
+    [AbpAuthorize(PermissionNames.Assessment_ReportCards_Download)]
     public async Task<string> GetReportPdfUrlAsync(Guid id)
     {
         var report = await _reportRepository
@@ -1048,7 +1095,20 @@ public class ReportAppService : ApplicationService, IReportAppService
         if (childIds != null && !childIds.Contains(report.StudentId))
             throw new UserFriendlyException(AssessmentExceptionCodes.ReportNotFound, "Report not found.");
 
-        return report.PdfUrl;
+        if (!report.HasPdf())
+            throw new UserFriendlyException(AssessmentExceptionCodes.PdfNotGenerated,
+                "No PDF has been generated for this report yet.");
+
+        // RC-04: mint a short-lived signed URL rather than handing back a
+        // durable link. The file itself is private, so the URL is the only way
+        // in and it expires.
+        var objectKey = report.ResolvePdfObjectKey(_fileStorage.DefaultBucketName);
+        if (string.IsNullOrWhiteSpace(objectKey))
+            throw new UserFriendlyException(AssessmentExceptionCodes.PdfNotGenerated,
+                "No PDF has been generated for this report yet.");
+
+        return await _fileStorage.CreateSignedDownloadUrlAsync(
+            _fileStorage.DefaultBucketName, objectKey, PdfLinkLifetimeSeconds);
     }
 
     private static CapsAchievementLevel CalculateAchievementLevel(decimal percentage)

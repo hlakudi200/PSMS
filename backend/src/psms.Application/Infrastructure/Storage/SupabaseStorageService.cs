@@ -23,9 +23,23 @@ public class SupabaseStorageService : IFileStorageService
         _configuration = configuration;
     }
 
+    /// <inheritdoc />
+    public string DefaultBucketName => GetConfig().BucketName;
+
     public Task<string> UploadAsync(string path, byte[] data, string contentType)
         => UploadAsync(GetConfig().BucketName, path, data, contentType);
 
+    /// <summary>
+    /// Uploads bytes and returns the object key, NOT a URL.
+    /// <para>
+    /// These objects are private. They used to be written with
+    /// <c>S3CannedACL.PublicRead</c> and the caller stored the resulting
+    /// permanent public link — which, for report cards, meant a named child's
+    /// full academic record was readable by anyone with the URL, forever, with
+    /// no authentication. Callers now keep the key and mint a short-lived
+    /// signed URL per request via <see cref="CreateSignedDownloadUrlAsync"/>.
+    /// </para>
+    /// </summary>
     public async Task<string> UploadAsync(string bucket, string path, byte[] data, string contentType)
     {
         var config = GetConfig();
@@ -39,12 +53,11 @@ public class SupabaseStorageService : IFileStorageService
             Key = path,
             InputStream = stream,
             ContentType = contentType,
-            CannedACL = S3CannedACL.PublicRead,
         };
 
         await client.PutObjectAsync(request);
 
-        return $"{config.PublicUrl}/{bucket}/{path}";
+        return path;
     }
 
     public Task DeleteAsync(string path)

@@ -154,6 +154,18 @@ namespace psms.Domain.Assessment.Entities
         [StringLength(2048)]
         public string PdfUrl { get; set; }
 
+        /// <summary>
+        /// Storage key of the generated PDF. A short-lived signed URL is minted
+        /// from this per request; nothing durable points at the file.
+        /// <para>
+        /// Replaces <see cref="PdfUrl"/>, which held a permanent public link.
+        /// That column is kept only so reports generated before the change can
+        /// still resolve — their key is derived from it on read.
+        /// </para>
+        /// </summary>
+        [StringLength(1024)]
+        public string PdfObjectKey { get; set; }
+
         // Navigation Properties
         [ForeignKey(nameof(StudentId))]
         public virtual Student Student { get; set; }
@@ -280,6 +292,44 @@ namespace psms.Domain.Assessment.Entities
         public void SetPdfUrl(string url)
         {
             PdfUrl = url;
+        }
+
+        /// <summary>
+        /// Records where the generated PDF lives. A signed URL is minted from
+        /// this per request, so nothing durable points at the file.
+        /// </summary>
+        public void SetPdfObjectKey(string objectKey)
+        {
+            PdfObjectKey = objectKey;
+        }
+
+        /// <summary>Whether a PDF has been produced for this report.</summary>
+        public bool HasPdf()
+        {
+            return !string.IsNullOrWhiteSpace(PdfObjectKey)
+                || !string.IsNullOrWhiteSpace(PdfUrl);
+        }
+
+        /// <summary>
+        /// Where this report's PDF lives in storage, or null if it has none.
+        /// <para>
+        /// Reports generated before RC-04 stored a permanent public URL shaped
+        /// <c>{publicUrl}/{bucket}/{key}</c> instead of the key. Rather than
+        /// migrate those rows, the key is recovered from the URL here, so an
+        /// old report downloads through the same signed-URL path as a new one.
+        /// </para>
+        /// </summary>
+        public string ResolvePdfObjectKey(string bucketName)
+        {
+            if (!string.IsNullOrWhiteSpace(PdfObjectKey))
+                return PdfObjectKey;
+
+            if (string.IsNullOrWhiteSpace(PdfUrl) || string.IsNullOrWhiteSpace(bucketName))
+                return null;
+
+            var marker = "/" + bucketName + "/";
+            var at = PdfUrl.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
+            return at >= 0 ? PdfUrl.Substring(at + marker.Length) : null;
         }
 
         /// <summary>

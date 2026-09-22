@@ -36,6 +36,12 @@ export interface IReportActionContext {
   recordPromotionAsync: (id: string, decision: number, promotedToGradeId?: string) => void;
   deleteAsync: (id: string) => void;
   generatePdfAsync: (id: string) => void;
+  /**
+   * Returns a short-lived signed link. Deliberately returns the value instead
+   * of putting it in state: it expires in minutes and must not be cached or
+   * re-rendered from (RC-04).
+   */
+  getPdfUrlAsync: (id: string) => Promise<string | undefined>;
   bulkGeneratePdfsAsync: (input: IBulkGenerateReportPdfsInput) => void;
   previewBulkGenerateAsync: (input: IBulkGenerateReports) => void;
   bulkGenerateAsync: (input: IBulkGenerateReports) => void;

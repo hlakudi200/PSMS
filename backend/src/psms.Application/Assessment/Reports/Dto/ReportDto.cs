@@ -34,7 +34,6 @@ public class ReportDto : FullAuditedEntityDto<Guid>
     public DateTime? PublishedDate { get; set; }
     public long? ApprovedByUserId { get; set; }
     public DateTime? ApprovedDate { get; set; }
-    public string PdfUrl { get; set; }
 
     // Flattened
     public string StudentName { get; set; }
@@ -57,4 +56,11 @@ public class ReportDto : FullAuditedEntityDto<Guid>
     /// </para>
     /// </summary>
     public Guid? ActiveWorkflowInstanceId { get; set; }
+
+    /// <summary>
+    /// Whether a PDF has been generated. The link itself is not exposed: it is
+    /// minted per request and short-lived, so callers ask
+    /// Report/GetReportPdfUrl when the user actually clicks download (RC-04).
+    /// </summary>
+    public bool HasPdf { get; set; }
 }

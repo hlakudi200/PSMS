@@ -366,6 +366,7 @@ function ReportDetailContent() {
     publishAsync,
     addPrincipalCommentAsync,
     generatePdfAsync,
+    getPdfUrlAsync,
   } = useReportActions();
 
   const [principalComment, setPrincipalComment] = useState('');
@@ -445,13 +446,13 @@ function ReportDetailContent() {
     }
   };
 
-  // Stop polling when pdfUrl becomes available
+  // Stop polling once the PDF exists
   useEffect(() => {
-    if (report?.pdfUrl && pdfGenerating) {
+    if (report?.hasPdf && pdfGenerating) {
       setPdfGenerating(false);
       message.success('PDF is ready for download');
     }
-  }, [report?.pdfUrl, pdfGenerating]);
+  }, [report?.hasPdf, pdfGenerating]);
 
   if (isPending && !report) {
     return (
@@ -673,11 +674,18 @@ function ReportDetailContent() {
         <Button icon={<PrinterOutlined />} onClick={handlePrint}>
           Print Report Card
         </Button>
-        {report.pdfUrl ? (
+        {report.hasPdf ? (
           <Button
             type="primary"
             icon={<DownloadOutlined />}
-            onClick={() => window.open(report.pdfUrl, '_blank')}
+            onClick={async () => {
+                  try {
+                    const url = await getPdfUrlAsync(reportId);
+                    if (url) window.open(url, '_blank', 'noopener,noreferrer');
+                  } catch {
+                    // Surfaced by the axios error interceptor.
+                  }
+                }}
           >
             Download PDF
           </Button>
