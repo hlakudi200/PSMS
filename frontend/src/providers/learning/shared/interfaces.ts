@@ -177,6 +177,8 @@ export interface IPagedAndSortedResultRequest {
     recurrencePattern?: string;
     className?: string;
     subjectName?: string;
+    // Pre-lesson materials (US-TCH-004). Present on Get, not on list rows.
+    materials?: IOnlineLessonMaterial[];
   }
   
   export interface IOnlineLessonList {
@@ -193,6 +195,15 @@ export interface IPagedAndSortedResultRequest {
     subjectName?: string;
   }
   
+  /** A learning material attached to a lesson; id is the material's id. */
+  export interface IOnlineLessonMaterial {
+    id: string;
+    title: string;
+    materialType: number;
+    fileName?: string;
+    externalLink?: string;
+  }
+
   export interface ICreateOnlineLesson {
     classSubjectId: string;
     title: string;
@@ -207,14 +218,20 @@ export interface IPagedAndSortedResultRequest {
     scheduledEndTime: string;
     isRecurring: boolean;
     recurrencePattern?: string;
+    materialIds?: string[];
   }
   
   export interface IUpdateOnlineLesson {
+    // Only sent when changed. Switching to an external platform needs meetingLink.
+    classSubjectId?: string;
+    platform?: number;
     title?: string;
     description?: string;
     meetingLink?: string;
     meetingId?: string;
     meetingPassword?: string;
+    // Replaces the attached materials; omit to leave them unchanged.
+    materialIds?: string[];
   }
   
   export interface IGetOnlineLessonsInput extends IPagedAndSortedResultRequest {

@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using psms.EntityFrameworkCore;
@@ -11,9 +12,11 @@ using psms.EntityFrameworkCore;
 namespace psms.Migrations
 {
     [DbContext(typeof(psmsDbContext))]
-    partial class psmsDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260922194625_AddOnlineLessonMaterials")]
+    partial class AddOnlineLessonMaterials
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -3870,55 +3873,6 @@ namespace psms.Migrations
                     b.HasIndex("AssessmentId");
 
                     b.ToTable("AssessmentQuestions");
-                });
-
-            modelBuilder.Entity("psms.Domain.Assessment.Entities.AssessmentWeighting", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("Band")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime>("CreationTime")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<long?>("CreatorUserId")
-                        .HasColumnType("bigint");
-
-                    b.Property<long?>("DeleterUserId")
-                        .HasColumnType("bigint");
-
-                    b.Property<DateTime?>("DeletionTime")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int>("ExamPercentage")
-                        .HasColumnType("integer");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
-
-                    b.Property<DateTime?>("LastModificationTime")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<long?>("LastModifierUserId")
-                        .HasColumnType("bigint");
-
-                    b.Property<int>("SbaPercentage")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("TenantId")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("TenantId", "Band")
-                        .IsUnique()
-                        .HasDatabaseName("IX_AssessmentWeightings_TenantId_Band")
-                        .HasFilter("\"IsDeleted\" = false");
-
-                    b.ToTable("AssessmentWeightings");
                 });
 
             modelBuilder.Entity("psms.Domain.Assessment.Entities.Mark", b =>

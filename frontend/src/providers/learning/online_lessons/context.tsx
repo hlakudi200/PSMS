@@ -34,13 +34,15 @@ export interface IOnlineLessonActionContext {
   getAllAsync: (input?: IGetOnlineLessonsInput) => void;
   getByClassSubjectAsync: (classSubjectId: string) => void;
   getUpcomingAsync: () => void;
-  createAsync: (input: ICreateOnlineLesson) => void;
-  updateAsync: (id: string, input: IUpdateOnlineLesson) => void;
+  // Create/update/reschedule re-throw so the modal only reports success
+  // when the server accepted the change.
+  createAsync: (input: ICreateOnlineLesson) => Promise<void>;
+  updateAsync: (id: string, input: IUpdateOnlineLesson) => Promise<void>;
   deleteAsync: (id: string) => void;
   startAsync: (id: string) => void;
   endAsync: (id: string, attendeeCount: number) => void;
   cancelAsync: (id: string) => void;
-  rescheduleAsync: (id: string, input: IRescheduleOnlineLesson) => void;
+  rescheduleAsync: (id: string, input: IRescheduleOnlineLesson) => Promise<void>;
   addRecordingAsync: (id: string, input: IAddRecording) => void;
   // SF-02 direct upload. Step 1: get a signed URL. Step 2: PUT the bytes
   // straight to storage. Step 3: record the object key.

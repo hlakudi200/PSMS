@@ -37,8 +37,11 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
     private readonly IRepository<Student, Guid> _studentRepository;
     private readonly IRepository<User, long> _userRepository;
     private readonly IRepository<LiveClassAttendance, Guid> _attendanceRepository;
+    private readonly IRepository<OnlineLessonMaterial, Guid> _lessonMaterialRepository;
+    private readonly IRepository<LearningMaterial, Guid> _learningMaterialRepository;
     private readonly IFileStorageService _fileStorage;
     private readonly ILiveKitTokenService _liveKit;
+    private readonly OnlineLessonNotifier _notifier;
 
     // Supabase bucket for lesson recordings (public-read, like materials).
     // Supabase bucket for lesson recordings — PRIVATE (LC-06). Object keys are
@@ -46,13 +49,13 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
     private const string RecordingsBucket = "recordings";
 
     // OL-001 scheduling guard rails. All times are in UTC; the school-hours
-    // window is converted from 07:00-17:00 South Africa Standard Time (SAST,
-    // UTC+02:00 year-round, no DST).
-    private const int MinAdvanceHours = 24;
+    // window is converted from 07:00-14:00 South Africa Standard Time (SAST,
+    // UTC+02:00 year-round, no DST). Lessons can be booked for any day from
+    // tomorrow (SAST) onwards, never for the current day.
     private const int MinDurationMinutes = 30;
     private const int MaxDurationMinutes = 180;
     private const int SchoolStartHourSast = 7;
-    private const int SchoolEndHourSast = 17;
+    private const int SchoolEndHourSast = 14;
     private static readonly TimeSpan SastOffset = TimeSpan.FromHours(2);
     // OL-006 host-window guard: teachers can Start a lesson at most 15
     // minutes before its scheduled start. Joining earlier would surprise
@@ -68,8 +71,11 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
         IRepository<Student, Guid> studentRepository,
         IRepository<User, long> userRepository,
         IRepository<LiveClassAttendance, Guid> attendanceRepository,
+        IRepository<OnlineLessonMaterial, Guid> lessonMaterialRepository,
+        IRepository<LearningMaterial, Guid> learningMaterialRepository,
         IFileStorageService fileStorage,
-        ILiveKitTokenService liveKit)
+        ILiveKitTokenService liveKit,
+        OnlineLessonNotifier notifier)
     {
         _onlineLessonRepository = onlineLessonRepository;
         _classSubjectRepository = classSubjectRepository;
@@ -77,8 +83,11 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
         _studentRepository = studentRepository;
         _userRepository = userRepository;
         _attendanceRepository = attendanceRepository;
+        _lessonMaterialRepository = lessonMaterialRepository;
+        _learningMaterialRepository = learningMaterialRepository;
         _fileStorage = fileStorage;
         _liveKit = liveKit;
+        _notifier = notifier;
     }
 
     [AbpAuthorize(PermissionNames.Learning_Lessons_View)]
@@ -118,7 +127,9 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
             }
         }
 
-        return ObjectMapper.Map<OnlineLessonDto>(lesson);
+        var dto = ObjectMapper.Map<OnlineLessonDto>(lesson);
+        dto.Materials = await GetLessonMaterialsAsync(lesson.Id);
+        return dto;
     }
 
     [AbpAuthorize(PermissionNames.Learning_Lessons_View)]
@@ -238,6 +249,9 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
         var teacherId = await ResolveCurrentTeacherIdOrThrowAsync();
         await EnsureTeacherOwnsClassSubjectAsync(input.ClassSubjectId, teacherId);
 
+        input.ScheduledStartTime = ToUtc(input.ScheduledStartTime);
+        input.ScheduledEndTime = ToUtc(input.ScheduledEndTime);
+
         // In-app (LiveKit) live classes are hosted inside PSMS — no external
         // meeting URL. The MeetingLink column is NOT NULL, so we store a
         // derived in-app join route. External platforms still require a real,
@@ -262,6 +276,8 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
             input.ScheduledEndTime,
             excludeLessonId: null);
 
+        var materialIds = await ValidateLessonMaterialsOrThrowAsync(input.MaterialIds, input.ClassSubjectId);
+
         var lesson = new OnlineLesson(
             lessonId,
             AbpSession.TenantId,
@@ -281,6 +297,11 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
         };
 
         await _onlineLessonRepository.InsertAsync(lesson);
+        foreach (var materialId in materialIds)
+        {
+            await _lessonMaterialRepository.InsertAsync(
+                new OnlineLessonMaterial(Guid.NewGuid(), AbpSession.TenantId, lesson.Id, materialId));
+        }
         try
         {
             await CurrentUnitOfWork.SaveChangesAsync();
@@ -290,6 +311,10 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
             throw new UserFriendlyException(LearningExceptionCodes.LessonOverlapsExisting,
                 "This time slot was just booked by another request. Please retry.");
         }
+
+        // Queued inside the same transaction, so a reminder only exists if
+        // the lesson does.
+        await _notifier.ScheduleRemindersAsync(lesson);
 
         // Commit the inner UoW so the Serializable transaction we opened
         // above is closed before we fetch the lesson back for the DTO.
@@ -307,17 +332,57 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
             throw new UserFriendlyException(LearningExceptionCodes.CannotUpdateNonScheduledLesson,
                 "Only scheduled lessons can be updated.");
 
+        // Moving the lesson to another class-subject (fixing a wrong pick):
+        // the teacher must teach the new one and the slot must be free there.
+        var classSubjectChanged = input.ClassSubjectId.HasValue
+                                  && input.ClassSubjectId.Value != lesson.ClassSubjectId;
+        if (classSubjectChanged)
+        {
+            var teacherId = await ResolveCurrentTeacherIdOrThrowAsync();
+            await EnsureTeacherOwnsClassSubjectAsync(input.ClassSubjectId.Value, teacherId);
+            await EnsureNoOverlapOrThrowAsync(
+                input.ClassSubjectId.Value, lesson.ScheduledStartTime, lesson.ScheduledEndTime, lesson.Id);
+            // Swap the loaded navigation along with the FK so EF doesn't
+            // reconcile the two back to the old class-subject.
+            lesson.ClassSubject = await _classSubjectRepository.GetAsync(input.ClassSubjectId.Value);
+            lesson.ClassSubjectId = input.ClassSubjectId.Value;
+        }
+
         if (input.Title != null) lesson.Title = input.Title.Trim();
         if (input.Description != null) lesson.Description = input.Description;
-        // Apply the same scheme whitelist on update — the iter-2 review
-        // surfaced an XSS path via Update→handleJoin→window.open(link).
-        if (input.MeetingLink != null)
+
+        var platform = input.Platform ?? lesson.Platform;
+        if (platform == OnlinePlatform.InApp)
         {
-            ValidateMeetingLinkOrThrow(input.MeetingLink);
-            lesson.MeetingLink = input.MeetingLink;
+            // In-app classes are hosted inside PSMS: the join route is derived
+            // from the lesson id and there are no external credentials.
+            lesson.MeetingLink = $"/live-class/{lesson.Id}";
+            lesson.MeetingId = null;
+            lesson.MeetingPassword = null;
         }
-        if (input.MeetingId != null) lesson.MeetingId = input.MeetingId;
-        if (input.MeetingPassword != null) lesson.MeetingPassword = input.MeetingPassword;
+        else
+        {
+            // Apply the same scheme whitelist on update — the iter-2 review
+            // surfaced an XSS path via Update→handleJoin→window.open(link).
+            // Switching away from in-app must supply a real meeting link.
+            if (input.MeetingLink != null || lesson.Platform == OnlinePlatform.InApp)
+            {
+                ValidateMeetingLinkOrThrow(input.MeetingLink);
+                lesson.MeetingLink = input.MeetingLink;
+            }
+            if (input.MeetingId != null) lesson.MeetingId = input.MeetingId;
+            if (input.MeetingPassword != null) lesson.MeetingPassword = input.MeetingPassword;
+        }
+        lesson.Platform = platform;
+
+        // Materials belong to a class-subject, so a class change revalidates
+        // them against the new one (or drops them when none were sent).
+        if (input.MaterialIds != null || classSubjectChanged)
+        {
+            var materialIds = await ValidateLessonMaterialsOrThrowAsync(
+                input.MaterialIds ?? new List<Guid>(), lesson.ClassSubjectId);
+            await ReplaceLessonMaterialsAsync(lesson.Id, materialIds);
+        }
 
         await _onlineLessonRepository.UpdateAsync(lesson);
         await CurrentUnitOfWork.SaveChangesAsync();
@@ -469,6 +534,16 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
 
         var lesson = await LoadOwnedLessonOrThrowAsync(id);
 
+        // The domain method would also accept a Cancelled lesson and leave it
+        // cancelled at the new time, which students would never hear about.
+        if (lesson.Status != OnlineLessonStatus.Scheduled)
+            throw new UserFriendlyException(LearningExceptionCodes.InvalidLessonStatusTransition,
+                "Only scheduled lessons can be rescheduled.");
+
+        var previousStart = lesson.ScheduledStartTime;
+        input.NewStartTime = ToUtc(input.NewStartTime);
+        input.NewEndTime = ToUtc(input.NewEndTime);
+
         // Same OL-001 guard rails as scheduling, applied to the new times.
         // Exclude `id` from overlap detection so a lesson moved forward 30
         // minutes is not flagged as colliding with itself.
@@ -496,6 +571,15 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
         {
             throw new UserFriendlyException(LearningExceptionCodes.LessonOverlapsExisting,
                 "This time slot was just booked by another request. Please retry.");
+        }
+
+        // A silent move is worse than a cancellation: tell the students, and
+        // queue reminders for the new time. Reminders queued for the old time
+        // see the changed start when they fire and do nothing.
+        if (lesson.ScheduledStartTime != previousStart)
+        {
+            await _notifier.NotifyRescheduledAsync(lesson, lesson.ClassSubject, previousStart);
+            await _notifier.ScheduleRemindersAsync(lesson);
         }
 
         await uow.CompleteAsync();
@@ -1095,8 +1179,8 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
     }
 
     /// <summary>
-    /// Enforces OL-001 scheduling rules: start strictly after now+24h,
-    /// times within 07:00-17:00 SAST, duration between 30 and 180 minutes,
+    /// Enforces OL-001 scheduling rules: start on a later SAST day than today,
+    /// times within 07:00-14:00 SAST, duration between 30 and 180 minutes,
     /// and no overlap with any other scheduled lesson on the same
     /// class-subject (excluding <paramref name="excludeLessonId"/>, used
     /// when rescheduling a lesson onto its own slot ± a few minutes).
@@ -1111,9 +1195,13 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
             throw new UserFriendlyException(LearningExceptionCodes.InvalidLessonTimes,
                 "End time must be after start time.");
 
-        if (scheduledStartUtc < DateTime.UtcNow.AddHours(MinAdvanceHours))
+        // No same-day bookings: the lesson's SAST date must be after today's
+        // SAST date. Tomorrow at 07:00 is fine even if it is booked tonight.
+        var startSast = scheduledStartUtc + SastOffset;
+        var todaySast = (DateTime.UtcNow + SastOffset).Date;
+        if (startSast.Date <= todaySast)
             throw new UserFriendlyException(LearningExceptionCodes.LessonTooSoon,
-                $"Lessons must be scheduled at least {MinAdvanceHours} hours in advance.");
+                "Lessons can't be scheduled for today. Pick tomorrow or a later day.");
 
         var durationMinutes = (int)(scheduledEndUtc - scheduledStartUtc).TotalMinutes;
         if (durationMinutes < MinDurationMinutes || durationMinutes > MaxDurationMinutes)
@@ -1121,12 +1209,11 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
                 $"Lesson duration must be between {MinDurationMinutes} and {MaxDurationMinutes} minutes.");
 
         // School-hours window: convert each UTC instant to SAST and assert
-        // it falls within [07:00, 17:00]. Inclusive at the end so a
-        // 16:00-17:00 lesson is admitted; 16:30-17:30 is rejected.
+        // it falls within [07:00, 14:00]. Inclusive at the end so a
+        // 13:00-14:00 lesson is admitted; 13:30-14:30 is rejected.
         // Comparing TimeSpan-vs-TimeSpan avoids floating-point brittleness
-        // on the boundary that a `TotalHours > 17.0` check has when the
+        // on the boundary that a `TotalHours > 14.0` check has when the
         // input has any sub-minute component.
-        var startSast = scheduledStartUtc + SastOffset;
         var endSast = scheduledEndUtc + SastOffset;
         var schoolStart = TimeSpan.FromHours(SchoolStartHourSast);
         var schoolEnd = TimeSpan.FromHours(SchoolEndHourSast);
@@ -1139,10 +1226,22 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
                 $"Lessons must be scheduled within school hours ({SchoolStartHourSast:D2}:00-{SchoolEndHourSast:D2}:00 SAST) on a single day.");
         }
 
-        // Overlap check: any *active* (not cancelled / not completed)
-        // lesson on the same class-subject whose [start, end) intersects
-        // [scheduledStart, scheduledEnd). Cancelled/completed rows are
-        // ignored — they cannot be revived in place.
+        await EnsureNoOverlapOrThrowAsync(classSubjectId, scheduledStartUtc, scheduledEndUtc, excludeLessonId);
+    }
+
+    /// <summary>
+    /// Overlap check: any *active* (not cancelled / not completed) lesson on
+    /// the class-subject whose [start, end) intersects [scheduledStart,
+    /// scheduledEnd). Cancelled/completed rows are ignored — they cannot be
+    /// revived in place. Also used on its own when a lesson moves to another
+    /// class-subject without changing its time.
+    /// </summary>
+    private async Task EnsureNoOverlapOrThrowAsync(
+        Guid classSubjectId,
+        DateTime scheduledStartUtc,
+        DateTime scheduledEndUtc,
+        Guid? excludeLessonId)
+    {
         var overlapQuery = _onlineLessonRepository
             .GetAll()
             .Where(ol => ol.TenantId == AbpSession.TenantId
@@ -1158,6 +1257,77 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
         if (hasOverlap)
             throw new UserFriendlyException(LearningExceptionCodes.LessonOverlapsExisting,
                 "This time slot overlaps an existing lesson on this class-subject. Pick a different slot.");
+    }
+
+    /// <summary>
+    /// Model binding under ABP's default clock hands us Local-kind values for
+    /// the client's "…Z" timestamps. Every OL-001 check and the reminder
+    /// delays assume UTC, so on a server not running in UTC they drift by the
+    /// local offset. Unspecified is taken as UTC, per the API contract.
+    /// </summary>
+    private static DateTime ToUtc(DateTime value)
+        => value.Kind == DateTimeKind.Local
+            ? value.ToUniversalTime()
+            : DateTime.SpecifyKind(value, DateTimeKind.Utc);
+
+    /// <summary>
+    /// Pre-lesson materials must be published materials on the lesson's own
+    /// class-subject, so a student is never pointed at something they can't
+    /// open. Returns the distinct ids to attach.
+    /// </summary>
+    private async Task<List<Guid>> ValidateLessonMaterialsOrThrowAsync(List<Guid> materialIds, Guid classSubjectId)
+    {
+        var ids = (materialIds ?? new List<Guid>()).Distinct().ToList();
+        if (ids.Count == 0)
+            return ids;
+
+        var validCount = await _learningMaterialRepository
+            .GetAll()
+            .CountAsync(m => ids.Contains(m.Id)
+                          && m.TenantId == AbpSession.TenantId
+                          && m.ClassSubjectId == classSubjectId
+                          && m.IsPublished);
+        if (validCount != ids.Count)
+            throw new UserFriendlyException(LearningExceptionCodes.InvalidLessonMaterials,
+                "Pre-lesson materials must be published materials for this class and subject.");
+
+        return ids;
+    }
+
+    private async Task ReplaceLessonMaterialsAsync(Guid lessonId, List<Guid> materialIds)
+    {
+        var existing = await _lessonMaterialRepository
+            .GetAll()
+            .Where(m => m.OnlineLessonId == lessonId)
+            .ToListAsync();
+
+        foreach (var row in existing.Where(r => !materialIds.Contains(r.LearningMaterialId)))
+            await _lessonMaterialRepository.DeleteAsync(row);
+
+        var existingIds = existing.Select(r => r.LearningMaterialId).ToHashSet();
+        foreach (var materialId in materialIds.Where(mid => !existingIds.Contains(mid)))
+        {
+            await _lessonMaterialRepository.InsertAsync(
+                new OnlineLessonMaterial(Guid.NewGuid(), AbpSession.TenantId, lessonId, materialId));
+        }
+    }
+
+    private async Task<List<OnlineLessonMaterialDto>> GetLessonMaterialsAsync(Guid lessonId)
+    {
+        // Soft-deleted materials drop out through the global filter on the join.
+        return await _lessonMaterialRepository
+            .GetAll()
+            .Where(m => m.OnlineLessonId == lessonId && m.LearningMaterial != null)
+            .OrderBy(m => m.LearningMaterial.Title)
+            .Select(m => new OnlineLessonMaterialDto
+            {
+                Id = m.LearningMaterialId,
+                Title = m.LearningMaterial.Title,
+                MaterialType = m.LearningMaterial.MaterialType,
+                FileName = m.LearningMaterial.FileName,
+                ExternalLink = m.LearningMaterial.ExternalLink,
+            })
+            .ToListAsync();
     }
 
     #endregion

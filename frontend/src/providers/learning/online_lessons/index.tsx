@@ -160,6 +160,7 @@ export const OnlineLessonProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(createOnlineLessonError());
+        throw error;
       });
   };
 
@@ -174,6 +175,7 @@ export const OnlineLessonProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(updateOnlineLessonError());
+        throw error;
       });
   };
 
@@ -237,13 +239,14 @@ export const OnlineLessonProvider = ({
     dispatch(rescheduleOnlineLessonPending());
     const endpoint = `/api/services/app/OnlineLesson/Reschedule?id=${id}`;
     await instance
-        .put(endpoint, input)
+        .post(endpoint, input)
         .then((response) => {
             dispatch(rescheduleOnlineLessonSuccess(response.data.result));
         })
         .catch((error) => {
             console.error(error);
             dispatch(rescheduleOnlineLessonError());
+            throw error;
         });
     };
 
