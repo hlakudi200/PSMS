@@ -124,6 +124,48 @@ public class ReportPdfBrandingRenderTests
     }
 
     [Fact]
+    public void A_grade_twelve_card_says_the_examination_is_external()
+    {
+        // RC-15. The mark shown is the 25% school-based component; the NSC paper
+        // is set and marked by the Department. A card that presents that as an
+        // unqualified final mark is claiming an NSC result it does not have.
+        var data = SampleData("#0066CC", null);
+        data.ReportType = "Year-End Report";
+        foreach (var subject in data.Subjects)
+            subject.AwaitsExternalExamination = true;
+
+        var pdf = ReportPdfGenerator.Generate(data);
+        WriteSample("report-grade-12.pdf", pdf);
+
+        var text = PdfText.Extract(pdf);
+
+        Assert.Contains("School-based assessment component only", text);
+        Assert.Contains("National Senior Certificate", text);
+    }
+
+    [Fact]
+    public void The_text_on_the_card_can_be_read_back_out_of_the_file()
+    {
+        // The font's "ti" ligature is one glyph whose ToUnicode entry is
+        // U+0000, so the card drew correctly and extracted as "Posi on",
+        // "Substan al", "Na onal" — uncopyable, unsearchable, and wrong to a
+        // screen reader. Ligatures are off for that reason; this is the guard.
+        var text = PdfText.Extract(ReportPdfGenerator.Generate(SampleData("#0066CC", null)));
+
+        Assert.Contains("Substantial", text);
+        Assert.Contains("Position", text);
+        Assert.Contains("Meritorious", text);
+    }
+
+    [Fact]
+    public void An_ordinary_card_carries_no_external_examination_note()
+    {
+        var text = PdfText.Extract(ReportPdfGenerator.Generate(SampleData("#0066CC", null)));
+
+        Assert.DoesNotContain("School-based assessment component only", text);
+    }
+
+    [Fact]
     public void A_malformed_colour_does_not_throw()
     {
         // Defensive: branding is validated on the way in, but a report card must

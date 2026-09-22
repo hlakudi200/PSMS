@@ -137,6 +137,12 @@ public class ReportSubjectAppService : ApplicationService, IReportSubjectAppServ
 
         reportSubject.RecordMarks(input.TermMark, input.ExamMark, input.TermWeight, input.ExamWeight);
 
+        // RC-15: a year-end card's marks are promotion marks, whole numbers
+        // under NPPPPR §31(3) — including one captured by hand, or this subject
+        // would show 74.67 beside siblings showing 75.
+        if (reportSubject.Report.ReportType == ReportType.YearEnd)
+            reportSubject.RoundToPromotionMark();
+
         if (input.TeacherComment != null)
             reportSubject.TeacherComment = input.TeacherComment;
 
@@ -190,6 +196,10 @@ public class ReportSubjectAppService : ApplicationService, IReportSubjectAppServ
                     $"The term and examination weights must add to 100%. Got {subjectMark.TermWeight:0.##}% and {subjectMark.ExamWeight:0.##}%.");
 
             reportSubject.RecordMarks(subjectMark.TermMark, subjectMark.ExamMark, subjectMark.TermWeight, subjectMark.ExamWeight);
+
+            // RC-15: see RecordMarksAsync — a year-end mark is a whole number.
+            if (report.ReportType == ReportType.YearEnd)
+                reportSubject.RoundToPromotionMark();
 
             if (subjectMark.TeacherComment != null)
                 reportSubject.TeacherComment = subjectMark.TeacherComment;

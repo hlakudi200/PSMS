@@ -44,6 +44,24 @@ public static class ReportPdfGenerator
             ? value.Value.ToString("F1", System.Globalization.CultureInfo.InvariantCulture)
             : "-";
 
+    /// <summary>
+    /// RC-15. Marks a final mark that is the School-Based Assessment component
+    /// only, because the examination is external.
+    /// </summary>
+    private const string ExternalExamMarker = " †";
+
+    /// <summary>
+    /// What that marker means, printed under the table. NPPPPR §31(1): in Grade
+    /// 12 the school-based assessment is 25% of the total mark and the external
+    /// assessment 75%, and the external paper is set and marked by the
+    /// Department of Basic Education, not by the school.
+    /// </summary>
+    private const string ExternalExamNote =
+        "† School-based assessment component only. The National Senior Certificate "
+        + "examination is set and marked externally by the Department of Basic Education "
+        + "and is not included in this mark. The final result is issued on the "
+        + "Department's statement of results.";
+
     /// <summary>Largest logo we will place in the header, in points.</summary>
     private const float LogoMaxHeight = 52f;
     private const float LogoMaxWidth = 150f;
@@ -142,7 +160,15 @@ public static class ReportPdfGenerator
                 page.Size(PageSizes.A4);
                 page.MarginVertical(30);
                 page.MarginHorizontal(25);
-                page.DefaultTextStyle(x => x.FontSize(10));
+                // Ligatures off, for every text style on the page. The font's
+                // "ti" ligature is one glyph that the embedded ToUnicode map
+                // points at U+0000, so the text drew correctly and came back out
+                // of the file as "Posi on", "Substan al", "Na onal". A report
+                // card is a document people copy from, search, and read with a
+                // screen reader; verified against two independent extractors.
+                page.DefaultTextStyle(x => x
+                    .FontSize(10)
+                    .DisableFontFeature(FontFeatures.StandardLigatures));
 
                 page.Header().Element(c => ComposeHeader(c, data));
                 page.Content().Element(c => ComposeContent(c, data));
@@ -209,6 +235,18 @@ public static class ReportPdfGenerator
 
             // ── Subject Table ──
             column.Item().Element(c => ComposeSubjectTable(c, data));
+
+            // ── RC-15: what the dagger means, when anything carries one ──
+            if (data.Subjects.Any(s => s.AwaitsExternalExamination))
+            {
+                column.Item().Height(4);
+                // Deliberately not italic: the italic face's "ti" ligature
+                // carries no usable mapping, so copying the note out of the PDF
+                // — or reading it with a screen reader — turns "National" into
+                // "Na onal".
+                column.Item().Text(ExternalExamNote).FontSize(7.5f).FontColor(Colors.Grey.Darken2);
+            }
+
             column.Item().Height(10);
 
             // ── Attendance ──
@@ -312,7 +350,11 @@ public static class ReportPdfGenerator
                 table.Cell().Element(DataCellStyle).Text(s.SubjectCode ?? "-").FontSize(9);
                 table.Cell().Element(DataCellStyle).AlignCenter().Text(Mark(s.TermMark)).FontSize(9);
                 table.Cell().Element(DataCellStyle).AlignCenter().Text(Mark(s.ExamMark)).FontSize(9);
-                table.Cell().Element(DataCellStyle).AlignCenter().Text(Mark(s.FinalMark)).SemiBold().FontSize(9);
+                table.Cell().Element(DataCellStyle).AlignCenter()
+                    // RC-15: the dagger marks a mark that is the school-based
+                    // component only, explained in the note under the table.
+                    .Text(s.AwaitsExternalExamination ? Mark(s.FinalMark) + ExternalExamMarker : Mark(s.FinalMark))
+                    .SemiBold().FontSize(9);
                 table.Cell().Element(DataCellStyle).AlignCenter().Text(Level(s.AchievementLevel)).FontSize(9);
                 // RC-06: the class comparison. Blank until the cohort pass has
                 // run, rather than a zero that reads as a class average of 0%.

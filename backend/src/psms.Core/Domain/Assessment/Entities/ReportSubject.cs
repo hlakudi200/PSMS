@@ -96,6 +96,18 @@ namespace psms.Domain.Assessment.Entities
         [Column(TypeName = "decimal(5,2)")]
         public decimal ExamWeight { get; set; } = 60;
 
+        /// <summary>
+        /// RC-15. The mark on this row is the School-Based Assessment component
+        /// only, because the examination for this subject is set and marked
+        /// outside the school and has not happened here — Grade 12's National
+        /// Senior Certificate paper (NPPPPR §31(1)).
+        /// <para>
+        /// The card has to say so. A 25% SBA mark presented as a final mark
+        /// reads as an NSC result and is not one.
+        /// </para>
+        /// </summary>
+        public bool AwaitsExternalExamination { get; set; }
+
         // Navigation Properties
         [ForeignKey(nameof(ReportId))]
         public virtual Report Report { get; set; }
@@ -159,6 +171,11 @@ namespace psms.Domain.Assessment.Entities
             TermWeight = termWeight;
             ExamWeight = examWeight;
 
+            // Marks recorded directly are the school's own, whatever they were
+            // before. Leaving the flag set would print "the examination is not
+            // included in this mark" beside a mark that now includes one.
+            AwaitsExternalExamination = false;
+
             // Calculate final mark. Clearing both marks clears the final mark
             // too — it used to keep the previous one, so a mark entered by
             // mistake and then blanked stayed on the card.
@@ -188,6 +205,47 @@ namespace psms.Domain.Assessment.Entities
                 FinalMark = System.Math.Round(FinalMark.Value, 2, System.MidpointRounding.AwayFromZero);
 
             // Calculate achievement level
+            AchievementLevel = CapsAchievementScale.LevelFor(FinalMark);
+        }
+
+        /// <summary>
+        /// RC-05 / RC-15. Records an aggregated subject mark: the two
+        /// components, the split actually applied to them, and whether the
+        /// examination is still to come externally.
+        /// </summary>
+        /// <param name="result">What <see cref="SubjectMarkAggregator"/> worked out.</param>
+        /// <param name="asPromotionMark">
+        /// True for a year-end card, whose final mark is the promotion mark and
+        /// is a whole number under NPPPPR §31(3). A term card keeps the two
+        /// decimals it is reported to.
+        /// </param>
+        public void RecordAggregate(SubjectMarkResult result, bool asPromotionMark)
+        {
+            RecordMarks(
+                result.SchoolBasedMark,
+                result.ExaminationMark,
+                result.AppliedSbaWeight,
+                result.AppliedExamWeight);
+
+            AwaitsExternalExamination = result.AwaitsExternalExamination;
+
+            if (asPromotionMark)
+                RoundToPromotionMark();
+        }
+
+        /// <summary>
+        /// Rounds the final mark to the whole number NPPPPR §31(3) prescribes,
+        /// and re-reads the level off it. Applied to a year-end card, whose
+        /// final mark is the promotion mark — including after a mark is
+        /// captured by hand, so one edited subject does not end up showing
+        /// 74.67 beside siblings showing 75.
+        /// </summary>
+        public void RoundToPromotionMark()
+        {
+            if (!FinalMark.HasValue)
+                return;
+
+            FinalMark = CapsRounding.PromotionMark(FinalMark.Value);
             AchievementLevel = CapsAchievementScale.LevelFor(FinalMark);
         }
 
