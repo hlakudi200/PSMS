@@ -27,17 +27,20 @@ public class ReportSubjectAppService : ApplicationService, IReportSubjectAppServ
     private readonly IRepository<Report, Guid> _reportRepository;
     private readonly psms.Academic.Students.ICurrentStudentResolver _currentStudent;
     private readonly psms.Academic.Parents.ICurrentParentResolver _currentParent;
+    private readonly psms.Assessment.Reports.ReportCohortStatisticsService _cohortStatistics;
 
     public ReportSubjectAppService(
         IRepository<ReportSubject, Guid> reportSubjectRepository,
         IRepository<Report, Guid> reportRepository,
         psms.Academic.Students.ICurrentStudentResolver currentStudent,
-        psms.Academic.Parents.ICurrentParentResolver currentParent)
+        psms.Academic.Parents.ICurrentParentResolver currentParent,
+        psms.Assessment.Reports.ReportCohortStatisticsService cohortStatistics)
     {
         _reportSubjectRepository = reportSubjectRepository;
         _reportRepository = reportRepository;
         _currentStudent = currentStudent;
         _currentParent = currentParent;
+        _cohortStatistics = cohortStatistics;
     }
 
     [AbpAuthorize(PermissionNames.Assessment_ReportCards_View)]
@@ -125,6 +128,13 @@ public class ReportSubjectAppService : ApplicationService, IReportSubjectAppServ
             throw new UserFriendlyException(AssessmentExceptionCodes.ReportNotEditable,
                 "Cannot modify report subjects on an approved or published report.");
 
+        // RC-07: [Range(0,100)] on each side independently lets 80/80 through,
+        // which would produce a final mark of 160. The DTO's 40/60 defaults only
+        // apply when the client omits the fields.
+        if (!ReportSubject.IsValidWeighting(input.TermWeight, input.ExamWeight))
+            throw new UserFriendlyException(AssessmentExceptionCodes.InvalidSubjectMarkWeighting,
+                $"The term and examination weights must add to 100%. Got {input.TermWeight:0.##}% and {input.ExamWeight:0.##}%.");
+
         reportSubject.RecordMarks(input.TermMark, input.ExamMark, input.TermWeight, input.ExamWeight);
 
         if (input.TeacherComment != null)
@@ -172,6 +182,12 @@ public class ReportSubjectAppService : ApplicationService, IReportSubjectAppServ
             if (reportSubject.ReportId != input.ReportId)
                 throw new UserFriendlyException(AssessmentExceptionCodes.ReportSubjectNotFound,
                     $"Report subject entry {subjectMark.ReportSubjectId} does not belong to report {input.ReportId}.");
+
+            // RC-07: [Range(0,100)] on each side independently lets 80/80
+            // through, which would produce a final mark of 160.
+            if (!ReportSubject.IsValidWeighting(subjectMark.TermWeight, subjectMark.ExamWeight))
+                throw new UserFriendlyException(AssessmentExceptionCodes.InvalidSubjectMarkWeighting,
+                    $"The term and examination weights must add to 100%. Got {subjectMark.TermWeight:0.##}% and {subjectMark.ExamWeight:0.##}%.");
 
             reportSubject.RecordMarks(subjectMark.TermMark, subjectMark.ExamMark, subjectMark.TermWeight, subjectMark.ExamWeight);
 
@@ -229,34 +245,22 @@ public class ReportSubjectAppService : ApplicationService, IReportSubjectAppServ
 
         if (report == null) return;
 
-        var subjectsWithMarks = await _reportSubjectRepository
+        var subjectRows = await _reportSubjectRepository
             .GetAll()
-            .Where(rs => rs.ReportId == reportId && rs.FinalMark.HasValue)
+            .Where(rs => rs.ReportId == reportId)
             .ToListAsync();
 
-        if (subjectsWithMarks.Any())
-        {
-            report.OverallPercentage = subjectsWithMarks.Average(rs => rs.FinalMark.Value);
-            report.OverallAchievementLevel = CalculateAchievementLevel(report.OverallPercentage.Value);
-        }
-        else
-        {
-            report.OverallPercentage = null;
-            report.OverallAchievementLevel = null;
-        }
+        // RC-07: one definition of the overall, shared with generation.
+        report.RecalculateOverall(subjectRows.Select(rs => rs.FinalMark));
 
         await _reportRepository.UpdateAsync(report);
         await CurrentUnitOfWork.SaveChangesAsync();
-    }
 
-    private static CapsAchievementLevel CalculateAchievementLevel(decimal percentage)
-    {
-        if (percentage >= 80) return CapsAchievementLevel.Level7;
-        if (percentage >= 70) return CapsAchievementLevel.Level6;
-        if (percentage >= 60) return CapsAchievementLevel.Level5;
-        if (percentage >= 50) return CapsAchievementLevel.Level4;
-        if (percentage >= 40) return CapsAchievementLevel.Level3;
-        if (percentage >= 30) return CapsAchievementLevel.Level2;
-        return CapsAchievementLevel.Level1;
+        // RC-06: this learner's mark moving reorders the class, so the whole
+        // cohort's positions and subject figures are recomputed — in this unit
+        // of work, so the pass sees the mark just saved and a failure takes the
+        // edit back with it.
+        await _cohortStatistics.RecalculateAsync(
+            report.TenantId, report.ClassId, report.TermId, report.ReportType);
     }
 }

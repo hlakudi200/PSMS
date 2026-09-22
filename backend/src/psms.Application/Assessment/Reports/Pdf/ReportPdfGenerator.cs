@@ -21,6 +21,29 @@ public static class ReportPdfGenerator
     private static readonly string BorderCol = Colors.Black;
     private static readonly string LightBorder = Colors.Grey.Lighten2;
 
+    /// <summary>
+    /// A CAPS level as it is printed in the marks table: the numeral alone.
+    /// The words for it are in the legend at the foot of the card, which is
+    /// what the legend is for — spelling "Outstanding" into a column this
+    /// narrow wrapped it over four lines.
+    /// </summary>
+    private static string Level(psms.Domain.Shared.Enums.CapsAchievementLevel? level) =>
+        level.HasValue ? ((int)level.Value).ToString() : "-";
+
+    /// <summary>
+    /// A mark as it is printed: one decimal, rounded half away from zero, and
+    /// always with a full stop.
+    /// <para>
+    /// Interpolating a decimal directly took the <i>server's</i> culture, so
+    /// the same report printed "72.4%" on one host and "72,4%" on another, and
+    /// never matched the browser print view, which is always a full stop.
+    /// </para>
+    /// </summary>
+    private static string Mark(decimal? value) =>
+        value.HasValue
+            ? value.Value.ToString("F1", System.Globalization.CultureInfo.InvariantCulture)
+            : "-";
+
     /// <summary>Largest logo we will place in the header, in points.</summary>
     private const float LogoMaxHeight = 52f;
     private const float LogoMaxWidth = 150f;
@@ -226,7 +249,7 @@ public static class ReportPdfGenerator
                     ? $"{data.ClassPosition} of {data.TotalStudentsInClass ?? 0}"
                     : "N/A";
                 InfoRow(c, "Class Position:", posText);
-                InfoRow(c, "Overall:", data.OverallPercentage.HasValue ? $"{data.OverallPercentage:F1}%" : "N/A");
+                InfoRow(c, "Overall:", data.OverallPercentage.HasValue ? $"{Mark(data.OverallPercentage)}%" : "N/A");
             });
         });
     }
@@ -247,14 +270,16 @@ public static class ReportPdfGenerator
         {
             table.ColumnsDefinition(columns =>
             {
-                columns.RelativeColumn(3);   // Subject
-                columns.RelativeColumn(1);   // Code
-                columns.RelativeColumn(1.2f); // Term Mark
-                columns.RelativeColumn(1.2f); // Exam Mark
-                columns.RelativeColumn(1.2f); // Final Mark
-                columns.RelativeColumn(0.8f); // Level
-                columns.RelativeColumn(2);   // Teacher
-                columns.RelativeColumn(2.5f); // Comment
+                columns.RelativeColumn(2.6f); // Subject
+                columns.RelativeColumn(0.9f); // Code
+                columns.RelativeColumn(1.1f); // Term Mark
+                columns.RelativeColumn(1.1f); // Exam Mark
+                columns.RelativeColumn(1.1f); // Final Mark
+                columns.RelativeColumn(0.6f); // Level
+                columns.RelativeColumn(1.1f); // Class average (RC-06)
+                columns.RelativeColumn(0.8f); // Position in class (RC-06)
+                columns.RelativeColumn(1.6f); // Teacher
+                columns.RelativeColumn(2.3f); // Comment
             });
 
             // Header row
@@ -273,7 +298,9 @@ public static class ReportPdfGenerator
                 header.Cell().Element(BrandedHeader).AlignCenter().Text("TERM\nMARK (%)").Bold().FontSize(8).FontColor(brandFg);
                 header.Cell().Element(BrandedHeader).AlignCenter().Text("EXAM\nMARK (%)").Bold().FontSize(8).FontColor(brandFg);
                 header.Cell().Element(BrandedHeader).AlignCenter().Text("FINAL\nMARK (%)").Bold().FontSize(8).FontColor(brandFg);
-                header.Cell().Element(BrandedHeader).AlignCenter().Text("LEVEL").Bold().FontSize(8).FontColor(brandFg);
+                header.Cell().Element(BrandedHeader).AlignCenter().Text("LVL").Bold().FontSize(8).FontColor(brandFg);
+                header.Cell().Element(BrandedHeader).AlignCenter().Text("CLASS\nAVG (%)").Bold().FontSize(8).FontColor(brandFg);
+                header.Cell().Element(BrandedHeader).AlignCenter().Text("POS").Bold().FontSize(8).FontColor(brandFg);
                 header.Cell().Element(BrandedHeader).Text("TEACHER").Bold().FontSize(8).FontColor(brandFg);
                 header.Cell().Element(BrandedHeader).Text("COMMENT").Bold().FontSize(8).FontColor(brandFg);
             });
@@ -283,19 +310,24 @@ public static class ReportPdfGenerator
             {
                 table.Cell().Element(DataCellStyle).Text(s.SubjectName ?? "").SemiBold().FontSize(9);
                 table.Cell().Element(DataCellStyle).Text(s.SubjectCode ?? "-").FontSize(9);
-                table.Cell().Element(DataCellStyle).AlignCenter().Text(s.TermMark.HasValue ? $"{s.TermMark:F1}" : "-").FontSize(9);
-                table.Cell().Element(DataCellStyle).AlignCenter().Text(s.ExamMark.HasValue ? $"{s.ExamMark:F1}" : "-").FontSize(9);
-                table.Cell().Element(DataCellStyle).AlignCenter().Text(s.FinalMark.HasValue ? $"{s.FinalMark:F1}" : "-").SemiBold().FontSize(9);
-                table.Cell().Element(DataCellStyle).AlignCenter().Text(s.AchievementLevel ?? "-").FontSize(9);
+                table.Cell().Element(DataCellStyle).AlignCenter().Text(Mark(s.TermMark)).FontSize(9);
+                table.Cell().Element(DataCellStyle).AlignCenter().Text(Mark(s.ExamMark)).FontSize(9);
+                table.Cell().Element(DataCellStyle).AlignCenter().Text(Mark(s.FinalMark)).SemiBold().FontSize(9);
+                table.Cell().Element(DataCellStyle).AlignCenter().Text(Level(s.AchievementLevel)).FontSize(9);
+                // RC-06: the class comparison. Blank until the cohort pass has
+                // run, rather than a zero that reads as a class average of 0%.
+                table.Cell().Element(DataCellStyle).AlignCenter().Text(Mark(s.ClassAverage)).FontSize(9);
+                table.Cell().Element(DataCellStyle).AlignCenter().Text(s.SubjectPosition?.ToString() ?? "-").FontSize(9);
                 table.Cell().Element(DataCellStyle).Text(s.TeacherName ?? "-").FontSize(8);
                 table.Cell().Element(DataCellStyle).Text(s.TeacherComment ?? "-").FontSize(8);
             }
 
-            // Overall footer row
-            var subjectsWithFinal = data.Subjects.Where(s => s.FinalMark.HasValue).ToList();
-            var overallAvg = subjectsWithFinal.Any()
-                ? $"{subjectsWithFinal.Average(s => s.FinalMark!.Value):F1}"
-                : "-";
+            // Overall footer row. RC-07: this prints the overall stored on the
+            // report, which is the same number the screen shows. It used to be
+            // recomputed here from the rendered rows, so an edited mark or a
+            // subject with no final mark made the printed card contradict the
+            // report it was printed from.
+            var overallAvg = Mark(data.OverallPercentage);
 
             // Span 4 columns for label
             table.Cell().ColumnSpan(4)
@@ -312,8 +344,8 @@ public static class ReportPdfGenerator
                 .Border(1).BorderColor(BorderCol)
                 .Background(Colors.Grey.Lighten4)
                 .Padding(4).AlignCenter()
-                .Text(data.OverallAchievementLevel ?? "-").Bold().FontSize(9);
-            table.Cell().ColumnSpan(2)
+                .Text(Level(data.OverallAchievementLevel)).Bold().FontSize(9);
+            table.Cell().ColumnSpan(4)
                 .Border(1).BorderColor(BorderCol)
                 .Background(Colors.Grey.Lighten4)
                 .Padding(4).Text("").FontSize(9);
@@ -429,33 +461,31 @@ public static class ReportPdfGenerator
                     cols.RelativeColumn(); // L1
                 });
 
+                // RC-07: the levels and their bands come from CapsAchievementScale,
+                // so the printed legend cannot drift from the levels actually
+                // awarded above it.
+                var levels = psms.Domain.Assessment.CapsAchievementScale.Descending;
+
                 // Header
                 table.Header(h =>
                 {
-                    foreach (var lv in new[] { "Level 7", "Level 6", "Level 5", "Level 4", "Level 3", "Level 2", "Level 1" })
+                    foreach (var level in levels)
                     {
                         h.Cell().Border(0.5f).BorderColor(LightBorder)
                             .Background(HeaderBg).Padding(2).AlignCenter()
-                            .Text(lv).Bold().FontSize(7);
+                            .Text($"Level {(int)level}").Bold().FontSize(7);
                     }
                 });
 
                 // Descriptions
-                var descs = new[]
+                foreach (var level in levels)
                 {
-                    "Outstanding\n80–100%",
-                    "Meritorious\n70–79%",
-                    "Substantial\n60–69%",
-                    "Adequate\n50–59%",
-                    "Moderate\n40–49%",
-                    "Elementary\n30–39%",
-                    "Not Achieved\n0–29%",
-                };
-                foreach (var desc in descs)
-                {
+                    var (low, high) = psms.Domain.Assessment.CapsAchievementScale.RangeFor(level);
+                    var descriptor = psms.Domain.Assessment.CapsAchievementScale.ShortDescriptorFor(level);
+
                     table.Cell().Border(0.5f).BorderColor(LightBorder)
                         .Padding(2).AlignCenter()
-                        .Text(desc).FontSize(7);
+                        .Text($"{descriptor}\n{low}–{high}%").FontSize(7);
                 }
             });
         });

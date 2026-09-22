@@ -60,6 +60,12 @@ public static class AssessmentExceptionCodes
     /// </summary>
     public const string InvalidAssessmentWeighting = "ASM_INVALID_ASSESSMENT_WEIGHTING";
 
+    /// <summary>
+    /// RC-07. Marks were recorded against a term/examination split that does
+    /// not add to 100%, which would give a final mark over 100.
+    /// </summary>
+    public const string InvalidSubjectMarkWeighting = "ASM_INVALID_SUBJECT_MARK_WEIGHTING";
+
     public const string ReportNotEditable = "ASM_REPORT_NOT_EDITABLE";
     public const string ReportNotPublished = "ASM_REPORT_NOT_PUBLISHED";
 

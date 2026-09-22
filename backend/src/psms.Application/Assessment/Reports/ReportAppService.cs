@@ -52,6 +52,7 @@ public class ReportAppService : ApplicationService, IReportAppService
     private readonly psms.Academic.Students.ICurrentStudentResolver _currentStudent;
     private readonly psms.Academic.Parents.ICurrentParentResolver _currentParent;
     private readonly psms.Workflow.Shared.WorkflowStarterService _workflowStarter;
+    private readonly ReportCohortStatisticsService _cohortStatistics;
 
     public ReportAppService(
         IRepository<Report, Guid> reportRepository,
@@ -68,7 +69,8 @@ public class ReportAppService : ApplicationService, IReportAppService
         IBackgroundJobManager backgroundJobManager,
         psms.Academic.Students.ICurrentStudentResolver currentStudent,
         psms.Academic.Parents.ICurrentParentResolver currentParent,
-        psms.Workflow.Shared.WorkflowStarterService workflowStarter)
+        psms.Workflow.Shared.WorkflowStarterService workflowStarter,
+        ReportCohortStatisticsService cohortStatistics)
     {
         _reportRepository = reportRepository;
         _reportSubjectRepository = reportSubjectRepository;
@@ -85,6 +87,7 @@ public class ReportAppService : ApplicationService, IReportAppService
         _currentStudent = currentStudent;
         _currentParent = currentParent;
         _workflowStarter = workflowStarter;
+        _cohortStatistics = cohortStatistics;
     }
 
     [AbpAuthorize(PermissionNames.Assessment_ReportCards_View)]
@@ -302,6 +305,13 @@ public class ReportAppService : ApplicationService, IReportAppService
             input.DaysLate,
             input.TeacherComment);
 
+        // RC-06: this learner joining the cohort reorders everybody in it. This
+        // runs in the same unit of work as the generation above, so a failure
+        // rolls the new report back with it rather than leaving a card that is
+        // ranked against nothing.
+        await _cohortStatistics.RecalculateAsync(
+            AbpSession.TenantId, input.ClassId, input.TermId, input.ReportType);
+
         return await GetAsync(report.Id);
     }
 
@@ -341,8 +351,13 @@ public class ReportAppService : ApplicationService, IReportAppService
             .Where(cs => cs.ClassId == classId && cs.IsActive)
             .ToListAsync();
 
+        // Active only, to match who a run actually generates for. The count is
+        // a starting figure: RC-06's cohort pass restates it as the number of
+        // report cards actually ranked, so a printed "3 of 30" is consistent.
         var totalStudentsInClass = await _studentRepository
-            .CountAsync(s => s.TenantId == AbpSession.TenantId && s.CurrentClassId == classId);
+            .CountAsync(s => s.TenantId == AbpSession.TenantId
+                && s.CurrentClassId == classId
+                && s.IsActive);
 
         var averages = new Dictionary<(Guid, Guid), decimal>();
 
@@ -436,8 +451,7 @@ public class ReportAppService : ApplicationService, IReportAppService
 
         // One ReportSubject per active class subject, carrying the mark average
         // already computed for this learner.
-        decimal? overallTotal = null;
-        var markedSubjects = 0;
+        var subjectFinalMarks = new List<decimal?>();
 
         foreach (var classSubject in context.ClassSubjects)
         {
@@ -452,25 +466,17 @@ public class ReportAppService : ApplicationService, IReportAppService
             if (context.SubjectAverages.TryGetValue((studentId, classSubject.SubjectId), out var average))
             {
                 reportSubject.RecordMarks(average, null);
-
-                if (reportSubject.FinalMark.HasValue)
-                {
-                    overallTotal = (overallTotal ?? 0m) + reportSubject.FinalMark.Value;
-                    markedSubjects++;
-                }
+                subjectFinalMarks.Add(reportSubject.FinalMark);
             }
 
             await _reportSubjectRepository.InsertAsync(reportSubject);
         }
 
-        // The overall is the mean of the subject final marks. It is computed from
-        // what was just written rather than re-read, so there is one round trip
-        // instead of a save-then-reload for every learner.
-        if (markedSubjects > 0)
-        {
-            report.OverallPercentage = overallTotal.Value / markedSubjects;
-            report.OverallAchievementLevel = CalculateAchievementLevel(report.OverallPercentage.Value);
-        }
+        // RC-07: the overall comes from Report.RecalculateOverall, the one
+        // definition of it. It is computed from what was just written rather
+        // than re-read, so there is one round trip instead of a save-then-reload
+        // for every learner.
+        report.RecalculateOverall(subjectFinalMarks);
 
         report.TotalStudentsInClass = context.TotalStudentsInClass;
 
@@ -726,6 +732,20 @@ public class ReportAppService : ApplicationService, IReportAppService
             }
 
             result.Items.Add(item);
+        }
+
+        // RC-06: class position and the per-subject class figures only exist
+        // once the cohort does, so they are stamped on in one pass here rather
+        // than guessed at per learner inside the loop above.
+        //
+        // Contained, unlike the other callers: every learner above has already
+        // committed in its own unit of work, and a class of report cards that
+        // were genuinely created must not come back as a failed request because
+        // the ranking pass fell over afterwards.
+        if (result.GeneratedCount > 0)
+        {
+            await _cohortStatistics.TryRecalculateAsync(
+                AbpSession.TenantId, input.ClassId, input.TermId, input.ReportType);
         }
 
         return result;
@@ -1018,6 +1038,14 @@ public class ReportAppService : ApplicationService, IReportAppService
         }
 
         await _reportRepository.DeleteAsync(report);
+
+        // RC-06: the cohort is one learner smaller. Without this, every
+        // remaining card keeps a position and a class average computed over the
+        // deleted learner until somebody happens to edit an unrelated mark. The
+        // flush is what makes the soft delete visible to the pass.
+        await CurrentUnitOfWork.SaveChangesAsync();
+        await _cohortStatistics.RecalculateAsync(
+            report.TenantId, report.ClassId, report.TermId, report.ReportType);
     }
 
     [AbpAuthorize(PermissionNames.Assessment_ReportCards_Generate)]
@@ -1109,16 +1137,5 @@ public class ReportAppService : ApplicationService, IReportAppService
 
         return await _fileStorage.CreateSignedDownloadUrlAsync(
             _fileStorage.DefaultBucketName, objectKey, PdfLinkLifetimeSeconds);
-    }
-
-    private static CapsAchievementLevel CalculateAchievementLevel(decimal percentage)
-    {
-        if (percentage >= 80) return CapsAchievementLevel.Level7;
-        if (percentage >= 70) return CapsAchievementLevel.Level6;
-        if (percentage >= 60) return CapsAchievementLevel.Level5;
-        if (percentage >= 50) return CapsAchievementLevel.Level4;
-        if (percentage >= 40) return CapsAchievementLevel.Level3;
-        if (percentage >= 30) return CapsAchievementLevel.Level2;
-        return CapsAchievementLevel.Level1;
     }
 }

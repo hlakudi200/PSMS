@@ -36,6 +36,7 @@ import { ReportProvider, useReportState, useReportActions } from '@/providers/as
 import { useAuthState } from '@/providers/auth';
 import { useBrandingState } from '@/providers/branding';
 import { getPrintableInk, getReadableForeground } from '@/utils/theme-config';
+import { formatMark, formatPercentage } from '@/utils/marks';
 import type { IReport, IReportSubject } from '@/providers/assessment/shared/interfaces';
 
 const { Title, Text, Paragraph } = Typography;
@@ -483,19 +484,36 @@ function ReportDetailContent() {
     { title: 'Code', dataIndex: 'subjectCode', key: 'subjectCode', width: 80 },
     {
       title: 'Term Mark', dataIndex: 'termMark', key: 'termMark', width: 100,
-      render: (v: number | undefined) => v != null ? `${v}%` : '-',
+      render: (v: number | undefined) => formatPercentage(v),
     },
     {
       title: 'Exam Mark', dataIndex: 'examMark', key: 'examMark', width: 100,
-      render: (v: number | undefined) => v != null ? `${v}%` : '-',
+      render: (v: number | undefined) => formatPercentage(v),
     },
     {
       title: 'Final Mark', dataIndex: 'finalMark', key: 'finalMark', width: 100,
-      render: (v: number | undefined) => v != null ? <Text strong>{v}%</Text> : '-',
+      render: (v: number | undefined) => v != null ? <Text strong>{formatPercentage(v)}</Text> : '-',
     },
     {
       title: 'Level', dataIndex: 'achievementLevel', key: 'achievementLevel', width: 160,
       render: (v: number | undefined) => getAchievementTag(v),
+    },
+    /* RC-06: the cohort figures. Blank until the class statistics pass has run
+       for this term — an empty cell rather than a 0 that reads as a real mark. */
+    {
+      title: 'Class Avg', dataIndex: 'classAverage', key: 'classAverage', width: 100,
+      render: (v: number | undefined) => v != null ? formatPercentage(v) : <Text type="secondary">-</Text>,
+    },
+    {
+      title: 'Position', dataIndex: 'subjectPosition', key: 'subjectPosition', width: 90,
+      render: (v: number | undefined) => v != null ? v : <Text type="secondary">-</Text>,
+    },
+    {
+      title: 'Class Range', key: 'classRange', width: 130,
+      render: (_: unknown, s: IReportSubject) =>
+        s.lowestInClass != null && s.highestInClass != null
+          ? <Text type="secondary">{formatPercentage(s.lowestInClass)} – {formatPercentage(s.highestInClass)}</Text>
+          : <Text type="secondary">-</Text>,
     },
     { title: 'Teacher', dataIndex: 'teacherName', key: 'teacherName' },
     {
@@ -505,11 +523,11 @@ function ReportDetailContent() {
     },
   ];
 
-  // Calculate subject average for print footer
-  const subjectsWithFinal = subjects.filter((s) => s.finalMark != null);
-  const overallAvg = subjectsWithFinal.length > 0
-    ? (subjectsWithFinal.reduce((sum, s) => sum + (s.finalMark ?? 0), 0) / subjectsWithFinal.length).toFixed(1)
-    : '-';
+  /* RC-07: the printed footer shows the overall stored on the report — the same
+     number as the Overall card above it. It used to be recomputed here from the
+     subject rows, so the print-out could contradict the screen it was printed
+     from. */
+  const overallAvg = formatMark(report.overallPercentage);
 
   return (
     <div style={{ padding: 24 }} className="report-print-area">
@@ -539,21 +557,23 @@ function ReportDetailContent() {
         <div className="info-row"><span className="info-label">Class:</span><span>{report.className ?? 'N/A'}</span></div>
         <div className="info-row"><span className="info-label">Date Generated:</span><span>{report.generatedDate ? dayjs(report.generatedDate).format('DD MMM YYYY') : 'N/A'}</span></div>
         <div className="info-row"><span className="info-label">Class Position:</span><span>{report.classPosition ?? '-'}{report.totalStudentsInClass ? ` of ${report.totalStudentsInClass}` : ''}</span></div>
-        <div className="info-row"><span className="info-label">Overall:</span><span>{report.overallPercentage != null ? `${report.overallPercentage.toFixed(1)}%` : '-'}</span></div>
+        <div className="info-row"><span className="info-label">Overall:</span><span>{formatPercentage(report.overallPercentage)}</span></div>
       </div>
 
       {/* Subject Table for Print */}
       <table className="print-subject-table">
         <thead>
           <tr>
-            <th style={{ textAlign: 'left', width: '22%' }}>Subject</th>
-            <th style={{ width: '8%' }}>Code</th>
-            <th style={{ width: '10%' }}>Term Mark (%)</th>
-            <th style={{ width: '10%' }}>Exam Mark (%)</th>
-            <th style={{ width: '10%' }}>Final Mark (%)</th>
-            <th style={{ width: '8%' }}>Level</th>
-            <th style={{ width: '15%' }}>Teacher</th>
-            <th style={{ textAlign: 'left', width: '17%' }}>Comment</th>
+            <th style={{ textAlign: 'left', width: '20%' }}>Subject</th>
+            <th style={{ width: '6%' }}>Code</th>
+            <th style={{ width: '9%' }}>Term Mark (%)</th>
+            <th style={{ width: '9%' }}>Exam Mark (%)</th>
+            <th style={{ width: '9%' }}>Final Mark (%)</th>
+            <th style={{ width: '6%' }}>Level</th>
+            <th style={{ width: '9%' }}>Class Avg (%)</th>
+            <th style={{ width: '5%' }}>Pos</th>
+            <th style={{ width: '12%' }}>Teacher</th>
+            <th style={{ textAlign: 'left', width: '15%' }}>Comment</th>
           </tr>
         </thead>
         <tbody>
@@ -561,10 +581,12 @@ function ReportDetailContent() {
             <tr key={s.id}>
               <td>{s.subjectName}</td>
               <td>{s.subjectCode ?? '-'}</td>
-              <td>{s.termMark != null ? s.termMark.toFixed(1) : '-'}</td>
-              <td>{s.examMark != null ? s.examMark.toFixed(1) : '-'}</td>
-              <td style={{ fontWeight: 700 }}>{s.finalMark != null ? s.finalMark.toFixed(1) : '-'}</td>
+              <td>{formatMark(s.termMark)}</td>
+              <td>{formatMark(s.examMark)}</td>
+              <td style={{ fontWeight: 700 }}>{formatMark(s.finalMark)}</td>
               <td>{s.achievementLevel ? achievementLabelsShort[s.achievementLevel] : '-'}</td>
+              <td>{formatMark(s.classAverage)}</td>
+              <td>{s.subjectPosition ?? '-'}</td>
               <td style={{ fontSize: 9, textAlign: 'left' }}>{s.teacherName ?? '-'}</td>
               <td style={{ fontSize: 9, textAlign: 'left' }}>{s.teacherComment ?? '-'}</td>
             </tr>
@@ -575,7 +597,7 @@ function ReportDetailContent() {
             <td colSpan={4} style={{ textAlign: 'right' }}>Overall Average:</td>
             <td>{overallAvg}%</td>
             <td>{report.overallAchievementLevel ? achievementLabelsShort[report.overallAchievementLevel] : '-'}</td>
-            <td colSpan={2}></td>
+            <td colSpan={4}></td>
           </tr>
         </tfoot>
       </table>

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using psms.Domain.Shared.Enums;
 
 namespace psms.Assessment.Reports.Pdf;
 
@@ -37,7 +38,12 @@ public class ReportPdfData
 
     // Overall performance
     public decimal? OverallPercentage { get; set; }
-    public string OverallAchievementLevel { get; set; }
+    /// <summary>
+    /// The overall CAPS level. Held as the level itself rather than a phrase so
+    /// the page can choose how much of it fits — the numeral in the table, the
+    /// words in the legend beneath it.
+    /// </summary>
+    public CapsAchievementLevel? OverallAchievementLevel { get; set; }
     public int? ClassPosition { get; set; }
     public int? TotalStudentsInClass { get; set; }
 
@@ -65,7 +71,21 @@ public class SubjectEntry
     public decimal? TermMark { get; set; }
     public decimal? ExamMark { get; set; }
     public decimal? FinalMark { get; set; }
-    public string AchievementLevel { get; set; }
+    public CapsAchievementLevel? AchievementLevel { get; set; }
     public string TeacherName { get; set; }
     public string TeacherComment { get; set; }
+
+    /// <summary>
+    /// RC-06. How the class did in this subject, for the parent to read the
+    /// learner's mark against. Null until the cohort pass has run.
+    /// </summary>
+    public decimal? ClassAverage { get; set; }
+
+    /// <summary>The learner's placing in the class in this subject.</summary>
+    public int? SubjectPosition { get; set; }
+
+    /// <summary>The best and worst marks in the class in this subject.</summary>
+    public decimal? HighestInClass { get; set; }
+
+    public decimal? LowestInClass { get; set; }
 }

@@ -119,7 +119,7 @@ public class ReportPdfDataLoader : ITransientDependency
             ReportType = GetReportTypeLabel(report.ReportType),
             GeneratedDate = report.GeneratedDate?.ToString("dd MMM yyyy"),
             OverallPercentage = report.OverallPercentage,
-            OverallAchievementLevel = GetAchievementLabel(report.OverallAchievementLevel),
+            OverallAchievementLevel = report.OverallAchievementLevel,
             ClassPosition = report.ClassPosition,
             TotalStudentsInClass = report.TotalStudentsInClass,
             DaysPresent = report.DaysPresent,
@@ -139,9 +139,13 @@ public class ReportPdfDataLoader : ITransientDependency
                 TermMark = sr.TermMark,
                 ExamMark = sr.ExamMark,
                 FinalMark = sr.FinalMark,
-                AchievementLevel = GetAchievementLabel(sr.AchievementLevel),
+                AchievementLevel = sr.AchievementLevel,
                 TeacherName = sr.Teacher?.GetFullName(),
                 TeacherComment = sr.TeacherComment,
+                ClassAverage = sr.ClassAverage,
+                SubjectPosition = sr.SubjectPosition,
+                HighestInClass = sr.HighestInClass,
+                LowestInClass = sr.LowestInClass,
             })
             .ToList();
 
@@ -205,15 +209,4 @@ public class ReportPdfDataLoader : ITransientDependency
         _ => "Report",
     };
 
-    private static string GetAchievementLabel(CapsAchievementLevel? level) => level switch
-    {
-        CapsAchievementLevel.Level7 => "7 - Outstanding",
-        CapsAchievementLevel.Level6 => "6 - Meritorious",
-        CapsAchievementLevel.Level5 => "5 - Substantial",
-        CapsAchievementLevel.Level4 => "4 - Adequate",
-        CapsAchievementLevel.Level3 => "3 - Moderate",
-        CapsAchievementLevel.Level2 => "2 - Elementary",
-        CapsAchievementLevel.Level1 => "1 - Not Achieved",
-        _ => null,
-    };
 }

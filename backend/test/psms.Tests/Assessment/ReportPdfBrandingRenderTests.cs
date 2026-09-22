@@ -1,4 +1,5 @@
 using psms.Assessment.Reports.Pdf;
+using psms.Domain.Shared.Enums;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -27,7 +28,7 @@ public class ReportPdfBrandingRenderTests
         ReportType = "Term 1 Report",
         GeneratedDate = "21 Sep 2026",
         OverallPercentage = 72.4m,
-        OverallAchievementLevel = "Level 6 - Meritorious",
+        OverallAchievementLevel = CapsAchievementLevel.Level6,
         ClassPosition = 4,
         TotalStudentsInClass = 31,
         DaysPresent = 58,
@@ -37,9 +38,9 @@ public class ReportPdfBrandingRenderTests
         PrincipalComment = "A pleasing report. Keep it up.",
         Subjects = new List<SubjectEntry>
         {
-            new SubjectEntry { SubjectName = "Mathematics", SubjectCode = "MATH", TermMark = 68m, FinalMark = 68m, AchievementLevel = "Level 5", TeacherName = "T. Petersen", TeacherComment = "Solid algebra." },
-            new SubjectEntry { SubjectName = "English Home Language", SubjectCode = "ENG", TermMark = 81m, FinalMark = 81m, AchievementLevel = "Level 7", TeacherName = "L. Mokoena", TeacherComment = "Excellent writing." },
-            new SubjectEntry { SubjectName = "Life Sciences", SubjectCode = "LSCI", TermMark = 74m, FinalMark = 74m, AchievementLevel = "Level 6", TeacherName = "T. Ndlovu", TeacherComment = "Good practical work." },
+            new SubjectEntry { SubjectName = "Mathematics", SubjectCode = "MATH", TermMark = 68m, FinalMark = 68m, AchievementLevel = CapsAchievementLevel.Level5, TeacherName = "T. Petersen", TeacherComment = "Solid algebra.", ClassAverage = 61.2m, SubjectPosition = 7, HighestInClass = 92m, LowestInClass = 28m },
+            new SubjectEntry { SubjectName = "English Home Language", SubjectCode = "ENG", TermMark = 81m, FinalMark = 81m, AchievementLevel = CapsAchievementLevel.Level7, TeacherName = "L. Mokoena", TeacherComment = "Excellent writing.", ClassAverage = 66.8m, SubjectPosition = 2, HighestInClass = 88m, LowestInClass = 41m },
+            new SubjectEntry { SubjectName = "Life Sciences", SubjectCode = "LSCI", TermMark = 74m, FinalMark = 74m, AchievementLevel = CapsAchievementLevel.Level6, TeacherName = "T. Ndlovu", TeacherComment = "Good practical work.", ClassAverage = 70.1m, SubjectPosition = 5, HighestInClass = 95m, LowestInClass = 39m },
         }
     };
 
@@ -77,6 +78,49 @@ public class ReportPdfBrandingRenderTests
 
         Assert.True(pdf.Length > 1000);
         WriteSample("report-pale-brand.pdf", pdf);
+    }
+
+    [Fact]
+    public void The_printed_overall_is_the_stored_one_not_a_recomputed_mean()
+    {
+        // RC-07. The rows here mean 74.33; the report stores 72.4. The PDF used
+        // to print its own mean of the rows, which is how a printed card could
+        // contradict the report it was printed from. Whatever the rows say, the
+        // page must carry the stored figure.
+        var data = SampleData("#0066CC", null);
+
+        var pdf = ReportPdfGenerator.Generate(data);
+        var text = PdfText.Extract(pdf);
+
+        Assert.Contains("72.4%", text);
+        Assert.DoesNotContain("74.3%", text);
+    }
+
+    [Fact]
+    public void The_class_figures_reach_the_page()
+    {
+        // RC-06. Five fields that were stored and never rendered anywhere.
+        var text = PdfText.Extract(ReportPdfGenerator.Generate(SampleData("#0066CC", null)));
+
+        Assert.Contains("CLASS", text);
+        Assert.Contains("61.2", text);  // the Mathematics class average
+        Assert.Contains("POS", text);
+    }
+
+    [Fact]
+    public void A_subject_with_no_class_figures_yet_prints_a_dash_not_a_zero()
+    {
+        var data = SampleData("#0066CC", null);
+        foreach (var subject in data.Subjects)
+        {
+            subject.ClassAverage = null;
+            subject.SubjectPosition = null;
+        }
+
+        var text = PdfText.Extract(ReportPdfGenerator.Generate(data));
+
+        Assert.Contains("CLASS", text);
+        Assert.DoesNotContain("0.0", text);
     }
 
     [Fact]

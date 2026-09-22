@@ -147,7 +147,7 @@ namespace psms.Domain.Assessment.Entities
         {
             RawMark = rawMark;
             Percentage = maxMarks > 0 ? (rawMark / maxMarks) * 100 : 0;
-            AchievementLevel = CalculateAchievementLevel(Percentage.Value);
+            AchievementLevel = CapsAchievementScale.LevelFor(Percentage.Value);
             MarkedDate = DateTime.UtcNow;
             MarkedByTeacherUserId = teacherUserId;
             TeacherComment = comment;
@@ -184,22 +184,9 @@ namespace psms.Domain.Assessment.Entities
 
                 Percentage = maxMarks > 0 ? (effectiveMark / maxMarks) * 100 : Percentage;
                 if (Percentage.HasValue)
-                    AchievementLevel = CalculateAchievementLevel(Percentage.Value);
+                    AchievementLevel = CapsAchievementScale.LevelFor(Percentage.Value);
             }
         }
 
-        /// <summary>
-        /// Calculates CAPS achievement level from percentage
-        /// </summary>
-        private CapsAchievementLevel CalculateAchievementLevel(decimal percentage)
-        {
-            if (percentage >= 80) return CapsAchievementLevel.Level7;
-            if (percentage >= 70) return CapsAchievementLevel.Level6;
-            if (percentage >= 60) return CapsAchievementLevel.Level5;
-            if (percentage >= 50) return CapsAchievementLevel.Level4;
-            if (percentage >= 40) return CapsAchievementLevel.Level3;
-            if (percentage >= 30) return CapsAchievementLevel.Level2;
-            return CapsAchievementLevel.Level1;
-        }
     }
 }
