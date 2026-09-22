@@ -940,6 +940,8 @@ public class DefaultRolesCreator
             // Academic - Own data
             PermissionNames.Academic_Students,
             PermissionNames.Academic_Students_View,
+            PermissionNames.Academic_ClassSubjects,
+            PermissionNames.Academic_ClassSubjects_View,
             PermissionNames.Academic_Timetables,
             PermissionNames.Academic_Timetables_View,
             PermissionNames.Academic_Attendance,
