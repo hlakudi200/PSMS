@@ -14,6 +14,7 @@ public static class LearningExceptionCodes
     public const string TermNotFound = "LRN_TERM_NOT_FOUND";
     public const string InvalidLearningMaterialUpload = "LRN_INVALID_LEARNING_MATERIAL_UPLOAD";
     public const string LearningMaterialTooLarge = "LRN_LEARNING_MATERIAL_TOO_LARGE";
+    public const string LearningMaterialNotVideo = "LRN_LEARNING_MATERIAL_NOT_VIDEO";
     public const string VersionConflict = "LRN_VERSION_CONFLICT";
 
     // OnlineLesson

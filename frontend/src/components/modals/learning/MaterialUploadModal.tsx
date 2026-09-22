@@ -82,6 +82,26 @@ function maxBytesForType(t: LearningMaterialType): number {
   return t === LearningMaterialType.Video ? VIDEO_MAX_BYTES : DOCUMENT_MAX_BYTES;
 }
 
+// US-TCH-006 naming convention for uploaded videos: Subject-Grade-Date-Topic.
+// Each part is squashed to letters/digits (e.g. "LifeOrientation") so the
+// hyphens only ever separate parts.
+function toNamePart(value: string | undefined): string {
+  return (value ?? '')
+    .replace(/[^A-Za-z0-9 ]+/g, ' ')
+    .split(' ')
+    .filter(Boolean)
+    .map((w) => w[0].toUpperCase() + w.slice(1))
+    .join('');
+}
+
+function suggestVideoFileName(subject?: string, grade?: string, topic?: string): string {
+  return [toNamePart(subject), toNamePart(grade), dayjs().format('YYYY-MM-DD'), toNamePart(topic)]
+    .filter(Boolean)
+    .join('-');
+}
+
+const FILE_NAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
+
 // Materials are tagged Core or Supplementary — an explicit choice (no
 // default) rather than a bare checkbox, since both states are meaningful.
 const MATERIAL_CATEGORIES = ['Core', 'Supplementary'] as const;
@@ -130,6 +150,13 @@ const uploadSchema = z
         message: "Scheduled date can't be in the past",
       }),
     notifyStudents: z.boolean().optional(),
+    // Video uploads only: the name to save the file under, without extension.
+    fileName: z
+      .string()
+      .min(1, 'File name is required')
+      .max(150, 'File name must be 150 characters or fewer')
+      .regex(FILE_NAME_PATTERN, 'Use letters, digits, hyphens or underscores only')
+      .optional(),
   })
   .refine(
     (d) =>
@@ -145,12 +172,19 @@ interface MaterialUploadModalProps {
   open: boolean;
   onClose: (refresh?: boolean) => void;
   classSubjects: IClassSubjectList[];
+  /**
+   * Video upload: the type is fixed to Video and a Subject-Grade-Date-Topic
+   * file name is suggested. Video files are stored privately and can only be
+   * streamed, never downloaded by students.
+   */
+  videoOnly?: boolean;
 }
 
 export const MaterialUploadModal: React.FC<MaterialUploadModalProps> = ({
   open,
   onClose,
   classSubjects,
+  videoOnly = false,
 }) => {
   const [form] = Form.useForm();
   const { uploadAsync, requestUploadUrlAsync, uploadFileToStorageAsync } =
@@ -164,12 +198,16 @@ export const MaterialUploadModal: React.FC<MaterialUploadModalProps> = ({
   const [materialType, setMaterialType] = useState<LearningMaterialType>(
     LearningMaterialType.Document
   );
+  // Until the teacher types their own file name, keep it in step with the
+  // suggestion as class, grade and title change.
+  const [fileNameEdited, setFileNameEdited] = useState(false);
 
   useEffect(() => {
     if (open) {
       form.resetFields();
       setFileList([]);
-      setMaterialType(LearningMaterialType.Document);
+      setFileNameEdited(false);
+      setMaterialType(videoOnly ? LearningMaterialType.Video : LearningMaterialType.Document);
       getActiveGradesAsync();
       // Term/GetAll doesn't exist on the backend (TermAppService has no
       // GetAllAsync method — a pre-existing bug in the terms provider, not
@@ -202,6 +240,29 @@ export const MaterialUploadModal: React.FC<MaterialUploadModalProps> = ({
       })),
     [academicYear]
   );
+
+  const watchedClassSubjectId = Form.useWatch('classSubjectId', form);
+  const watchedGradeId = Form.useWatch('gradeId', form);
+  const watchedTitle = Form.useWatch('title', form);
+
+  const suggestedFileName = useMemo(() => {
+    if (!videoOnly) return '';
+    const cs = classSubjects.find((c) => c.id === watchedClassSubjectId);
+    const grade = (activeGrades ?? []).find((g) => g.id === watchedGradeId)?.gradeName;
+    return suggestVideoFileName(cs?.subjectName, grade ?? cs?.className, watchedTitle);
+  }, [videoOnly, classSubjects, activeGrades, watchedClassSubjectId, watchedGradeId, watchedTitle]);
+
+  useEffect(() => {
+    if (videoOnly && !fileNameEdited) {
+      form.setFieldValue('fileName', suggestedFileName);
+    }
+  }, [videoOnly, fileNameEdited, suggestedFileName, form]);
+
+  const pickedExtension = (() => {
+    const name = fileList[0]?.name;
+    const dot = name?.lastIndexOf('.') ?? -1;
+    return name && dot > 0 ? name.slice(dot).toLowerCase() : '';
+  })();
 
   const isExternalLink = materialType === LearningMaterialType.ExternalLink;
   const accept = acceptForType(materialType);
@@ -238,6 +299,7 @@ export const MaterialUploadModal: React.FC<MaterialUploadModalProps> = ({
         scheduledPublishDate: values.scheduledPublishDate
           ? dayjs(values.scheduledPublishDate).toISOString()
           : undefined,
+        fileName: videoOnly ? (values.fileName ?? '').trim() : undefined,
       });
       if (!parsed.success) {
         form.setFields(
@@ -274,7 +336,11 @@ export const MaterialUploadModal: React.FC<MaterialUploadModalProps> = ({
         });
         await uploadFileToStorageAsync(ticket.uploadUrl, f);
         objectKey = ticket.objectKey;
-        fileName = f.name;
+        // Video uploads are saved under the convention name (the real
+        // extension is kept, so server-side type checks still apply).
+        fileName = videoOnly && parsed.data.fileName
+          ? `${parsed.data.fileName}${pickedExtension}`
+          : f.name;
       }
 
       // gradeId / materialCategory / tags / scheduledPublishDate /
@@ -292,7 +358,7 @@ export const MaterialUploadModal: React.FC<MaterialUploadModalProps> = ({
         objectKey,
         fileName,
       });
-      message.success('Learning material uploaded');
+      message.success(videoOnly ? 'Video uploaded' : 'Learning material uploaded');
       onClose(true);
     } catch (err) {
       // The direct-to-storage PUT uses fetch, so its failure is NOT caught by
@@ -308,7 +374,7 @@ export const MaterialUploadModal: React.FC<MaterialUploadModalProps> = ({
 
   return (
     <Modal
-      title="Upload Learning Material"
+      title={videoOnly ? 'Upload Video' : 'Upload Learning Material'}
       open={open}
       onCancel={() => onClose()}
       onOk={handleSubmit}
@@ -373,13 +439,15 @@ export const MaterialUploadModal: React.FC<MaterialUploadModalProps> = ({
           />
         </Form.Item>
 
-        <Form.Item label="Material type" required>
-          <Select
-            value={materialType}
-            onChange={(v) => setMaterialType(v as LearningMaterialType)}
-            options={materialTypeOptions}
-          />
-        </Form.Item>
+        {!videoOnly && (
+          <Form.Item label="Material type" required>
+            <Select
+              value={materialType}
+              onChange={(v) => setMaterialType(v as LearningMaterialType)}
+              options={materialTypeOptions}
+            />
+          </Form.Item>
+        )}
 
         <Form.Item
           label="Category"
@@ -429,11 +497,38 @@ export const MaterialUploadModal: React.FC<MaterialUploadModalProps> = ({
                   Click or drag a file to this area
                 </p>
                 <p className="ant-upload-hint" style={{ fontSize: 12 }}>
-                  Browser-side type/size checks run before submission;
-                  server-side validation is the source of truth.
+                  {videoOnly
+                    ? 'Students can watch this video in PSMS but cannot download it.'
+                    : 'Browser-side type/size checks run before submission; server-side validation is the source of truth.'}
                 </p>
               </Upload.Dragger>
             </Form.Item>
+            {videoOnly && (
+              <Form.Item
+                label="File name"
+                name="fileName"
+                tooltip="Suggested as Subject-Grade-Date-Topic. You can change it."
+                extra={
+                  fileNameEdited && suggestedFileName ? (
+                    <a
+                      onClick={() => {
+                        setFileNameEdited(false);
+                        form.setFieldValue('fileName', suggestedFileName);
+                      }}
+                    >
+                      Use suggested: {suggestedFileName}
+                    </a>
+                  ) : undefined
+                }
+              >
+                <Input
+                  placeholder="Subject-Grade-YYYY-MM-DD-Topic"
+                  maxLength={150}
+                  addonAfter={pickedExtension || '.mp4'}
+                  onChange={() => setFileNameEdited(true)}
+                />
+              </Form.Item>
+            )}
             <Form.Item
               label="Optional supporting link"
               name="externalLink"

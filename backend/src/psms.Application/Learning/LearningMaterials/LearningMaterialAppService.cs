@@ -32,6 +32,7 @@ public class LearningMaterialAppService : ApplicationService, ILearningMaterialA
     private readonly IRepository<ClassSubject, Guid> _classSubjectRepository;
     private readonly IRepository<Term, Guid> _termRepository;
     private readonly IRepository<Teacher, Guid> _teacherRepository;
+    private readonly IRepository<Student, Guid> _studentRepository;
     private readonly IFileStorageService _fileStorage;
 
     // LM-003 retention cap. Beyond this we prune the oldest version on
@@ -41,12 +42,24 @@ public class LearningMaterialAppService : ApplicationService, ILearningMaterialA
     // Supabase bucket for learning-material files (public-read).
     private const string MaterialsBucket = "materials";
 
+    // Video materials are view-only for students, so they must not get a
+    // permanent public URL. They go to the PRIVATE bucket lesson recordings
+    // already use (LC-06), under a "materials/" prefix that can't collide
+    // with the "{tenant}/{lessonId}/" recording keys. The object key is
+    // stored in FileUrl and playback goes through short-lived signed URLs
+    // (GetVideoUrl).
+    private const string PrivateVideoBucket = "recordings";
+
+    // Long enough to watch a full video, short enough that a shared link dies.
+    private const int VideoUrlExpirySeconds = 3 * 60 * 60; // 3h
+
     public LearningMaterialAppService(
         IRepository<LearningMaterial, Guid> learningMaterialRepository,
         IRepository<LearningMaterialVersion, Guid> versionRepository,
         IRepository<ClassSubject, Guid> classSubjectRepository,
         IRepository<Term, Guid> termRepository,
         IRepository<Teacher, Guid> teacherRepository,
+        IRepository<Student, Guid> studentRepository,
         IFileStorageService fileStorage)
     {
         _learningMaterialRepository = learningMaterialRepository;
@@ -54,33 +67,48 @@ public class LearningMaterialAppService : ApplicationService, ILearningMaterialA
         _classSubjectRepository = classSubjectRepository;
         _termRepository = termRepository;
         _teacherRepository = teacherRepository;
+        _studentRepository = studentRepository;
         _fileStorage = fileStorage;
     }
 
+    private static bool IsPrivateVideo(LearningMaterialType materialType)
+        => materialType == LearningMaterialType.Video;
+
+    private static string BucketFor(LearningMaterialType materialType)
+        => IsPrivateVideo(materialType) ? PrivateVideoBucket : MaterialsBucket;
+
+    /// <summary>Key prefix a material file must sit under, per bucket.</summary>
+    private string MaterialKeyPrefix(Guid classSubjectId, LearningMaterialType materialType)
+        => IsPrivateVideo(materialType)
+            ? $"{AbpSession.TenantId ?? 0}/materials/{classSubjectId}/"
+            : $"{AbpSession.TenantId ?? 0}/{classSubjectId}/";
+
     /// <summary>Tenant-scoped object key for a material file.</summary>
-    private string BuildMaterialObjectKey(Guid classSubjectId, string fileName)
+    private string BuildMaterialObjectKey(Guid classSubjectId, string fileName, LearningMaterialType materialType)
     {
         var ext = Path.GetExtension(fileName).ToLowerInvariant();
-        return $"{AbpSession.TenantId ?? 0}/{classSubjectId}/{Guid.NewGuid()}{ext}";
+        return $"{MaterialKeyPrefix(classSubjectId, materialType)}{Guid.NewGuid()}{ext}";
     }
 
     /// <summary>
     /// Validates a client-supplied object key (must be in this tenant +
     /// class-subject prefix), confirms the file actually exists in storage,
     /// reads its REAL size/type (the client's reported values are not
-    /// trusted), enforces LM-001, and returns the server-derived public URL.
+    /// trusted), enforces LM-001, and returns what to store in FileUrl: the
+    /// public URL, or for a private video the object key.
     /// </summary>
     private async Task<(string FileUrl, long Size, string ContentType)> ResolveUploadedFileAsync(
         string objectKey, Guid classSubjectId, string fileName, LearningMaterialType materialType)
     {
-        var expectedPrefix = $"{AbpSession.TenantId ?? 0}/{classSubjectId}/";
+        var bucket = BucketFor(materialType);
+        var expectedPrefix = MaterialKeyPrefix(classSubjectId, materialType);
         if (string.IsNullOrWhiteSpace(objectKey)
             || !objectKey.StartsWith(expectedPrefix, StringComparison.Ordinal)
             || objectKey.Contains(".."))
             throw new UserFriendlyException(LearningExceptionCodes.InvalidLearningMaterialUpload,
                 "Invalid upload reference. Call RequestUploadUrl and upload the file first.");
 
-        var info = await _fileStorage.GetObjectInfoAsync(MaterialsBucket, objectKey);
+        var info = await _fileStorage.GetObjectInfoAsync(bucket, objectKey);
         if (info == null)
             throw new UserFriendlyException(LearningExceptionCodes.InvalidLearningMaterialUpload,
                 "The uploaded file was not found in storage. Please re-upload.");
@@ -89,7 +117,7 @@ public class LearningMaterialAppService : ApplicationService, ILearningMaterialA
         ValidateFileMetadata(fileName, info.SizeBytes, materialType);
 
         return (
-            _fileStorage.GetPublicUrl(MaterialsBucket, objectKey),
+            IsPrivateVideo(materialType) ? objectKey : _fileStorage.GetPublicUrl(bucket, objectKey),
             info.SizeBytes,
             string.IsNullOrWhiteSpace(info.ContentType) ? "application/octet-stream" : info.ContentType);
     }
@@ -115,8 +143,8 @@ public class LearningMaterialAppService : ApplicationService, ILearningMaterialA
 
         ValidateFileExtension(input.FileName, input.MaterialType);
 
-        var key = BuildMaterialObjectKey(input.ClassSubjectId, input.FileName);
-        return await _fileStorage.CreateUploadTicketAsync(MaterialsBucket, key);
+        var key = BuildMaterialObjectKey(input.ClassSubjectId, input.FileName, input.MaterialType);
+        return await _fileStorage.CreateUploadTicketAsync(BucketFor(input.MaterialType), key);
     }
 
     /// <summary>
@@ -137,8 +165,8 @@ public class LearningMaterialAppService : ApplicationService, ILearningMaterialA
 
         ValidateFileExtension(input.FileName, material.MaterialType);
 
-        var key = BuildMaterialObjectKey(material.ClassSubjectId, input.FileName);
-        return await _fileStorage.CreateUploadTicketAsync(MaterialsBucket, key);
+        var key = BuildMaterialObjectKey(material.ClassSubjectId, input.FileName, material.MaterialType);
+        return await _fileStorage.CreateUploadTicketAsync(BucketFor(material.MaterialType), key);
     }
 
     [AbpAuthorize(PermissionNames.Learning_Materials_View)]
@@ -412,7 +440,22 @@ public class LearningMaterialAppService : ApplicationService, ILearningMaterialA
             throw new UserFriendlyException(LearningExceptionCodes.LearningMaterialNotFound,
                 "Learning material not found.");
 
-        await _learningMaterialRepository.DeleteAsync(material);
+        // Deleting a material removes it for good: at thousands of schools,
+        // files left behind in storage are pure cost. Every stored file
+        // (current + older versions) is removed from storage and the rows are
+        // hard-deleted. Versions and any lesson links cascade with the
+        // material row.
+        var fileUrls = await _versionRepository
+            .GetAll()
+            .Where(v => v.LearningMaterialId == material.Id && v.TenantId == AbpSession.TenantId)
+            .Select(v => v.FileUrl)
+            .ToListAsync();
+        fileUrls.Add(material.FileUrl);
+
+        await _learningMaterialRepository.HardDeleteAsync(material);
+        await CurrentUnitOfWork.SaveChangesAsync();
+
+        await DeleteStoredFilesAsync(material, fileUrls);
     }
 
     [AbpAuthorize(PermissionNames.Learning_Materials_Edit)]
@@ -455,6 +498,49 @@ public class LearningMaterialAppService : ApplicationService, ILearningMaterialA
         await CurrentUnitOfWork.SaveChangesAsync();
 
         return await GetAsync(id);
+    }
+
+    /// <summary>
+    /// Short-lived signed URL to stream a video material. Video files sit in a
+    /// private bucket so students can watch but never hold a permanent link.
+    /// Students only get videos that are published and belong to their own
+    /// class; unpublished videos are for staff who can edit materials.
+    /// </summary>
+    [AbpAuthorize(PermissionNames.Learning_Materials_View)]
+    public async Task<string> GetVideoUrlAsync(Guid id)
+    {
+        var material = await _learningMaterialRepository
+            .GetAll()
+            .Include(lm => lm.ClassSubject)
+            .FirstOrDefaultAsync(lm => lm.Id == id && lm.TenantId == AbpSession.TenantId);
+        if (material == null)
+            throw new UserFriendlyException(LearningExceptionCodes.LearningMaterialNotFound,
+                "Learning material not found.");
+
+        if (!IsPrivateVideo(material.MaterialType) || string.IsNullOrWhiteSpace(material.FileUrl))
+            throw new UserFriendlyException(LearningExceptionCodes.LearningMaterialNotVideo,
+                "This learning material has no video to play.");
+
+        var student = await _studentRepository
+            .FirstOrDefaultAsync(s => s.UserId == AbpSession.UserId && s.TenantId == AbpSession.TenantId);
+        var canEdit = await PermissionChecker.IsGrantedAsync(PermissionNames.Learning_Materials_Edit);
+        var allowed = student != null
+            ? material.IsPublished && student.CurrentClassId == material.ClassSubject?.ClassId
+            : material.IsPublished || canEdit;
+        if (!allowed)
+            throw new UserFriendlyException(LearningExceptionCodes.LearningMaterialNotFound,
+                "Learning material not found.");
+
+        // Only ever sign a key inside this material's own prefix, so a tampered
+        // FileUrl can't be used to mint a URL for another tenant's object.
+        var objectKey = material.FileUrl.Trim();
+        var expectedPrefix = MaterialKeyPrefix(material.ClassSubjectId, material.MaterialType);
+        if (!objectKey.StartsWith(expectedPrefix, StringComparison.Ordinal) || objectKey.Contains(".."))
+            throw new UserFriendlyException(LearningExceptionCodes.LearningMaterialNotVideo,
+                "This learning material has no video to play.");
+
+        return await _fileStorage.CreateSignedDownloadUrlAsync(
+            PrivateVideoBucket, objectKey, VideoUrlExpirySeconds);
     }
 
     [AbpAuthorize(PermissionNames.Learning_Materials_View)]
@@ -694,19 +780,81 @@ public class LearningMaterialAppService : ApplicationService, ILearningMaterialA
         if (totalCount <= MaxVersionsPerMaterial) return;
 
         var overage = totalCount - MaxVersionsPerMaterial;
-        var oldestIds = await _versionRepository
+        var oldest = await _versionRepository
             .GetAll()
             .Where(v => v.LearningMaterialId == learningMaterialId
                      && v.TenantId == AbpSession.TenantId)
             .OrderBy(v => v.VersionNumber)
             .Take(overage)
-            .Select(v => v.Id)
+            .Select(v => new { v.Id, v.FileUrl })
             .ToListAsync();
-        foreach (var id in oldestIds)
+        foreach (var version in oldest)
         {
-            await _versionRepository.DeleteAsync(id);
+            await _versionRepository.DeleteAsync(version.Id);
         }
         await CurrentUnitOfWork.SaveChangesAsync();
+
+        // Pruned versions' files go from storage too, unless the material or
+        // a remaining version still points at the same file (Restore copies
+        // a version's file reference rather than the bytes).
+        var material = await _learningMaterialRepository.GetAsync(learningMaterialId);
+        var prunedUrls = oldest.Select(v => v.FileUrl).ToList();
+        var stillUsed = await _versionRepository
+            .GetAll()
+            .Where(v => v.LearningMaterialId == learningMaterialId)
+            .Select(v => v.FileUrl)
+            .ToListAsync();
+        stillUsed.Add(material.FileUrl);
+        await DeleteStoredFilesAsync(material, prunedUrls.Except(stillUsed).ToList());
+    }
+
+    /// <summary>
+    /// Storage key for a material's stored file reference, or null if it isn't
+    /// a file this service uploaded for that material. Videos store the private
+    /// object key; everything else stores the public URL of the key.
+    /// </summary>
+    private string ObjectKeyFor(LearningMaterial material, string fileUrl)
+    {
+        if (string.IsNullOrWhiteSpace(fileUrl))
+            return null;
+
+        var key = fileUrl.Trim();
+        if (!IsPrivateVideo(material.MaterialType))
+        {
+            var publicBase = _fileStorage.GetPublicUrl(MaterialsBucket, string.Empty);
+            if (!key.StartsWith(publicBase, StringComparison.Ordinal))
+                return null;
+            key = key.Substring(publicBase.Length);
+        }
+
+        var prefix = MaterialKeyPrefix(material.ClassSubjectId, material.MaterialType);
+        return key.StartsWith(prefix, StringComparison.Ordinal) && !key.Contains("..") ? key : null;
+    }
+
+    /// <summary>
+    /// Best-effort removal of a material's files from storage. Runs after the
+    /// rows are gone and never fails the caller: a file that can't be deleted
+    /// is logged rather than resurrecting the material.
+    /// </summary>
+    private async Task DeleteStoredFilesAsync(LearningMaterial material, IEnumerable<string> fileUrls)
+    {
+        var bucket = BucketFor(material.MaterialType);
+        var keys = fileUrls
+            .Select(url => ObjectKeyFor(material, url))
+            .Where(key => key != null)
+            .Distinct();
+
+        foreach (var key in keys)
+        {
+            try
+            {
+                await _fileStorage.DeleteAsync(bucket, key);
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn($"Could not delete stored file '{key}' for material {material.Id}: {ex.Message}", ex);
+            }
+        }
     }
 
     /// <summary>
