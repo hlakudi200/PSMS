@@ -39,7 +39,6 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
     private readonly IRepository<LiveClassAttendance, Guid> _attendanceRepository;
     private readonly IRepository<OnlineLessonMaterial, Guid> _lessonMaterialRepository;
     private readonly IRepository<LearningMaterial, Guid> _learningMaterialRepository;
-    private readonly IRepository<Term, Guid> _termRepository;
     private readonly IFileStorageService _fileStorage;
     private readonly ILiveKitTokenService _liveKit;
     private readonly OnlineLessonNotifier _notifier;
@@ -74,7 +73,6 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
         IRepository<LiveClassAttendance, Guid> attendanceRepository,
         IRepository<OnlineLessonMaterial, Guid> lessonMaterialRepository,
         IRepository<LearningMaterial, Guid> learningMaterialRepository,
-        IRepository<Term, Guid> termRepository,
         IFileStorageService fileStorage,
         ILiveKitTokenService liveKit,
         OnlineLessonNotifier notifier)
@@ -87,7 +85,6 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
         _attendanceRepository = attendanceRepository;
         _lessonMaterialRepository = lessonMaterialRepository;
         _learningMaterialRepository = learningMaterialRepository;
-        _termRepository = termRepository;
         _fileStorage = fileStorage;
         _liveKit = liveKit;
         _notifier = notifier;
@@ -1195,8 +1192,6 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
                 $"Lessons must be scheduled within school hours ({SchoolStartHourSast:D2}:00-{SchoolEndHourSast:D2}:00 SAST) on a single day.");
         }
 
-        await EnsureWithinCurrentTermOrThrowAsync(startSast.Date);
-
         // Overlap check: any *active* (not cancelled / not completed)
         // lesson on the same class-subject whose [start, end) intersects
         // [scheduledStart, scheduledEnd). Cancelled/completed rows are
@@ -1219,37 +1214,6 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
     }
 
     /// <summary>
-    /// US-TCH-004 term rule: the lesson's SAST calendar date must fall inside
-    /// a term of the current academic year, so no lessons land in holidays or
-    /// in another year. Checking only the term flagged IsCurrent would block
-    /// every booking from the last day of a term until an admin moves the
-    /// flag, because lessons need 24 h notice. Schools with no terms set up
-    /// for the current year are not blocked, since there is nothing to check.
-    /// </summary>
-    private async Task EnsureWithinCurrentTermOrThrowAsync(DateTime lessonDateSast)
-    {
-        var terms = await _termRepository
-            .GetAll()
-            .Where(t => t.TenantId == AbpSession.TenantId && t.AcademicYear.IsCurrent)
-            .OrderBy(t => t.StartDate)
-            .ToListAsync();
-        if (terms.Count == 0)
-            return;
-
-        var inTerm = terms.Any(t => lessonDateSast >= ToSastDate(t.StartDate)
-                                 && lessonDateSast <= ToSastDate(t.EndDate));
-        if (inTerm)
-            return;
-
-        var next = terms.FirstOrDefault(t => ToSastDate(t.StartDate) > lessonDateSast);
-        var hint = next == null
-            ? "There are no more terms this academic year."
-            : $"The next term, {next.TermName}, starts on {ToSastDate(next.StartDate):yyyy-MM-dd}.";
-        throw new UserFriendlyException(LearningExceptionCodes.LessonOutsideCurrentTerm,
-            $"Lessons must fall within a school term of the current academic year. {hint}");
-    }
-
-    /// <summary>
     /// Model binding under ABP's default clock hands us Local-kind values for
     /// the client's "…Z" timestamps. Every OL-001 check and the reminder
     /// delays assume UTC, so on a server not running in UTC they drift by the
@@ -1259,14 +1223,6 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
         => value.Kind == DateTimeKind.Local
             ? value.ToUniversalTime()
             : DateTime.SpecifyKind(value, DateTimeKind.Utc);
-
-    /// <summary>
-    /// Calendar date of a stored term boundary in SAST. Npgsql hands back
-    /// timestamptz values as UTC, so a term entered as local midnight reads as
-    /// 22:00 the day before; shift it back before taking the date.
-    /// </summary>
-    private static DateTime ToSastDate(DateTime value)
-        => value.Kind == DateTimeKind.Utc ? (value + SastOffset).Date : value.Date;
 
     /// <summary>
     /// Pre-lesson materials must be published materials on the lesson's own
