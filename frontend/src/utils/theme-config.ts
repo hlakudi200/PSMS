@@ -500,6 +500,39 @@ export const getReadableForeground = (hex: string): string => {
   return luminance > 0.179 ? "#1F1F1F" : "#FFFFFF";
 };
 
+/**
+ * The brand colour, darkened until it reads as ink on white paper.
+ *
+ * A pale brand — gold, mint, sky — set straight as text is almost invisible on
+ * a printed page, so it is shaded down while staying recognisably the school's
+ * colour. A colour already dark enough comes back unchanged. Mirrors
+ * ReportPdfGenerator.InkOnWhite so the printed page and the generated PDF agree.
+ */
+export const getPrintableInk = (hex: string): string => {
+  const value = (hex || "").replace("#", "");
+  if (!/^[0-9A-Fa-f]{6}$/.test(value)) return "#1F1F1F";
+
+  let [r, g, b] = [0, 2, 4].map((o) => parseInt(value.slice(o, o + 2), 16));
+
+  const luminance = () => {
+    const channel = (c: number) => {
+      const srgb = c / 255;
+      return srgb <= 0.03928 ? srgb / 12.92 : Math.pow((srgb + 0.055) / 1.055, 2.4);
+    };
+    return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
+  };
+
+  // 0.35 keeps strong mid-tones untouched while pulling pastels down.
+  for (let i = 0; i < 8 && luminance() > 0.35; i++) {
+    r = Math.round(r * 0.8);
+    g = Math.round(g * 0.8);
+    b = Math.round(b * 0.8);
+  }
+
+  const hexOf = (c: number) => c.toString(16).padStart(2, "0");
+  return `#${hexOf(r)}${hexOf(g)}${hexOf(b)}`.toUpperCase();
+};
+
 /** Mixes a #RRGGBB colour toward white. `amount` 0 = unchanged, 1 = white. */
 const tintTowardWhite = (hex: string, amount: number): string => {
   const value = hex.replace("#", "");
