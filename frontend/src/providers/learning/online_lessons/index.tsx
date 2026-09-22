@@ -239,7 +239,7 @@ export const OnlineLessonProvider = ({
     dispatch(rescheduleOnlineLessonPending());
     const endpoint = `/api/services/app/OnlineLesson/Reschedule?id=${id}`;
     await instance
-        .put(endpoint, input)
+        .post(endpoint, input)
         .then((response) => {
             dispatch(rescheduleOnlineLessonSuccess(response.data.result));
         })

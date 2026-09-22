@@ -252,6 +252,9 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
         var teacherId = await ResolveCurrentTeacherIdOrThrowAsync();
         await EnsureTeacherOwnsClassSubjectAsync(input.ClassSubjectId, teacherId);
 
+        input.ScheduledStartTime = ToUtc(input.ScheduledStartTime);
+        input.ScheduledEndTime = ToUtc(input.ScheduledEndTime);
+
         // In-app (LiveKit) live classes are hosted inside PSMS — no external
         // meeting URL. The MeetingLink column is NOT NULL, so we store a
         // derived in-app join route. External platforms still require a real,
@@ -507,6 +510,8 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
                 "Only scheduled lessons can be rescheduled.");
 
         var previousStart = lesson.ScheduledStartTime;
+        input.NewStartTime = ToUtc(input.NewStartTime);
+        input.NewEndTime = ToUtc(input.NewEndTime);
 
         // Same OL-001 guard rails as scheduling, applied to the new times.
         // Exclude `id` from overlap detection so a lesson moved forward 30
@@ -1211,29 +1216,46 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
     }
 
     /// <summary>
-    /// US-TCH-004 current-term rule: the lesson's SAST calendar date must fall
-    /// within the current term. Schools that have not set a current term yet
-    /// are not blocked, since there is nothing to validate against.
+    /// US-TCH-004 term rule: the lesson's SAST calendar date must fall inside
+    /// a term of the current academic year, so no lessons land in holidays or
+    /// in another year. Checking only the term flagged IsCurrent would block
+    /// every booking from the last day of a term until an admin moves the
+    /// flag, because lessons need 24 h notice. Schools with no terms set up
+    /// for the current year are not blocked, since there is nothing to check.
     /// </summary>
     private async Task EnsureWithinCurrentTermOrThrowAsync(DateTime lessonDateSast)
     {
-        var term = await _termRepository
+        var terms = await _termRepository
             .GetAll()
-            .Include(t => t.AcademicYear)
-            .FirstOrDefaultAsync(t => t.TenantId == AbpSession.TenantId
-                                   && t.IsCurrent
-                                   && t.AcademicYear.IsCurrent);
-        if (term == null)
+            .Where(t => t.TenantId == AbpSession.TenantId && t.AcademicYear.IsCurrent)
+            .OrderBy(t => t.StartDate)
+            .ToListAsync();
+        if (terms.Count == 0)
             return;
 
-        var termStart = ToSastDate(term.StartDate);
-        var termEnd = ToSastDate(term.EndDate);
-        if (lessonDateSast < termStart || lessonDateSast > termEnd)
-        {
-            throw new UserFriendlyException(LearningExceptionCodes.LessonOutsideCurrentTerm,
-                $"Lessons must fall within the current term ({term.TermName}: {termStart:yyyy-MM-dd} to {termEnd:yyyy-MM-dd}).");
-        }
+        var inTerm = terms.Any(t => lessonDateSast >= ToSastDate(t.StartDate)
+                                 && lessonDateSast <= ToSastDate(t.EndDate));
+        if (inTerm)
+            return;
+
+        var next = terms.FirstOrDefault(t => ToSastDate(t.StartDate) > lessonDateSast);
+        var hint = next == null
+            ? "There are no more terms this academic year."
+            : $"The next term, {next.TermName}, starts on {ToSastDate(next.StartDate):yyyy-MM-dd}.";
+        throw new UserFriendlyException(LearningExceptionCodes.LessonOutsideCurrentTerm,
+            $"Lessons must fall within a school term of the current academic year. {hint}");
     }
+
+    /// <summary>
+    /// Model binding under ABP's default clock hands us Local-kind values for
+    /// the client's "…Z" timestamps. Every OL-001 check and the reminder
+    /// delays assume UTC, so on a server not running in UTC they drift by the
+    /// local offset. Unspecified is taken as UTC, per the API contract.
+    /// </summary>
+    private static DateTime ToUtc(DateTime value)
+        => value.Kind == DateTimeKind.Local
+            ? value.ToUniversalTime()
+            : DateTime.SpecifyKind(value, DateTimeKind.Utc);
 
     /// <summary>
     /// Calendar date of a stored term boundary in SAST. Npgsql hands back

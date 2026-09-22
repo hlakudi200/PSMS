@@ -55,9 +55,9 @@ public static class LearningExceptionCodes
     // LC-01 in-app live classroom: the lesson isn't an in-app live class, the
     // class hasn't started yet (for students), or LiveKit isn't configured.
     public const string LiveClassNotAvailable = "LRN_LIVE_CLASS_NOT_AVAILABLE";
-    // US-TCH-004: the lesson date must fall inside the current term, and
-    // pre-lesson materials must be published materials on the lesson's own
-    // class-subject.
+    // US-TCH-004: the lesson date must fall inside a term of the current
+    // academic year, and pre-lesson materials must be published materials
+    // on the lesson's own class-subject.
     public const string LessonOutsideCurrentTerm = "LRN_LESSON_OUTSIDE_CURRENT_TERM";
     public const string InvalidLessonMaterials = "LRN_INVALID_LESSON_MATERIALS";
 }
