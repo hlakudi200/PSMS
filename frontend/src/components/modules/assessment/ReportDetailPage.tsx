@@ -38,6 +38,7 @@ import { useBrandingState } from '@/providers/branding';
 import { getPrintableInk, getReadableForeground } from '@/utils/theme-config';
 import { formatMark, formatPercentage } from '@/utils/marks';
 import { PromotionDecisionModal, promotionDecisionLabels } from './PromotionDecisionModal';
+import { SubjectMarksModal } from './SubjectMarksModal';
 import type { IReport, IReportSubject } from '@/providers/assessment/shared/interfaces';
 
 const { Title, Text, Paragraph } = Typography;
@@ -453,6 +454,7 @@ function ReportDetailContent() {
   };
 
   const [promotionOpen, setPromotionOpen] = useState(false);
+  const [marksOpen, setMarksOpen] = useState(false);
 
   const handlePublish = async () => {
     await publishAsync(reportId);
@@ -863,6 +865,21 @@ function ReportDetailContent() {
         />
       )}
 
+      {/* RC-12: capturing the subject marks and comments. The provider for
+          this existed and was mounted nowhere, so a subject mark could only ever
+          come from the automatic aggregation and the per-subject teacher comment
+          — a named field of a South African report card — could not be written
+          at all. */}
+      {canManageReport && (
+        <SubjectMarksModal
+          open={marksOpen}
+          reportId={report.id}
+          readOnly={report.status === 4 || report.status === 5}
+          onClose={() => setMarksOpen(false)}
+          onSaved={() => getAsync(report.id)}
+        />
+      )}
+
       {/* RC-16: the promotion decision. NPPPPR §(2b)(c) requires it to be
           reflected on the learner's report card, and the year-end card is the
           one that carries it. */}
@@ -962,14 +979,37 @@ function ReportDetailContent() {
       </Row>
 
       {/* Subject Breakdown */}
-      <Card title="Subject Breakdown" style={{ marginBottom: 16 }} className="no-print">
+      <Card
+        title="Subject Breakdown"
+        style={{ marginBottom: 16 }}
+        className="no-print"
+        extra={
+          canManageReport ? (
+            <Button size="small" onClick={() => setMarksOpen(true)}>
+              {report.status === 4 || report.status === 5 ? 'View marks' : 'Capture marks and comments'}
+            </Button>
+          ) : undefined
+        }
+      >
         <Table<IReportSubject>
           dataSource={subjects}
           columns={subjectColumns}
           rowKey="id"
           pagination={false}
           size="small"
-          locale={{ emptyText: <Empty description="No subject data" image={Empty.PRESENTED_IMAGE_SIMPLE} /> }}
+          locale={{
+            emptyText: (
+              <Empty
+                description={
+                  /* RE-002 NO_SUBJECTS_IN_REPORT: a card with no subjects cannot
+                     be sent for approval or published, so say why rather than
+                     leaving an empty table. */
+                  'No subjects on this report. Check that the class has its subjects configured, then generate it again.'
+                }
+                image={Empty.PRESENTED_IMAGE_SIMPLE}
+              />
+            ),
+          }}
         />
       </Card>
 

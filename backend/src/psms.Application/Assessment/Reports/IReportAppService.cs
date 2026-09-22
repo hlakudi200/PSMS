@@ -20,9 +20,9 @@ public interface IReportAppService : IApplicationService
     Task<BulkGenerateReportsResultDto> BulkGenerateAsync(BulkGenerateReportsInput input);
     Task<ReportDto> SubmitForApprovalAsync(Guid id);
     Task<ReportDto> PublishAsync(Guid id);
-    Task<ReportDto> AddTeacherCommentAsync(Guid id, ReportCommentDto input);
-    Task<ReportDto> AddPrincipalCommentAsync(Guid id, ReportCommentDto input);
-    Task<ReportDto> AcknowledgeByParentAsync(Guid id, ReportCommentDto input);
+    Task<ReportDto> AddTeacherCommentAsync(Guid id, TeacherCommentDto input);
+    Task<ReportDto> AddPrincipalCommentAsync(Guid id, PrincipalCommentDto input);
+    Task<ReportDto> AcknowledgeByParentAsync(Guid id, ParentAcknowledgementDto input);
     Task<ReportDto> RecordPromotionAsync(Guid id, PromotionDecision decision, Guid? promotedToGradeId);
 
     /// <summary>

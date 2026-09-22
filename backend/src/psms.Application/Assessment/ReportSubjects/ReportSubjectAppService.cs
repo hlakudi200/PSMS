@@ -241,6 +241,14 @@ public class ReportSubjectAppService : ApplicationService, IReportSubjectAppServ
             throw new UserFriendlyException(AssessmentExceptionCodes.ReportSubjectNotFound,
                 "Report subject entry not found.");
 
+        // RC-10: the two methods beside this one refuse an approved or published
+        // report; this one had no status guard at all, so the comments on a card
+        // a parent had already downloaded could be rewritten afterwards.
+        if (reportSubject.Report.Status == ReportStatus.Published
+            || reportSubject.Report.Status == ReportStatus.Approved)
+            throw new UserFriendlyException(AssessmentExceptionCodes.ReportNotEditable,
+                "Cannot modify report subjects on an approved or published report.");
+
         reportSubject.TeacherComment = comment;
         await _reportSubjectRepository.UpdateAsync(reportSubject);
         await CurrentUnitOfWork.SaveChangesAsync();

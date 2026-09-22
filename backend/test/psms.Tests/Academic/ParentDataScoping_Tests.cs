@@ -314,7 +314,7 @@ public class ParentDataScoping_Tests : psmsTestBase
         LoginAs(_parentAUserId); // Parent A acting on Student B's report
 
         await Should.ThrowAsync<UserFriendlyException>(
-            () => _reportAppService.AcknowledgeByParentAsync(reportId, new ReportCommentDto { Comment = "Looks good" }));
+            () => _reportAppService.AcknowledgeByParentAsync(reportId, new ParentAcknowledgementDto { Comment = "Looks good" }));
     }
 
     // ---- StudentParentAppService.GetMyChildrenAsync ----
