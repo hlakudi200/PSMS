@@ -314,6 +314,11 @@ public class psmsAuthorizationProvider : AuthorizationProvider
         reportCards.CreateChildPermission(PermissionNames.Assessment_ReportCards_Publish, L("PublishReportCards"));
         reportCards.CreateChildPermission(PermissionNames.Assessment_ReportCards_Download, L("DownloadReportCard"));
 
+        // Assessment weightings (SBA : examination split per grade band)
+        var weightings = assessment.CreateChildPermission(PermissionNames.Assessment_Weightings, L("AssessmentWeightings"));
+        weightings.CreateChildPermission(PermissionNames.Assessment_Weightings_View, L("ViewAssessmentWeightings"));
+        weightings.CreateChildPermission(PermissionNames.Assessment_Weightings_Manage, L("ManageAssessmentWeightings"));
+
         // Feedback
         var feedback = assessment.CreateChildPermission(PermissionNames.Assessment_Feedback, L("Feedback"));
         feedback.CreateChildPermission(PermissionNames.Assessment_Feedback_View, L("ViewFeedback"));

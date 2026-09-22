@@ -54,6 +54,12 @@ public static class AssessmentExceptionCodes
     public const string IncompleteMarksForReport = "ASM_INCOMPLETE_MARKS_FOR_REPORT";
     public const string InvalidReportStatusTransition = "ASM_INVALID_REPORT_STATUS_TRANSITION";
     public const string CannotPublishUnapproved = "ASM_CANNOT_PUBLISH_UNAPPROVED";
+    /// <summary>
+    /// A school tried to save an SBA / examination split that does not total
+    /// 100%, or supplied the same band twice.
+    /// </summary>
+    public const string InvalidAssessmentWeighting = "ASM_INVALID_ASSESSMENT_WEIGHTING";
+
     public const string ReportNotEditable = "ASM_REPORT_NOT_EDITABLE";
     public const string ReportNotPublished = "ASM_REPORT_NOT_PUBLISHED";
 

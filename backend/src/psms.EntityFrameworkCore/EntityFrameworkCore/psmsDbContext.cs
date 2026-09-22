@@ -379,6 +379,9 @@ public class psmsDbContext : AbpZeroDbContext<Tenant, Role, User, psmsDbContext>
     /// </summary>
     public DbSet<SchoolBranding> SchoolBrandings { get; set; }
 
+    /// <summary>A school's SBA / examination split per grade band (RC-14).</summary>
+    public DbSet<psms.Domain.Assessment.Entities.AssessmentWeighting> AssessmentWeightings { get; set; }
+
     public psmsDbContext(DbContextOptions<psmsDbContext> options)
         : base(options)
     {
@@ -409,6 +412,14 @@ public class psmsDbContext : AbpZeroDbContext<Tenant, Role, User, psmsDbContext>
         // SchoolBranding - exactly one branding row per tenant (soft-delete
         // aware, so deleting and re-creating branding doesn't hit the index).
         // Doubles as the lookup index for the anonymous login-page fetch.
+        // One weighting per band per school. Soft-deleted rows must not hold the
+        // slot, the same filter SchoolBrandings uses.
+        modelBuilder.Entity<psms.Domain.Assessment.Entities.AssessmentWeighting>()
+            .HasIndex(w => new { w.TenantId, w.Band })
+            .IsUnique()
+            .HasFilter("\"IsDeleted\" = false")
+            .HasDatabaseName("IX_AssessmentWeightings_TenantId_Band");
+
         modelBuilder.Entity<SchoolBranding>()
             .HasIndex(b => b.TenantId)
             .IsUnique()

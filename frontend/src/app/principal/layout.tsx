@@ -30,6 +30,7 @@ import {
   FileProtectOutlined,
   HomeOutlined,
   SafetyCertificateOutlined,
+  SettingOutlined,
 } from '@ant-design/icons';
 import LayoutShell from '@/components/shared/LayoutShell';
 import { roleColors } from '@/utils/theme-config';
@@ -67,6 +68,7 @@ const buildMenuItems = (isVicePrincipal: boolean) => [
     children: [
       { key: '/principal/reports', icon: <BarChartOutlined />, label: 'Reports' },
       { key: '/principal/mark-sheets', icon: <FileTextOutlined />, label: 'Mark Sheets' },
+      { key: '/principal/settings', icon: <SettingOutlined />, label: 'Assessment Settings' },
     ],
   },
   {

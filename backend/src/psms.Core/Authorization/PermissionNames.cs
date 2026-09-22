@@ -257,6 +257,15 @@ public static class PermissionNames
     public const string Assessment_ReportCards_Download = "Assessment.ReportCards.Download";
 
     // Feedback
+    /// <summary>
+    /// The school's SBA / examination split per grade band. Its own permission
+    /// rather than Administration.Settings.Edit: this is an academic policy
+    /// decision the principal owns, not general system administration.
+    /// </summary>
+    public const string Assessment_Weightings = "Assessment.Weightings";
+    public const string Assessment_Weightings_View = "Assessment.Weightings.View";
+    public const string Assessment_Weightings_Manage = "Assessment.Weightings.Manage";
+
     public const string Assessment_Feedback = "Assessment.Feedback";
     public const string Assessment_Feedback_View = "Assessment.Feedback.View";
     public const string Assessment_Feedback_Create = "Assessment.Feedback.Create";
