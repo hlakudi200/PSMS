@@ -497,6 +497,23 @@ function ReportDetailContent() {
       title: 'Level', dataIndex: 'achievementLevel', key: 'achievementLevel', width: 160,
       render: (v: number | undefined) => getAchievementTag(v),
     },
+    /* RC-06: the cohort figures. Blank until the class statistics pass has run
+       for this term — an empty cell rather than a 0 that reads as a real mark. */
+    {
+      title: 'Class Avg', dataIndex: 'classAverage', key: 'classAverage', width: 100,
+      render: (v: number | undefined) => v != null ? `${v.toFixed(1)}%` : <Text type="secondary">-</Text>,
+    },
+    {
+      title: 'Position', dataIndex: 'subjectPosition', key: 'subjectPosition', width: 90,
+      render: (v: number | undefined) => v != null ? v : <Text type="secondary">-</Text>,
+    },
+    {
+      title: 'Class Range', key: 'classRange', width: 130,
+      render: (_: unknown, s: IReportSubject) =>
+        s.lowestInClass != null && s.highestInClass != null
+          ? <Text type="secondary">{s.lowestInClass.toFixed(1)}% – {s.highestInClass.toFixed(1)}%</Text>
+          : <Text type="secondary">-</Text>,
+    },
     { title: 'Teacher', dataIndex: 'teacherName', key: 'teacherName' },
     {
       title: 'Comment', dataIndex: 'teacherComment', key: 'teacherComment',
@@ -505,10 +522,12 @@ function ReportDetailContent() {
     },
   ];
 
-  // Calculate subject average for print footer
-  const subjectsWithFinal = subjects.filter((s) => s.finalMark != null);
-  const overallAvg = subjectsWithFinal.length > 0
-    ? (subjectsWithFinal.reduce((sum, s) => sum + (s.finalMark ?? 0), 0) / subjectsWithFinal.length).toFixed(1)
+  /* RC-07: the printed footer shows the overall stored on the report — the same
+     number as the Overall card above it. It used to be recomputed here from the
+     subject rows, so the print-out could contradict the screen it was printed
+     from. */
+  const overallAvg = report.overallPercentage != null
+    ? report.overallPercentage.toFixed(1)
     : '-';
 
   return (
@@ -546,14 +565,16 @@ function ReportDetailContent() {
       <table className="print-subject-table">
         <thead>
           <tr>
-            <th style={{ textAlign: 'left', width: '22%' }}>Subject</th>
-            <th style={{ width: '8%' }}>Code</th>
-            <th style={{ width: '10%' }}>Term Mark (%)</th>
-            <th style={{ width: '10%' }}>Exam Mark (%)</th>
-            <th style={{ width: '10%' }}>Final Mark (%)</th>
-            <th style={{ width: '8%' }}>Level</th>
-            <th style={{ width: '15%' }}>Teacher</th>
-            <th style={{ textAlign: 'left', width: '17%' }}>Comment</th>
+            <th style={{ textAlign: 'left', width: '20%' }}>Subject</th>
+            <th style={{ width: '6%' }}>Code</th>
+            <th style={{ width: '9%' }}>Term Mark (%)</th>
+            <th style={{ width: '9%' }}>Exam Mark (%)</th>
+            <th style={{ width: '9%' }}>Final Mark (%)</th>
+            <th style={{ width: '6%' }}>Level</th>
+            <th style={{ width: '9%' }}>Class Avg (%)</th>
+            <th style={{ width: '5%' }}>Pos</th>
+            <th style={{ width: '12%' }}>Teacher</th>
+            <th style={{ textAlign: 'left', width: '15%' }}>Comment</th>
           </tr>
         </thead>
         <tbody>
@@ -565,6 +586,8 @@ function ReportDetailContent() {
               <td>{s.examMark != null ? s.examMark.toFixed(1) : '-'}</td>
               <td style={{ fontWeight: 700 }}>{s.finalMark != null ? s.finalMark.toFixed(1) : '-'}</td>
               <td>{s.achievementLevel ? achievementLabelsShort[s.achievementLevel] : '-'}</td>
+              <td>{s.classAverage != null ? s.classAverage.toFixed(1) : '-'}</td>
+              <td>{s.subjectPosition ?? '-'}</td>
               <td style={{ fontSize: 9, textAlign: 'left' }}>{s.teacherName ?? '-'}</td>
               <td style={{ fontSize: 9, textAlign: 'left' }}>{s.teacherComment ?? '-'}</td>
             </tr>
@@ -575,7 +598,7 @@ function ReportDetailContent() {
             <td colSpan={4} style={{ textAlign: 'right' }}>Overall Average:</td>
             <td>{overallAvg}%</td>
             <td>{report.overallAchievementLevel ? achievementLabelsShort[report.overallAchievementLevel] : '-'}</td>
-            <td colSpan={2}></td>
+            <td colSpan={4}></td>
           </tr>
         </tfoot>
       </table>

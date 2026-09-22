@@ -127,16 +127,41 @@ namespace psms.Domain.Assessment.Entities
         }
 
         /// <summary>
-        /// Records the marks for this subject
+        /// Whether a term/examination split is one a final mark can be computed
+        /// from: each side within 0-100, and the two adding to exactly 100.
+        /// <para>
+        /// RC-07: the DTO ranges each side independently, so 80/80 used to be
+        /// accepted and produced a final mark of 160.
+        /// </para>
         /// </summary>
+        public static bool IsValidWeighting(decimal termWeight, decimal examWeight) =>
+            termWeight >= 0 && termWeight <= 100 &&
+            examWeight >= 0 && examWeight <= 100 &&
+            termWeight + examWeight == 100;
+
+        /// <summary>
+        /// Records the marks for this subject.
+        /// </summary>
+        /// <exception cref="ArgumentException">
+        /// The weights do not add to 100, so no meaningful final mark exists.
+        /// Callers reachable from the API validate first and raise a friendly
+        /// error; this is the backstop for everything else.
+        /// </exception>
         public void RecordMarks(decimal? termMark, decimal? examMark, decimal termWeight = 40, decimal examWeight = 60)
         {
+            if (!IsValidWeighting(termWeight, examWeight))
+                throw new ArgumentException(
+                    $"Term and examination weights must each be 0-100 and add to 100; got {termWeight}/{examWeight}.",
+                    nameof(termWeight));
+
             TermMark = termMark;
             ExamMark = examMark;
             TermWeight = termWeight;
             ExamWeight = examWeight;
 
-            // Calculate final mark
+            // Calculate final mark. Clearing both marks clears the final mark
+            // too — it used to keep the previous one, so a mark entered by
+            // mistake and then blanked stayed on the card.
             if (termMark.HasValue && examMark.HasValue)
             {
                 FinalMark = (termMark.Value * termWeight / 100) + (examMark.Value * examWeight / 100);
@@ -149,26 +174,33 @@ namespace psms.Domain.Assessment.Entities
             {
                 FinalMark = examMark.Value;
             }
+            else
+            {
+                FinalMark = null;
+            }
 
             // Calculate achievement level
-            if (FinalMark.HasValue)
-            {
-                AchievementLevel = CalculateAchievementLevel(FinalMark.Value);
-            }
+            AchievementLevel = CapsAchievementScale.LevelFor(FinalMark);
         }
 
         /// <summary>
-        /// Calculates CAPS achievement level from percentage
+        /// RC-06. Stamps this row with how the learner did against the rest of
+        /// the class in this subject. Computed as a cohort pass once every
+        /// report in the class exists, not while generating one learner — there
+        /// is nothing to compare a learner to on their own.
         /// </summary>
-        private CapsAchievementLevel CalculateAchievementLevel(decimal percentage)
+        public void SetClassStatistics(int? position, decimal? classAverage, decimal? highest, decimal? lowest)
         {
-            if (percentage >= 80) return CapsAchievementLevel.Level7;
-            if (percentage >= 70) return CapsAchievementLevel.Level6;
-            if (percentage >= 60) return CapsAchievementLevel.Level5;
-            if (percentage >= 50) return CapsAchievementLevel.Level4;
-            if (percentage >= 40) return CapsAchievementLevel.Level3;
-            if (percentage >= 30) return CapsAchievementLevel.Level2;
-            return CapsAchievementLevel.Level1;
+            SubjectPosition = position;
+            ClassAverage = classAverage;
+            HighestInClass = highest;
+            LowestInClass = lowest;
         }
+
+        /// <summary>
+        /// Clears the cohort statistics, for when this row no longer has a mark
+        /// to rank or the cohort it was ranked against has gone.
+        /// </summary>
+        public void ClearClassStatistics() => SetClassStatistics(null, null, null, null);
     }
 }

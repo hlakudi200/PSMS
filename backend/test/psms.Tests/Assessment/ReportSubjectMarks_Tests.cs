@@ -1,0 +1,115 @@
+using psms.Domain.Assessment.Entities;
+using psms.Domain.Shared.Enums;
+using System;
+using Xunit;
+
+namespace psms.Tests.Assessment;
+
+/// <summary>
+/// RC-07. Recording marks on a subject row: the weighting has to be a real
+/// split, and clearing a mark has to clear what was derived from it.
+/// </summary>
+public class ReportSubjectMarks_Tests
+{
+    private static ReportSubject NewSubject() =>
+        new ReportSubject(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
+
+    [Fact]
+    public void The_final_mark_is_the_weighted_split_of_the_two()
+    {
+        var subject = NewSubject();
+
+        subject.RecordMarks(termMark: 60m, examMark: 80m, termWeight: 40m, examWeight: 60m);
+
+        // 60 * 0.4 + 80 * 0.6
+        Assert.Equal(72m, subject.FinalMark);
+        Assert.Equal(CapsAchievementLevel.Level6, subject.AchievementLevel);
+    }
+
+    [Fact]
+    public void One_mark_on_its_own_is_the_final_mark()
+    {
+        var termOnly = NewSubject();
+        termOnly.RecordMarks(termMark: 55m, examMark: null);
+        Assert.Equal(55m, termOnly.FinalMark);
+
+        var examOnly = NewSubject();
+        examOnly.RecordMarks(termMark: null, examMark: 45m);
+        Assert.Equal(45m, examOnly.FinalMark);
+    }
+
+    [Theory]
+    [InlineData(80, 80)]   // the reported case: a final mark of 160
+    [InlineData(40, 50)]   // adds to less than 100
+    [InlineData(-10, 110)] // adds to 100 but neither side is a real weight
+    public void A_split_that_is_not_a_split_is_refused(decimal termWeight, decimal examWeight)
+    {
+        var subject = NewSubject();
+
+        Assert.False(ReportSubject.IsValidWeighting(termWeight, examWeight));
+        Assert.Throws<ArgumentException>(() =>
+            subject.RecordMarks(70m, 70m, termWeight, examWeight));
+    }
+
+    [Theory]
+    [InlineData(0, 100)]   // Grade 12 Life Orientation is the other way round,
+    [InlineData(100, 0)]   // and Foundation Phase is 100% school-based.
+    [InlineData(25, 75)]
+    [InlineData(40, 60)]
+    public void The_national_splits_are_all_accepted(decimal termWeight, decimal examWeight)
+    {
+        Assert.True(ReportSubject.IsValidWeighting(termWeight, examWeight));
+
+        var subject = NewSubject();
+        subject.RecordMarks(50m, 90m, termWeight, examWeight);
+
+        Assert.NotNull(subject.FinalMark);
+        Assert.InRange(subject.FinalMark.Value, 0m, 100m);
+    }
+
+    [Fact]
+    public void A_refused_split_leaves_the_row_untouched()
+    {
+        var subject = NewSubject();
+        subject.RecordMarks(60m, 60m);
+
+        Assert.Throws<ArgumentException>(() => subject.RecordMarks(90m, 90m, 80m, 80m));
+
+        Assert.Equal(60m, subject.FinalMark);
+        Assert.Equal(60m, subject.TermMark);
+    }
+
+    [Fact]
+    public void Blanking_both_marks_clears_the_final_mark_and_the_level()
+    {
+        var subject = NewSubject();
+        subject.RecordMarks(72m, null);
+        Assert.Equal(72m, subject.FinalMark);
+
+        subject.RecordMarks(null, null);
+
+        // It used to keep 72, so a mark entered by mistake stayed on the card.
+        Assert.Null(subject.FinalMark);
+        Assert.Null(subject.AchievementLevel);
+    }
+
+    [Fact]
+    public void Class_statistics_can_be_stamped_on_and_cleared()
+    {
+        var subject = NewSubject();
+
+        subject.SetClassStatistics(3, 61.5m, 88m, 22m);
+
+        Assert.Equal(3, subject.SubjectPosition);
+        Assert.Equal(61.5m, subject.ClassAverage);
+        Assert.Equal(88m, subject.HighestInClass);
+        Assert.Equal(22m, subject.LowestInClass);
+
+        subject.ClearClassStatistics();
+
+        Assert.Null(subject.SubjectPosition);
+        Assert.Null(subject.ClassAverage);
+        Assert.Null(subject.HighestInClass);
+        Assert.Null(subject.LowestInClass);
+    }
+}

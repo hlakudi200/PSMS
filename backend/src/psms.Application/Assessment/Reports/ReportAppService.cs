@@ -52,6 +52,7 @@ public class ReportAppService : ApplicationService, IReportAppService
     private readonly psms.Academic.Students.ICurrentStudentResolver _currentStudent;
     private readonly psms.Academic.Parents.ICurrentParentResolver _currentParent;
     private readonly psms.Workflow.Shared.WorkflowStarterService _workflowStarter;
+    private readonly ReportCohortStatisticsService _cohortStatistics;
 
     public ReportAppService(
         IRepository<Report, Guid> reportRepository,
@@ -68,7 +69,8 @@ public class ReportAppService : ApplicationService, IReportAppService
         IBackgroundJobManager backgroundJobManager,
         psms.Academic.Students.ICurrentStudentResolver currentStudent,
         psms.Academic.Parents.ICurrentParentResolver currentParent,
-        psms.Workflow.Shared.WorkflowStarterService workflowStarter)
+        psms.Workflow.Shared.WorkflowStarterService workflowStarter,
+        ReportCohortStatisticsService cohortStatistics)
     {
         _reportRepository = reportRepository;
         _reportSubjectRepository = reportSubjectRepository;
@@ -85,6 +87,7 @@ public class ReportAppService : ApplicationService, IReportAppService
         _currentStudent = currentStudent;
         _currentParent = currentParent;
         _workflowStarter = workflowStarter;
+        _cohortStatistics = cohortStatistics;
     }
 
     [AbpAuthorize(PermissionNames.Assessment_ReportCards_View)]
@@ -302,6 +305,10 @@ public class ReportAppService : ApplicationService, IReportAppService
             input.DaysLate,
             input.TeacherComment);
 
+        // RC-06: this learner joining the cohort reorders everybody in it.
+        await _cohortStatistics.TryRecalculateAsync(
+            AbpSession.TenantId, input.ClassId, input.TermId, input.ReportType);
+
         return await GetAsync(report.Id);
     }
 
@@ -436,8 +443,7 @@ public class ReportAppService : ApplicationService, IReportAppService
 
         // One ReportSubject per active class subject, carrying the mark average
         // already computed for this learner.
-        decimal? overallTotal = null;
-        var markedSubjects = 0;
+        var subjectFinalMarks = new List<decimal?>();
 
         foreach (var classSubject in context.ClassSubjects)
         {
@@ -452,25 +458,17 @@ public class ReportAppService : ApplicationService, IReportAppService
             if (context.SubjectAverages.TryGetValue((studentId, classSubject.SubjectId), out var average))
             {
                 reportSubject.RecordMarks(average, null);
-
-                if (reportSubject.FinalMark.HasValue)
-                {
-                    overallTotal = (overallTotal ?? 0m) + reportSubject.FinalMark.Value;
-                    markedSubjects++;
-                }
+                subjectFinalMarks.Add(reportSubject.FinalMark);
             }
 
             await _reportSubjectRepository.InsertAsync(reportSubject);
         }
 
-        // The overall is the mean of the subject final marks. It is computed from
-        // what was just written rather than re-read, so there is one round trip
-        // instead of a save-then-reload for every learner.
-        if (markedSubjects > 0)
-        {
-            report.OverallPercentage = overallTotal.Value / markedSubjects;
-            report.OverallAchievementLevel = CalculateAchievementLevel(report.OverallPercentage.Value);
-        }
+        // RC-07: the overall comes from Report.RecalculateOverall, the one
+        // definition of it. It is computed from what was just written rather
+        // than re-read, so there is one round trip instead of a save-then-reload
+        // for every learner.
+        report.RecalculateOverall(subjectFinalMarks);
 
         report.TotalStudentsInClass = context.TotalStudentsInClass;
 
@@ -726,6 +724,15 @@ public class ReportAppService : ApplicationService, IReportAppService
             }
 
             result.Items.Add(item);
+        }
+
+        // RC-06: class position and the per-subject class figures only exist
+        // once the cohort does, so they are stamped on in one pass here rather
+        // than guessed at per learner inside the loop above.
+        if (result.GeneratedCount > 0)
+        {
+            await _cohortStatistics.TryRecalculateAsync(
+                AbpSession.TenantId, input.ClassId, input.TermId, input.ReportType);
         }
 
         return result;
@@ -1109,16 +1116,5 @@ public class ReportAppService : ApplicationService, IReportAppService
 
         return await _fileStorage.CreateSignedDownloadUrlAsync(
             _fileStorage.DefaultBucketName, objectKey, PdfLinkLifetimeSeconds);
-    }
-
-    private static CapsAchievementLevel CalculateAchievementLevel(decimal percentage)
-    {
-        if (percentage >= 80) return CapsAchievementLevel.Level7;
-        if (percentage >= 70) return CapsAchievementLevel.Level6;
-        if (percentage >= 60) return CapsAchievementLevel.Level5;
-        if (percentage >= 50) return CapsAchievementLevel.Level4;
-        if (percentage >= 40) return CapsAchievementLevel.Level3;
-        if (percentage >= 30) return CapsAchievementLevel.Level2;
-        return CapsAchievementLevel.Level1;
     }
 }

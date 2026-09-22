@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Linq;
 using Abp.Domain.Entities;
 using Abp.Domain.Entities.Auditing;
 using psms.Domain.Academic.Entities;
@@ -285,6 +286,60 @@ namespace psms.Domain.Assessment.Entities
             ParentAcknowledgedDate = DateTime.UtcNow;
             ParentComment = comment;
         }
+
+        /// <summary>
+        /// RC-07. The one place the overall average is decided.
+        /// <para>
+        /// The overall is the <b>unweighted mean of the subject final marks</b>,
+        /// over the subjects that have one. Nothing in CAPS or the National
+        /// Protocol prescribes an overall aggregate at all — it is a convenience
+        /// for the card — and no subject carries a credit value in this system,
+        /// so there is nothing to weight by. If subject credits are ever
+        /// introduced, this is the single method to change.
+        /// </para>
+        /// <para>
+        /// A subject with no mark does not count as a zero: it is left out of
+        /// the mean entirely, so a term with one unmarked subject does not
+        /// silently depress the average. With no marked subjects at all, both
+        /// the percentage and the level are cleared rather than shown as 0%.
+        /// </para>
+        /// <para>
+        /// Stored rounded to two decimals, which is what the column holds. The
+        /// PDF and the print view <b>render</b> this value; neither recomputes
+        /// its own, which is how they used to contradict the screen.
+        /// </para>
+        /// </summary>
+        public void RecalculateOverall(IEnumerable<decimal?> subjectFinalMarks)
+        {
+            var marked = (subjectFinalMarks ?? Enumerable.Empty<decimal?>())
+                .Where(m => m.HasValue)
+                .Select(m => m.Value)
+                .ToList();
+
+            if (marked.Count == 0)
+            {
+                OverallPercentage = null;
+                OverallAchievementLevel = null;
+                return;
+            }
+
+            OverallPercentage = Math.Round(
+                marked.Sum() / marked.Count, 2, MidpointRounding.AwayFromZero);
+            OverallAchievementLevel = CapsAchievementScale.LevelFor(OverallPercentage.Value);
+        }
+
+        /// <summary>
+        /// Convenience over <see cref="RecalculateOverall(IEnumerable{decimal?})"/>
+        /// for a caller that already holds the subject rows.
+        /// </summary>
+        public void RecalculateOverall(IEnumerable<ReportSubject> subjects) =>
+            RecalculateOverall((subjects ?? Enumerable.Empty<ReportSubject>()).Select(s => s.FinalMark));
+
+        /// <summary>
+        /// RC-06. Where the learner placed in the class on the overall average.
+        /// Null when they have no overall to rank.
+        /// </summary>
+        public void SetClassPosition(int? position) => ClassPosition = position;
 
         /// <summary>
         /// Sets the URL to the generated PDF
