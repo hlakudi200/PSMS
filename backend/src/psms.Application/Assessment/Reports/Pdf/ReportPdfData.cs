@@ -11,6 +11,21 @@ public class ReportPdfData
     // School info
     public string SchoolName { get; set; }
 
+    /// <summary>
+    /// The school's action colour, "#RRGGBB". Falls back to the stock PSMS
+    /// palette when the tenant has not branded itself (issue #56).
+    /// </summary>
+    public string PrimaryColor { get; set; } = psms.Domain.Tenancy.BrandingDefaults.PrimaryColor;
+
+    /// <summary>The school's chrome colour, "#RRGGBB".</summary>
+    public string SecondaryColor { get; set; } = psms.Domain.Tenancy.BrandingDefaults.SecondaryColor;
+
+    /// <summary>
+    /// The school's logo, already fetched. Null when the tenant has no logo, or
+    /// when it could not be read — a report card must still print without it.
+    /// </summary>
+    public byte[] LogoBytes { get; set; }
+
     // Student info
     public string StudentName { get; set; }
     public string AdmissionNumber { get; set; }

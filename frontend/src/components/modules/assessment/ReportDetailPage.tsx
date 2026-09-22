@@ -34,6 +34,8 @@ import {
 import dayjs from 'dayjs';
 import { ReportProvider, useReportState, useReportActions } from '@/providers/assessment/reports';
 import { useAuthState } from '@/providers/auth';
+import { useBrandingState } from '@/providers/branding';
+import { getPrintableInk, getReadableForeground } from '@/utils/theme-config';
 import type { IReport, IReportSubject } from '@/providers/assessment/shared/interfaces';
 
 const { Title, Text, Paragraph } = Typography;
@@ -79,7 +81,7 @@ function getAchievementTag(level?: number) {
 }
 
 /* ─── Print stylesheet ─── */
-const printStyles = `
+const buildPrintStyles = (ink: string, brandBg: string, brandFg: string) => `
 @media print {
   /* Reset page */
   @page {
@@ -108,7 +110,7 @@ const printStyles = `
     flex-direction: column;
     align-items: center;
     text-align: center;
-    border-bottom: 3px double #000;
+    border-bottom: 3px double ${ink};
     padding-bottom: 8px;
     margin-bottom: 10px;
   }
@@ -118,6 +120,15 @@ const printStyles = `
     text-transform: uppercase;
     letter-spacing: 1px;
     margin: 0;
+    color: ${ink};
+  }
+  /* The school's logo, constrained so a tall or wide upload cannot push the
+     rest of the card onto a second page. */
+  .print-header .print-logo {
+    max-height: 56px;
+    max-width: 160px;
+    object-fit: contain;
+    margin-bottom: 6px;
   }
   .print-header .report-type-label {
     font-size: 14px;
@@ -162,7 +173,8 @@ const printStyles = `
     text-align: center;
   }
   .print-subject-table th {
-    background: #f0f0f0 !important;
+    background: ${brandBg} !important;
+    color: ${brandFg} !important;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
     font-weight: 700;
@@ -318,6 +330,14 @@ function ReportDetailContent() {
   const reportId = params.id as string;
 
   const { currentRole, currentUser } = useAuthState();
+  // The printed card carries the school's identity, not PSMS's (issue #56).
+  const { branding } = useBrandingState();
+  const printInk = getPrintableInk(branding.primaryColor);
+  const printStyles = buildPrintStyles(
+    printInk,
+    branding.primaryColor,
+    getReadableForeground(branding.primaryColor)
+  );
   // Managers (principal/vice-principal/admin) get the full report actions
   // (Approve / Publish / Generate PDF / Principal Comment). Everyone else — e.g.
   // a teacher reviewing the report at the HOD step via the workflow — gets a
@@ -498,7 +518,13 @@ function ReportDetailContent() {
 
       {/* School Header */}
       <div className="print-header">
-        <h2>{(report as IReport & { schoolName?: string }).schoolName ?? 'School Report Card'}</h2>
+        {branding.logoUrl && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img className="print-logo" src={branding.logoUrl} alt={`${branding.schoolName} logo`} />
+        )}
+        {/* schoolName was previously cast onto IReport, where it does not exist,
+            so every printed card read the literal fallback. */}
+        <h2>{branding.schoolName || 'School Report Card'}</h2>
         <div className="report-type-label">{reportTypeMap[report.reportType] ?? 'Student Report Card'}</div>
         <div style={{ fontSize: 11, marginTop: 2 }}>
           {report.termName ?? ''} {report.termName && report.academicYearName ? ' — ' : ''} {report.academicYearName ?? ''}

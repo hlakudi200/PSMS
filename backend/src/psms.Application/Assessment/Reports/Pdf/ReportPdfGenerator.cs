@@ -14,10 +14,92 @@ namespace psms.Assessment.Reports.Pdf;
 /// </summary>
 public static class ReportPdfGenerator
 {
-    // Colours
+    // Colours. The neutrals stay fixed — a report card has to stay legible in
+    // black and white — while the school's primary colour carries the identity:
+    // the logo rule, the school name and the table headers.
     private static readonly string HeaderBg = Colors.Grey.Lighten3;
     private static readonly string BorderCol = Colors.Black;
     private static readonly string LightBorder = Colors.Grey.Lighten2;
+
+    /// <summary>Largest logo we will place in the header, in points.</summary>
+    private const float LogoMaxHeight = 52f;
+    private const float LogoMaxWidth = 150f;
+
+    /// <summary>
+    /// The colour if it is one QuestPDF will accept, otherwise the stock PSMS
+    /// primary. Branding is validated on the way in, but a report card must not
+    /// be the thing that falls over if a bad value ever reaches it.
+    /// </summary>
+    private static string SafeColor(string hex)
+    {
+        var value = (hex ?? string.Empty).Trim();
+        if (!value.StartsWith("#")) value = "#" + value;
+
+        return System.Text.RegularExpressions.Regex.IsMatch(value, "^#[0-9A-Fa-f]{6}$")
+            ? value.ToUpperInvariant()
+            : psms.Domain.Tenancy.BrandingDefaults.PrimaryColor;
+    }
+
+    /// <summary>
+    /// The brand colour, darkened until it is legible as ink on white paper.
+    /// A pale brand — gold, mint, sky — set straight as text is almost invisible
+    /// on a printed page, so it is shaded down while staying recognisably the
+    /// school's colour. A colour that is already dark enough is returned as-is.
+    /// </summary>
+    private static string InkOnWhite(string hex)
+    {
+        var value = SafeColor(hex).Substring(1);
+        var r = Convert.ToInt32(value.Substring(0, 2), 16);
+        var g = Convert.ToInt32(value.Substring(2, 2), 16);
+        var b = Convert.ToInt32(value.Substring(4, 2), 16);
+
+        // Shade toward black until the colour carries enough weight against
+        // white. 0.35 keeps strong mid-tones (a royal blue, a deep purple)
+        // untouched while pulling pastels down to something readable.
+        for (var i = 0; i < 8 && Luminance(r, g, b) > 0.35f; i++)
+        {
+            r = (int)(r * 0.8f);
+            g = (int)(g * 0.8f);
+            b = (int)(b * 0.8f);
+        }
+
+        return $"#{r:X2}{g:X2}{b:X2}";
+    }
+
+    private static float Luminance(int r, int g, int b)
+    {
+        float Channel(int c)
+        {
+            var srgb = c / 255f;
+            return srgb <= 0.03928f ? srgb / 12.92f : (float)Math.Pow((srgb + 0.055f) / 1.055f, 2.4);
+        }
+
+        return 0.2126f * Channel(r) + 0.7152f * Channel(g) + 0.0722f * Channel(b);
+    }
+
+    /// <summary>
+    /// Black or white, whichever reads better on the given background. Mirrors
+    /// the frontend's getReadableForeground so a branded header looks the same
+    /// on screen and on paper; 0.179 is the crossover where the two give equal
+    /// contrast.
+    /// </summary>
+    private static string ReadableOn(string hex)
+    {
+        var value = (hex ?? string.Empty).Replace("#", string.Empty);
+        if (value.Length < 6 || !System.Text.RegularExpressions.Regex.IsMatch(value, "^[0-9A-Fa-f]{6}$"))
+            return Colors.White;
+
+        float Channel(int offset)
+        {
+            var srgb = Convert.ToInt32(value.Substring(offset, 2), 16) / 255f;
+            return srgb <= 0.03928f
+                ? srgb / 12.92f
+                : (float)Math.Pow((srgb + 0.055f) / 1.055f, 2.4);
+        }
+
+        var luminance = 0.2126f * Channel(0) + 0.7152f * Channel(2) + 0.0722f * Channel(4);
+        return luminance > 0.179f ? "#1F1F1F" : Colors.White;
+    }
 
     static ReportPdfGenerator()
     {
@@ -26,6 +108,10 @@ public static class ReportPdfGenerator
 
     public static byte[] Generate(ReportPdfData data)
     {
+        // Gate the brand colour once here so every use below is safe.
+        data.PrimaryColor = SafeColor(data.PrimaryColor);
+        data.SecondaryColor = SafeColor(data.SecondaryColor);
+
         var document = Document.Create(container =>
         {
             container.Page(page =>
@@ -49,10 +135,20 @@ public static class ReportPdfGenerator
     {
         container.Column(column =>
         {
-            // School name — large, uppercase, centred
+            // The school's logo, when it has one. Constrained so a tall or wide
+            // upload cannot push the rest of the card off the page.
+            if (data.LogoBytes != null && data.LogoBytes.Length > 0)
+            {
+                column.Item().AlignCenter()
+                    .MaxHeight(LogoMaxHeight).MaxWidth(LogoMaxWidth)
+                    .Image(data.LogoBytes).FitArea();
+                column.Item().Height(6);
+            }
+
+            // School name — large, uppercase, centred, in the school's colour
             column.Item().AlignCenter()
                 .Text(data.SchoolName?.ToUpperInvariant() ?? "SCHOOL REPORT CARD")
-                .Bold().FontSize(18).LetterSpacing(0.05f);
+                .Bold().FontSize(18).LetterSpacing(0.05f).FontColor(InkOnWhite(data.PrimaryColor));
 
             // Report type
             column.Item().AlignCenter()
@@ -69,8 +165,9 @@ public static class ReportPdfGenerator
 
             column.Item().Height(4);
 
-            // Double rule
-            column.Item().LineHorizontal(2).LineColor(BorderCol);
+            // Double rule — the heavy line takes the school's colour, the hairline
+            // stays black so the card still reads as a document in mono.
+            column.Item().LineHorizontal(2).LineColor(InkOnWhite(data.PrimaryColor));
             column.Item().Height(2);
             column.Item().LineHorizontal(0.5f).LineColor(BorderCol);
 
@@ -163,14 +260,22 @@ public static class ReportPdfGenerator
             // Header row
             table.Header(header =>
             {
-                header.Cell().Element(HeaderCellStyle).Text("SUBJECT").Bold().FontSize(8);
-                header.Cell().Element(HeaderCellStyle).Text("CODE").Bold().FontSize(8);
-                header.Cell().Element(HeaderCellStyle).AlignCenter().Text("TERM\nMARK (%)").Bold().FontSize(8);
-                header.Cell().Element(HeaderCellStyle).AlignCenter().Text("EXAM\nMARK (%)").Bold().FontSize(8);
-                header.Cell().Element(HeaderCellStyle).AlignCenter().Text("FINAL\nMARK (%)").Bold().FontSize(8);
-                header.Cell().Element(HeaderCellStyle).AlignCenter().Text("LEVEL").Bold().FontSize(8);
-                header.Cell().Element(HeaderCellStyle).Text("TEACHER").Bold().FontSize(8);
-                header.Cell().Element(HeaderCellStyle).Text("COMMENT").Bold().FontSize(8);
+                // The subject table's header row carries the school's colour, with a
+                // foreground picked for contrast so a dark navy and a pale gold
+                // brand both stay readable.
+                var brandBg = data.PrimaryColor;
+                var brandFg = ReadableOn(brandBg);
+                IContainer BrandedHeader(IContainer cell) =>
+                    cell.Border(1).BorderColor(BorderCol).Background(brandBg).Padding(4);
+
+                header.Cell().Element(BrandedHeader).Text("SUBJECT").Bold().FontSize(8).FontColor(brandFg);
+                header.Cell().Element(BrandedHeader).Text("CODE").Bold().FontSize(8).FontColor(brandFg);
+                header.Cell().Element(BrandedHeader).AlignCenter().Text("TERM\nMARK (%)").Bold().FontSize(8).FontColor(brandFg);
+                header.Cell().Element(BrandedHeader).AlignCenter().Text("EXAM\nMARK (%)").Bold().FontSize(8).FontColor(brandFg);
+                header.Cell().Element(BrandedHeader).AlignCenter().Text("FINAL\nMARK (%)").Bold().FontSize(8).FontColor(brandFg);
+                header.Cell().Element(BrandedHeader).AlignCenter().Text("LEVEL").Bold().FontSize(8).FontColor(brandFg);
+                header.Cell().Element(BrandedHeader).Text("TEACHER").Bold().FontSize(8).FontColor(brandFg);
+                header.Cell().Element(BrandedHeader).Text("COMMENT").Bold().FontSize(8).FontColor(brandFg);
             });
 
             // Data rows
