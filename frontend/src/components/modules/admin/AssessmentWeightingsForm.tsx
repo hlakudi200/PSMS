@@ -180,6 +180,13 @@ function AssessmentWeightingsContent() {
         return (
           <Space direction="vertical" size={0}>
             <Text strong>{name}</Text>
+            {record.examinationIsExternal && (
+              <Tooltip title="The examination half is the National Senior Certificate paper, set and marked nationally. The school holds only the 25% school-based assessment, so a Grade 12 final mark cannot be computed here.">
+                <Tag color="blue" style={{ marginTop: 4 }}>
+                  External examination
+                </Tag>
+              </Tooltip>
+            )}
             {departed && (
               <Tooltip
                 title={`The national default is ${record.policySbaPercentage}% school-based assessment and ${record.policyExamPercentage}% examination.`}
@@ -314,10 +321,21 @@ function AssessmentWeightingsContent() {
         size="small"
       />
 
-      <Text type="secondary" style={{ display: 'block', marginTop: 12, fontSize: 12 }}>
-        Foundation Phase has no examination component — Grades R&ndash;3 are assessed entirely
-        through school-based assessment.
-      </Text>
+      <Space direction="vertical" size={4} style={{ marginTop: 12 }}>
+        <Text type="secondary" style={{ fontSize: 12 }}>
+          Foundation Phase has no examination component — Grades R&ndash;3 are assessed entirely
+          through school-based assessment.
+        </Text>
+        <Text type="secondary" style={{ fontSize: 12 }}>
+          Grade 12&rsquo;s examination is the external National Senior Certificate paper, set and
+          marked nationally. The school holds only the 25% school-based assessment, so a final
+          Grade 12 mark comes from the DBE, not from here.
+        </Text>
+        <Text type="secondary" style={{ fontSize: 12 }}>
+          Life Orientation is an exception at 100% school-based assessment in Grades 10&ndash;12
+          (NPPPPR §31(2)). These weightings are per band, so that subject is not yet handled.
+        </Text>
+      </Space>
     </Card>
   );
 }

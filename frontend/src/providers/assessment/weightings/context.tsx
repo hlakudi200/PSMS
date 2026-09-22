@@ -23,6 +23,11 @@ export interface IAssessmentWeighting {
   policySbaPercentage: number;
   policyExamPercentage: number;
   matchesPolicyDefault: boolean;
+  /**
+   * Grade 12 only. The examination half is the external NSC paper (NPPPPR
+   * §31(1)); the school holds just the 25% SBA.
+   */
+  examinationIsExternal: boolean;
 }
 
 export interface IUpdateAssessmentWeightingItem {
