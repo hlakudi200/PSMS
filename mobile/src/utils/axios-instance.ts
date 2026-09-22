@@ -1,4 +1,5 @@
 import axios from "axios";
+import { attachNetworkLogger } from "./dev-inspector";
 import { clearSession, getSession } from "./secure-session";
 
 const baseURL = process.env.EXPO_PUBLIC_API_BASE_URL ?? "http://localhost:21021";
@@ -8,6 +9,9 @@ export const getAxiosInstance = (onUnauthorized?: () => void) => {
     baseURL,
     headers: { "Content-Type": "application/json;charset=utf-8" },
   });
+
+  // Must be attached first so it sees final request headers and raw responses.
+  attachNetworkLogger(instance);
 
   instance.interceptors.request.use(async (config) => {
     const session = await getSession();
