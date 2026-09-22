@@ -171,6 +171,11 @@ namespace psms.Domain.Assessment.Entities
             TermWeight = termWeight;
             ExamWeight = examWeight;
 
+            // Marks recorded directly are the school's own, whatever they were
+            // before. Leaving the flag set would print "the examination is not
+            // included in this mark" beside a mark that now includes one.
+            AwaitsExternalExamination = false;
+
             // Calculate final mark. Clearing both marks clears the final mark
             // too — it used to keep the previous one, so a mark entered by
             // mistake and then blanked stayed on the card.
@@ -224,11 +229,24 @@ namespace psms.Domain.Assessment.Entities
 
             AwaitsExternalExamination = result.AwaitsExternalExamination;
 
-            if (asPromotionMark && FinalMark.HasValue)
-            {
-                FinalMark = CapsRounding.PromotionMark(FinalMark.Value);
-                AchievementLevel = CapsAchievementScale.LevelFor(FinalMark);
-            }
+            if (asPromotionMark)
+                RoundToPromotionMark();
+        }
+
+        /// <summary>
+        /// Rounds the final mark to the whole number NPPPPR §31(3) prescribes,
+        /// and re-reads the level off it. Applied to a year-end card, whose
+        /// final mark is the promotion mark — including after a mark is
+        /// captured by hand, so one edited subject does not end up showing
+        /// 74.67 beside siblings showing 75.
+        /// </summary>
+        public void RoundToPromotionMark()
+        {
+            if (!FinalMark.HasValue)
+                return;
+
+            FinalMark = CapsRounding.PromotionMark(FinalMark.Value);
+            AchievementLevel = CapsAchievementScale.LevelFor(FinalMark);
         }
 
         /// <summary>

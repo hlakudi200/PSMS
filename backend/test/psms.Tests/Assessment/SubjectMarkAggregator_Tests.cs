@@ -144,6 +144,63 @@ public class SubjectMarkAggregator_Tests
         Assert.False(result.AwaitsExternalExamination);
     }
 
+    // ─── a term mark is not composed against the examination ───
+
+    [Fact]
+    public void A_term_mark_is_the_weighted_mean_of_everything_done_in_the_term()
+    {
+        // National Protocol §17(1): "reporting is against the total mark
+        // obtained in all tasks completed in a term". The band split composes
+        // the YEAR mark against the end-of-year examination; applying it in
+        // term 1 would re-weight a class test as though it were the final paper.
+        var result = SubjectMarkAggregator.AggregateTerm(new[]
+        {
+            Sba(70m, weight: 1m),
+            Sba(80m, weight: 1m),
+            Exam(60m, weight: 2m),   // a term test the teacher typed as an exam
+        });
+
+        // (70 + 80 + 60*2) / 4 — one mean over the term's tasks, at the weights
+        // the teacher gave them.
+        Assert.Equal(67.5m, result.FinalMark);
+        Assert.Equal(67.5m, result.SchoolBasedMark);
+        Assert.Null(result.ExaminationMark);
+        Assert.False(result.AwaitsExternalExamination);
+
+        // The Senior Phase split would have made this 76: 75*0.6 + 60*0.4.
+        Assert.NotEqual(72m, result.FinalMark);
+    }
+
+    [Fact]
+    public void A_term_with_nothing_recorded_is_blank()
+    {
+        Assert.Null(SubjectMarkAggregator.AggregateTerm(Array.Empty<AssessmentContribution>()).FinalMark);
+        Assert.Null(SubjectMarkAggregator.AggregateTerm(null).FinalMark);
+    }
+
+    // ─── a band with no examination component ───
+
+    [Fact]
+    public void Where_the_band_has_no_examination_an_exam_task_is_school_work()
+    {
+        // The Foundation Phase is 100% school-based (Circular S8 of 2023), and
+        // Life Orientation in the FET phase likewise (NPPPPR §31(2)). There is
+        // nothing for an examination to be weighted against, so multiplying it
+        // by zero would drop a real mark off the card without saying so.
+        var result = SubjectMarkAggregator.Aggregate(
+            new[] { Sba(60m), Exam(80m) },
+            sbaPercentage: 100,
+            examPercentage: 0,
+            examinationIsExternal: false);
+
+        Assert.Equal(70m, result.SchoolBasedMark);
+        Assert.Equal(70m, result.FinalMark);
+
+        // and nothing is left hanging in an examination column the card prints
+        Assert.Null(result.ExaminationMark);
+        Assert.False(result.AwaitsExternalExamination);
+    }
+
     // ─── defensive ───
 
     [Fact]

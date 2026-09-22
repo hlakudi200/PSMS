@@ -195,6 +195,49 @@ public class ReportSubjectMarks_Tests
     }
 
     [Fact]
+    public void Capturing_a_mark_by_hand_clears_the_external_examination_note()
+    {
+        var subject = NewSubject();
+        subject.RecordAggregate(
+            SubjectMarkAggregator.Aggregate(
+                new[] { new AssessmentContribution(68m, 1m, false) }, 25, 75, true),
+            asPromotionMark: true);
+
+        Assert.True(subject.AwaitsExternalExamination);
+
+        // A teacher enters the marks directly. Whatever this mark is, it is the
+        // school's own — and the card must not print "the examination is not
+        // included in this mark" beside a mark that now includes one.
+        subject.RecordMarks(70m, 60m, 40m, 60m);
+
+        Assert.False(subject.AwaitsExternalExamination);
+        Assert.Equal(64m, subject.FinalMark);
+    }
+
+    [Fact]
+    public void A_year_end_mark_can_be_rounded_back_to_a_whole_number_after_an_edit()
+    {
+        var subject = NewSubject();
+        subject.RecordMarks(74m, 75m, 50m, 50m);
+        Assert.Equal(74.5m, subject.FinalMark);
+
+        subject.RoundToPromotionMark();
+
+        Assert.Equal(75m, subject.FinalMark);
+        Assert.Equal(CapsAchievementLevel.Level6, subject.AchievementLevel);
+    }
+
+    [Fact]
+    public void Rounding_an_unmarked_subject_does_nothing()
+    {
+        var subject = NewSubject();
+
+        subject.RoundToPromotionMark();
+
+        Assert.Null(subject.FinalMark);
+    }
+
+    [Fact]
     public void Class_statistics_can_be_stamped_on_and_cleared()
     {
         var subject = NewSubject();

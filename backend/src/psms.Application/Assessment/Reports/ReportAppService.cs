@@ -369,6 +369,14 @@ public class ReportAppService : ApplicationService, IReportAppService
         public bool IsPromotionMark { get; set; }
 
         /// <summary>
+        /// Whether the band's School-Based Assessment to examination split
+        /// applies. It composes the <b>year</b> mark against the end-of-year
+        /// examination, so it applies to a year-end card and to nothing else: a
+        /// term card reports the term's own tasks (National Protocol §17(1)).
+        /// </summary>
+        public bool ComposesAgainstTheExamination { get; set; }
+
+        /// <summary>
         /// Every completed mark in scope, per (learner, subject), carrying its
         /// weight and whether it was the examination. A missing key means that
         /// learner has no completed marks for that subject, which is how a
@@ -443,9 +451,6 @@ public class ReportAppService : ApplicationService, IReportAppService
         Guid? termId,
         Guid academicYearId)
     {
-        if (termId.HasValue)
-            return new List<Guid> { termId.Value };
-
         var terms = await _termRepository
             .GetAll()
             .Where(t => t.TenantId == AbpSession.TenantId)
@@ -454,18 +459,40 @@ public class ReportAppService : ApplicationService, IReportAppService
             .Select(t => new { t.Id, t.TermNumber })
             .ToListAsync();
 
-        if (reportType == ReportType.MidYear)
+        if (IsYearScoped(reportType))
         {
-            return terms
-                .Where(t => t.TermNumber == SouthAfricanTermNumber.Term1
-                    || t.TermNumber == SouthAfricanTermNumber.Term2)
-                .Select(t => t.Id)
-                .ToList();
+            // A term supplied for a year-scoped report is ignored rather than
+            // honoured: a year-end card built from one term would still be
+            // stamped with a whole-number promotion mark, which would be a
+            // promotion decision made on a quarter of the year.
+            return reportType == ReportType.MidYear
+                ? terms
+                    .Where(t => t.TermNumber == SouthAfricanTermNumber.Term1
+                        || t.TermNumber == SouthAfricanTermNumber.Term2)
+                    .Select(t => t.Id)
+                    .ToList()
+                : terms.Select(t => t.Id).ToList();
         }
 
-        // Year-end, and a progress report with no term named: the whole year.
-        return terms.Select(t => t.Id).ToList();
+        // Everything else reports one term, and has to name it. The screen
+        // enforces this; the API did not, so a Term 3 card posted without a term
+        // was quietly built from the whole year.
+        if (!termId.HasValue)
+            throw new UserFriendlyException(AssessmentExceptionCodes.TermRequiredForReport,
+                "A term report needs the term it covers.");
+
+        if (terms.All(t => t.Id != termId.Value))
+            throw new UserFriendlyException(AssessmentExceptionCodes.TermNotInAcademicYear,
+                "That term does not belong to the selected academic year.");
+
+        return new List<Guid> { termId.Value };
     }
+
+    /// <summary>
+    /// Whether this kind of report covers a span of terms rather than one.
+    /// </summary>
+    private static bool IsYearScoped(ReportType reportType) =>
+        reportType == ReportType.YearEnd || reportType == ReportType.MidYear;
 
     /// <summary>
     /// The school's split for a grade band, falling back to the national
@@ -507,14 +534,22 @@ public class ReportAppService : ApplicationService, IReportAppService
                 && s.CurrentClassId == classId
                 && s.IsActive);
 
-        // The grade decides the band, and the band decides the split.
+        // The grade decides the band, and the band decides the split. A class
+        // whose grade cannot be resolved — deleted, or never set — must stop the
+        // run: defaulting would silently pick the Foundation band, whose split
+        // is 100:0, and drop every examination mark off the card.
         var gradeLevel = await _classRepository
             .GetAll()
             .Where(c => c.Id == classId && c.TenantId == AbpSession.TenantId)
             .Select(c => (SouthAfricanGradeLevel?)c.Grade.GradeLevel)
-            .FirstOrDefaultAsync() ?? SouthAfricanGradeLevel.Grade1;
+            .FirstOrDefaultAsync();
 
-        var band = AssessmentWeightingDefaults.BandFor(gradeLevel);
+        if (!gradeLevel.HasValue)
+            throw new UserFriendlyException(AssessmentExceptionCodes.ClassGradeNotResolved,
+                "This class is not linked to a grade, so there is no way to tell how its marks "
+                + "should be weighted. Set the class's grade and try again.");
+
+        var band = AssessmentWeightingDefaults.BandFor(gradeLevel.Value);
         var (sba, exam) = await ResolveWeightingAsync(band);
 
         var contributions = new Dictionary<(Guid, Guid), List<AssessmentContribution>>();
@@ -558,7 +593,7 @@ public class ReportAppService : ApplicationService, IReportAppService
         {
             ClassSubjects = classSubjects,
             TotalStudentsInClass = totalStudentsInClass,
-            GradeLevel = gradeLevel,
+            GradeLevel = gradeLevel.Value,
             SbaPercentage = sba,
             ExamPercentage = exam,
             // RC-15: Grade 12's examination is the external NSC paper. The
@@ -566,6 +601,7 @@ public class ReportAppService : ApplicationService, IReportAppService
             // 75% to make a number that reads like an NSC result.
             ExaminationIsExternal = band == AssessmentWeightingBand.Grade12,
             IsPromotionMark = reportType == ReportType.YearEnd,
+            ComposesAgainstTheExamination = reportType == ReportType.YearEnd,
             Contributions = contributions
         };
     }
@@ -630,18 +666,32 @@ public class ReportAppService : ApplicationService, IReportAppService
                 TeacherId = classSubject.TeacherId
             };
 
-            // RC-05 / RC-15: the School-Based Assessment and the examination are
-            // averaged separately and then combined with the band's split, with
-            // Life Orientation and Grade 12 handled as policy requires.
             if (context.Contributions.TryGetValue((studentId, classSubject.SubjectId), out var marks))
             {
-                var fullySchoolBased = context.IsFullySchoolBased(classSubject);
+                // RC-05: a term card reports "the total mark obtained in all
+                // tasks completed in a term" (National Protocol §17(1)). The
+                // band's SBA:examination split is about the end-of-year
+                // examination, so it composes the year mark and only that —
+                // applying it in term 1 would re-weight a class test as though
+                // it were the final paper.
+                SubjectMarkResult aggregate;
 
-                var aggregate = SubjectMarkAggregator.Aggregate(
-                    marks,
-                    fullySchoolBased ? 100 : context.SbaPercentage,
-                    fullySchoolBased ? 0 : context.ExamPercentage,
-                    examinationIsExternal: context.ExaminationIsExternal && !fullySchoolBased);
+                if (context.ComposesAgainstTheExamination)
+                {
+                    // RC-15: with Life Orientation and Grade 12 handled as
+                    // policy requires.
+                    var fullySchoolBased = context.IsFullySchoolBased(classSubject);
+
+                    aggregate = SubjectMarkAggregator.Aggregate(
+                        marks,
+                        fullySchoolBased ? 100 : context.SbaPercentage,
+                        fullySchoolBased ? 0 : context.ExamPercentage,
+                        examinationIsExternal: context.ExaminationIsExternal && !fullySchoolBased);
+                }
+                else
+                {
+                    aggregate = SubjectMarkAggregator.AggregateTerm(marks);
+                }
 
                 reportSubject.RecordAggregate(aggregate, context.IsPromotionMark);
                 subjectFinalMarks.Add(reportSubject.FinalMark);
@@ -782,8 +832,29 @@ public class ReportAppService : ApplicationService, IReportAppService
             input.ReportType, input.TermId, input.AcademicYearId);
 
         if (termIds.Count == 0)
-            throw new UserFriendlyException(AssessmentExceptionCodes.NoTermsInScope,
-                "There are no terms in the academic year to build these reports from.");
+        {
+            // A preview exists to show what would block a run, so it reports
+            // this rather than failing — a principal looking at an academic year
+            // with no terms configured should see why, not an error dialog.
+            if (!previewOnly)
+                throw new UserFriendlyException(AssessmentExceptionCodes.NoTermsInScope,
+                    "There are no terms in the academic year to build these reports from.");
+
+            foreach (var blocked in students)
+            {
+                result.Items.Add(new BulkGenerateReportItemDto
+                {
+                    StudentId = blocked.Id,
+                    StudentName = $"{blocked.FirstName} {blocked.LastName}".Trim(),
+                    AdmissionNumber = blocked.AdmissionNumber,
+                    Outcome = BulkGenerateOutcome.Blocked,
+                    Message = "There are no terms in the academic year to build this report from."
+                });
+                result.BlockedCount++;
+            }
+
+            return result;
+        }
 
         // RE-001, evaluated per learner rather than for the batch: one learner
         // with an outstanding mark must not stop the other thirty-nine.

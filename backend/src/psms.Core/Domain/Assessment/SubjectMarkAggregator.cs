@@ -117,6 +117,32 @@ namespace psms.Domain.Assessment
     /// </summary>
     public static class SubjectMarkAggregator
     {
+        /// <summary>
+        /// A term's mark: the weighted mean of every task completed in the term,
+        /// whatever kind it was.
+        /// <para>
+        /// National Protocol §17(1): "recording of learner performance is
+        /// against the assessment task and <b>reporting is against the total
+        /// mark obtained in all tasks completed in a term</b>". The band's
+        /// SBA:examination split is about the <i>end-of-year</i> examination
+        /// (Circular S8 of 2023), which has not happened in term 1; applying it
+        /// to a term card would re-weight a term test as though it were the
+        /// final paper.
+        /// </para>
+        /// </summary>
+        public static SubjectMarkResult AggregateTerm(IEnumerable<AssessmentContribution> contributions)
+        {
+            var mark = Average(contributions ?? Enumerable.Empty<AssessmentContribution>());
+
+            return mark.HasValue
+                ? new SubjectMarkResult(mark, null, mark, 100m, 0m, false)
+                : SubjectMarkResult.None;
+        }
+
+        /// <summary>
+        /// A year mark: the School-Based Assessment and the end-of-year
+        /// examination averaged separately and combined at the band's split.
+        /// </summary>
         public static SubjectMarkResult Aggregate(
             IEnumerable<AssessmentContribution> contributions,
             int sbaPercentage,
@@ -125,14 +151,24 @@ namespace psms.Domain.Assessment
         {
             var all = (contributions ?? Enumerable.Empty<AssessmentContribution>()).ToList();
 
-            var schoolBased = Average(all.Where(c => !c.IsExamination));
+            // Where the band has no examination component at all — the
+            // Foundation Phase, and Life Orientation in the FET phase — there is
+            // nothing for an examination to be weighted against, so a task the
+            // teacher labelled an exam is simply more school work. Splitting it
+            // out would multiply it by zero and drop a real mark off the card
+            // without saying so.
+            var examinationCounts = examinationIsExternal || examPercentage > 0;
+
+            var schoolBased = Average(all.Where(c => !c.IsExamination || !examinationCounts));
 
             // An external examination did not happen at this school, so whatever
             // internal paper was written is not the examination component and is
-            // not reported as one.
-            var examination = examinationIsExternal
-                ? null
-                : Average(all.Where(c => c.IsExamination));
+            // not reported as one. Nor is there an examination component to
+            // report when the band does not have one — those marks have already
+            // been folded into the school-based total above.
+            var examination = examinationCounts && !examinationIsExternal
+                ? Average(all.Where(c => c.IsExamination))
+                : null;
 
             if (!schoolBased.HasValue && !examination.HasValue)
                 return SubjectMarkResult.None;
