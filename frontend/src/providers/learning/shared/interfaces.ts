@@ -222,6 +222,9 @@ export interface IPagedAndSortedResultRequest {
   }
   
   export interface IUpdateOnlineLesson {
+    // Only sent when changed. Switching to an external platform needs meetingLink.
+    classSubjectId?: string;
+    platform?: number;
     title?: string;
     description?: string;
     meetingLink?: string;

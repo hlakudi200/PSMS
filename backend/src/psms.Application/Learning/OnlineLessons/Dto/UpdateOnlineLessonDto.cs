@@ -1,5 +1,7 @@
+using psms.Domain.Shared.Enums;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 
 namespace psms.Learning.OnlineLessons.Dto;
 
@@ -10,6 +12,16 @@ namespace psms.Learning.OnlineLessons.Dto;
 /// </summary>
 public class UpdateOnlineLessonDto
 {
+    /// <summary>Moves the lesson to another class-subject the teacher teaches. Null = unchanged.</summary>
+    public Guid? ClassSubjectId { get; set; }
+
+    /// <summary>
+    /// Changes the platform. Null = unchanged. Switching to an external
+    /// platform requires MeetingLink; switching to InApp clears the external details.
+    /// </summary>
+    [EnumDataType(typeof(OnlinePlatform))]
+    public OnlinePlatform? Platform { get; set; }
+
     public string Title { get; set; }
     public string Description { get; set; }
     public string MeetingLink { get; set; }

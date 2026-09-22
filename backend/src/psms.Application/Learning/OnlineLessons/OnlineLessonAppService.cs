@@ -332,21 +332,55 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
             throw new UserFriendlyException(LearningExceptionCodes.CannotUpdateNonScheduledLesson,
                 "Only scheduled lessons can be updated.");
 
+        // Moving the lesson to another class-subject (fixing a wrong pick):
+        // the teacher must teach the new one and the slot must be free there.
+        var classSubjectChanged = input.ClassSubjectId.HasValue
+                                  && input.ClassSubjectId.Value != lesson.ClassSubjectId;
+        if (classSubjectChanged)
+        {
+            var teacherId = await ResolveCurrentTeacherIdOrThrowAsync();
+            await EnsureTeacherOwnsClassSubjectAsync(input.ClassSubjectId.Value, teacherId);
+            await EnsureNoOverlapOrThrowAsync(
+                input.ClassSubjectId.Value, lesson.ScheduledStartTime, lesson.ScheduledEndTime, lesson.Id);
+            // Swap the loaded navigation along with the FK so EF doesn't
+            // reconcile the two back to the old class-subject.
+            lesson.ClassSubject = await _classSubjectRepository.GetAsync(input.ClassSubjectId.Value);
+            lesson.ClassSubjectId = input.ClassSubjectId.Value;
+        }
+
         if (input.Title != null) lesson.Title = input.Title.Trim();
         if (input.Description != null) lesson.Description = input.Description;
-        // Apply the same scheme whitelist on update — the iter-2 review
-        // surfaced an XSS path via Update→handleJoin→window.open(link).
-        if (input.MeetingLink != null)
-        {
-            ValidateMeetingLinkOrThrow(input.MeetingLink);
-            lesson.MeetingLink = input.MeetingLink;
-        }
-        if (input.MeetingId != null) lesson.MeetingId = input.MeetingId;
-        if (input.MeetingPassword != null) lesson.MeetingPassword = input.MeetingPassword;
 
-        if (input.MaterialIds != null)
+        var platform = input.Platform ?? lesson.Platform;
+        if (platform == OnlinePlatform.InApp)
         {
-            var materialIds = await ValidateLessonMaterialsOrThrowAsync(input.MaterialIds, lesson.ClassSubjectId);
+            // In-app classes are hosted inside PSMS: the join route is derived
+            // from the lesson id and there are no external credentials.
+            lesson.MeetingLink = $"/live-class/{lesson.Id}";
+            lesson.MeetingId = null;
+            lesson.MeetingPassword = null;
+        }
+        else
+        {
+            // Apply the same scheme whitelist on update — the iter-2 review
+            // surfaced an XSS path via Update→handleJoin→window.open(link).
+            // Switching away from in-app must supply a real meeting link.
+            if (input.MeetingLink != null || lesson.Platform == OnlinePlatform.InApp)
+            {
+                ValidateMeetingLinkOrThrow(input.MeetingLink);
+                lesson.MeetingLink = input.MeetingLink;
+            }
+            if (input.MeetingId != null) lesson.MeetingId = input.MeetingId;
+            if (input.MeetingPassword != null) lesson.MeetingPassword = input.MeetingPassword;
+        }
+        lesson.Platform = platform;
+
+        // Materials belong to a class-subject, so a class change revalidates
+        // them against the new one (or drops them when none were sent).
+        if (input.MaterialIds != null || classSubjectChanged)
+        {
+            var materialIds = await ValidateLessonMaterialsOrThrowAsync(
+                input.MaterialIds ?? new List<Guid>(), lesson.ClassSubjectId);
             await ReplaceLessonMaterialsAsync(lesson.Id, materialIds);
         }
 
@@ -1192,10 +1226,22 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
                 $"Lessons must be scheduled within school hours ({SchoolStartHourSast:D2}:00-{SchoolEndHourSast:D2}:00 SAST) on a single day.");
         }
 
-        // Overlap check: any *active* (not cancelled / not completed)
-        // lesson on the same class-subject whose [start, end) intersects
-        // [scheduledStart, scheduledEnd). Cancelled/completed rows are
-        // ignored — they cannot be revived in place.
+        await EnsureNoOverlapOrThrowAsync(classSubjectId, scheduledStartUtc, scheduledEndUtc, excludeLessonId);
+    }
+
+    /// <summary>
+    /// Overlap check: any *active* (not cancelled / not completed) lesson on
+    /// the class-subject whose [start, end) intersects [scheduledStart,
+    /// scheduledEnd). Cancelled/completed rows are ignored — they cannot be
+    /// revived in place. Also used on its own when a lesson moves to another
+    /// class-subject without changing its time.
+    /// </summary>
+    private async Task EnsureNoOverlapOrThrowAsync(
+        Guid classSubjectId,
+        DateTime scheduledStartUtc,
+        DateTime scheduledEndUtc,
+        Guid? excludeLessonId)
+    {
         var overlapQuery = _onlineLessonRepository
             .GetAll()
             .Where(ol => ol.TenantId == AbpSession.TenantId

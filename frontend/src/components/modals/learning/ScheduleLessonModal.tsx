@@ -420,7 +420,8 @@ export const ScheduleLessonModal: React.FC<ScheduleLessonModalProps> = ({
       message.error(inlineSchoolHoursWarning);
       return;
     }
-    if (timeChanged && conflict.hasConflict) {
+    const classChanged = !!lesson && result.data.classSubjectId !== lesson.classSubjectId;
+    if ((timeChanged || classChanged) && conflict.hasConflict) {
       // Confirm-don't-block: server will reject anyway, but the user has
       // been warned so they can deliberately retry once they've moved the
       // other lesson. We bail here.
@@ -483,8 +484,13 @@ export const ScheduleLessonModal: React.FC<ScheduleLessonModalProps> = ({
     end: Dayjs,
     materialIds: string[]
   ) => {
-    const isInAppLesson = current.platform === PLATFORM_INAPP;
+    // Meeting fields follow the platform picked in the form, which may have
+    // changed. Class-subject and platform are only sent when they changed.
+    const isInAppLesson = data.platform === PLATFORM_INAPP;
     const update: IUpdateOnlineLesson = {
+      classSubjectId:
+        data.classSubjectId !== current.classSubjectId ? data.classSubjectId : undefined,
+      platform: data.platform !== current.platform ? data.platform : undefined,
       title: data.title.trim(),
       // Empty string clears the description; the server treats null as "unchanged".
       description: data.description?.trim() ?? '',
@@ -578,7 +584,6 @@ export const ScheduleLessonModal: React.FC<ScheduleLessonModalProps> = ({
                 showSearch
                 optionFilterProp="label"
                 options={classSubjectOptions}
-                disabled={isEdit}
               />
             </Form.Item>
           </Col>
@@ -590,7 +595,7 @@ export const ScheduleLessonModal: React.FC<ScheduleLessonModalProps> = ({
               validateStatus={zodErrors.platform ? 'error' : undefined}
               help={zodErrors.platform}
             >
-              <Select options={PLATFORM_OPTIONS} disabled={isEdit} />
+              <Select options={PLATFORM_OPTIONS} />
             </Form.Item>
           </Col>
         </Row>
