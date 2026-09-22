@@ -22,8 +22,11 @@ namespace psms.Assessment.Weightings;
 /// <para>
 /// Seeded from DBE Circular S8 of 2023 and editable, because an independent
 /// school may run an approved variation. Reading is open to any authenticated
-/// user — report screens need it to explain a mark — while editing sits behind
-/// the same settings permission as branding.
+/// user — report screens need it to explain how a mark was composed — while
+/// editing needs Assessment.Weightings.Manage.
+///
+/// Deliberately not Administration.Settings.Edit, which only the tenant Admin
+/// holds: the split is an academic policy decision the principal owns.
 /// </para>
 /// </summary>
 [AbpAuthorize]
@@ -62,7 +65,7 @@ public class AssessmentWeightingAppService : ApplicationService, IAssessmentWeig
     /// does not silently under- or over-states every learner's final mark, so
     /// it is refused rather than normalised.
     /// </summary>
-    [AbpAuthorize(PermissionNames.Administration_Settings_Edit)]
+    [AbpAuthorize(PermissionNames.Assessment_Weightings_Manage)]
     public async Task<ListResultDto<AssessmentWeightingDto>> UpdateAsync(UpdateAssessmentWeightingsDto input)
     {
         if (input?.Weightings == null || input.Weightings.Count == 0)
@@ -103,7 +106,7 @@ public class AssessmentWeightingAppService : ApplicationService, IAssessmentWeig
     }
 
     /// <summary>Returns every band to the DBE Circular S8 of 2023 value.</summary>
-    [AbpAuthorize(PermissionNames.Administration_Settings_Edit)]
+    [AbpAuthorize(PermissionNames.Assessment_Weightings_Manage)]
     public async Task<ListResultDto<AssessmentWeightingDto>> ResetToDefaultsAsync()
     {
         var rows = await EnsureAllBandsAsync();
