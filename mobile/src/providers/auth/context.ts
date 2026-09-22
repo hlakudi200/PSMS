@@ -40,6 +40,8 @@ export interface IAuthStateContext {
   currentStudentId?: string;
   /** The caller's own CurrentClassId (Guid) — for class-scoped reads (e.g. this term's assessment list). */
   currentClassId?: string;
+  /** True once the Student/GetActiveStudents lookup behind currentStudentId/currentClassId has failed — lets screens stop showing a loading spinner and show a real error state instead. */
+  currentStudentIdError?: boolean;
 }
 
 export interface IAuthActionContext {

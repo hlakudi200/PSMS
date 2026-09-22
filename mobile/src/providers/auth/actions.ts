@@ -39,9 +39,13 @@ export const getCurrentUserError = createAction<AuthPatch, string>(
   AuthActionEnums.getCurrentUserError,
   (errorMessage) => ({ isPending: false, isSuccess: false, isError: true, errorMessage, isAccessDenied: false })
 );
-export const setCurrentStudentId = createAction<AuthPatch, { currentStudentId?: string; currentClassId?: string }>(
+export const setCurrentStudentId = createAction<
+  AuthPatch, { currentStudentId?: string; currentClassId?: string; currentStudentIdError?: boolean }
+>(
   AuthActionEnums.setCurrentStudentId,
-  ({ currentStudentId, currentClassId }) => ({ currentStudentId, currentClassId })
+  ({ currentStudentId, currentClassId, currentStudentIdError = false }) => ({
+    currentStudentId, currentClassId, currentStudentIdError,
+  })
 );
 export const signOutUser = createAction<AuthPatch>(AuthActionEnums.signOutUser, () => ({
   ...INITIAL_AUTH_VALUES,
@@ -64,4 +68,5 @@ const INITIAL_AUTH_VALUES = {
   currentRole: undefined,
   currentStudentId: undefined,
   currentClassId: undefined,
+  currentStudentIdError: false,
 };

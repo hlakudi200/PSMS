@@ -3,12 +3,13 @@ import { FlatList, RefreshControl, StyleSheet, Text } from "react-native";
 import { router } from "expo-router";
 import { Button, ListRow, Screen, StateView } from "../../components";
 import { colors, spacing, typography } from "../../theme";
-import { useAuthState } from "../../providers/auth";
+import { useAuthActions, useAuthState } from "../../providers/auth";
 import { useSubjectsActions, useSubjectsState } from "../../providers/subjects";
 import type { IMySubject } from "../../providers/subjects/context";
 
 export function SubjectsScreen() {
-  const { currentStudentId, currentClassId } = useAuthState();
+  const { currentStudentId, currentClassId, currentStudentIdError } = useAuthState();
+  const { signOut } = useAuthActions();
   const { subjects, isPending, isError } = useSubjectsState();
   const { getMySubjectsAsync } = useSubjectsActions();
 
@@ -22,6 +23,25 @@ export function SubjectsScreen() {
   // marks is the only built destination to tap through to today.
   const openMarks = useCallback(() => router.push("/(student)/(tabs)/marks"), []);
 
+  const handleSignOut = useCallback(async () => {
+    await signOut();
+    router.dismissAll();
+    router.replace("/(auth)/login");
+  }, [signOut]);
+
+  // currentStudentIdError means auth already tried and failed to resolve the
+  // student profile behind currentStudentId/currentClassId — showing a
+  // loading spinner here would spin forever, since reload() can't do
+  // anything without those ids. Only fall back to the ordinary loading state
+  // while that lookup is still in flight.
+  if (currentStudentIdError) {
+    return (
+      <Screen>
+        <StateView state="error" message="We couldn't load your student profile. Try signing in again." />
+        <Button onPress={() => void handleSignOut()}>Sign out</Button>
+      </Screen>
+    );
+  }
   if ((isPending && !subjects) || !currentStudentId || !currentClassId) {
     return <Screen><StateView state="loading" message="Loading your subjects…" /></Screen>;
   }

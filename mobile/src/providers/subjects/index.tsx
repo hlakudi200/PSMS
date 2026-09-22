@@ -26,6 +26,10 @@ export const SubjectsProvider = ({ children }: { children: React.ReactNode }) =>
 
       const teachingBySubjectId = new Map<string, { teacherName?: string; className?: string }>();
       for (const cs of classSubjectResponse.data.result.items as any[]) {
+        // GetByClass doesn't filter by IsActive — a deactivated assignment (subject
+        // dropped/reassigned mid-year) is still returned, and would otherwise show a
+        // stale teacher for a subject the student is still actively enrolled in.
+        if (!cs.isActive) continue;
         teachingBySubjectId.set(cs.subjectId, {
           teacherName: cs.teacherName ?? undefined,
           className: cs.className ?? undefined,

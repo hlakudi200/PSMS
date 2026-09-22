@@ -45,7 +45,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           const self = activeStudents.data.result.items?.[0];
           dispatch(setCurrentStudentId({ currentStudentId: self?.id, currentClassId: self?.currentClassId }));
         } catch {
-          // Non-fatal: screens that need it will show their own error state.
+          dispatch(setCurrentStudentId({ currentStudentIdError: true }));
         }
       }
     } catch (error) {
