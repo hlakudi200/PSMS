@@ -19,6 +19,7 @@ namespace psms.Domain.Assessment.Entities
         public const int MaxTeacherCommentLength = 2000;
         public const int MaxPrincipalCommentLength = 1000;
         public const int MaxParentCommentLength = 1000;
+        public const int MaxPromotionReasonLength = 1000;
 
         /// <summary>
         /// Tenant identifier for multi-tenancy
@@ -122,6 +123,17 @@ namespace psms.Domain.Assessment.Entities
         /// Next grade promoted to
         /// </summary>
         public Guid? PromotedToGradeId { get; set; }
+
+        /// <summary>
+        /// RC-16. Why the decision was what it was, when it departs from the
+        /// national requirements — a retention, or a progression despite them
+        /// being met. NPPPPR §(2b) puts a retention behind a staff meeting and
+        /// then a meeting with the parent; §(2b)(c) requires the decision to be
+        /// reflected on the report card, and a decision that departs from the
+        /// rules should carry what it was based on.
+        /// </summary>
+        [StringLength(MaxPromotionReasonLength)]
+        public string PromotionReason { get; set; }
 
         /// <summary>
         /// Status of the report
@@ -412,10 +424,29 @@ namespace psms.Domain.Assessment.Entities
         /// <summary>
         /// Records promotion decision
         /// </summary>
-        public void RecordPromotion(PromotionDecision decision, Guid? promotedToGradeId = null)
+        /// <summary>
+        /// RC-16. Records the promotion decision. A retained learner stays where
+        /// they are, so the destination grade is cleared rather than kept from a
+        /// previous decision.
+        /// </summary>
+        public void RecordPromotion(
+            PromotionDecision decision,
+            Guid? promotedToGradeId = null,
+            string reason = null)
         {
             PromotionDecision = decision;
-            PromotedToGradeId = promotedToGradeId;
+            PromotedToGradeId = decision == Shared.Enums.PromotionDecision.Retained
+                ? null
+                : promotedToGradeId;
+            PromotionReason = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim();
         }
+
+        /// <summary>
+        /// Whether this is the card the promotion decision belongs on. NPPPPR
+        /// §(2b)(c) requires the decision to be "reflected on the learner's
+        /// report card", and the card that carries the year's composite marks
+        /// is the year-end one.
+        /// </summary>
+        public bool CarriesPromotionDecision() => ReportType == ReportType.YearEnd;
     }
 }

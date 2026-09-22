@@ -253,6 +253,17 @@ public static class ReportPdfGenerator
             column.Item().Element(c => ComposeAttendance(c, data));
             column.Item().Height(10);
 
+            // ── RC-16: the promotion decision ──
+            // NPPPPR §(2b)(c): "the decision reached at the meeting contemplated
+            // above must be reflected on the learner's report card." Printing
+            // attendance, marks and comments while omitting the one thing the
+            // policy names was a direct breach.
+            if (!string.IsNullOrWhiteSpace(data.PromotionDecision))
+            {
+                column.Item().Element(c => ComposePromotion(c, data));
+                column.Item().Height(10);
+            }
+
             // ── Comments ──
             column.Item().Element(c => ComposeComments(c, data));
             column.Item().Height(16);
@@ -391,6 +402,34 @@ public static class ReportPdfGenerator
                 .Border(1).BorderColor(BorderCol)
                 .Background(Colors.Grey.Lighten4)
                 .Padding(4).Text("").FontSize(9);
+        });
+    }
+
+    // ─── RC-16: the promotion decision, which the year-end card exists to carry ───
+    private static void ComposePromotion(IContainer container, ReportPdfData data)
+    {
+        var brandBg = data.PrimaryColor;
+        var brandFg = ReadableOn(brandBg);
+
+        container.Border(1).BorderColor(BorderCol).Column(column =>
+        {
+            column.Item().Background(brandBg).Padding(4)
+                .Text("PROMOTION DECISION").Bold().FontSize(8).FontColor(brandFg);
+
+            column.Item().Padding(6).Column(body =>
+            {
+                var line = string.IsNullOrWhiteSpace(data.PromotedToGradeName)
+                    ? data.PromotionDecision
+                    : $"{data.PromotionDecision} to {data.PromotedToGradeName}";
+
+                body.Item().Text(line).Bold().FontSize(11);
+
+                if (!string.IsNullOrWhiteSpace(data.PromotionReason))
+                {
+                    body.Item().Height(3);
+                    body.Item().Text(data.PromotionReason).FontSize(9);
+                }
+            });
         });
     }
 

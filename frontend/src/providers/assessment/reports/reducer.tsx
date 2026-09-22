@@ -115,6 +115,18 @@ export const ReportReducer = handleActions<
       ...state,
       ...action.payload,
     }),
+    [ReportActionEnums.getPromotionAdvicePending]: (state, action) => ({
+      ...state,
+      ...action.payload,
+    }),
+    [ReportActionEnums.getPromotionAdviceSuccess]: (state, action) => ({
+      ...state,
+      ...action.payload,
+    }),
+    [ReportActionEnums.getPromotionAdviceError]: (state, action) => ({
+      ...state,
+      ...action.payload,
+    }),
     [ReportActionEnums.recordPromotionPending]: (state, action) => ({
       ...state,
       ...action.payload,

@@ -166,6 +166,37 @@ public class ReportPdfBrandingRenderTests
     }
 
     [Fact]
+    public void A_year_end_card_prints_the_promotion_decision()
+    {
+        // RC-16. NPPPPR §(2b)(c): "the decision reached at the meeting
+        // contemplated above must be reflected on the learner's report card."
+        // The card printed attendance, marks and comments and omitted the one
+        // thing the policy names.
+        var data = SampleData("#0066CC", null);
+        data.ReportType = "Year-End Report";
+        data.PromotionDecision = "Promoted";
+        data.PromotedToGradeName = "Grade 9";
+        data.PromotionReason = "Met the requirements in all nine subjects.";
+
+        var pdf = ReportPdfGenerator.Generate(data);
+        WriteSample("report-promotion.pdf", pdf);
+
+        var text = PdfText.Extract(pdf);
+
+        Assert.Contains("PROMOTION DECISION", text);
+        Assert.Contains("Promoted to Grade 9", text);
+        Assert.Contains("Met the requirements", text);
+    }
+
+    [Fact]
+    public void A_card_with_no_decision_prints_no_promotion_block()
+    {
+        var text = PdfText.Extract(ReportPdfGenerator.Generate(SampleData("#0066CC", null)));
+
+        Assert.DoesNotContain("PROMOTION DECISION", text);
+    }
+
+    [Fact]
     public void A_malformed_colour_does_not_throw()
     {
         // Defensive: branding is validated on the way in, but a report card must

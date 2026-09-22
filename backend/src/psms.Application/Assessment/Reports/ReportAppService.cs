@@ -15,6 +15,7 @@ using psms.Authorization;
 using psms.Domain.Academic.Entities;
 using psms.Domain.Assessment;
 using psms.Domain.Assessment.Entities;
+using psms.Domain.Assessment.Promotion;
 using psms.Domain.Shared.Enums;
 using psms.Domain.Workflow.Enums;
 using System;
@@ -49,6 +50,7 @@ public class ReportAppService : ApplicationService, IReportAppService
     private readonly IRepository<AssessmentEntity, Guid> _assessmentRepository;
     private readonly IRepository<Attendance, Guid> _attendanceRepository;
     private readonly IRepository<AssessmentWeighting, Guid> _weightingRepository;
+    private readonly IRepository<Grade, Guid> _gradeRepository;
     private readonly psms.Domain.Shared.Storage.IFileStorageService _fileStorage;
     private readonly IBackgroundJobManager _backgroundJobManager;
     private readonly psms.Academic.Students.ICurrentStudentResolver _currentStudent;
@@ -68,6 +70,7 @@ public class ReportAppService : ApplicationService, IReportAppService
         IRepository<AssessmentEntity, Guid> assessmentRepository,
         IRepository<Attendance, Guid> attendanceRepository,
         IRepository<AssessmentWeighting, Guid> weightingRepository,
+        IRepository<Grade, Guid> gradeRepository,
         psms.Domain.Shared.Storage.IFileStorageService fileStorage,
         IBackgroundJobManager backgroundJobManager,
         psms.Academic.Students.ICurrentStudentResolver currentStudent,
@@ -86,6 +89,7 @@ public class ReportAppService : ApplicationService, IReportAppService
         _assessmentRepository = assessmentRepository;
         _attendanceRepository = attendanceRepository;
         _weightingRepository = weightingRepository;
+        _gradeRepository = gradeRepository;
         _fileStorage = fileStorage;
         _backgroundJobManager = backgroundJobManager;
         _currentStudent = currentStudent;
@@ -1258,17 +1262,192 @@ public class ReportAppService : ApplicationService, IReportAppService
     [AbpAuthorize(PermissionNames.Assessment_ReportCards_Publish)]
     public async Task<ReportDto> RecordPromotionAsync(Guid id, PromotionDecision decision, Guid? promotedToGradeId)
     {
+        return await RecordPromotionDecisionAsync(new RecordPromotionDto
+        {
+            ReportId = id,
+            Decision = decision,
+            PromotedToGradeId = promotedToGradeId
+        });
+    }
+
+    /// <summary>
+    /// RC-16. Records the promotion decision on a year-end report card.
+    /// <para>
+    /// The decision itself stays a person's: NPPPPR §(2b) puts a retention
+    /// behind a meeting of subject staff and then a meeting with the parent, and
+    /// progression — moving a learner on despite not meeting the requirements,
+    /// to keep them from spending more than four years in a phase — is a
+    /// judgement no rule can reach. What is checked here is everything
+    /// structural: the right kind of card, a card still open to being changed,
+    /// and a destination grade that exists and is the one the learner would
+    /// actually move into.
+    /// </para>
+    /// <para>
+    /// Use <see cref="GetPromotionAdviceAsync"/> first: it says whether the
+    /// national requirements are met and exactly which are not.
+    /// </para>
+    /// </summary>
+    [AbpAuthorize(PermissionNames.Assessment_ReportCards_Generate)]
+    public async Task<ReportDto> RecordPromotionDecisionAsync(RecordPromotionDto input)
+    {
         var report = await _reportRepository
+            .FirstOrDefaultAsync(r => r.Id == input.ReportId && r.TenantId == AbpSession.TenantId);
+
+        if (report == null)
+            throw new UserFriendlyException(AssessmentExceptionCodes.ReportNotFound, "Report not found.");
+
+        // RE-003 and National Protocol §25(3): a published card is a legal
+        // document that must carry no corrections. The promotion decision is
+        // recorded before it is issued, not after.
+        if (report.Status == ReportStatus.Published)
+            throw new UserFriendlyException(AssessmentExceptionCodes.ReportNotEditable,
+                "This report card has been published. A published report card cannot be changed.");
+
+        if (!report.CarriesPromotionDecision())
+            throw new UserFriendlyException(AssessmentExceptionCodes.PromotionNotOnThisReport,
+                "A promotion decision belongs on the year-end report card, which is the one that "
+                + "carries the composite marks for the year.");
+
+        Guid? destinationGradeId = null;
+
+        if (input.Decision != PromotionDecision.Retained)
+        {
+            if (!input.PromotedToGradeId.HasValue)
+                throw new UserFriendlyException(AssessmentExceptionCodes.PromotionGradeRequired,
+                    "Say which grade the learner moves into.");
+
+            var options = await BuildGradeOptionsAsync(report.ClassId);
+            var chosen = options.FirstOrDefault(g => g.Id == input.PromotedToGradeId.Value);
+
+            if (chosen == null)
+                throw new UserFriendlyException(AssessmentExceptionCodes.ReportNotFound,
+                    "That grade does not exist at this school.");
+
+            if (input.Decision == PromotionDecision.Promoted && !chosen.IsNextGrade)
+                throw new UserFriendlyException(AssessmentExceptionCodes.PromotionGradeNotNext,
+                    $"A promoted learner moves into the next grade. {chosen.GradeName} is not it.");
+
+            destinationGradeId = chosen.Id;
+        }
+
+        report.RecordPromotion(input.Decision, destinationGradeId, input.Reason);
+
+        await _reportRepository.UpdateAsync(report);
+        await CurrentUnitOfWork.SaveChangesAsync();
+
+        return await GetAsync(input.ReportId);
+    }
+
+    /// <summary>
+    /// RC-16. What the national promotion requirements make of this learner's
+    /// year — whether they are met, and clause by clause which are not.
+    /// <para>
+    /// Advice only. The rules never recommend progression, because moving a
+    /// learner on despite not meeting the requirements is a judgement made in a
+    /// meeting (NPPPPR §(2b)), not something a rule can reach.
+    /// </para>
+    /// </summary>
+    [AbpAuthorize(PermissionNames.Assessment_ReportCards_View)]
+    public async Task<PromotionAdviceDto> GetPromotionAdviceAsync(Guid id)
+    {
+        var report = await _reportRepository
+            .GetAll()
+            .Include(r => r.SubjectReports).ThenInclude(sr => sr.Subject)
+            .Include(r => r.PromotedToGrade)
             .FirstOrDefaultAsync(r => r.Id == id && r.TenantId == AbpSession.TenantId);
 
         if (report == null)
             throw new UserFriendlyException(AssessmentExceptionCodes.ReportNotFound, "Report not found.");
 
-        report.RecordPromotion(decision, promotedToGradeId);
-        await _reportRepository.UpdateAsync(report);
-        await CurrentUnitOfWork.SaveChangesAsync();
+        var grade = await _classRepository
+            .GetAll()
+            .Where(c => c.Id == report.ClassId && c.TenantId == AbpSession.TenantId)
+            .Select(c => new { c.Grade.GradeLevel, c.Grade.GradeName })
+            .FirstOrDefaultAsync();
 
-        return await GetAsync(id);
+        var advice = new PromotionAdviceDto
+        {
+            ReportId = report.Id,
+            GradeLevel = grade?.GradeLevel ?? SouthAfricanGradeLevel.Grade1,
+            GradeName = grade?.GradeName,
+            Recorded = report.PromotionDecision,
+            PromotedToGradeId = report.PromotedToGradeId,
+            PromotedToGradeName = report.PromotedToGrade?.GradeName,
+            GradeOptions = await BuildGradeOptionsAsync(report.ClassId)
+        };
+
+        if (grade == null)
+        {
+            advice.IsEvaluable = false;
+            advice.NotEvaluableReason =
+                "This class is not linked to a grade, so there are no requirements to check against.";
+            return advice;
+        }
+
+        if (!report.CarriesPromotionDecision())
+        {
+            advice.IsEvaluable = false;
+            advice.NotEvaluableReason =
+                "Promotion is decided on the year-end report card, which carries the composite marks "
+                + "for the whole year. This is a term report.";
+            return advice;
+        }
+
+        var subjects = report.SubjectReports
+            .Select(sr => new PromotionSubject(
+                sr.Subject?.SubjectName ?? "Unknown subject",
+                SubjectRoleResolver.Resolve(sr.Subject?.SubjectName, sr.Subject?.SubjectCode),
+                sr.FinalMark,
+                schoolBasedAssessmentComplete: sr.FinalMark.HasValue))
+            .ToList();
+
+        var evaluation = PromotionRules.Evaluate(grade.GradeLevel, subjects);
+
+        advice.IsEvaluable = true;
+        advice.MeetsRequirements = evaluation.MeetsRequirements;
+        advice.Recommended = evaluation.Recommended;
+        advice.Requirements = evaluation.Requirements
+            .Select(r => new PromotionRequirementDto
+            {
+                Clause = r.Clause,
+                Description = r.Description,
+                IsMet = r.IsMet,
+                Detail = r.Detail
+            })
+            .ToList();
+
+        return advice;
+    }
+
+    /// <summary>
+    /// The grades a learner in this class could be moved into: the one they are
+    /// in, and the one immediately after it.
+    /// </summary>
+    private async Task<List<PromotionGradeOptionDto>> BuildGradeOptionsAsync(Guid classId)
+    {
+        var current = await _classRepository
+            .GetAll()
+            .Where(c => c.Id == classId && c.TenantId == AbpSession.TenantId)
+            .Select(c => (SouthAfricanGradeLevel?)c.Grade.GradeLevel)
+            .FirstOrDefaultAsync();
+
+        var grades = await _gradeRepository
+            .GetAll()
+            .Where(g => g.TenantId == AbpSession.TenantId && g.IsActive)
+            .OrderBy(g => g.GradeLevel)
+            .Select(g => new { g.Id, g.GradeName, g.GradeLevel })
+            .ToListAsync();
+
+        return grades
+            .Select(g => new PromotionGradeOptionDto
+            {
+                Id = g.Id,
+                GradeName = g.GradeName,
+                GradeLevel = g.GradeLevel,
+                IsCurrentGrade = current.HasValue && g.GradeLevel == current.Value,
+                IsNextGrade = current.HasValue && (int)g.GradeLevel == (int)current.Value + 1
+            })
+            .ToList();
     }
 
     [AbpAuthorize(PermissionNames.Assessment_ReportCards_Generate)]

@@ -9,6 +9,8 @@ import {
   IBulkGenerateReportPdfsInput,
   IBulkGenerateReports,
   IBulkGenerateReportsResult,
+  IPromotionAdvice,
+  IRecordPromotion,
 } from "../shared/interfaces";
 
 export interface IReportStateContext {
@@ -21,6 +23,8 @@ export interface IReportStateContext {
   /** RC-01: the last bulk preview, and the last bulk run's per-learner result. */
   bulkPreview?: IBulkGenerateReportsResult;
   bulkResult?: IBulkGenerateReportsResult;
+  /** RC-16: the last promotion evaluation loaded, for the decision screen. */
+  promotionAdvice?: IPromotionAdvice;
 }
 
 export interface IReportActionContext {
@@ -34,6 +38,10 @@ export interface IReportActionContext {
   addPrincipalCommentAsync: (id: string, input: IReportComment) => void;
   acknowledgeByParentAsync: (id: string, input: IReportComment) => void;
   recordPromotionAsync: (id: string, decision: number, promotedToGradeId?: string) => void;
+  /** RC-16: what the national requirements make of this learner's year. */
+  getPromotionAdviceAsync: (id: string) => void;
+  /** RC-16: records the decision, with the destination grade and a reason. */
+  recordPromotionDecisionAsync: (input: IRecordPromotion) => void;
   deleteAsync: (id: string) => void;
   generatePdfAsync: (id: string) => void;
   /**

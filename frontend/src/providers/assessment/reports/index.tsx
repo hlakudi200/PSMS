@@ -11,6 +11,7 @@ import {
   IGenerateReport,
   IGetReportsInput,
   IReportComment,
+  IRecordPromotion,
 } from "../shared/interfaces";
 import { ReportReducer } from "./reducer";
 import { useContext, useReducer } from "react";
@@ -42,6 +43,9 @@ import {
   acknowledgeByParentPending,
   acknowledgeByParentSuccess,
   acknowledgeByParentError,
+  getPromotionAdvicePending,
+  getPromotionAdviceSuccess,
+  getPromotionAdviceError,
   recordPromotionPending,
   recordPromotionSuccess,
   recordPromotionError,
@@ -242,6 +246,42 @@ export const ReportProvider = ({
       });
   };
 
+  /**
+   * RC-16. What the national promotion requirements make of this learner's
+   * year. Advice, not a decision: NPPPPR §(2b) puts a retention behind a staff
+   * meeting and then a meeting with the parent.
+   */
+  const getPromotionAdviceAsync = async (id: string) => {
+    dispatch(getPromotionAdvicePending());
+    const endpoint = `/api/services/app/Report/GetPromotionAdvice?id=${id}`;
+    await instance
+      .get(endpoint)
+      .then((response) => {
+        dispatch(getPromotionAdviceSuccess(response.data.result));
+      })
+      .catch((error) => {
+        console.error(error);
+        dispatch(getPromotionAdviceError());
+        throw error;
+      });
+  };
+
+  /** RC-16. Records the decision, with the destination grade and a reason. */
+  const recordPromotionDecisionAsync = async (input: IRecordPromotion) => {
+    dispatch(recordPromotionPending());
+    const endpoint = `/api/services/app/Report/RecordPromotionDecision`;
+    await instance
+      .post(endpoint, input)
+      .then((response) => {
+        dispatch(recordPromotionSuccess(response.data.result));
+      })
+      .catch((error) => {
+        console.error(error);
+        dispatch(recordPromotionError());
+        throw error;
+      });
+  };
+
   const generatePdfAsync = async (id: string) => {
     dispatch(generatePdfPending());
     const endpoint = `/api/services/app/Report/GenerateReportPdf?id=${id}`;
@@ -341,6 +381,8 @@ export const ReportProvider = ({
           addPrincipalCommentAsync,
           acknowledgeByParentAsync,
           recordPromotionAsync,
+          getPromotionAdviceAsync,
+          recordPromotionDecisionAsync,
           deleteAsync,
           generatePdfAsync,
           getPdfUrlAsync,

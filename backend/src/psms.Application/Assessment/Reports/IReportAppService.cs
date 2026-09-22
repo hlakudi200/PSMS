@@ -24,6 +24,19 @@ public interface IReportAppService : IApplicationService
     Task<ReportDto> AddPrincipalCommentAsync(Guid id, ReportCommentDto input);
     Task<ReportDto> AcknowledgeByParentAsync(Guid id, ReportCommentDto input);
     Task<ReportDto> RecordPromotionAsync(Guid id, PromotionDecision decision, Guid? promotedToGradeId);
+
+    /// <summary>
+    /// RC-16. Records the promotion decision on a year-end report card, with the
+    /// destination grade validated and a reason kept when the decision departs
+    /// from the national requirements.
+    /// </summary>
+    Task<ReportDto> RecordPromotionDecisionAsync(RecordPromotionDto input);
+
+    /// <summary>
+    /// RC-16. What the national promotion requirements make of this learner's
+    /// year — whether they are met, and clause by clause which are not.
+    /// </summary>
+    Task<PromotionAdviceDto> GetPromotionAdviceAsync(Guid id);
     Task DeleteAsync(Guid id);
     Task GenerateReportPdfAsync(Guid id);
     Task<int> BulkGenerateReportPdfsAsync(BulkGenerateReportPdfsInput input);

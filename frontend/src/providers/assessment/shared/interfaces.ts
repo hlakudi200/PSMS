@@ -293,6 +293,8 @@ export interface IReport {
   parentAcknowledgedDate?: string;
   promotionDecision?: number;
   promotedToGradeId?: string;
+  /** RC-16: why, when the decision departs from the national requirements. */
+  promotionReason?: string;
   status: number;
   generatedDate?: string;
   publishedDate?: string;
@@ -453,6 +455,53 @@ export interface IReportSubject {
   subjectName?: string;
   subjectCode?: string;
   teacherName?: string;
+}
+
+/** RC-16: one clause of a grade's promotion requirements, and whether it is met. */
+export interface IPromotionRequirement {
+  clause?: string;
+  description?: string;
+  isMet?: boolean;
+  detail?: string;
+}
+
+/** RC-16: a grade the learner could be moved into. */
+export interface IPromotionGradeOption {
+  id: string;
+  gradeName?: string;
+  gradeLevel?: number;
+  isNextGrade?: boolean;
+  isCurrentGrade?: boolean;
+}
+
+/**
+ * RC-16: what the national promotion requirements make of a learner's year.
+ * Advice, not a decision — NPPPPR §(2b) puts a retention behind a staff meeting
+ * and then a meeting with the parent.
+ */
+export interface IPromotionAdvice {
+  reportId: string;
+  gradeLevel?: number;
+  gradeName?: string;
+  isEvaluable?: boolean;
+  notEvaluableReason?: string;
+  meetsRequirements?: boolean;
+  recommended?: number;
+  requirements?: IPromotionRequirement[];
+  recorded?: number;
+  promotedToGradeId?: string;
+  promotedToGradeName?: string;
+  /** RC-16: why, when the decision departs from the national requirements. */
+  promotionReason?: string;
+  gradeOptions?: IPromotionGradeOption[];
+}
+
+/** RC-16: input for recording the promotion decision on a year-end card. */
+export interface IRecordPromotion {
+  reportId: string;
+  decision: number;
+  promotedToGradeId?: string;
+  reason?: string;
 }
 
 export interface IRecordReportSubjectMarks {

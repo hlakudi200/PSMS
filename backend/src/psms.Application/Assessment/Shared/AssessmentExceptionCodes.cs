@@ -90,6 +90,23 @@ public static class AssessmentExceptionCodes
     public const string ClassGradeNotResolved = "ASM_CLASS_GRADE_NOT_RESOLVED";
 
     /// <summary>
+    /// RC-16. A promotion decision was recorded on something other than the
+    /// year-end report card, which is the one it belongs on.
+    /// </summary>
+    public const string PromotionNotOnThisReport = "ASM_PROMOTION_NOT_ON_THIS_REPORT";
+
+    /// <summary>
+    /// RC-16. A learner was promoted or progressed without saying which grade
+    /// they move into.
+    /// </summary>
+    public const string PromotionGradeRequired = "ASM_PROMOTION_GRADE_REQUIRED";
+
+    /// <summary>
+    /// RC-16. A promoted learner was sent to a grade that is not the next one.
+    /// </summary>
+    public const string PromotionGradeNotNext = "ASM_PROMOTION_GRADE_NOT_NEXT";
+
+    /// <summary>
     /// RE-002 / RC-05 / RC-12. A report card with no subjects, or with no marks
     /// in any subject, was sent for approval or publication. A blank card must
     /// never reach a parent.
