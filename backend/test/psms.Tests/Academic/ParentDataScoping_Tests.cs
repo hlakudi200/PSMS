@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using Abp.Authorization.Roles;
 using Abp.Authorization.Users;
@@ -156,12 +157,31 @@ public class ParentDataScoping_Tests : psmsTestBase
 
     // ---- CurrentParentResolver ----
 
+    /// <summary>
+    /// Calls the resolver inside a unit of work.
+    /// <para>
+    /// The resolver reads through repositories and memoises on
+    /// <c>IUnitOfWorkManager.Current</c>. Every other test here goes through an
+    /// app service, which ABP wraps in a unit of work for free; a direct call
+    /// has none, so the repository reaches for a DbContext the previous scope
+    /// already disposed and the test fails with ObjectDisposedException rather
+    /// than on its assertion.
+    /// </para>
+    /// </summary>
+    private async Task<List<Guid>> ResolveChildIdsAsync()
+    {
+        using var uow = Resolve<Abp.Domain.Uow.IUnitOfWorkManager>().Begin();
+        var childIds = await Resolve<ICurrentParentResolver>().GetCurrentChildStudentIdsAsync();
+        await uow.CompleteAsync();
+        return childIds;
+    }
+
     [Fact]
     public async Task Resolver_Returns_Linked_Children_For_Parent()
     {
         LoginAs(_parentAUserId);
 
-        var childIds = await _currentParentResolver.GetCurrentChildStudentIdsAsync();
+        var childIds = await ResolveChildIdsAsync();
 
         childIds.ShouldNotBeNull();
         childIds.ShouldBe(new[] { _studentAId });
@@ -172,7 +192,7 @@ public class ParentDataScoping_Tests : psmsTestBase
     {
         LoginAs(_studentAUserId);
 
-        var childIds = await _currentParentResolver.GetCurrentChildStudentIdsAsync();
+        var childIds = await ResolveChildIdsAsync();
 
         childIds.ShouldBeNull();
     }
@@ -182,7 +202,7 @@ public class ParentDataScoping_Tests : psmsTestBase
     {
         LoginAsDefaultTenantAdmin();
 
-        var childIds = await _currentParentResolver.GetCurrentChildStudentIdsAsync();
+        var childIds = await ResolveChildIdsAsync();
 
         childIds.ShouldBeNull();
     }
@@ -192,7 +212,7 @@ public class ParentDataScoping_Tests : psmsTestBase
     {
         LoginAs(_parentNoChildrenUserId);
 
-        var childIds = await _currentParentResolver.GetCurrentChildStudentIdsAsync();
+        var childIds = await ResolveChildIdsAsync();
 
         childIds.ShouldNotBeNull();
         childIds.ShouldBeEmpty();
