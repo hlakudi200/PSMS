@@ -146,6 +146,7 @@ public class ReportPdfDataLoader : ITransientDependency
                 SubjectPosition = sr.SubjectPosition,
                 HighestInClass = sr.HighestInClass,
                 LowestInClass = sr.LowestInClass,
+                AwaitsExternalExamination = sr.AwaitsExternalExamination,
             })
             .ToList();
 

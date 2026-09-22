@@ -96,6 +96,18 @@ namespace psms.Domain.Assessment.Entities
         [Column(TypeName = "decimal(5,2)")]
         public decimal ExamWeight { get; set; } = 60;
 
+        /// <summary>
+        /// RC-15. The mark on this row is the School-Based Assessment component
+        /// only, because the examination for this subject is set and marked
+        /// outside the school and has not happened here — Grade 12's National
+        /// Senior Certificate paper (NPPPPR §31(1)).
+        /// <para>
+        /// The card has to say so. A 25% SBA mark presented as a final mark
+        /// reads as an NSC result and is not one.
+        /// </para>
+        /// </summary>
+        public bool AwaitsExternalExamination { get; set; }
+
         // Navigation Properties
         [ForeignKey(nameof(ReportId))]
         public virtual Report Report { get; set; }
@@ -189,6 +201,34 @@ namespace psms.Domain.Assessment.Entities
 
             // Calculate achievement level
             AchievementLevel = CapsAchievementScale.LevelFor(FinalMark);
+        }
+
+        /// <summary>
+        /// RC-05 / RC-15. Records an aggregated subject mark: the two
+        /// components, the split actually applied to them, and whether the
+        /// examination is still to come externally.
+        /// </summary>
+        /// <param name="result">What <see cref="SubjectMarkAggregator"/> worked out.</param>
+        /// <param name="asPromotionMark">
+        /// True for a year-end card, whose final mark is the promotion mark and
+        /// is a whole number under NPPPPR §31(3). A term card keeps the two
+        /// decimals it is reported to.
+        /// </param>
+        public void RecordAggregate(SubjectMarkResult result, bool asPromotionMark)
+        {
+            RecordMarks(
+                result.SchoolBasedMark,
+                result.ExaminationMark,
+                result.AppliedSbaWeight,
+                result.AppliedExamWeight);
+
+            AwaitsExternalExamination = result.AwaitsExternalExamination;
+
+            if (asPromotionMark && FinalMark.HasValue)
+            {
+                FinalMark = CapsRounding.PromotionMark(FinalMark.Value);
+                AchievementLevel = CapsAchievementScale.LevelFor(FinalMark);
+            }
         }
 
         /// <summary>

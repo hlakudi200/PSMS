@@ -446,6 +446,8 @@ export interface IReportSubject {
   classAverage?: number;
   highestInClass?: number;
   lowestInClass?: number;
+  /** RC-15: the mark is the school-based component only; the NSC examination is external. */
+  awaitsExternalExamination?: boolean;
   termWeight: number;
   examWeight: number;
   subjectName?: string;

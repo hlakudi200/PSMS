@@ -21,6 +21,12 @@ public class ReportSubjectDto : EntityDto<Guid>
     public decimal? ClassAverage { get; set; }
     public decimal? HighestInClass { get; set; }
     public decimal? LowestInClass { get; set; }
+
+    /// <summary>
+    /// RC-15. The mark is the school-based component only — the examination for
+    /// this subject is the external National Senior Certificate paper.
+    /// </summary>
+    public bool AwaitsExternalExamination { get; set; }
     public decimal TermWeight { get; set; }
     public decimal ExamWeight { get; set; }
 

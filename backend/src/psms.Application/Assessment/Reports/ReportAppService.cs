@@ -13,6 +13,7 @@ using psms.Assessment.ReportSubjects.Dto;
 using psms.Assessment.Shared;
 using psms.Authorization;
 using psms.Domain.Academic.Entities;
+using psms.Domain.Assessment;
 using psms.Domain.Assessment.Entities;
 using psms.Domain.Shared.Enums;
 using psms.Domain.Workflow.Enums;
@@ -47,6 +48,7 @@ public class ReportAppService : ApplicationService, IReportAppService
     private readonly IRepository<ClassSubject, Guid> _classSubjectRepository;
     private readonly IRepository<AssessmentEntity, Guid> _assessmentRepository;
     private readonly IRepository<Attendance, Guid> _attendanceRepository;
+    private readonly IRepository<AssessmentWeighting, Guid> _weightingRepository;
     private readonly psms.Domain.Shared.Storage.IFileStorageService _fileStorage;
     private readonly IBackgroundJobManager _backgroundJobManager;
     private readonly psms.Academic.Students.ICurrentStudentResolver _currentStudent;
@@ -65,6 +67,7 @@ public class ReportAppService : ApplicationService, IReportAppService
         IRepository<ClassSubject, Guid> classSubjectRepository,
         IRepository<AssessmentEntity, Guid> assessmentRepository,
         IRepository<Attendance, Guid> attendanceRepository,
+        IRepository<AssessmentWeighting, Guid> weightingRepository,
         psms.Domain.Shared.Storage.IFileStorageService fileStorage,
         IBackgroundJobManager backgroundJobManager,
         psms.Academic.Students.ICurrentStudentResolver currentStudent,
@@ -82,6 +85,7 @@ public class ReportAppService : ApplicationService, IReportAppService
         _classSubjectRepository = classSubjectRepository;
         _assessmentRepository = assessmentRepository;
         _attendanceRepository = attendanceRepository;
+        _weightingRepository = weightingRepository;
         _fileStorage = fileStorage;
         _backgroundJobManager = backgroundJobManager;
         _currentStudent = currentStudent;
@@ -271,27 +275,38 @@ public class ReportAppService : ApplicationService, IReportAppService
             throw new UserFriendlyException(AssessmentExceptionCodes.DuplicateReport,
                 "A report already exists for this student, term, and report type.");
 
-        // RE-001: Validate all marks for student/term are completed
-        if (input.TermId.HasValue)
-        {
-            var incompleteMarks = await _markRepository
-                .GetAll()
-                .Where(m => m.TenantId == AbpSession.TenantId)
-                .Where(m => m.StudentId == input.StudentId)
-                .Where(m => m.Assessment.TermId == input.TermId.Value)
-                .Where(m => m.Assessment.ClassSubject.ClassId == input.ClassId)
-                .Where(m => m.Status != MarkStatus.Completed && m.Status != MarkStatus.Absent && m.Status != MarkStatus.Exempted)
-                .AnyAsync();
+        // RC-05: which terms this report covers. A year-end card is the
+        // composite of the whole year, not a term with no filter.
+        var termIds = await ResolveTermScopeAsync(
+            input.ReportType, input.TermId, input.AcademicYearId);
 
-            if (incompleteMarks)
-                throw new UserFriendlyException(AssessmentExceptionCodes.IncompleteMarksForReport,
-                    "Cannot generate report. There are incomplete marks for this student in the specified term.");
-        }
+        if (termIds.Count == 0)
+            throw new UserFriendlyException(AssessmentExceptionCodes.NoTermsInScope,
+                "There are no terms in the academic year to build this report from.");
+
+        // RE-001: every mark in scope must be complete. This used to be skipped
+        // entirely for a year-end report, because it was written as "if a term
+        // was given" and a year-end report has no single term.
+        var incompleteMarks = await _markRepository
+            .GetAll()
+            .Where(m => m.TenantId == AbpSession.TenantId)
+            .Where(m => m.StudentId == input.StudentId)
+            .Where(m => termIds.Contains(m.Assessment.TermId))
+            .Where(m => m.Assessment.ClassSubject.ClassId == input.ClassId)
+            .Where(m => m.Status != MarkStatus.Completed && m.Status != MarkStatus.Absent && m.Status != MarkStatus.Exempted)
+            .AnyAsync();
+
+        if (incompleteMarks)
+            throw new UserFriendlyException(AssessmentExceptionCodes.IncompleteMarksForReport,
+                termIds.Count > 1
+                    ? "Cannot generate report. There are incomplete marks for this student in the academic year."
+                    : "Cannot generate report. There are incomplete marks for this student in the specified term.");
 
         var context = await LoadGenerationContextAsync(
             input.ClassId,
-            input.TermId,
-            new[] { input.StudentId });
+            termIds,
+            new[] { input.StudentId },
+            input.ReportType);
 
         var report = await BuildReportAsync(
             context,
@@ -331,18 +346,151 @@ public class ReportAppService : ApplicationService, IReportAppService
 
         public int TotalStudentsInClass { get; set; }
 
+        /// <summary>The grade this class sits in, which decides the split.</summary>
+        public SouthAfricanGradeLevel GradeLevel { get; set; }
+
+        /// <summary>The school's School-Based Assessment percentage for that grade's band.</summary>
+        public int SbaPercentage { get; set; }
+
+        /// <summary>The school's examination percentage for that grade's band.</summary>
+        public int ExamPercentage { get; set; }
+
         /// <summary>
-        /// The weighted subject average per (learner, subject). A missing key
-        /// means that learner has no completed marks for that subject, which is
-        /// how a subject with no marks stays blank on the card.
+        /// RC-15. Whether the examination for this grade is the external
+        /// National Senior Certificate paper, in which case the school holds
+        /// only the School-Based Assessment component.
         /// </summary>
-        public Dictionary<(Guid StudentId, Guid SubjectId), decimal> SubjectAverages { get; set; }
+        public bool ExaminationIsExternal { get; set; }
+
+        /// <summary>
+        /// Whether the final mark on this card is the promotion mark, and so a
+        /// whole number under NPPPPR §31(3). True for a year-end report.
+        /// </summary>
+        public bool IsPromotionMark { get; set; }
+
+        /// <summary>
+        /// Every completed mark in scope, per (learner, subject), carrying its
+        /// weight and whether it was the examination. A missing key means that
+        /// learner has no completed marks for that subject, which is how a
+        /// subject with no marks stays blank on the card.
+        /// </summary>
+        public Dictionary<(Guid StudentId, Guid SubjectId), List<AssessmentContribution>> Contributions { get; set; }
+
+        /// <summary>
+        /// Whether this subject is assessed entirely by the school in this
+        /// grade, whatever the band says - Life Orientation in Grades 10-12
+        /// (NPPPPR §31(2)).
+        /// </summary>
+        public bool IsFullySchoolBased(ClassSubject classSubject) =>
+            SubjectAssessmentRules.IsFullySchoolBased(
+                classSubject.Subject?.SubjectName,
+                classSubject.Subject?.SubjectCode,
+                GradeLevel);
+    }
+
+    /// <summary>
+    /// RC-05. The terms a report covers.
+    /// <para>
+    /// A term card reports its own term. A <b>year-end</b> card is the composite
+    /// of every term in the academic year - National Protocol §17(1), "the
+    /// promotion of a learner is based on the composite marks obtained in all
+    /// four terms", and §25(5), "the end-of-year report card should indicate
+    /// cumulative learner performance for the year". A <b>mid-year</b> card
+    /// covers the terms that have finished by the middle of it.
+    /// </para>
+    /// <para>
+    /// This is what was missing: both the completeness gate and the mark query
+    /// were written as "if a term was given", and a year-end report has no
+    /// single term, so it skipped the gate and aggregated nothing.
+    /// </para>
+    /// </summary>
+    /// <summary>
+    /// RE-002 / RC-05 / RC-12. Refuses to move a blank report card forward.
+    /// <para>
+    /// Two ways one is reached: a class with no class-subjects configured
+    /// generates a card with no subject rows at all, and a report built over a
+    /// scope with no marks generates rows that are all empty. Both used to
+    /// reach Generated, and from there could be submitted, approved and
+    /// published as a completely blank card.
+    /// </para>
+    /// <para>
+    /// The gate is here rather than at generation on purpose: generating the
+    /// shell before the marks exist is a legitimate thing to do, and RC-12 adds
+    /// the screen for filling it in. What must not happen is a blank card
+    /// reaching a parent.
+    /// </para>
+    /// </summary>
+    private async Task AssertNotBlankAsync(Report report)
+    {
+        var subjects = await _reportSubjectRepository
+            .GetAll()
+            .Where(rs => rs.ReportId == report.Id)
+            .Select(rs => new { rs.FinalMark })
+            .ToListAsync();
+
+        if (subjects.Count == 0)
+            throw new UserFriendlyException(AssessmentExceptionCodes.BlankReportCard,
+                "This report card has no subjects on it. Check that the class has its subjects configured, "
+                + "then generate it again.");
+
+        if (subjects.All(rs => rs.FinalMark == null))
+            throw new UserFriendlyException(AssessmentExceptionCodes.BlankReportCard,
+                "This report card has no marks in any subject. Capture the marks before sending it on.");
+    }
+
+    private async Task<List<Guid>> ResolveTermScopeAsync(
+        ReportType reportType,
+        Guid? termId,
+        Guid academicYearId)
+    {
+        if (termId.HasValue)
+            return new List<Guid> { termId.Value };
+
+        var terms = await _termRepository
+            .GetAll()
+            .Where(t => t.TenantId == AbpSession.TenantId)
+            .Where(t => t.AcademicYearId == academicYearId)
+            .OrderBy(t => t.TermNumber)
+            .Select(t => new { t.Id, t.TermNumber })
+            .ToListAsync();
+
+        if (reportType == ReportType.MidYear)
+        {
+            return terms
+                .Where(t => t.TermNumber == SouthAfricanTermNumber.Term1
+                    || t.TermNumber == SouthAfricanTermNumber.Term2)
+                .Select(t => t.Id)
+                .ToList();
+        }
+
+        // Year-end, and a progress report with no term named: the whole year.
+        return terms.Select(t => t.Id).ToList();
+    }
+
+    /// <summary>
+    /// The school's split for a grade band, falling back to the national
+    /// default when the tenant has no row for it - the same behaviour the
+    /// settings screen shows, so a school that has never opened it still gets
+    /// marks composed the way policy says.
+    /// </summary>
+    private async Task<(int Sba, int Exam)> ResolveWeightingAsync(AssessmentWeightingBand band)
+    {
+        var row = await _weightingRepository
+            .GetAll()
+            .Where(w => w.TenantId == AbpSession.TenantId && w.Band == band)
+            .FirstOrDefaultAsync();
+
+        if (row != null && AssessmentWeighting.IsValidSplit(row.SbaPercentage, row.ExamPercentage))
+            return (row.SbaPercentage, row.ExamPercentage);
+
+        return (AssessmentWeightingDefaults.SbaFor(band), AssessmentWeightingDefaults.ExamFor(band));
     }
 
     private async Task<ReportGenerationContext> LoadGenerationContextAsync(
         Guid classId,
-        Guid? termId,
-        IReadOnlyCollection<Guid> studentIds)
+        IReadOnlyCollection<Guid> termIds,
+        IReadOnlyCollection<Guid> studentIds,
+        ReportType reportType)
     {
         var classSubjects = await _classSubjectRepository
             .GetAll()
@@ -359,18 +507,29 @@ public class ReportAppService : ApplicationService, IReportAppService
                 && s.CurrentClassId == classId
                 && s.IsActive);
 
-        var averages = new Dictionary<(Guid, Guid), decimal>();
+        // The grade decides the band, and the band decides the split.
+        var gradeLevel = await _classRepository
+            .GetAll()
+            .Where(c => c.Id == classId && c.TenantId == AbpSession.TenantId)
+            .Select(c => (SouthAfricanGradeLevel?)c.Grade.GradeLevel)
+            .FirstOrDefaultAsync() ?? SouthAfricanGradeLevel.Grade1;
 
-        if (termId.HasValue && studentIds.Count > 0 && classSubjects.Count > 0)
+        var band = AssessmentWeightingDefaults.BandFor(gradeLevel);
+        var (sba, exam) = await ResolveWeightingAsync(band);
+
+        var contributions = new Dictionary<(Guid, Guid), List<AssessmentContribution>>();
+
+        if (termIds.Count > 0 && studentIds.Count > 0 && classSubjects.Count > 0)
         {
             var ids = studentIds.ToList();
+            var terms = termIds.ToList();
             var subjectIds = classSubjects.Select(cs => cs.SubjectId).Distinct().ToList();
 
             var marks = await _markRepository
                 .GetAll()
                 .Where(m => m.TenantId == AbpSession.TenantId)
                 .Where(m => ids.Contains(m.StudentId))
-                .Where(m => m.Assessment.TermId == termId.Value)
+                .Where(m => terms.Contains(m.Assessment.TermId))
                 .Where(m => m.Assessment.ClassSubject.ClassId == classId)
                 .Where(m => subjectIds.Contains(m.Assessment.ClassSubject.SubjectId))
                 .Where(m => m.Status == MarkStatus.Completed && m.Percentage.HasValue)
@@ -379,19 +538,19 @@ public class ReportAppService : ApplicationService, IReportAppService
                     m.StudentId,
                     m.Assessment.ClassSubject.SubjectId,
                     Percentage = m.Percentage.Value,
-                    m.Assessment.Weight
+                    m.Assessment.Weight,
+                    m.Assessment.AssessmentType
                 })
                 .ToListAsync();
 
             foreach (var group in marks.GroupBy(m => (m.StudentId, m.SubjectId)))
             {
-                var totalWeight = group.Sum(m => m.Weight);
-
-                averages[group.Key] = totalWeight > 0
-                    // Weighted average: sum(percentage * weight) / sum(weight)
-                    ? group.Sum(m => m.Percentage * m.Weight) / totalWeight
-                    // Fallback to a simple average when no weights are configured
-                    : group.Average(m => m.Percentage);
+                contributions[group.Key] = group
+                    .Select(m => new AssessmentContribution(
+                        m.Percentage,
+                        m.Weight,
+                        m.AssessmentType == AcademicAssessmentType.Exam))
+                    .ToList();
             }
         }
 
@@ -399,7 +558,15 @@ public class ReportAppService : ApplicationService, IReportAppService
         {
             ClassSubjects = classSubjects,
             TotalStudentsInClass = totalStudentsInClass,
-            SubjectAverages = averages
+            GradeLevel = gradeLevel,
+            SbaPercentage = sba,
+            ExamPercentage = exam,
+            // RC-15: Grade 12's examination is the external NSC paper. The
+            // school's own trial paper is not it, and must not be blended in at
+            // 75% to make a number that reads like an NSC result.
+            ExaminationIsExternal = band == AssessmentWeightingBand.Grade12,
+            IsPromotionMark = reportType == ReportType.YearEnd,
+            Contributions = contributions
         };
     }
 
@@ -463,9 +630,20 @@ public class ReportAppService : ApplicationService, IReportAppService
                 TeacherId = classSubject.TeacherId
             };
 
-            if (context.SubjectAverages.TryGetValue((studentId, classSubject.SubjectId), out var average))
+            // RC-05 / RC-15: the School-Based Assessment and the examination are
+            // averaged separately and then combined with the band's split, with
+            // Life Orientation and Grade 12 handled as policy requires.
+            if (context.Contributions.TryGetValue((studentId, classSubject.SubjectId), out var marks))
             {
-                reportSubject.RecordMarks(average, null);
+                var fullySchoolBased = context.IsFullySchoolBased(classSubject);
+
+                var aggregate = SubjectMarkAggregator.Aggregate(
+                    marks,
+                    fullySchoolBased ? 100 : context.SbaPercentage,
+                    fullySchoolBased ? 0 : context.ExamPercentage,
+                    examinationIsExternal: context.ExaminationIsExternal && !fullySchoolBased);
+
+                reportSubject.RecordAggregate(aggregate, context.IsPromotionMark);
                 subjectFinalMarks.Add(reportSubject.FinalMark);
             }
 
@@ -597,35 +775,41 @@ public class ReportAppService : ApplicationService, IReportAppService
             .GroupBy(r => r.StudentId)
             .ToDictionary(g => g.Key, g => g.First().Id);
 
+        // RC-05: the terms this run covers. A year-end run has no TermId, and
+        // both the gate below and the mark query used to be skipped entirely
+        // because of it.
+        var termIds = await ResolveTermScopeAsync(
+            input.ReportType, input.TermId, input.AcademicYearId);
+
+        if (termIds.Count == 0)
+            throw new UserFriendlyException(AssessmentExceptionCodes.NoTermsInScope,
+                "There are no terms in the academic year to build these reports from.");
+
         // RE-001, evaluated per learner rather than for the batch: one learner
         // with an outstanding mark must not stop the other thirty-nine.
-        var blockedStudentIds = new HashSet<Guid>();
-        if (input.TermId.HasValue)
-        {
-            var incomplete = await _markRepository
-                .GetAll()
-                .Where(m => m.TenantId == AbpSession.TenantId)
-                .Where(m => m.Assessment.TermId == input.TermId.Value)
-                .Where(m => m.Assessment.ClassSubject.ClassId == input.ClassId)
-                .Where(m => studentIds.Contains(m.StudentId))
-                .Where(m => m.Status != MarkStatus.Completed
-                    && m.Status != MarkStatus.Absent
-                    && m.Status != MarkStatus.Exempted)
-                .Select(m => m.StudentId)
-                .Distinct()
-                .ToListAsync();
+        var incomplete = await _markRepository
+            .GetAll()
+            .Where(m => m.TenantId == AbpSession.TenantId)
+            .Where(m => termIds.Contains(m.Assessment.TermId))
+            .Where(m => m.Assessment.ClassSubject.ClassId == input.ClassId)
+            .Where(m => studentIds.Contains(m.StudentId))
+            .Where(m => m.Status != MarkStatus.Completed
+                && m.Status != MarkStatus.Absent
+                && m.Status != MarkStatus.Exempted)
+            .Select(m => m.StudentId)
+            .Distinct()
+            .ToListAsync();
 
-            blockedStudentIds = new HashSet<Guid>(incomplete);
-        }
+        var blockedStudentIds = new HashSet<Guid>(incomplete);
 
         var readingRegister = input.UseAttendanceRecords && term != null;
         var attendanceByStudent = await ResolveAttendanceAsync(input, term, studentIds);
 
-        // Loaded once for the whole run: the class subjects, the headcount, and
-        // every learner's subject averages in a single mark query.
+        // Loaded once for the whole run: the class subjects, the headcount, the
+        // grade's weighting, and every learner's marks in a single query.
         var context = previewOnly
             ? null
-            : await LoadGenerationContextAsync(input.ClassId, input.TermId, studentIds);
+            : await LoadGenerationContextAsync(input.ClassId, termIds, studentIds, input.ReportType);
 
         foreach (var student in students)
         {
@@ -839,6 +1023,8 @@ public class ReportAppService : ApplicationService, IReportAppService
         if (report == null)
             throw new UserFriendlyException(AssessmentExceptionCodes.ReportNotFound, "Report not found.");
 
+        await AssertNotBlankAsync(report);
+
         try
         {
             report.SubmitForApproval();
@@ -885,6 +1071,8 @@ public class ReportAppService : ApplicationService, IReportAppService
 
         if (report == null)
             throw new UserFriendlyException(AssessmentExceptionCodes.ReportNotFound, "Report not found.");
+
+        await AssertNotBlankAsync(report);
 
         try
         {

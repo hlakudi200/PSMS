@@ -66,6 +66,19 @@ public static class AssessmentExceptionCodes
     /// </summary>
     public const string InvalidSubjectMarkWeighting = "ASM_INVALID_SUBJECT_MARK_WEIGHTING";
 
+    /// <summary>
+    /// RC-05. A report was asked for over an academic year that has no terms,
+    /// so there is nothing to aggregate.
+    /// </summary>
+    public const string NoTermsInScope = "ASM_NO_TERMS_IN_SCOPE";
+
+    /// <summary>
+    /// RE-002 / RC-05 / RC-12. A report card with no subjects, or with no marks
+    /// in any subject, was sent for approval or publication. A blank card must
+    /// never reach a parent.
+    /// </summary>
+    public const string BlankReportCard = "ASM_BLANK_REPORT_CARD";
+
     public const string ReportNotEditable = "ASM_REPORT_NOT_EDITABLE";
     public const string ReportNotPublished = "ASM_REPORT_NOT_PUBLISHED";
 

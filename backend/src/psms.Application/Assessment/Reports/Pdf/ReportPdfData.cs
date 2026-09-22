@@ -88,4 +88,11 @@ public class SubjectEntry
     public decimal? HighestInClass { get; set; }
 
     public decimal? LowestInClass { get; set; }
+
+    /// <summary>
+    /// RC-15. The mark is the school-based component only: the examination for
+    /// this subject is the external National Senior Certificate paper and has
+    /// not happened here. The card has to say so.
+    /// </summary>
+    public bool AwaitsExternalExamination { get; set; }
 }

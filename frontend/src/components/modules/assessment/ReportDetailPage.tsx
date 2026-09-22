@@ -69,6 +69,18 @@ const achievementLabels: Record<number, { symbol: string; desc: string }> = {
   7: { symbol: '7', desc: 'Outstanding (80-100%)' },
 };
 
+/**
+ * RC-15. NPPPPR §31(1): in Grade 12 the school-based assessment is 25% of the
+ * total mark and the external assessment 75%, and that external paper is set
+ * and marked by the Department of Basic Education, not by the school. A card
+ * showing the 25% has to say what it is.
+ */
+const EXTERNAL_EXAM_NOTE =
+  '† School-based assessment component only. The National Senior Certificate '
+  + 'examination is set and marked externally by the Department of Basic Education '
+  + 'and is not included in this mark. The final result is issued on the '
+  + "Department's statement of results.";
+
 const achievementLabelsShort: Record<number, string> = {
   1: '1', 2: '2', 3: '3', 4: '4', 5: '5', 6: '6', 7: '7',
 };
@@ -196,6 +208,15 @@ const buildPrintStyles = (ink: string, brandBg: string, brandFg: string) => `
     print-color-adjust: exact;
   }
 
+  /* ─── RC-15: the external-examination note under the marks table ─── */
+  .print-external-exam-note {
+    display: block !important;
+    font-size: 8.5px;
+    color: #444;
+    margin: -4px 0 10px;
+    line-height: 1.35;
+  }
+
   /* ─── Attendance Box ─── */
   .print-attendance {
     display: flex !important;
@@ -317,6 +338,7 @@ const buildPrintStyles = (ink: string, brandBg: string, brandFg: string) => `
 .print-header { display: none; }
 .print-student-info { display: none; }
 .print-subject-table { display: none; }
+.print-external-exam-note { display: none; }
 .print-attendance { display: none; }
 .print-comments { display: none; }
 .print-signatures { display: none; }
@@ -492,7 +514,9 @@ function ReportDetailContent() {
     },
     {
       title: 'Final Mark', dataIndex: 'finalMark', key: 'finalMark', width: 100,
-      render: (v: number | undefined) => v != null ? <Text strong>{formatPercentage(v)}</Text> : '-',
+      render: (v: number | undefined, s: IReportSubject) => v != null
+        ? <Text strong>{formatPercentage(v)}{s.awaitsExternalExamination ? ' †' : ''}</Text>
+        : '-',
     },
     {
       title: 'Level', dataIndex: 'achievementLevel', key: 'achievementLevel', width: 160,
@@ -583,7 +607,9 @@ function ReportDetailContent() {
               <td>{s.subjectCode ?? '-'}</td>
               <td>{formatMark(s.termMark)}</td>
               <td>{formatMark(s.examMark)}</td>
-              <td style={{ fontWeight: 700 }}>{formatMark(s.finalMark)}</td>
+              <td style={{ fontWeight: 700 }}>
+                {formatMark(s.finalMark)}{s.awaitsExternalExamination ? ' †' : ''}
+              </td>
               <td>{s.achievementLevel ? achievementLabelsShort[s.achievementLevel] : '-'}</td>
               <td>{formatMark(s.classAverage)}</td>
               <td>{s.subjectPosition ?? '-'}</td>
@@ -601,6 +627,12 @@ function ReportDetailContent() {
           </tr>
         </tfoot>
       </table>
+
+      {/* RC-15: what the dagger means, when anything carries one. The PDF
+          prints the same note; the two must not say different things. */}
+      {subjects.some((s) => s.awaitsExternalExamination) && (
+        <div className="print-external-exam-note">{EXTERNAL_EXAM_NOTE}</div>
+      )}
 
       {/* Attendance for Print */}
       <div className="print-attendance">
