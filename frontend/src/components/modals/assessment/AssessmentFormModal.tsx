@@ -17,6 +17,7 @@ import {
   message,
 } from 'antd';
 import { z } from 'zod';
+import { AssessmentType, assessmentTypeLabels } from '@/providers/shared/enums';
 import dayjs, { Dayjs } from 'dayjs';
 import { useAssessmentActions, useAssessmentState } from '@/providers/assessment/assessments';
 import type {
@@ -42,15 +43,13 @@ import {
 
 const { Text } = Typography;
 
-// Mirror backend psms.Domain.Shared.Enums.AssessmentType.
-const ASSESSMENT_TYPE_OPTIONS = [
-  { value: 1, label: 'Placement' },
-  { value: 2, label: 'Diagnostic' },
-  { value: 3, label: 'Readiness' },
-  { value: 4, label: 'Language Proficiency' },
-  { value: 5, label: 'Mathematics' },
-  { value: 6, label: 'General' },
-];
+// Mirrors backend psms.Domain.Shared.Enums.AcademicAssessmentType.
+// RC-13: these were the ADMISSIONS types — a teacher setting a class test was
+// picking "Placement" or "General". Driven off the shared academic enum now, so
+// this list and the mark-sheet screens can no longer drift apart.
+const ASSESSMENT_TYPE_OPTIONS = Object.entries(assessmentTypeLabels).map(
+  ([value, label]) => ({ value: Number(value), label })
+);
 
 // Mirror backend psms.Domain.Shared.Enums.CapsAssessmentCategory.
 const CAPS_CATEGORY_OPTIONS = [
@@ -75,7 +74,7 @@ const assessmentSchema = z
       .min(3, 'Name must be at least 3 characters.')
       .max(200, 'Name must be 200 characters or fewer.'),
     description: z.string().max(2000, 'Description must be 2000 characters or fewer.').optional().or(z.literal('')),
-    assessmentType: z.number({ message: 'Pick an assessment type.' }).int().min(1).max(6),
+    assessmentType: z.number({ message: 'Pick an assessment type.' }).int().min(1).max(7),
     capsCategory: z.number().int().min(1).max(9).optional().nullable(),
     maxMarks: z
       .number({ message: 'Maximum marks is required.' })
@@ -349,7 +348,7 @@ export const AssessmentFormModal: React.FC<AssessmentFormModalProps> = ({
         form={form}
         layout="vertical"
         initialValues={{
-          assessmentType: 6,
+          assessmentType: AssessmentType.Test,
           maxMarks: 100,
           weight: 0,
           passPercentage: 50,

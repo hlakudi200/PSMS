@@ -18,7 +18,7 @@ public class ScheduleAssessmentDto
     /// Type of assessment.
     /// </summary>
     [Required]
-    public AssessmentType Type { get; set; }
+    public AdmissionAssessmentType Type { get; set; }
 
     /// <summary>
     /// Date of the assessment.

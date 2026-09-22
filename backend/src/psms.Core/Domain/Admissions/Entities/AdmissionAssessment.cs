@@ -23,7 +23,7 @@ namespace psms.Domain.Admissions.Entities
         public Guid ApplicationId { get; set; }
 
         [Required]
-        public AssessmentType Type { get; set; }
+        public AdmissionAssessmentType Type { get; set; }
 
         [Required]
         public DateTime ScheduledDate { get; set; }
@@ -61,7 +61,7 @@ namespace psms.Domain.Admissions.Entities
 
         protected AdmissionAssessment() { }
 
-        public AdmissionAssessment(Guid id, Guid applicationId, AssessmentType type,
+        public AdmissionAssessment(Guid id, Guid applicationId, AdmissionAssessmentType type,
             DateTime scheduledDate, Guid assessedGradeId, long assessorUserId)
         {
             Id = id;

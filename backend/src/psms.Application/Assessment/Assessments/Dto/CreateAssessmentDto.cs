@@ -23,7 +23,7 @@ public class CreateAssessmentDto
     public string Description { get; set; }
 
     [Required]
-    public AssessmentType AssessmentType { get; set; }
+    public AcademicAssessmentType AssessmentType { get; set; }
 
     public CapsAssessmentCategory? CapsCategory { get; set; }
 

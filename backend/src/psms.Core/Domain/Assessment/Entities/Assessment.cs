@@ -53,7 +53,7 @@ namespace psms.Domain.Assessment.Entities
         /// Type of assessment
         /// </summary>
         [Required]
-        public AssessmentType AssessmentType { get; set; }
+        public AcademicAssessmentType AssessmentType { get; set; }
 
         /// <summary>
         /// CAPS assessment category
@@ -153,7 +153,7 @@ namespace psms.Domain.Assessment.Entities
             Guid classSubjectId,
             Guid termId,
             string name,
-            AssessmentType assessmentType,
+            AcademicAssessmentType assessmentType,
             decimal maxMarks,
             long createdByTeacherUserId) : this()
         {

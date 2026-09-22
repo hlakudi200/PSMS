@@ -12,7 +12,7 @@ public class AssessmentListDto : EntityDto<Guid>
     public Guid ClassSubjectId { get; set; }
     public Guid TermId { get; set; }
     public string Name { get; set; }
-    public AssessmentType AssessmentType { get; set; }
+    public AcademicAssessmentType AssessmentType { get; set; }
     public CapsAssessmentCategory? CapsCategory { get; set; }
     public decimal MaxMarks { get; set; }
     public decimal Weight { get; set; }
