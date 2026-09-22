@@ -1,5 +1,7 @@
 'use client';
 
+import { assessmentTypeLabels } from '@/providers/shared/enums';
+
 import { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
@@ -32,14 +34,9 @@ const MAX_ROWS = 1000;
 const MAX_FILE_BYTES = 10 * 1024 * 1024; // 10 MB
 const TEMPLATE_HEADERS = ['StudentIdNumber', 'SubjectCode', 'AssessmentType', 'Mark', 'MaxMark'] as const;
 
-const ASSESSMENT_TYPE_LABEL: Record<number, string> = {
-  1: 'Placement',
-  2: 'Diagnostic',
-  3: 'Readiness',
-  4: 'Language Proficiency',
-  5: 'Mathematics',
-  6: 'General',
-};
+// RC-13: was the admissions enum. The shared academic labels are the ones
+// the teacher actually means.
+const ASSESSMENT_TYPE_LABEL: Record<number, string> = assessmentTypeLabels;
 
 interface ParsedRow {
   rowNumber: number; // spreadsheet row number as the teacher sees it (header = row 1)

@@ -1,5 +1,7 @@
 'use client';
 
+import { assessmentTypeLabels } from '@/providers/shared/enums';
+
 import React, { useEffect, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { usePortalBase } from '@/utils/portal-base';
@@ -23,15 +25,8 @@ import type { IMarkList } from '@/providers/assessment/shared/interfaces';
 
 const { Text } = Typography;
 
-const assessmentTypeMap: Record<number, string> = {
-  1: 'Test',
-  2: 'Assignment',
-  3: 'Exam',
-  4: 'Practical',
-  5: 'Oral',
-  6: 'Project',
-  7: 'Other',
-};
+// Shared with every other assessment screen so they cannot drift (RC-13).
+const assessmentTypeMap: Record<number, string> = assessmentTypeLabels;
 
 const achievementLevelMap: Record<number, { label: string; color: string }> = {
   1: { label: 'Not Achieved', color: 'red' },

@@ -1,5 +1,7 @@
 'use client';
 
+import { assessmentTypeLabels } from '@/providers/shared/enums';
+
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
@@ -68,15 +70,9 @@ import { MIN_QUESTIONS } from '@/components/modals/assessment/QuestionBuilder';
 
 const { Title, Text } = Typography;
 
-// Mirror backend psms.Domain.Shared.Enums.AssessmentType.
-const TYPE_LABEL: Record<number, string> = {
-  1: 'Placement',
-  2: 'Diagnostic',
-  3: 'Readiness',
-  4: 'Language Proficiency',
-  5: 'Mathematics',
-  6: 'General',
-};
+// RC-13: was the admissions enum. The shared academic labels are the ones
+// the teacher actually means.
+const TYPE_LABEL: Record<number, string> = assessmentTypeLabels;
 
 function TeacherAssessmentsContent() {
   const router = useRouter();

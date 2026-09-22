@@ -15,7 +15,7 @@ public class AdmissionAssessmentDto : CreationAuditedEntityDto<Guid>
     public string ApplicantName { get; set; }
 
     // Assessment Type
-    public AssessmentType Type { get; set; }
+    public AdmissionAssessmentType Type { get; set; }
     public string TypeDisplayName => Type.ToString();
 
     // Schedule Information (ADM-015)
