@@ -146,6 +146,9 @@ public static class AcademicExceptionCodes
     // AT-002: once the day has passed, a regular teacher can no longer
     // capture that date's register (admin override = ViewAll permission).
     public const string AttendanceLocked = "ACD_ATTENDANCE_LOCKED";
+    // T-T21: a plain teacher may only capture/correct attendance for a
+    // class they are actually assigned to (admin override = ViewAll).
+    public const string AttendanceClassNotAssigned = "ACD_ATTENDANCE_CLASS_NOT_ASSIGNED";
 
     // Timetable
     public const string TimetableNotFound = "ACD_TIMETABLE_NOT_FOUND";

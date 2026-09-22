@@ -19,6 +19,7 @@ public class CaptureAttendanceDto
     public DateTime AttendanceDate { get; set; }
 
     [Required]
+    [EnumDataType(typeof(AttendanceStatus))]
     public AttendanceStatus Status { get; set; }
 
     [StringLength(500)]

@@ -935,6 +935,7 @@ public class PsmsRolePermissionSeeder : ITransientDependency
             PermissionNames.Academic_Attendance,
             PermissionNames.Academic_Attendance_View,
             PermissionNames.Academic_Attendance_Capture,
+            PermissionNames.Academic_Attendance_Edit,
             PermissionNames.Academic_Attendance_Reports,
             PermissionNames.Academic_Calendar,
             PermissionNames.Academic_Calendar_View,
