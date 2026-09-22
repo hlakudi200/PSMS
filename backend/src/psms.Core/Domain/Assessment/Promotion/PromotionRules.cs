@@ -161,6 +161,14 @@ namespace psms.Domain.Assessment.Promotion
         /// <summary>
         /// The proviso in §21(1): whichever subject is not counted among the
         /// eight must still have its School-Based Assessment completed.
+        /// <para>
+        /// Checked over every required subject rather than only the uncounted
+        /// ninth, which is stricter than the clause. Working out which subject
+        /// is "the ninth" means fixing an assignment of subjects to clauses, and
+        /// there is usually more than one; reporting every subject with
+        /// outstanding School-Based Assessment says more, and the description
+        /// says that is what it is doing.
+        /// </para>
         /// </summary>
         private static PromotionRequirement NinthSubjectSbaComplete(IReadOnlyList<PromotionSubject> subjects)
         {

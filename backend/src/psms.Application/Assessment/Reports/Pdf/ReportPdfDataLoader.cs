@@ -211,7 +211,7 @@ public class ReportPdfDataLoader : ITransientDependency
     private static string GetPromotionLabel(PromotionDecision? decision) => decision switch
     {
         psms.Domain.Shared.Enums.PromotionDecision.Promoted => "Promoted",
-        psms.Domain.Shared.Enums.PromotionDecision.Retained => "Not promoted — retained in the current grade",
+        psms.Domain.Shared.Enums.PromotionDecision.Retained => "Not promoted — retained",
         psms.Domain.Shared.Enums.PromotionDecision.ConditionalPromotion => "Conditionally promoted",
         psms.Domain.Shared.Enums.PromotionDecision.ProgressedWithSupport => "Progressed with support",
         _ => null,

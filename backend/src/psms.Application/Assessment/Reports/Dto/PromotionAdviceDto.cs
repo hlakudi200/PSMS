@@ -51,6 +51,12 @@ public class PromotionAdviceDto
     public string PromotedToGradeName { get; set; }
 
     /// <summary>
+    /// The reason stored with the recorded decision, so the screen can show it
+    /// and send it back unchanged rather than erasing it.
+    /// </summary>
+    public string PromotionReason { get; set; }
+
+    /// <summary>
     /// The grades the learner could be moved into — the next grade for a
     /// promotion, and the one they are in for a retention.
     /// </summary>

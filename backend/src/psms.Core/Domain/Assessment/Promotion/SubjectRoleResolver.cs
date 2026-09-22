@@ -29,29 +29,81 @@ namespace psms.Domain.Assessment.Promotion
             var name = Normalise(subjectName);
             var code = (subjectCode ?? string.Empty).Trim().ToUpperInvariant();
 
-            // Language levels first: "English Home Language" is a language
-            // before it is anything else.
+            // Mathematics first. A code suffix is a much weaker signal than the
+            // subject's own name, and testing the suffixes first meant a subject
+            // named "Mathematics" with the code MATHL — Maths Higher Level, a
+            // real convention — resolved as a Home Language, satisfied the
+            // language clause, and left Mathematics unrepresented.
+            if (IsMathematics(name, code))
+                return SubjectRole.Mathematics;
+
+            // Language levels, written out or abbreviated. Schools write both
+            // "English Home Language" and "English (HL)", and the parenthesised
+            // form used to be looked for only in the code, so "English (HL)"
+            // resolved to nothing and the learner was advised retained for
+            // having no Home Language.
             if (name.Contains("home language") || name.Contains("huistaal")
-                || code.EndsWith("HL", StringComparison.Ordinal))
+                || HasToken(name, "hl") || code.EndsWith("HL", StringComparison.Ordinal))
                 return SubjectRole.HomeLanguage;
 
             if (name.Contains("first additional language") || name.Contains("eerste addisionele taal")
-                || code.EndsWith("FAL", StringComparison.Ordinal))
+                || HasToken(name, "fal") || code.EndsWith("FAL", StringComparison.Ordinal))
                 return SubjectRole.FirstAdditionalLanguage;
 
             if (name.Contains("second additional language") || name.Contains("tweede addisionele taal")
-                || code.EndsWith("SAL", StringComparison.Ordinal))
+                || HasToken(name, "sal") || code.EndsWith("SAL", StringComparison.Ordinal))
                 return SubjectRole.SecondAdditionalLanguage;
 
-            // Mathematics, and the FET-phase Mathematical Literacy, which counts
-            // as the Mathematics requirement for a learner who offers it.
-            if (name == "mathematics" || name == "wiskunde"
-                || name.StartsWith("mathematical literacy", StringComparison.Ordinal)
-                || name.StartsWith("wiskundige geletterdheid", StringComparison.Ordinal)
-                || code == "MATH" || code == "MATHS" || code == "MLIT" || code == "WISK")
-                return SubjectRole.Mathematics;
-
             return SubjectRole.Other;
+        }
+
+        /// <summary>
+        /// Mathematics, however the school writes it — "Maths", "Mathematics
+        /// Grade 8", "Core Mathematics", "Wiskunde".
+        /// <para>
+        /// Mathematical Literacy is <b>not</b> matched: it is a different
+        /// subject offered in place of Mathematics in the FET phase, where the
+        /// promotion requirements are stated in percentages over all subjects
+        /// and never single out Mathematics. Treating it as Mathematics would
+        /// only matter in a phase that does not ask.
+        /// </para>
+        /// </summary>
+        private static bool IsMathematics(string name, string code)
+        {
+            if (name.Contains("mathematical literacy") || name.Contains("wiskundige geletterdheid"))
+                return false;
+
+            return name.Contains("mathematics")
+                || name.Contains("wiskunde")
+                || HasToken(name, "maths")
+                || HasToken(name, "math")
+                || code == "MATH" || code == "MATHS" || code == "WISK";
+        }
+
+        /// <summary>
+        /// Whether a short abbreviation appears as a word of its own, so "hl"
+        /// matches "english (hl)" and "english hl" but not "highland studies".
+        /// </summary>
+        private static bool HasToken(string name, string token)
+        {
+            if (string.IsNullOrEmpty(name))
+                return false;
+
+            var index = name.IndexOf(token, StringComparison.Ordinal);
+
+            while (index >= 0)
+            {
+                var beforeOk = index == 0 || !char.IsLetterOrDigit(name[index - 1]);
+                var after = index + token.Length;
+                var afterOk = after >= name.Length || !char.IsLetterOrDigit(name[after]);
+
+                if (beforeOk && afterOk)
+                    return true;
+
+                index = name.IndexOf(token, index + 1, StringComparison.Ordinal);
+            }
+
+            return false;
         }
 
         /// <summary>

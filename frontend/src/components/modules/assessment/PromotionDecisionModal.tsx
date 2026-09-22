@@ -89,13 +89,21 @@ export const PromotionDecisionModal: React.FC<Props> = ({
 }) => {
   const [form] = Form.useForm<PromotionFormValues>();
   const { getPromotionAdviceAsync, recordPromotionDecisionAsync } = useReportActions();
-  const { promotionAdvice, isPending } = useReportState();
+  const { promotionAdvice } = useReportState();
 
   const [decision, setDecision] = useState<number | undefined>();
   const [saving, setSaving] = useState(false);
 
+  const [loadFailed, setLoadFailed] = useState(false);
+
   useEffect(() => {
-    if (open) getPromotionAdviceAsync(reportId);
+    if (!open) return;
+
+    setLoadFailed(false);
+    /* The provider rethrows, and an unawaited effect would turn a 403 into an
+       unhandled rejection and leave the modal spinning with its save button
+       permanently disabled. */
+    Promise.resolve(getPromotionAdviceAsync(reportId)).catch(() => setLoadFailed(true));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, reportId]);
 
@@ -113,21 +121,23 @@ export const PromotionDecisionModal: React.FC<Props> = ({
       decision: seeded,
       promotedToGradeId:
         advice.promotedToGradeId ?? advice.gradeOptions?.find((g) => g.isNextGrade)?.id,
-      reason: undefined,
+      /* Seeded from what is stored: an edit that does not mention the reason is
+         not an edit that clears it, and the reason is what NPPPPR §(2b)(c)
+         requires to be printed on the card. */
+      reason: advice.promotionReason ?? undefined,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [advice]);
 
   const gradeOptions = useMemo(
     () =>
-      (advice?.gradeOptions ?? []).map((g) => ({
-        value: g.id,
-        label: g.isNextGrade
-          ? `${g.gradeName} (next grade)`
-          : g.isCurrentGrade
-            ? `${g.gradeName} (current grade)`
-            : g.gradeName,
-      })),
+      /* Only the next grade: a promotion, a conditional promotion and a
+         progression all move the learner into the following grade — they differ
+         in what the school undertakes once the learner is there, not in where
+         they go. The server refuses anything else. */
+      (advice?.gradeOptions ?? [])
+        .filter((g) => g.isNextGrade)
+        .map((g) => ({ value: g.id, label: `${g.gradeName} (next grade)` })),
     [advice],
   );
 
@@ -140,7 +150,15 @@ export const PromotionDecisionModal: React.FC<Props> = ({
       (!advice.meetsRequirements && decision === PromotionDecisionValue.Promoted));
 
   const handleSubmit = async () => {
-    const values = await form.validateFields();
+    let values: PromotionFormValues;
+
+    try {
+      values = await form.validateFields();
+    } catch {
+      // The field errors are already on screen; nothing more to say.
+      return;
+    }
+
     const parsed = schema.safeParse(values);
 
     if (!parsed.success) {
@@ -189,7 +207,15 @@ export const PromotionDecisionModal: React.FC<Props> = ({
         </Button>,
       ]}
     >
-      {!advice && isPending && (
+      {!advice && loadFailed && (
+        <Alert
+          type="error"
+          showIcon
+          message="Could not load the promotion requirements for this report."
+        />
+      )}
+
+      {!advice && !loadFailed && (
         <div style={{ textAlign: 'center', padding: 32 }}>
           <Spin />
         </div>
