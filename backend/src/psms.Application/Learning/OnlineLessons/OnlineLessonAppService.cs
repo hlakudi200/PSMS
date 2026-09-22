@@ -50,13 +50,13 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
     private const string RecordingsBucket = "recordings";
 
     // OL-001 scheduling guard rails. All times are in UTC; the school-hours
-    // window is converted from 07:00-17:00 South Africa Standard Time (SAST,
-    // UTC+02:00 year-round, no DST).
-    private const int MinAdvanceHours = 24;
+    // window is converted from 07:00-14:00 South Africa Standard Time (SAST,
+    // UTC+02:00 year-round, no DST). Lessons can be booked for any day from
+    // tomorrow (SAST) onwards, never for the current day.
     private const int MinDurationMinutes = 30;
     private const int MaxDurationMinutes = 180;
     private const int SchoolStartHourSast = 7;
-    private const int SchoolEndHourSast = 17;
+    private const int SchoolEndHourSast = 14;
     private static readonly TimeSpan SastOffset = TimeSpan.FromHours(2);
     // OL-006 host-window guard: teachers can Start a lesson at most 15
     // minutes before its scheduled start. Joining earlier would surprise
@@ -1148,8 +1148,8 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
     }
 
     /// <summary>
-    /// Enforces OL-001 scheduling rules: start strictly after now+24h,
-    /// times within 07:00-17:00 SAST, duration between 30 and 180 minutes,
+    /// Enforces OL-001 scheduling rules: start on a later SAST day than today,
+    /// times within 07:00-14:00 SAST, duration between 30 and 180 minutes,
     /// and no overlap with any other scheduled lesson on the same
     /// class-subject (excluding <paramref name="excludeLessonId"/>, used
     /// when rescheduling a lesson onto its own slot ± a few minutes).
@@ -1164,9 +1164,13 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
             throw new UserFriendlyException(LearningExceptionCodes.InvalidLessonTimes,
                 "End time must be after start time.");
 
-        if (scheduledStartUtc < DateTime.UtcNow.AddHours(MinAdvanceHours))
+        // No same-day bookings: the lesson's SAST date must be after today's
+        // SAST date. Tomorrow at 07:00 is fine even if it is booked tonight.
+        var startSast = scheduledStartUtc + SastOffset;
+        var todaySast = (DateTime.UtcNow + SastOffset).Date;
+        if (startSast.Date <= todaySast)
             throw new UserFriendlyException(LearningExceptionCodes.LessonTooSoon,
-                $"Lessons must be scheduled at least {MinAdvanceHours} hours in advance.");
+                "Lessons can't be scheduled for today. Pick tomorrow or a later day.");
 
         var durationMinutes = (int)(scheduledEndUtc - scheduledStartUtc).TotalMinutes;
         if (durationMinutes < MinDurationMinutes || durationMinutes > MaxDurationMinutes)
@@ -1174,12 +1178,11 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
                 $"Lesson duration must be between {MinDurationMinutes} and {MaxDurationMinutes} minutes.");
 
         // School-hours window: convert each UTC instant to SAST and assert
-        // it falls within [07:00, 17:00]. Inclusive at the end so a
-        // 16:00-17:00 lesson is admitted; 16:30-17:30 is rejected.
+        // it falls within [07:00, 14:00]. Inclusive at the end so a
+        // 13:00-14:00 lesson is admitted; 13:30-14:30 is rejected.
         // Comparing TimeSpan-vs-TimeSpan avoids floating-point brittleness
-        // on the boundary that a `TotalHours > 17.0` check has when the
+        // on the boundary that a `TotalHours > 14.0` check has when the
         // input has any sub-minute component.
-        var startSast = scheduledStartUtc + SastOffset;
         var endSast = scheduledEndUtc + SastOffset;
         var schoolStart = TimeSpan.FromHours(SchoolStartHourSast);
         var schoolEnd = TimeSpan.FromHours(SchoolEndHourSast);

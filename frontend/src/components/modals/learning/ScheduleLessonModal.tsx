@@ -42,11 +42,11 @@ const { Text } = Typography;
 // here is deliberate — the client *must* mirror the rules so we can show
 // inline errors before a round trip; the backend remains the source of
 // truth and re-validates on submit.
-const MIN_ADVANCE_HOURS = 24;
+// Lessons can be booked for tomorrow (SAST) or later, never for today.
 const MIN_DURATION_MINUTES = 30;
 const MAX_DURATION_MINUTES = 180;
 const SCHOOL_START_HOUR = 7; // 07:00 SAST
-const SCHOOL_END_HOUR = 17; // 17:00 SAST
+const SCHOOL_END_HOUR = 14; // 14:00 SAST
 const SAST_OFFSET_MINUTES = 2 * 60; // UTC+02:00, no DST in South Africa
 
 // Backend enum psms.Domain.Shared.Enums.OnlinePlatform.
@@ -95,7 +95,7 @@ const scheduleLessonSchema = z.object({
     .max(50, 'Meeting password must be 50 characters or fewer.')
     .optional()
     .or(z.literal('')),
-  // "Must be in the future" is enforced by the 24 h advance check at submit,
+  // "Must be in the future" is enforced by the no-same-day check at submit,
   // which an edit that keeps the original time is allowed to skip.
   scheduledStart: z
     .custom<Dayjs>((v) => dayjs.isDayjs(v) && (v as Dayjs).isValid(), {
@@ -383,9 +383,9 @@ export const ScheduleLessonModal: React.FC<ScheduleLessonModalProps> = ({
   const inlineAdvanceWarning = useMemo<string | null>(() => {
     if (!timeChanged) return null;
     if (!watchedStart || !dayjs.isDayjs(watchedStart)) return null;
-    const threshold = dayjs().add(MIN_ADVANCE_HOURS, 'hour');
-    if (watchedStart.isBefore(threshold)) {
-      return `Lessons must be scheduled at least ${MIN_ADVANCE_HOURS} hours in advance.`;
+    const todaySast = sastView(Date.now()).dateKey;
+    if (sastView(watchedStart.valueOf()).dateKey <= todaySast) {
+      return "Lessons can't be scheduled for today. Pick tomorrow or a later day.";
     }
     return null;
   }, [watchedStart, timeChanged]);
@@ -524,14 +524,14 @@ export const ScheduleLessonModal: React.FC<ScheduleLessonModalProps> = ({
   };
 
   const disabledDate = (current: Dayjs) => {
-    // Disallow days before "today in SAST" — a user in another timezone
+    // Disallow today and earlier, in SAST — a user in another timezone
     // browsing late at night could otherwise see their local "today"
     // greyed out even though SAST is already tomorrow (or vice versa).
     // We work via the same offset arithmetic as the school-hours check.
     if (!current) return false;
     const nowSastDateKey = sastView(Date.now()).dateKey;
     const currentSastDateKey = sastView(current.valueOf()).dateKey;
-    return currentSastDateKey < nowSastDateKey;
+    return currentSastDateKey <= nowSastDateKey;
   };
 
   return (
@@ -550,7 +550,7 @@ export const ScheduleLessonModal: React.FC<ScheduleLessonModalProps> = ({
       width={680}
     >
       <Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>
-        Lessons must start at least {MIN_ADVANCE_HOURS} hours from now,
+        Lessons can be booked for tomorrow or later (not today),
         within school hours ({SCHOOL_START_HOUR.toString().padStart(2, '0')}
         :00–{SCHOOL_END_HOUR.toString().padStart(2, '0')}:00 SAST), and
         between {MIN_DURATION_MINUTES} and {MAX_DURATION_MINUTES} minutes

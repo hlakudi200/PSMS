@@ -22,8 +22,8 @@ public static class LearningExceptionCodes
     public const string InvalidLessonStatusTransition = "LRN_INVALID_LESSON_STATUS_TRANSITION";
     public const string CannotUpdateNonScheduledLesson = "LRN_CANNOT_UPDATE_NON_SCHEDULED_LESSON";
     public const string CannotDeleteActiveLesson = "LRN_CANNOT_DELETE_ACTIVE_LESSON";
-    // OL-001 scheduling guard rails — must schedule >=24h ahead, within
-    // 07:00-17:00 SA time, 30-180 minutes long, and not overlap an
+    // OL-001 scheduling guard rails — must be booked for tomorrow or later,
+    // within 07:00-14:00 SA time, 30-180 minutes long, and not overlap an
     // already-scheduled lesson on the same class-subject.
     public const string LessonTooSoon = "LRN_LESSON_TOO_SOON";
     public const string LessonOutsideSchoolHours = "LRN_LESSON_OUTSIDE_SCHOOL_HOURS";

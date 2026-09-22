@@ -386,7 +386,7 @@ function TeacherLessonsContent() {
           </Title>
           <Text type="secondary">
             Schedule live lessons for your class-subjects. Lessons must be
-            booked at least 24 h ahead, within school hours (OL-001).
+            booked from tomorrow onwards, within school hours (OL-001).
           </Text>
         </div>
         <Space>
