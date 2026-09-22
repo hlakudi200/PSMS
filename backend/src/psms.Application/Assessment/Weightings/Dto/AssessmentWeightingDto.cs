@@ -26,4 +26,17 @@ public class AssessmentWeightingDto
 
     /// <summary>False when the school has set its own split for this band.</summary>
     public bool MatchesPolicyDefault { get; set; }
+
+    /// <summary>
+    /// True for Grade 12, where the examination half is the National Senior
+    /// Certificate paper — NPPPPR §31(1) calls it the "external assessment
+    /// mark", set and marked by the DBE and provincial departments, not the
+    /// school.
+    /// <para>
+    /// The school therefore holds only the 25% SBA. Anything computing a Grade
+    /// 12 final mark from school data alone would be producing a number that
+    /// looks official and is not.
+    /// </para>
+    /// </summary>
+    public bool ExaminationIsExternal { get; set; }
 }

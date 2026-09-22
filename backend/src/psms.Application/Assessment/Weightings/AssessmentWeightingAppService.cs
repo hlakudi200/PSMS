@@ -160,6 +160,7 @@ public class AssessmentWeightingAppService : ApplicationService, IAssessmentWeig
             ExamPercentage = r.ExamPercentage,
             PolicySbaPercentage = AssessmentWeightingDefaults.SbaFor(r.Band),
             PolicyExamPercentage = AssessmentWeightingDefaults.ExamFor(r.Band),
-            MatchesPolicyDefault = r.MatchesPolicyDefault()
+            MatchesPolicyDefault = r.MatchesPolicyDefault(),
+            ExaminationIsExternal = r.Band == AssessmentWeightingBand.Grade12
         }).ToList());
 }
