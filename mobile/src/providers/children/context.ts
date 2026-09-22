@@ -11,10 +11,9 @@ export interface IChildSummary {
   studentId: string;
   studentName: string;
   admissionNumber?: string;
-  isPrimaryContact: boolean;
   className?: string;
   gradeName?: string;
-  /** Attendance for the current term — undefined when the summary couldn't be loaded. */
+  /** Attendance for the current term — undefined when it couldn't be loaded, or when no register has been captured yet. */
   attendancePercentage?: number;
   attendanceDaysPresent?: number;
   attendanceTotalDays?: number;
@@ -28,8 +27,7 @@ export interface IChildrenStateContext {
   myChildren?: IChildSummary[];
   /** The child every other parent screen scopes its reads to. */
   selectedChildId?: string;
-  /** Unread counts are per signed-in user, not per child — the backend resolves them from the session. */
-  unreadAnnouncements?: number;
+  /** Resolved per signed-in user by the backend, not per child. */
   unreadNotifications?: number;
 }
 

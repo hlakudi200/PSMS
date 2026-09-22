@@ -24,27 +24,20 @@ const loadCurrentTermRange = async (instance: AxiosInstance): Promise<ITermRange
   }
 };
 
-const loadStudentDetail = async (instance: AxiosInstance, studentId: string) => {
-  try {
-    const { data } = await instance.get("/api/services/app/Student/Get", { params: { id: studentId } });
-    return {
-      className: data.result.currentClassName ?? undefined,
-      gradeName: data.result.currentGradeName ?? undefined,
-    };
-  } catch {
-    return undefined;
-  }
-};
-
 const loadAttendance = async (instance: AxiosInstance, studentId: string, term: ITermRange) => {
   try {
     const { data } = await instance.get("/api/services/app/Attendance/GetStudentSummary", {
       params: { studentId, startDate: term.startDate, endDate: term.endDate },
     });
+    // AttendancePercentage is a non-nullable decimal the backend computes as 0
+    // when no register has been captured yet, which would read on the card as
+    // total absence. Only treat it as a real figure once there are days behind it.
+    const totalDays: number = data.result.totalDays ?? 0;
+    if (totalDays <= 0) return undefined;
     return {
-      attendancePercentage: data.result.attendancePercentage ?? undefined,
-      attendanceDaysPresent: data.result.presentCount ?? undefined,
-      attendanceTotalDays: data.result.totalDays ?? undefined,
+      attendancePercentage: data.result.attendancePercentage as number,
+      attendanceDaysPresent: data.result.presentCount as number,
+      attendanceTotalDays: totalDays,
     };
   } catch {
     return undefined;
@@ -76,9 +69,9 @@ const loadLatestPublishedReport = async (
   }
 };
 
-const loadUnreadCount = async (instance: AxiosInstance, url: string): Promise<number | undefined> => {
+const loadUnreadNotifications = async (instance: AxiosInstance): Promise<number | undefined> => {
   try {
-    const { data } = await instance.get(url);
+    const { data } = await instance.get("/api/services/app/Notification/GetUnreadCount");
     return data.result ?? undefined;
   } catch {
     return undefined;
@@ -90,31 +83,39 @@ export const ChildrenProvider = ({ children }: { children: React.ReactNode }) =>
   const instance = useRef(getAxiosInstance()).current;
   const selectedChildIdRef = useRef(state.selectedChildId);
   selectedChildIdRef.current = state.selectedChildId;
+  const isLoadingRef = useRef(false);
 
   const getMyChildrenAsync = useCallback(async () => {
+    // The load fans out over several requests, so a second pull-to-refresh
+    // landing mid-flight could otherwise overwrite newer state with older.
+    if (isLoadingRef.current) return;
+    isLoadingRef.current = true;
     dispatch(getPending());
     try {
-      const { data } = await instance.get("/api/services/app/StudentParent/GetMyChildren");
-      const links = data.result.items as any[];
+      // Student/GetAll resolves a parent caller to their own children
+      // server-side (MOB-BE-04) and already carries each child's name,
+      // admission number, grade and class — so it replaces a per-child
+      // Student/Get fan-out. None of these three depend on each other.
+      const [childrenResponse, term, unreadNotifications] = await Promise.all([
+        instance.get("/api/services/app/Student/GetAll"),
+        loadCurrentTermRange(instance),
+        loadUnreadNotifications(instance),
+      ]);
 
       // Every per-child metric below is best-effort: a child still lists with
       // its name and class when a summary call fails or has no data yet.
-      const term = await loadCurrentTermRange(instance);
-
       const myChildren: IChildSummary[] = await Promise.all(
-        links.map(async (link) => {
-          const [detail, attendance, latestReport] = await Promise.all([
-            loadStudentDetail(instance, link.studentId),
-            term ? loadAttendance(instance, link.studentId, term) : Promise.resolve(undefined),
-            loadLatestPublishedReport(instance, link.studentId),
+        (childrenResponse.data.result.items as any[]).map(async (student) => {
+          const [attendance, latestReport] = await Promise.all([
+            term ? loadAttendance(instance, student.id, term) : Promise.resolve(undefined),
+            loadLatestPublishedReport(instance, student.id),
           ]);
           return {
-            studentId: link.studentId,
-            studentName: link.studentName,
-            admissionNumber: link.studentAdmissionNumber ?? undefined,
-            isPrimaryContact: !!link.isPrimaryContact,
-            className: detail?.className,
-            gradeName: detail?.gradeName,
+            studentId: student.id,
+            studentName: student.fullName,
+            admissionNumber: student.admissionNumber ?? undefined,
+            className: student.currentClassName ?? undefined,
+            gradeName: student.currentGradeName ?? undefined,
             attendancePercentage: attendance?.attendancePercentage,
             attendanceDaysPresent: attendance?.attendanceDaysPresent,
             attendanceTotalDays: attendance?.attendanceTotalDays,
@@ -123,11 +124,6 @@ export const ChildrenProvider = ({ children }: { children: React.ReactNode }) =>
         })
       );
 
-      const [unreadAnnouncements, unreadNotifications] = await Promise.all([
-        loadUnreadCount(instance, "/api/services/app/AnnouncementRead/GetUnreadCount"),
-        loadUnreadCount(instance, "/api/services/app/Notification/GetUnreadCount"),
-      ]);
-
       // Keep the parent's current selection across a refresh; fall back to the
       // first child on first load, or if that child is no longer linked.
       const previous = selectedChildIdRef.current;
@@ -135,9 +131,11 @@ export const ChildrenProvider = ({ children }: { children: React.ReactNode }) =>
         ? previous
         : myChildren[0]?.studentId;
 
-      dispatch(getSuccess({ myChildren, selectedChildId, unreadAnnouncements, unreadNotifications }));
+      dispatch(getSuccess({ myChildren, selectedChildId, unreadNotifications }));
     } catch {
       dispatch(getError());
+    } finally {
+      isLoadingRef.current = false;
     }
   }, [instance]);
 

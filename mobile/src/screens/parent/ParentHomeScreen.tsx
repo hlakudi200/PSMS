@@ -11,7 +11,7 @@ import { formatDate, formatPercentage } from "../../utils/assessment-labels";
 export function ParentHomeScreen() {
   const { currentUser } = useAuthState();
   const { signOut } = useAuthActions();
-  const { myChildren, selectedChildId, isPending, isError, unreadAnnouncements, unreadNotifications } = useChildrenState();
+  const { myChildren, selectedChildId, isPending, isError, unreadNotifications } = useChildrenState();
   const { getMyChildrenAsync, selectChild } = useChildrenActions();
 
   useEffect(() => { void getMyChildrenAsync(); }, [getMyChildrenAsync]);
@@ -22,16 +22,18 @@ export function ParentHomeScreen() {
     router.replace("/(auth)/login");
   }, [signOut]);
 
-  if (isPending && !myChildren) {
-    return <Screen><StateView state="loading" message="Loading your family…" /></Screen>;
-  }
-  if (isError) {
+  // Only take over the whole screen before there is anything to show. Once the
+  // list has loaded, a failed refresh reports inline instead of discarding it.
+  if (isError && !myChildren) {
     return (
       <Screen>
         <StateView state="error" message="Couldn't load your children." />
         <Button onPress={() => void getMyChildrenAsync()}>Retry</Button>
       </Screen>
     );
+  }
+  if (!myChildren) {
+    return <Screen><StateView state="loading" message="Loading your family…" /></Screen>;
   }
 
   return (
@@ -45,7 +47,15 @@ export function ParentHomeScreen() {
           <View>
             <Badge label="PARENT PORTAL" />
             <Text style={styles.title}>Welcome{currentUser?.name ? `, ${currentUser.name}` : ""}</Text>
-            <UnreadSummary announcements={unreadAnnouncements} notifications={unreadNotifications} />
+            {!!unreadNotifications && (
+              <View style={styles.unreadRow}>
+                <Badge
+                  label={`${unreadNotifications} unread notification${unreadNotifications === 1 ? "" : "s"}`}
+                  tone="warning"
+                />
+              </View>
+            )}
+            {isError && <Text style={styles.inlineError}>Couldn&apos;t refresh — showing what loaded earlier.</Text>}
           </View>
         }
         ListEmptyComponent={
@@ -68,21 +78,8 @@ export function ParentHomeScreen() {
   );
 }
 
-function UnreadSummary({ announcements, notifications }: { announcements?: number; notifications?: number }) {
-  const hasAnnouncements = !!announcements;
-  const hasNotifications = !!notifications;
-  if (!hasAnnouncements && !hasNotifications) return null;
-
-  return (
-    <View style={styles.unreadRow}>
-      {hasAnnouncements && <Badge label={`${announcements} unread announcement${announcements === 1 ? "" : "s"}`} tone="warning" />}
-      {hasNotifications && <Badge label={`${notifications} unread notification${notifications === 1 ? "" : "s"}`} tone="warning" />}
-    </View>
-  );
-}
-
 function ChildCard({ child, isSelected, onPress }: { child: IChildSummary; isSelected: boolean; onPress: () => void }) {
-  const classLine = [child.gradeName, child.className].filter(Boolean).join(" · ");
+  const subtitle = [child.gradeName, child.className, child.admissionNumber].filter(Boolean).join(" · ");
 
   return (
     <Pressable accessibilityRole="button" onPress={onPress} style={styles.cardWrapper}>
@@ -91,19 +88,19 @@ function ChildCard({ child, isSelected, onPress }: { child: IChildSummary; isSel
           <Text style={styles.childName} numberOfLines={2}>{child.studentName}</Text>
           {isSelected && <Badge label="Selected" tone="success" />}
         </View>
-        {!!classLine && <Text style={styles.classLine}>{classLine}</Text>}
+        {!!subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
 
         <View style={styles.metric}>
           <Text style={styles.metricLabel}>Attendance this term</Text>
           {child.attendancePercentage != null ? (
             <Text style={styles.metricValue}>
               {formatPercentage(child.attendancePercentage)}
-              {child.attendanceTotalDays ? (
-                <Text style={styles.metricDetail}>{`  ${child.attendanceDaysPresent ?? 0}/${child.attendanceTotalDays} days`}</Text>
-              ) : null}
+              <Text style={styles.metricDetail}>
+                {`  ${child.attendanceDaysPresent ?? 0}/${child.attendanceTotalDays} days`}
+              </Text>
             </Text>
           ) : (
-            <Text style={styles.metricEmpty}>Not available yet</Text>
+            <Text style={styles.metricEmpty}>No register captured yet</Text>
           )}
         </View>
 
@@ -131,12 +128,13 @@ function ChildCard({ child, isSelected, onPress }: { child: IChildSummary; isSel
 const styles = StyleSheet.create({
   title: { color: colors.text, fontSize: typography.title, fontWeight: "800", marginTop: spacing.lg },
   list: { paddingBottom: spacing.xxl },
-  unreadRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.md, marginBottom: spacing.lg },
-  cardWrapper: { marginBottom: spacing.md },
+  unreadRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.md },
+  inlineError: { color: colors.danger, fontSize: 14, marginTop: spacing.md },
+  cardWrapper: { marginTop: spacing.md },
   selectedCard: { borderColor: colors.primary, borderWidth: 2 },
   cardTop: { alignItems: "center", flexDirection: "row", gap: spacing.sm, justifyContent: "space-between" },
   childName: { color: colors.text, flex: 1, fontSize: 18, fontWeight: "800" },
-  classLine: { color: colors.textMuted, fontSize: 14, marginTop: spacing.xs },
+  subtitle: { color: colors.textMuted, fontSize: 14, marginTop: spacing.xs },
   metric: { marginTop: spacing.md },
   metricLabel: { color: colors.textMuted, fontSize: 13, fontWeight: "700" },
   metricValue: { color: colors.text, fontSize: 16, fontWeight: "700", marginTop: spacing.xs },

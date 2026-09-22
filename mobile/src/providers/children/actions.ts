@@ -16,16 +16,11 @@ export const getPending = createAction<ChildrenPatch>(ChildrenActionEnums.getPen
 
 export const getSuccess = createAction<
   ChildrenPatch,
-  {
-    myChildren: IChildSummary[];
-    selectedChildId?: string;
-    unreadAnnouncements?: number;
-    unreadNotifications?: number;
-  }
+  { myChildren: IChildSummary[]; selectedChildId?: string; unreadNotifications?: number }
 >(
   ChildrenActionEnums.getSuccess,
-  ({ myChildren, selectedChildId, unreadAnnouncements, unreadNotifications }) => ({
-    isPending: false, isError: false, myChildren, selectedChildId, unreadAnnouncements, unreadNotifications,
+  ({ myChildren, selectedChildId, unreadNotifications }) => ({
+    isPending: false, isError: false, myChildren, selectedChildId, unreadNotifications,
   })
 );
 
