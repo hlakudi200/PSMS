@@ -64,6 +64,7 @@ public class ReportPdfDataLoader : ITransientDependency
             .Include(r => r.Class)
             .Include(r => r.Term)
             .Include(r => r.AcademicYear)
+            .Include(r => r.PromotedToGrade)
             .Include(r => r.SubjectReports).ThenInclude(sr => sr.Subject)
             .Include(r => r.SubjectReports).ThenInclude(sr => sr.Teacher)
             .FirstOrDefaultAsync(r => r.Id == reportId && r.TenantId == tenantId);
@@ -125,6 +126,9 @@ public class ReportPdfDataLoader : ITransientDependency
             DaysPresent = report.DaysPresent,
             DaysAbsent = report.DaysAbsent,
             DaysLate = report.DaysLate,
+            PromotionDecision = GetPromotionLabel(report.PromotionDecision),
+            PromotedToGradeName = report.PromotedToGrade?.GradeName,
+            PromotionReason = report.PromotionReason,
             TeacherComment = report.TeacherComment,
             PrincipalComment = report.PrincipalComment,
             ParentComment = report.ParentComment,
@@ -197,6 +201,21 @@ public class ReportPdfDataLoader : ITransientDependency
             return null;
         }
     }
+
+    /// <summary>
+    /// RC-16. How a promotion decision is worded on the card. The Protocol
+    /// distinguishes progression from promotion — Grades R-8 progress, Grades
+    /// 9-11 are promoted (National Protocol §26(7)(k)-(m)) — so the wording says
+    /// which one this is.
+    /// </summary>
+    private static string GetPromotionLabel(PromotionDecision? decision) => decision switch
+    {
+        psms.Domain.Shared.Enums.PromotionDecision.Promoted => "Promoted",
+        psms.Domain.Shared.Enums.PromotionDecision.Retained => "Not promoted — retained",
+        psms.Domain.Shared.Enums.PromotionDecision.ConditionalPromotion => "Conditionally promoted",
+        psms.Domain.Shared.Enums.PromotionDecision.ProgressedWithSupport => "Progressed with support",
+        _ => null,
+    };
 
     private static string GetReportTypeLabel(ReportType type) => type switch
     {

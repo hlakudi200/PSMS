@@ -5,6 +5,7 @@ import {
   IReportList,
   IPagedResult,
   IBulkGenerateReportsResult,
+  IPromotionAdvice,
 } from "../shared/interfaces";
 
 export enum ReportActionEnums {
@@ -44,6 +45,9 @@ export enum ReportActionEnums {
   acknowledgeByParentSuccess = "ACKNOWLEDGE_BY_PARENT_SUCCESS",
   acknowledgeByParentError = "ACKNOWLEDGE_BY_PARENT_ERROR",
 
+  getPromotionAdvicePending = "GET_PROMOTION_ADVICE_PENDING",
+  getPromotionAdviceSuccess = "GET_PROMOTION_ADVICE_SUCCESS",
+  getPromotionAdviceError = "GET_PROMOTION_ADVICE_ERROR",
   recordPromotionPending = "RECORD_PROMOTION_PENDING",
   recordPromotionSuccess = "RECORD_PROMOTION_SUCCESS",
   recordPromotionError = "RECORD_PROMOTION_ERROR",
@@ -264,6 +268,26 @@ export const acknowledgeByParentError = createAction<IReportStateContext>(
 );
 
 // Record Promotion Actions
+export const getPromotionAdvicePending = createAction<IReportStateContext>(
+  ReportActionEnums.getPromotionAdvicePending,
+  () => ({ isPending: true, isSuccess: false, isError: false, promotionAdvice: undefined })
+);
+
+export const getPromotionAdviceSuccess = createAction<IReportStateContext, IPromotionAdvice>(
+  ReportActionEnums.getPromotionAdviceSuccess,
+  (promotionAdvice) => ({
+    isPending: false,
+    isSuccess: true,
+    isError: false,
+    promotionAdvice,
+  })
+);
+
+export const getPromotionAdviceError = createAction<IReportStateContext>(
+  ReportActionEnums.getPromotionAdviceError,
+  () => ({ isPending: false, isSuccess: false, isError: true })
+);
+
 export const recordPromotionPending = createAction<IReportStateContext>(
   ReportActionEnums.recordPromotionPending,
   () => ({ isPending: true, isSuccess: false, isError: false })

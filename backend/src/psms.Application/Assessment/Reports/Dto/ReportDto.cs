@@ -29,6 +29,12 @@ public class ReportDto : FullAuditedEntityDto<Guid>
     public DateTime? ParentAcknowledgedDate { get; set; }
     public PromotionDecision? PromotionDecision { get; set; }
     public Guid? PromotedToGradeId { get; set; }
+
+    /// <summary>
+    /// RC-16. Why the decision was what it was, when it departs from the
+    /// national requirements.
+    /// </summary>
+    public string PromotionReason { get; set; }
     public ReportStatus Status { get; set; }
     public DateTime? GeneratedDate { get; set; }
     public DateTime? PublishedDate { get; set; }

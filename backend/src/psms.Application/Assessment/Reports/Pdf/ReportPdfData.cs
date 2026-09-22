@@ -52,6 +52,19 @@ public class ReportPdfData
     public int DaysAbsent { get; set; }
     public int DaysLate { get; set; }
 
+    /// <summary>
+    /// RC-16. The promotion decision, spelled out. NPPPPR §(2b)(c): "the
+    /// decision reached at the meeting contemplated above must be reflected on
+    /// the learner's report card." Null on a card that carries no decision.
+    /// </summary>
+    public string PromotionDecision { get; set; }
+
+    /// <summary>The grade the learner moves into, when they move.</summary>
+    public string PromotedToGradeName { get; set; }
+
+    /// <summary>Why, when the decision departs from the national requirements.</summary>
+    public string PromotionReason { get; set; }
+
     // Comments
     public string TeacherComment { get; set; }
     public string PrincipalComment { get; set; }

@@ -37,6 +37,7 @@ import { useAuthState } from '@/providers/auth';
 import { useBrandingState } from '@/providers/branding';
 import { getPrintableInk, getReadableForeground } from '@/utils/theme-config';
 import { formatMark, formatPercentage } from '@/utils/marks';
+import { PromotionDecisionModal, promotionDecisionLabels } from './PromotionDecisionModal';
 import type { IReport, IReportSubject } from '@/providers/assessment/shared/interfaces';
 
 const { Title, Text, Paragraph } = Typography;
@@ -208,6 +209,31 @@ const buildPrintStyles = (ink: string, brandBg: string, brandFg: string) => `
     print-color-adjust: exact;
   }
 
+  /* ─── RC-16: the promotion decision ─── */
+  .print-promotion {
+    display: block !important;
+    border: 1px solid #000;
+    margin-bottom: 10px;
+  }
+  .print-promotion-title {
+    background: #f5f5f5 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    font-size: 9px;
+    font-weight: 700;
+    padding: 3px 6px;
+    border-bottom: 1px solid #000;
+  }
+  .print-promotion-body {
+    font-size: 12px;
+    font-weight: 700;
+    padding: 6px;
+  }
+  .print-promotion-reason {
+    font-size: 10px;
+    padding: 0 6px 6px;
+  }
+
   /* ─── RC-15: the external-examination note under the marks table ─── */
   .print-external-exam-note {
     display: block !important;
@@ -338,6 +364,7 @@ const buildPrintStyles = (ink: string, brandBg: string, brandFg: string) => `
 .print-header { display: none; }
 .print-student-info { display: none; }
 .print-subject-table { display: none; }
+.print-promotion { display: none; }
 .print-external-exam-note { display: none; }
 .print-attendance { display: none; }
 .print-comments { display: none; }
@@ -424,6 +451,8 @@ function ReportDetailContent() {
       setSubmitting(false);
     }
   };
+
+  const [promotionOpen, setPromotionOpen] = useState(false);
 
   const handlePublish = async () => {
     await publishAsync(reportId);
@@ -553,6 +582,10 @@ function ReportDetailContent() {
      from. */
   const overallAvg = formatMark(report.overallPercentage);
 
+  /* RC-16: only the year-end card carries a promotion decision — it is the one
+     with the composite marks for the year behind it. */
+  const isYearEndReport = report.reportType === 6;
+
   return (
     <div style={{ padding: 24 }} className="report-print-area">
       <style>{printStyles}</style>
@@ -632,6 +665,20 @@ function ReportDetailContent() {
           prints the same note; the two must not say different things. */}
       {subjects.some((s) => s.awaitsExternalExamination) && (
         <div className="print-external-exam-note">{EXTERNAL_EXAM_NOTE}</div>
+      )}
+
+      {/* RC-16: the decision, printed. The PDF prints the same block. */}
+      {report.promotionDecision && (
+        <div className="print-promotion">
+          <div className="print-promotion-title">PROMOTION DECISION</div>
+          <div className="print-promotion-body">
+            {promotionDecisionLabels[report.promotionDecision] ?? 'Recorded'}
+            {report.promotedToGradeName ? ` to ${report.promotedToGradeName}` : ''}
+          </div>
+          {report.promotionReason && (
+            <div className="print-promotion-reason">{report.promotionReason}</div>
+          )}
+        </div>
       )}
 
       {/* Attendance for Print */}
@@ -813,6 +860,43 @@ function ReportDetailContent() {
               <Button type="primary" size="small" icon={<SendOutlined />}>Publish</Button>
             </Popconfirm>
           }
+        />
+      )}
+
+      {/* RC-16: the promotion decision. NPPPPR §(2b)(c) requires it to be
+          reflected on the learner's report card, and the year-end card is the
+          one that carries it. */}
+      {isYearEndReport && (
+        <Alert
+          className="no-print"
+          type={report.promotionDecision ? 'success' : 'warning'}
+          showIcon
+          style={{ marginBottom: 16 }}
+          message={
+            report.promotionDecision
+              ? `Promotion: ${promotionDecisionLabels[report.promotionDecision] ?? 'Recorded'}${
+                  report.promotedToGradeName ? ` to ${report.promotedToGradeName}` : ''
+                }`
+              : 'No promotion decision has been recorded on this year-end report.'
+          }
+          description={report.promotionReason}
+          action={
+            canManageReport && report.status !== 5 ? (
+              <Button size="small" onClick={() => setPromotionOpen(true)}>
+                {report.promotionDecision ? 'Review' : 'Record decision'}
+              </Button>
+            ) : undefined
+          }
+        />
+      )}
+
+      {isYearEndReport && (
+        <PromotionDecisionModal
+          open={promotionOpen}
+          reportId={report.id}
+          studentName={report.studentName}
+          onClose={() => setPromotionOpen(false)}
+          onRecorded={() => getAsync(report.id)}
         />
       )}
 
