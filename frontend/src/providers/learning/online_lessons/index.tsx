@@ -160,6 +160,7 @@ export const OnlineLessonProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(createOnlineLessonError());
+        throw error;
       });
   };
 
@@ -174,6 +175,7 @@ export const OnlineLessonProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(updateOnlineLessonError());
+        throw error;
       });
   };
 
@@ -244,6 +246,7 @@ export const OnlineLessonProvider = ({
         .catch((error) => {
             console.error(error);
             dispatch(rescheduleOnlineLessonError());
+            throw error;
         });
     };
 

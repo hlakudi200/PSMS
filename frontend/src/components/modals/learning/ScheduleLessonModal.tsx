@@ -24,8 +24,14 @@ import {
 import type {
   IClassSubjectList,
 } from '@/providers/academic/shared/interfaces';
+import {
+  useLearningMaterialActions,
+  useLearningMaterialState,
+} from '@/providers/learning/learning_materials';
 import type {
+  IOnlineLesson,
   IOnlineLessonList,
+  IUpdateOnlineLesson,
 } from '@/providers/learning/shared/interfaces';
 import { ACTIVE_LESSON_STATUSES } from '@/providers/learning/shared/online-lesson-status';
 
@@ -89,18 +95,18 @@ const scheduleLessonSchema = z.object({
     .max(50, 'Meeting password must be 50 characters or fewer.')
     .optional()
     .or(z.literal('')),
+  // "Must be in the future" is enforced by the 24 h advance check at submit,
+  // which an edit that keeps the original time is allowed to skip.
   scheduledStart: z
     .custom<Dayjs>((v) => dayjs.isDayjs(v) && (v as Dayjs).isValid(), {
       message: 'Pick a start date and time.',
-    })
-    .refine((v) => v.isAfter(dayjs()), {
-      message: 'Start time must be in the future.',
     }),
   durationMinutes: z
     .number({ message: 'Duration is required.' })
     .int()
     .min(MIN_DURATION_MINUTES, `Duration must be at least ${MIN_DURATION_MINUTES} minutes.`)
     .max(MAX_DURATION_MINUTES, `Duration cannot exceed ${MAX_DURATION_MINUTES} minutes.`),
+  materialIds: z.array(z.string()).optional(),
 }).superRefine((val, ctx) => {
   // External platforms need a valid meeting URL; in-app classes don't.
   if (val.platform !== PLATFORM_INAPP) {
@@ -123,6 +129,7 @@ interface ScheduleLessonFormValues {
   meetingPassword?: string;
   scheduledStart?: Dayjs;
   durationMinutes?: number;
+  materialIds?: string[];
 }
 
 /**
@@ -150,7 +157,8 @@ interface ConflictResult {
 function detectConflicts(
   existing: IOnlineLessonList[] | undefined,
   newStartIso: string,
-  newEndIso: string
+  newEndIso: string,
+  excludeLessonId?: string
 ): ConflictResult {
   if (!existing || existing.length === 0) {
     return { hasConflict: false, conflictTitles: [] };
@@ -158,6 +166,8 @@ function detectConflicts(
   const newStart = new Date(newStartIso).getTime();
   const newEnd = new Date(newEndIso).getTime();
   const overlapping = existing.filter((ol) => {
+    // A lesson being edited never conflicts with itself.
+    if (ol.id === excludeLessonId) return false;
     // Only Scheduled/InProgress rows block a slot — Cancelled/Completed
     // cannot be revived in place. Same convention as the backend overlap
     // query in OnlineLessonAppService.ValidateScheduleOrThrowAsync.
@@ -178,13 +188,20 @@ interface ScheduleLessonModalProps {
   open: boolean;
   onClose: (refresh: boolean) => void;
   classSubjects: IClassSubjectList[];
+  /** When set, the modal edits and reschedules this lesson instead of creating one. */
+  lesson?: IOnlineLesson;
 }
+
+const sameIds = (a: string[], b: string[]) =>
+  a.length === b.length && a.every((id) => b.includes(id));
 
 export const ScheduleLessonModal: React.FC<ScheduleLessonModalProps> = ({
   open,
   onClose,
   classSubjects,
+  lesson,
 }) => {
+  const isEdit = !!lesson;
   const [form] = Form.useForm<ScheduleLessonFormValues>();
   const [submitting, setSubmitting] = useState(false);
   const [zodErrors, setZodErrors] = useState<Record<string, string>>({});
@@ -194,21 +211,47 @@ export const ScheduleLessonModal: React.FC<ScheduleLessonModalProps> = ({
   // longer matches the user's current selection.
   const conflictExpectedClassSubjectIdRef = useRef<string | null>(null);
 
-  const { createAsync, getByClassSubjectAsync } = useOnlineLessonActions();
+  const { createAsync, updateAsync, rescheduleAsync, getByClassSubjectAsync } =
+    useOnlineLessonActions();
   const {
     lessonsByClassSubject,
     lessonsByClassSubjectPending,
     isPending: createPending,
   } = useOnlineLessonState();
+  const { getAllAsync: getMaterials } = useLearningMaterialActions();
+  const { learningMaterials, isPending: materialsPending } = useLearningMaterialState();
 
-  // Reset on open so a previous attempt doesn't leak in.
+  const originalStart = useMemo(
+    () => (lesson ? dayjs(lesson.scheduledStartTime) : undefined),
+    [lesson]
+  );
+  const originalMaterialIds = useMemo(
+    () => (lesson?.materials ?? []).map((m) => m.id),
+    [lesson]
+  );
+
+  // Reset on open so a previous attempt doesn't leak in; prefill in edit mode.
   useEffect(() => {
     if (open) {
       form.resetFields();
       setZodErrors({});
       conflictExpectedClassSubjectIdRef.current = null;
+      if (lesson) {
+        form.setFieldsValue({
+          classSubjectId: lesson.classSubjectId,
+          title: lesson.title,
+          description: lesson.description ?? '',
+          platform: lesson.platform,
+          meetingLink: lesson.platform === PLATFORM_INAPP ? undefined : lesson.meetingLink,
+          meetingId: lesson.meetingId ?? '',
+          meetingPassword: lesson.meetingPassword ?? '',
+          scheduledStart: dayjs(lesson.scheduledStartTime),
+          durationMinutes: lesson.durationMinutes,
+          materialIds: (lesson.materials ?? []).map((m) => m.id),
+        });
+      }
     }
-  }, [open, form]);
+  }, [open, form, lesson]);
 
   const classSubjectOptions = useMemo(
     () =>
@@ -240,11 +283,50 @@ export const ScheduleLessonModal: React.FC<ScheduleLessonModalProps> = ({
       // conflict-detection memo treats it as empty.
       conflictExpectedClassSubjectIdRef.current = watchedClassSubjectId;
       getByClassSubjectAsync(watchedClassSubjectId);
+      // Only published materials can be attached; students can't open drafts.
+      getMaterials({
+        classSubjectId: watchedClassSubjectId,
+        isPublished: true,
+        maxResultCount: 200,
+        sorting: 'Title',
+      });
     } else if (!watchedClassSubjectId) {
       conflictExpectedClassSubjectIdRef.current = null;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, watchedClassSubjectId]);
+
+  // Switching class-subject invalidates the picked materials.
+  const handleValuesChange = (changed: Partial<ScheduleLessonFormValues>) => {
+    if ('classSubjectId' in changed) {
+      form.setFieldValue('materialIds', []);
+    }
+  };
+
+  const materialOptions = useMemo(() => {
+    const options = (learningMaterials ?? [])
+      .filter((m) => m.classSubjectId === watchedClassSubjectId)
+      .map((m) => ({ value: m.id, label: m.title }));
+    // Keep already-attached materials labelled even if they've since been
+    // unpublished and so dropped out of the list above.
+    (lesson?.materials ?? []).forEach((m) => {
+      if (!options.some((o) => o.value === m.id)) {
+        options.push({ value: m.id, label: m.title });
+      }
+    });
+    return options;
+  }, [learningMaterials, watchedClassSubjectId, lesson]);
+
+  // In edit mode the OL-001 time rules only apply when the time moves; a
+  // lesson now less than 24 h away can still have its title fixed.
+  const timeChanged = useMemo(() => {
+    if (!lesson || !originalStart) return true;
+    if (!watchedStart || !dayjs.isDayjs(watchedStart)) return true;
+    return (
+      !watchedStart.isSame(originalStart, 'minute') ||
+      watchedDuration !== lesson.durationMinutes
+    );
+  }, [lesson, originalStart, watchedStart, watchedDuration]);
 
   // Live conflict detection — recomputes only when start, duration, or
   // the fetched lesson list changes. The pre-check is a courtesy: the
@@ -264,16 +346,19 @@ export const ScheduleLessonModal: React.FC<ScheduleLessonModalProps> = ({
     return detectConflicts(
       lessonsByClassSubject,
       watchedStart.toISOString(),
-      endIso
+      endIso,
+      lesson?.id
     );
   }, [
     lessonsByClassSubject,
     watchedStart,
     watchedDuration,
     watchedClassSubjectId,
+    lesson?.id,
   ]);
 
   const inlineSchoolHoursWarning = useMemo<string | null>(() => {
+    if (!timeChanged) return null;
     if (!watchedStart || !watchedDuration || !dayjs.isDayjs(watchedStart)) {
       return null;
     }
@@ -293,16 +378,17 @@ export const ScheduleLessonModal: React.FC<ScheduleLessonModalProps> = ({
         .padStart(2, '0')}:00–${SCHOOL_END_HOUR.toString().padStart(2, '0')}:00 SAST).`;
     }
     return null;
-  }, [watchedStart, watchedDuration]);
+  }, [watchedStart, watchedDuration, timeChanged]);
 
   const inlineAdvanceWarning = useMemo<string | null>(() => {
+    if (!timeChanged) return null;
     if (!watchedStart || !dayjs.isDayjs(watchedStart)) return null;
     const threshold = dayjs().add(MIN_ADVANCE_HOURS, 'hour');
     if (watchedStart.isBefore(threshold)) {
       return `Lessons must be scheduled at least ${MIN_ADVANCE_HOURS} hours in advance.`;
     }
     return null;
-  }, [watchedStart]);
+  }, [watchedStart, timeChanged]);
 
   const handleSubmit = async () => {
     let values: ScheduleLessonFormValues;
@@ -334,7 +420,7 @@ export const ScheduleLessonModal: React.FC<ScheduleLessonModalProps> = ({
       message.error(inlineSchoolHoursWarning);
       return;
     }
-    if (conflict.hasConflict) {
+    if (timeChanged && conflict.hasConflict) {
       // Confirm-don't-block: server will reject anyway, but the user has
       // been warned so they can deliberately retry once they've moved the
       // other lesson. We bail here.
@@ -344,6 +430,12 @@ export const ScheduleLessonModal: React.FC<ScheduleLessonModalProps> = ({
 
     const start = result.data.scheduledStart;
     const end = start.add(result.data.durationMinutes, 'minute');
+    const materialIds = result.data.materialIds ?? [];
+
+    if (lesson) {
+      await submitEdit(lesson, result.data, start, end, materialIds);
+      return;
+    }
 
     setSubmitting(true);
     try {
@@ -369,12 +461,63 @@ export const ScheduleLessonModal: React.FC<ScheduleLessonModalProps> = ({
         scheduledStartTime: start.toISOString(),
         scheduledEndTime: end.toISOString(),
         isRecurring: false,
+        materialIds: materialIds.length > 0 ? materialIds : undefined,
       });
       message.success('Lesson scheduled');
       onClose(true);
     } catch {
       // axios interceptor surfaces the server message — including the
       // OL-001 codes we may not have caught client-side.
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Edit = an optional Reschedule (which re-runs OL-001 server-side and
+  // notifies students) followed by an Update of everything else. The time
+  // moves first so a rejected slot leaves the lesson untouched.
+  const submitEdit = async (
+    current: IOnlineLesson,
+    data: z.infer<typeof scheduleLessonSchema>,
+    start: Dayjs,
+    end: Dayjs,
+    materialIds: string[]
+  ) => {
+    const isInAppLesson = current.platform === PLATFORM_INAPP;
+    const update: IUpdateOnlineLesson = {
+      title: data.title.trim(),
+      // Empty string clears the description; the server treats null as "unchanged".
+      description: data.description?.trim() ?? '',
+      meetingLink: isInAppLesson ? undefined : data.meetingLink?.trim(),
+      meetingId: isInAppLesson ? undefined : data.meetingId?.trim() ?? '',
+      meetingPassword: isInAppLesson ? undefined : data.meetingPassword?.trim() ?? '',
+      materialIds: sameIds(materialIds, originalMaterialIds) ? undefined : materialIds,
+    };
+
+    setSubmitting(true);
+    let rescheduled = false;
+    try {
+      if (timeChanged) {
+        await rescheduleAsync(current.id, {
+          newStartTime: start.toISOString(),
+          newEndTime: end.toISOString(),
+        });
+        rescheduled = true;
+      }
+      await updateAsync(current.id, update);
+      message.success(
+        rescheduled
+          ? 'Lesson rescheduled. Enrolled students have been notified.'
+          : 'Lesson updated'
+      );
+      onClose(true);
+    } catch {
+      // The axios interceptor shows the server message. If the time already
+      // moved, say so, so the teacher doesn't retry the reschedule.
+      if (rescheduled) {
+        message.warning('The new time was saved, but the other changes were not.');
+        onClose(true);
+      }
     } finally {
       setSubmitting(false);
     }
@@ -396,12 +539,12 @@ export const ScheduleLessonModal: React.FC<ScheduleLessonModalProps> = ({
       open={open}
       title={
         <Space>
-          <span>Schedule online lesson</span>
+          <span>{isEdit ? 'Edit online lesson' : 'Schedule online lesson'}</span>
         </Space>
       }
       onCancel={() => onClose(false)}
       onOk={handleSubmit}
-      okText="Schedule"
+      okText={isEdit ? 'Save changes' : 'Schedule'}
       confirmLoading={submitting || createPending}
       destroyOnHidden
       width={680}
@@ -412,12 +555,14 @@ export const ScheduleLessonModal: React.FC<ScheduleLessonModalProps> = ({
         :00–{SCHOOL_END_HOUR.toString().padStart(2, '0')}:00 SAST), and
         between {MIN_DURATION_MINUTES} and {MAX_DURATION_MINUTES} minutes
         long (OL-001).
+        {isEdit && ' Changing the time notifies enrolled students.'}
       </Text>
 
       <Form<ScheduleLessonFormValues>
         form={form}
         layout="vertical"
-        initialValues={{ durationMinutes: 60, platform: 1 }}
+        initialValues={{ durationMinutes: 60, platform: 1, materialIds: [] }}
+        onValuesChange={handleValuesChange}
       >
         <Row gutter={12}>
           <Col xs={24} md={12}>
@@ -433,6 +578,7 @@ export const ScheduleLessonModal: React.FC<ScheduleLessonModalProps> = ({
                 showSearch
                 optionFilterProp="label"
                 options={classSubjectOptions}
+                disabled={isEdit}
               />
             </Form.Item>
           </Col>
@@ -444,7 +590,7 @@ export const ScheduleLessonModal: React.FC<ScheduleLessonModalProps> = ({
               validateStatus={zodErrors.platform ? 'error' : undefined}
               help={zodErrors.platform}
             >
-              <Select options={PLATFORM_OPTIONS} />
+              <Select options={PLATFORM_OPTIONS} disabled={isEdit} />
             </Form.Item>
           </Col>
         </Row>
@@ -473,6 +619,30 @@ export const ScheduleLessonModal: React.FC<ScheduleLessonModalProps> = ({
             placeholder="Optional notes shown to students."
             maxLength={2000}
             showCount
+          />
+        </Form.Item>
+
+        <Form.Item
+          label="Pre-lesson materials (optional)"
+          name="materialIds"
+          extra="Published materials for this class and subject, so students can prepare."
+          validateStatus={zodErrors.materialIds ? 'error' : undefined}
+          help={zodErrors.materialIds}
+        >
+          <Select
+            mode="multiple"
+            placeholder={
+              watchedClassSubjectId
+                ? 'Attach materials students should read first'
+                : 'Pick a class & subject first'
+            }
+            disabled={!watchedClassSubjectId}
+            loading={materialsPending}
+            optionFilterProp="label"
+            options={materialOptions}
+            notFoundContent={
+              materialsPending ? 'Loading…' : 'No published materials for this class and subject'
+            }
           />
         </Form.Item>
 

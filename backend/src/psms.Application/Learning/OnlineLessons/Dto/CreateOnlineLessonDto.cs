@@ -1,5 +1,6 @@
 using psms.Domain.Shared.Enums;
 using System;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 
 namespace psms.Learning.OnlineLessons.Dto;
@@ -46,4 +47,10 @@ public class CreateOnlineLessonDto
     public bool IsRecurring { get; set; }
 
     public string RecurrencePattern { get; set; }
+
+    /// <summary>
+    /// Published learning materials on the same class-subject to attach as
+    /// pre-lesson reading (US-TCH-004). Null or empty attaches nothing.
+    /// </summary>
+    public List<Guid> MaterialIds { get; set; }
 }

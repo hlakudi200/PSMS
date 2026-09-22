@@ -46,7 +46,8 @@ public class LearningMapper : Profile
                     ? src.ClassSubject.Class.ClassName : null))
             .ForMember(dest => dest.SubjectName,
                 opt => opt.MapFrom(src => src.ClassSubject != null && src.ClassSubject.Subject != null
-                    ? src.ClassSubject.Subject.SubjectName : null));
+                    ? src.ClassSubject.Subject.SubjectName : null))
+            .ForMember(dest => dest.Materials, opt => opt.Ignore());
 
         // Entity to ListDto (lightweight)
         CreateMap<OnlineLesson, OnlineLessonListDto>()

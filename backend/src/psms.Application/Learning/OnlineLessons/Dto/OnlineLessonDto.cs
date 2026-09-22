@@ -1,6 +1,7 @@
 using Abp.Application.Services.Dto;
 using psms.Domain.Shared.Enums;
 using System;
+using System.Collections.Generic;
 
 namespace psms.Learning.OnlineLessons.Dto;
 
@@ -32,4 +33,7 @@ public class OnlineLessonDto : FullAuditedEntityDto<Guid>
     // Flattened from ClassSubject
     public string ClassName { get; set; }
     public string SubjectName { get; set; }
+
+    /// <summary>Pre-lesson materials, filled in by the app service (not AutoMapper).</summary>
+    public List<OnlineLessonMaterialDto> Materials { get; set; } = new List<OnlineLessonMaterialDto>();
 }

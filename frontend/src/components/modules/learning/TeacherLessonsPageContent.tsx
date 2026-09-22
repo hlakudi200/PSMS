@@ -23,6 +23,7 @@ import {
   CalendarOutlined,
   ClockCircleOutlined,
   CloseCircleOutlined,
+  EditOutlined,
   PlayCircleOutlined,
   PlusOutlined,
   ReloadOutlined,
@@ -46,6 +47,7 @@ import {
   useOnlineLessonActions,
   useOnlineLessonState,
 } from '@/providers/learning/online_lessons';
+import { LearningMaterialProvider } from '@/providers/learning/learning_materials';
 import type { IClassSubjectList } from '@/providers/academic/shared/interfaces';
 import type {
   IOnlineLessonList,
@@ -96,6 +98,10 @@ function TeacherLessonsContent() {
   const router = useRouter();
   const { currentUser } = useAuthState();
   const [scheduleOpen, setScheduleOpen] = useState(false);
+  // Lesson being edited. The list row lacks the description, meeting
+  // details and materials, so Edit fetches the full lesson first and the
+  // modal opens once it has arrived.
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   // Filter strip state — server-side keyword + class-subject + status.
   const [searchKeyword, setSearchKeyword] = useState('');
@@ -124,13 +130,18 @@ function TeacherLessonsContent() {
 
   const {
     getAllAsync: getAllLessons,
+    getAsync: getLesson,
     cancelAsync,
   } = useOnlineLessonActions();
   const {
+    onlineLesson,
     onlineLessons,
     isPending: lessonsPending,
     isError: lessonsError,
   } = useOnlineLessonState();
+
+  const editingLesson =
+    editingId && onlineLesson?.id === editingId ? onlineLesson : undefined;
 
   useEffect(() => {
     if (currentUser?.id != null) {
@@ -230,6 +241,11 @@ function TeacherLessonsContent() {
     }
   };
 
+  const handleEdit = (record: IOnlineLessonList) => {
+    setEditingId(record.id);
+    getLesson(record.id);
+  };
+
   const handleOpen = (record: IOnlineLessonList) => {
     // Route into the host shell where Start/End/Cancel and the meeting
     // link live. Same surface for Scheduled (where Start is gated by the
@@ -292,7 +308,7 @@ function TeacherLessonsContent() {
     {
       title: 'Actions',
       key: 'actions',
-      width: 220,
+      width: 260,
       render: (_: unknown, record: IOnlineLessonList) => (
         <Space size="small">
           {record.platform === PLATFORM_INAPP
@@ -322,6 +338,17 @@ function TeacherLessonsContent() {
               >
                 Open
               </Button>
+            </Tooltip>
+          )}
+          {record.status === ONLINE_LESSON_STATUS.Scheduled && (
+            <Tooltip title="Edit or reschedule">
+              <Button
+                size="small"
+                icon={<EditOutlined />}
+                aria-label={`Edit ${record.title}`}
+                loading={editingId === record.id && !editingLesson && lessonsPending}
+                onClick={() => handleEdit(record)}
+              />
             </Tooltip>
           )}
           {record.status === ONLINE_LESSON_STATUS.Scheduled && (
@@ -503,6 +530,16 @@ function TeacherLessonsContent() {
           if (refresh) refreshLessons();
         }}
       />
+
+      <ScheduleLessonModal
+        open={!!editingLesson}
+        lesson={editingLesson}
+        classSubjects={classSubjects ?? []}
+        onClose={(refresh) => {
+          setEditingId(null);
+          if (refresh) refreshLessons();
+        }}
+      />
     </div>
   );
 }
@@ -512,7 +549,9 @@ export default function TeacherLessonsPageContent() {
     <TeacherProvider>
       <ClassSubjectProvider>
         <OnlineLessonProvider>
-          <TeacherLessonsContent />
+          <LearningMaterialProvider>
+            <TeacherLessonsContent />
+          </LearningMaterialProvider>
         </OnlineLessonProvider>
       </ClassSubjectProvider>
     </TeacherProvider>

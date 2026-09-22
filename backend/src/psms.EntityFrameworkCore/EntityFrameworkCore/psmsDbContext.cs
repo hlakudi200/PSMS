@@ -257,6 +257,11 @@ public class psmsDbContext : AbpZeroDbContext<Tenant, Role, User, psmsDbContext>
     /// </summary>
     public DbSet<LiveClassAttendance> LiveClassAttendances { get; set; }
 
+    /// <summary>
+    /// Pre-lesson materials attached to an online lesson (US-TCH-004).
+    /// </summary>
+    public DbSet<OnlineLessonMaterial> OnlineLessonMaterials { get; set; }
+
     /* ==================== Communication Module ==================== */
 
     /// <summary>
@@ -521,6 +526,12 @@ public class psmsDbContext : AbpZeroDbContext<Tenant, Role, User, psmsDbContext>
             .HasIndex(a => new { a.OnlineLessonId, a.ParticipantIdentity })
             .IsUnique()
             .HasDatabaseName("IX_LiveClassAttendances_OnlineLessonId_ParticipantIdentity");
+
+        // OnlineLessonMaterial - a material is attached to a lesson at most once
+        modelBuilder.Entity<OnlineLessonMaterial>()
+            .HasIndex(m => new { m.OnlineLessonId, m.LearningMaterialId })
+            .IsUnique()
+            .HasDatabaseName("IX_OnlineLessonMaterials_OnlineLessonId_LearningMaterialId");
 
         // Attendance - one record per student per day
         modelBuilder.Entity<Attendance>()

@@ -37,8 +37,12 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
     private readonly IRepository<Student, Guid> _studentRepository;
     private readonly IRepository<User, long> _userRepository;
     private readonly IRepository<LiveClassAttendance, Guid> _attendanceRepository;
+    private readonly IRepository<OnlineLessonMaterial, Guid> _lessonMaterialRepository;
+    private readonly IRepository<LearningMaterial, Guid> _learningMaterialRepository;
+    private readonly IRepository<Term, Guid> _termRepository;
     private readonly IFileStorageService _fileStorage;
     private readonly ILiveKitTokenService _liveKit;
+    private readonly OnlineLessonNotifier _notifier;
 
     // Supabase bucket for lesson recordings (public-read, like materials).
     // Supabase bucket for lesson recordings — PRIVATE (LC-06). Object keys are
@@ -68,8 +72,12 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
         IRepository<Student, Guid> studentRepository,
         IRepository<User, long> userRepository,
         IRepository<LiveClassAttendance, Guid> attendanceRepository,
+        IRepository<OnlineLessonMaterial, Guid> lessonMaterialRepository,
+        IRepository<LearningMaterial, Guid> learningMaterialRepository,
+        IRepository<Term, Guid> termRepository,
         IFileStorageService fileStorage,
-        ILiveKitTokenService liveKit)
+        ILiveKitTokenService liveKit,
+        OnlineLessonNotifier notifier)
     {
         _onlineLessonRepository = onlineLessonRepository;
         _classSubjectRepository = classSubjectRepository;
@@ -77,8 +85,12 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
         _studentRepository = studentRepository;
         _userRepository = userRepository;
         _attendanceRepository = attendanceRepository;
+        _lessonMaterialRepository = lessonMaterialRepository;
+        _learningMaterialRepository = learningMaterialRepository;
+        _termRepository = termRepository;
         _fileStorage = fileStorage;
         _liveKit = liveKit;
+        _notifier = notifier;
     }
 
     [AbpAuthorize(PermissionNames.Learning_Lessons_View)]
@@ -118,7 +130,9 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
             }
         }
 
-        return ObjectMapper.Map<OnlineLessonDto>(lesson);
+        var dto = ObjectMapper.Map<OnlineLessonDto>(lesson);
+        dto.Materials = await GetLessonMaterialsAsync(lesson.Id);
+        return dto;
     }
 
     [AbpAuthorize(PermissionNames.Learning_Lessons_View)]
@@ -262,6 +276,8 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
             input.ScheduledEndTime,
             excludeLessonId: null);
 
+        var materialIds = await ValidateLessonMaterialsOrThrowAsync(input.MaterialIds, input.ClassSubjectId);
+
         var lesson = new OnlineLesson(
             lessonId,
             AbpSession.TenantId,
@@ -281,6 +297,11 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
         };
 
         await _onlineLessonRepository.InsertAsync(lesson);
+        foreach (var materialId in materialIds)
+        {
+            await _lessonMaterialRepository.InsertAsync(
+                new OnlineLessonMaterial(Guid.NewGuid(), AbpSession.TenantId, lesson.Id, materialId));
+        }
         try
         {
             await CurrentUnitOfWork.SaveChangesAsync();
@@ -290,6 +311,10 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
             throw new UserFriendlyException(LearningExceptionCodes.LessonOverlapsExisting,
                 "This time slot was just booked by another request. Please retry.");
         }
+
+        // Queued inside the same transaction, so a reminder only exists if
+        // the lesson does.
+        await _notifier.ScheduleRemindersAsync(lesson);
 
         // Commit the inner UoW so the Serializable transaction we opened
         // above is closed before we fetch the lesson back for the DTO.
@@ -318,6 +343,12 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
         }
         if (input.MeetingId != null) lesson.MeetingId = input.MeetingId;
         if (input.MeetingPassword != null) lesson.MeetingPassword = input.MeetingPassword;
+
+        if (input.MaterialIds != null)
+        {
+            var materialIds = await ValidateLessonMaterialsOrThrowAsync(input.MaterialIds, lesson.ClassSubjectId);
+            await ReplaceLessonMaterialsAsync(lesson.Id, materialIds);
+        }
 
         await _onlineLessonRepository.UpdateAsync(lesson);
         await CurrentUnitOfWork.SaveChangesAsync();
@@ -469,6 +500,14 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
 
         var lesson = await LoadOwnedLessonOrThrowAsync(id);
 
+        // The domain method would also accept a Cancelled lesson and leave it
+        // cancelled at the new time, which students would never hear about.
+        if (lesson.Status != OnlineLessonStatus.Scheduled)
+            throw new UserFriendlyException(LearningExceptionCodes.InvalidLessonStatusTransition,
+                "Only scheduled lessons can be rescheduled.");
+
+        var previousStart = lesson.ScheduledStartTime;
+
         // Same OL-001 guard rails as scheduling, applied to the new times.
         // Exclude `id` from overlap detection so a lesson moved forward 30
         // minutes is not flagged as colliding with itself.
@@ -496,6 +535,15 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
         {
             throw new UserFriendlyException(LearningExceptionCodes.LessonOverlapsExisting,
                 "This time slot was just booked by another request. Please retry.");
+        }
+
+        // A silent move is worse than a cancellation: tell the students, and
+        // queue reminders for the new time. Reminders queued for the old time
+        // see the changed start when they fire and do nothing.
+        if (lesson.ScheduledStartTime != previousStart)
+        {
+            await _notifier.NotifyRescheduledAsync(lesson, lesson.ClassSubject, previousStart);
+            await _notifier.ScheduleRemindersAsync(lesson);
         }
 
         await uow.CompleteAsync();
@@ -1139,6 +1187,8 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
                 $"Lessons must be scheduled within school hours ({SchoolStartHourSast:D2}:00-{SchoolEndHourSast:D2}:00 SAST) on a single day.");
         }
 
+        await EnsureWithinCurrentTermOrThrowAsync(startSast.Date);
+
         // Overlap check: any *active* (not cancelled / not completed)
         // lesson on the same class-subject whose [start, end) intersects
         // [scheduledStart, scheduledEnd). Cancelled/completed rows are
@@ -1158,6 +1208,99 @@ public class OnlineLessonAppService : ApplicationService, IOnlineLessonAppServic
         if (hasOverlap)
             throw new UserFriendlyException(LearningExceptionCodes.LessonOverlapsExisting,
                 "This time slot overlaps an existing lesson on this class-subject. Pick a different slot.");
+    }
+
+    /// <summary>
+    /// US-TCH-004 current-term rule: the lesson's SAST calendar date must fall
+    /// within the current term. Schools that have not set a current term yet
+    /// are not blocked, since there is nothing to validate against.
+    /// </summary>
+    private async Task EnsureWithinCurrentTermOrThrowAsync(DateTime lessonDateSast)
+    {
+        var term = await _termRepository
+            .GetAll()
+            .Include(t => t.AcademicYear)
+            .FirstOrDefaultAsync(t => t.TenantId == AbpSession.TenantId
+                                   && t.IsCurrent
+                                   && t.AcademicYear.IsCurrent);
+        if (term == null)
+            return;
+
+        var termStart = ToSastDate(term.StartDate);
+        var termEnd = ToSastDate(term.EndDate);
+        if (lessonDateSast < termStart || lessonDateSast > termEnd)
+        {
+            throw new UserFriendlyException(LearningExceptionCodes.LessonOutsideCurrentTerm,
+                $"Lessons must fall within the current term ({term.TermName}: {termStart:yyyy-MM-dd} to {termEnd:yyyy-MM-dd}).");
+        }
+    }
+
+    /// <summary>
+    /// Calendar date of a stored term boundary in SAST. Npgsql hands back
+    /// timestamptz values as UTC, so a term entered as local midnight reads as
+    /// 22:00 the day before; shift it back before taking the date.
+    /// </summary>
+    private static DateTime ToSastDate(DateTime value)
+        => value.Kind == DateTimeKind.Utc ? (value + SastOffset).Date : value.Date;
+
+    /// <summary>
+    /// Pre-lesson materials must be published materials on the lesson's own
+    /// class-subject, so a student is never pointed at something they can't
+    /// open. Returns the distinct ids to attach.
+    /// </summary>
+    private async Task<List<Guid>> ValidateLessonMaterialsOrThrowAsync(List<Guid> materialIds, Guid classSubjectId)
+    {
+        var ids = (materialIds ?? new List<Guid>()).Distinct().ToList();
+        if (ids.Count == 0)
+            return ids;
+
+        var validCount = await _learningMaterialRepository
+            .GetAll()
+            .CountAsync(m => ids.Contains(m.Id)
+                          && m.TenantId == AbpSession.TenantId
+                          && m.ClassSubjectId == classSubjectId
+                          && m.IsPublished);
+        if (validCount != ids.Count)
+            throw new UserFriendlyException(LearningExceptionCodes.InvalidLessonMaterials,
+                "Pre-lesson materials must be published materials for this class and subject.");
+
+        return ids;
+    }
+
+    private async Task ReplaceLessonMaterialsAsync(Guid lessonId, List<Guid> materialIds)
+    {
+        var existing = await _lessonMaterialRepository
+            .GetAll()
+            .Where(m => m.OnlineLessonId == lessonId)
+            .ToListAsync();
+
+        foreach (var row in existing.Where(r => !materialIds.Contains(r.LearningMaterialId)))
+            await _lessonMaterialRepository.DeleteAsync(row);
+
+        var existingIds = existing.Select(r => r.LearningMaterialId).ToHashSet();
+        foreach (var materialId in materialIds.Where(mid => !existingIds.Contains(mid)))
+        {
+            await _lessonMaterialRepository.InsertAsync(
+                new OnlineLessonMaterial(Guid.NewGuid(), AbpSession.TenantId, lessonId, materialId));
+        }
+    }
+
+    private async Task<List<OnlineLessonMaterialDto>> GetLessonMaterialsAsync(Guid lessonId)
+    {
+        // Soft-deleted materials drop out through the global filter on the join.
+        return await _lessonMaterialRepository
+            .GetAll()
+            .Where(m => m.OnlineLessonId == lessonId && m.LearningMaterial != null)
+            .OrderBy(m => m.LearningMaterial.Title)
+            .Select(m => new OnlineLessonMaterialDto
+            {
+                Id = m.LearningMaterialId,
+                Title = m.LearningMaterial.Title,
+                MaterialType = m.LearningMaterial.MaterialType,
+                FileName = m.LearningMaterial.FileName,
+                ExternalLink = m.LearningMaterial.ExternalLink,
+            })
+            .ToListAsync();
     }
 
     #endregion
