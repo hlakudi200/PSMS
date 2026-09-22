@@ -13,43 +13,49 @@ using System.Threading.Tasks;
 namespace psms.Assessment.Reports;
 
 /// <summary>
-/// RC-06. Fills in the five figures on a report card that only exist relative
-/// to the rest of the class: the learner's position overall, and per subject
-/// their position, the class average, the highest and the lowest mark.
+/// RC-06. Fills in the figures on a report card that only exist relative to the
+/// rest of the class: the learner's position overall, the size of the cohort
+/// they were ranked against, and per subject their position, the class average,
+/// the highest and the lowest mark.
 /// <para>
 /// These cannot be computed while generating one learner — there is no cohort
 /// to compare against yet — so this runs as a pass over the whole class once
 /// its reports exist. It is called after a bulk run, after a single report is
-/// generated, and whenever a subject mark is edited, since any one edit
-/// reorders everybody.
+/// generated, whenever a subject mark is edited, and after a report is deleted,
+/// since each of those changes who is in the cohort or where they sit in it.
 /// </para>
 /// <para>
 /// A cohort is one (class, term, report type). Two report types for the same
 /// term rank separately, which is what you want: a mid-year and a term 2 card
-/// are different assessments of different work.
+/// assess different work.
 /// </para>
 /// </summary>
 public class ReportCohortStatisticsService : ITransientDependency
 {
     private readonly IRepository<Report, Guid> _reportRepository;
-    private readonly IRepository<ReportSubject, Guid> _reportSubjectRepository;
     private readonly IUnitOfWorkManager _unitOfWorkManager;
 
     public Castle.Core.Logging.ILogger Logger { get; set; } = Castle.Core.Logging.NullLogger.Instance;
 
     public ReportCohortStatisticsService(
         IRepository<Report, Guid> reportRepository,
-        IRepository<ReportSubject, Guid> reportSubjectRepository,
         IUnitOfWorkManager unitOfWorkManager)
     {
         _reportRepository = reportRepository;
-        _reportSubjectRepository = reportSubjectRepository;
         _unitOfWorkManager = unitOfWorkManager;
     }
 
     /// <summary>
     /// Recomputes the cohort figures for every report in one (class, term,
-    /// report type) and saves them. Returns how many reports were touched.
+    /// report type) and saves them. Returns how many reports were restated —
+    /// which is fewer than the cohort when some of it is already approved or
+    /// published.
+    /// <para>
+    /// Runs in the caller's unit of work, so it sees the caller's uncommitted
+    /// writes and fails with them. The caller must have flushed those writes
+    /// (SaveChangesAsync) first, or the pass will read the class as it was
+    /// before the edit.
+    /// </para>
     /// </summary>
     public async Task<int> RecalculateAsync(
         int? tenantId,
@@ -69,26 +75,41 @@ public class ReportCohortStatisticsService : ITransientDependency
         if (reports.Count == 0)
             return 0;
 
-        Apply(reports);
+        var restated = Apply(reports);
 
-        foreach (var report in reports)
-        {
-            await _reportRepository.UpdateAsync(report);
-
-            foreach (var subject in report.SubjectReports)
-                await _reportSubjectRepository.UpdateAsync(subject);
-        }
-
+        // No UpdateAsync: every entity here was loaded by this unit of work and
+        // is tracked by it, so the change tracker writes exactly the rows Apply
+        // actually altered. Marking them all Modified instead — which ABP's
+        // Update does unconditionally — rewrote the whole class on every pass
+        // and stamped LastModifierUserId on forty untouched report cards
+        // because one teacher saved one mark.
         await _unitOfWorkManager.Current.SaveChangesAsync();
 
-        return reports.Count;
+        return restated;
     }
 
     /// <summary>
-    /// As <see cref="RecalculateAsync"/>, but never throws: a failure to work
-    /// out class positions must not fail the generation run that produced the
-    /// reports, or the mark edit that was otherwise saved. The figures are
-    /// recomputed on the next edit or run.
+    /// As <see cref="RecalculateAsync"/>, but contained — for a caller whose
+    /// own work is <b>already committed</b> and must not be undone by a failure
+    /// to work out class positions. That is the bulk generation run: each
+    /// learner commits in its own unit of work, and forty saved report cards
+    /// must not be reported as a failed request because the ranking pass fell
+    /// over. The figures are recomputed on the next edit or run.
+    /// <para>
+    /// It takes its own unit of work so a failure rolls back only its own
+    /// writes; swallowing the exception on the caller's unit of work would
+    /// leave mutated entities tracked on a transaction the database had already
+    /// failed, and the same exception would resurface when the caller completed
+    /// — the outcome catching it exists to prevent.
+    /// </para>
+    /// <para>
+    /// Because that new unit of work is a separate transaction, it cannot see
+    /// the caller's <i>uncommitted</i> writes. A caller still inside its own
+    /// transaction — a single generation, a mark edit, a delete — must call
+    /// <see cref="RecalculateAsync"/> instead, and let a failure roll the whole
+    /// operation back, which is the coherent outcome there: either the edit and
+    /// its restatement both happen, or neither does.
+    /// </para>
     /// </summary>
     public async Task TryRecalculateAsync(
         int? tenantId,
@@ -98,7 +119,14 @@ public class ReportCohortStatisticsService : ITransientDependency
     {
         try
         {
-            await RecalculateAsync(tenantId, classId, termId, reportType);
+            using (var uow = _unitOfWorkManager.Begin(new UnitOfWorkOptions
+            {
+                Scope = System.Transactions.TransactionScopeOption.RequiresNew
+            }))
+            {
+                await RecalculateAsync(tenantId, classId, termId, reportType);
+                await uow.CompleteAsync();
+            }
         }
         catch (Exception ex)
         {
@@ -111,66 +139,84 @@ public class ReportCohortStatisticsService : ITransientDependency
     /// <summary>
     /// The calculation itself, over reports already loaded with their subject
     /// rows. Separated from the loading and saving so it can be tested without
-    /// a database.
+    /// a database. Returns how many reports it restated.
+    /// <para>
+    /// Every report passed in counts towards the ranking and the class figures;
+    /// only reports that are still open to restatement are written to. A
+    /// published classmate's mark is a real mark and belongs in the class
+    /// average, but their card has been issued and must not be rewritten.
+    /// </para>
     /// </summary>
-    public static void Apply(IReadOnlyCollection<Report> reports)
+    public static int Apply(IReadOnlyCollection<Report> reports)
     {
         if (reports == null || reports.Count == 0)
-            return;
+            return 0;
 
-        // ── Overall: where each learner placed in the class.
+        var writable = reports.Where(r => !r.IsLockedForRestatement()).ToList();
+        if (writable.Count == 0)
+            return 0;
+
+        // ── Overall: where each learner placed in the class, out of how many.
         var overallPositions = CohortRanking.Positions(
             reports.Select(r => new KeyValuePair<Guid, decimal?>(r.Id, r.OverallPercentage)));
 
-        foreach (var report in reports)
+        foreach (var report in writable)
         {
             report.SetClassPosition(
                 overallPositions.TryGetValue(report.Id, out var position)
                     ? position
                     : (int?)null);
+
+            // The denominator is the cohort actually ranked, so "3 of 30" is
+            // internally consistent. It used to be a class headcount taken at
+            // generation time, which drifted as learners moved in and out and
+            // could print a position larger than the class.
+            report.SetCohortSize(reports.Count);
         }
 
         // ── Per subject: the class figures, and where each learner placed in it.
         var rowsBySubject = reports
-            .SelectMany(r => r.SubjectReports ?? Enumerable.Empty<ReportSubject>())
-            .GroupBy(rs => rs.SubjectId);
+            .SelectMany(r => (r.SubjectReports ?? Enumerable.Empty<ReportSubject>())
+                .Select(rs => new { Report = r, Row = rs }))
+            .GroupBy(x => x.Row.SubjectId);
 
         foreach (var subjectRows in rowsBySubject)
         {
-            var rows = subjectRows.ToList();
-            var summary = CohortRanking.Summarise(rows.Select(rs => rs.FinalMark));
+            var all = subjectRows.ToList();
+            var summary = CohortRanking.Summarise(all.Select(x => x.Row.FinalMark));
+            var writableRows = all.Where(x => !x.Report.IsLockedForRestatement()).ToList();
 
             if (summary == null)
             {
-                // Nobody in the class has a mark in this subject yet. Clear any
+                // Nobody in the class has a mark in this subject. Clear any
                 // figures left from a previous run rather than leaving stale
                 // ones next to a now-blank mark.
-                foreach (var row in rows)
-                    row.ClearClassStatistics();
+                foreach (var entry in writableRows)
+                    entry.Row.ClearClassStatistics();
 
                 continue;
             }
 
             var positions = CohortRanking.Positions(
-                rows.Select(rs => new KeyValuePair<Guid, decimal?>(rs.Id, rs.FinalMark)));
+                all.Select(x => new KeyValuePair<Guid, decimal?>(x.Row.Id, x.Row.FinalMark)));
 
-            foreach (var row in rows)
+            foreach (var entry in writableRows)
             {
-                if (!row.FinalMark.HasValue)
-                {
-                    // An unmarked learner has no position, but the class
-                    // figures still belong on their card — that is the
-                    // comparison the card is for.
-                    row.SetClassStatistics(null, summary.Value.Average, summary.Value.Highest, summary.Value.Lowest);
-                    continue;
-                }
+                var row = entry.Row;
 
+                // An unmarked learner has no position, but the class figures
+                // still belong on their card — that is the comparison the card
+                // is for.
                 row.SetClassStatistics(
-                    positions.TryGetValue(row.Id, out var position) ? position : (int?)null,
+                    row.FinalMark.HasValue && positions.TryGetValue(row.Id, out var position)
+                        ? position
+                        : (int?)null,
                     summary.Value.Average,
                     summary.Value.Highest,
                     summary.Value.Lowest);
             }
         }
+
+        return writable.Count;
     }
 }

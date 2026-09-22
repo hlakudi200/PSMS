@@ -22,14 +22,6 @@ public static class ReportPdfGenerator
     private static readonly string LightBorder = Colors.Grey.Lighten2;
 
     /// <summary>
-    /// A mark as it is printed: one decimal, always with a full stop.
-    /// <para>
-    /// Interpolating a decimal directly took the <i>server's</i> culture, so
-    /// the same report printed "72.4%" on one host and "72,4%" on another, and
-    /// never matched the browser print view, which is always a full stop.
-    /// </para>
-    /// </summary>
-    /// <summary>
     /// A CAPS level as it is printed in the marks table: the numeral alone.
     /// The words for it are in the legend at the foot of the card, which is
     /// what the legend is for — spelling "Outstanding" into a column this
@@ -38,6 +30,15 @@ public static class ReportPdfGenerator
     private static string Level(psms.Domain.Shared.Enums.CapsAchievementLevel? level) =>
         level.HasValue ? ((int)level.Value).ToString() : "-";
 
+    /// <summary>
+    /// A mark as it is printed: one decimal, rounded half away from zero, and
+    /// always with a full stop.
+    /// <para>
+    /// Interpolating a decimal directly took the <i>server's</i> culture, so
+    /// the same report printed "72.4%" on one host and "72,4%" on another, and
+    /// never matched the browser print view, which is always a full stop.
+    /// </para>
+    /// </summary>
     private static string Mark(decimal? value) =>
         value.HasValue
             ? value.Value.ToString("F1", System.Globalization.CultureInfo.InvariantCulture)

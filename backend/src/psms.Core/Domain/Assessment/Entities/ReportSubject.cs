@@ -179,6 +179,14 @@ namespace psms.Domain.Assessment.Entities
                 FinalMark = null;
             }
 
+            // Rounded to what the column holds, so the value in memory is the
+            // value in the database. Generation reads these straight back out of
+            // memory while an edit re-reads them from Postgres; unrounded, the
+            // same report could produce an overall a cent apart depending on
+            // which path last touched it.
+            if (FinalMark.HasValue)
+                FinalMark = System.Math.Round(FinalMark.Value, 2, System.MidpointRounding.AwayFromZero);
+
             // Calculate achievement level
             AchievementLevel = CapsAchievementScale.LevelFor(FinalMark);
         }

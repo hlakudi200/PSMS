@@ -94,6 +94,22 @@ public class ReportSubjectMarks_Tests
     }
 
     [Fact]
+    public void The_final_mark_is_stored_at_the_precision_the_column_holds()
+    {
+        var subject = NewSubject();
+
+        // 55 * 0.4 + 71 * 0.6 = 64.6 exactly; the awkward one is a split that
+        // does not land on two decimals.
+        subject.RecordMarks(termMark: 55m, examMark: 71.555m, termWeight: 40m, examWeight: 60m);
+
+        // The column is decimal(5,2). Rounding here means the value in memory,
+        // which generation reads straight back out, is the value an edit later
+        // re-reads from the database — they used to differ by a cent.
+        Assert.Equal(decimal.Round(subject.FinalMark.Value, 2), subject.FinalMark);
+        Assert.Equal(64.93m, subject.FinalMark);
+    }
+
+    [Fact]
     public void Class_statistics_can_be_stamped_on_and_cleared()
     {
         var subject = NewSubject();

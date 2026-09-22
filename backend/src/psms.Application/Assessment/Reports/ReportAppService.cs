@@ -305,8 +305,11 @@ public class ReportAppService : ApplicationService, IReportAppService
             input.DaysLate,
             input.TeacherComment);
 
-        // RC-06: this learner joining the cohort reorders everybody in it.
-        await _cohortStatistics.TryRecalculateAsync(
+        // RC-06: this learner joining the cohort reorders everybody in it. This
+        // runs in the same unit of work as the generation above, so a failure
+        // rolls the new report back with it rather than leaving a card that is
+        // ranked against nothing.
+        await _cohortStatistics.RecalculateAsync(
             AbpSession.TenantId, input.ClassId, input.TermId, input.ReportType);
 
         return await GetAsync(report.Id);
@@ -348,8 +351,13 @@ public class ReportAppService : ApplicationService, IReportAppService
             .Where(cs => cs.ClassId == classId && cs.IsActive)
             .ToListAsync();
 
+        // Active only, to match who a run actually generates for. The count is
+        // a starting figure: RC-06's cohort pass restates it as the number of
+        // report cards actually ranked, so a printed "3 of 30" is consistent.
         var totalStudentsInClass = await _studentRepository
-            .CountAsync(s => s.TenantId == AbpSession.TenantId && s.CurrentClassId == classId);
+            .CountAsync(s => s.TenantId == AbpSession.TenantId
+                && s.CurrentClassId == classId
+                && s.IsActive);
 
         var averages = new Dictionary<(Guid, Guid), decimal>();
 
@@ -729,6 +737,11 @@ public class ReportAppService : ApplicationService, IReportAppService
         // RC-06: class position and the per-subject class figures only exist
         // once the cohort does, so they are stamped on in one pass here rather
         // than guessed at per learner inside the loop above.
+        //
+        // Contained, unlike the other callers: every learner above has already
+        // committed in its own unit of work, and a class of report cards that
+        // were genuinely created must not come back as a failed request because
+        // the ranking pass fell over afterwards.
         if (result.GeneratedCount > 0)
         {
             await _cohortStatistics.TryRecalculateAsync(
@@ -1025,6 +1038,14 @@ public class ReportAppService : ApplicationService, IReportAppService
         }
 
         await _reportRepository.DeleteAsync(report);
+
+        // RC-06: the cohort is one learner smaller. Without this, every
+        // remaining card keeps a position and a class average computed over the
+        // deleted learner until somebody happens to edit an unrelated mark. The
+        // flush is what makes the soft delete visible to the pass.
+        await CurrentUnitOfWork.SaveChangesAsync();
+        await _cohortStatistics.RecalculateAsync(
+            report.TenantId, report.ClassId, report.TermId, report.ReportType);
     }
 
     [AbpAuthorize(PermissionNames.Assessment_ReportCards_Generate)]

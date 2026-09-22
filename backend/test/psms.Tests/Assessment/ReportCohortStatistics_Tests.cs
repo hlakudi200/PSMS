@@ -21,7 +21,12 @@ public class ReportCohortStatistics_Tests
     private static readonly Guid Maths = Guid.NewGuid();
     private static readonly Guid English = Guid.NewGuid();
 
-    private static Report ReportWith(params (Guid SubjectId, decimal? Mark)[] subjects)
+    private static Report ReportWith(params (Guid SubjectId, decimal? Mark)[] subjects) =>
+        ReportWith(ReportStatus.Generated, subjects);
+
+    private static Report ReportWith(
+        ReportStatus status,
+        params (Guid SubjectId, decimal? Mark)[] subjects)
     {
         var report = new Report(
             Guid.NewGuid(), 1, Guid.NewGuid(), ClassId, Guid.NewGuid(), ReportType.Term1);
@@ -37,6 +42,7 @@ public class ReportCohortStatistics_Tests
         }
 
         report.RecalculateOverall(report.SubjectReports);
+        report.Status = status;
 
         return report;
     }
@@ -200,8 +206,71 @@ public class ReportCohortStatistics_Tests
         ReportCohortStatisticsService.Apply(new[] { alone });
 
         Assert.Equal(1, alone.ClassPosition);
+        Assert.Equal(1, alone.TotalStudentsInClass);
         Assert.Equal(1, RowFor(alone, Maths).SubjectPosition);
         Assert.Equal(55m, RowFor(alone, Maths).ClassAverage);
+    }
+
+    [Fact]
+    public void The_denominator_is_the_cohort_that_was_ranked()
+    {
+        // "Position 3 of 30" has to be internally consistent. It used to be a
+        // class headcount frozen at generation time, so a learner arriving or
+        // leaving could print a position larger than the class.
+        var reports = new[]
+        {
+            ReportWith((Maths, 80m)),
+            ReportWith((Maths, 60m)),
+            ReportWith((Maths, 40m)),
+        };
+
+        ReportCohortStatisticsService.Apply(reports);
+
+        Assert.All(reports, r => Assert.Equal(3, r.TotalStudentsInClass));
+        Assert.Equal(3, reports.Last().ClassPosition);
+    }
+
+    // ─── an issued card is not rewritten ───
+
+    [Theory]
+    [InlineData(ReportStatus.Published)]
+    [InlineData(ReportStatus.Approved)]
+    public void An_issued_card_counts_in_the_cohort_but_is_never_restated(ReportStatus status)
+    {
+        // A published card may already be a PDF in a parent's hands, and the
+        // National Protocol §25(3) requires it to carry no corrections that
+        // compromise its legal status. A classmate's later mark must not move
+        // the position printed on it.
+        var issued = ReportWith(status, (Maths, 90m));
+        var draft = ReportWith((Maths, 50m));
+
+        var restated = ReportCohortStatisticsService.Apply(new[] { issued, draft });
+
+        Assert.Equal(1, restated);
+
+        Assert.Null(issued.ClassPosition);
+        Assert.Null(issued.TotalStudentsInClass);
+        Assert.Null(RowFor(issued, Maths).SubjectPosition);
+        Assert.Null(RowFor(issued, Maths).ClassAverage);
+
+        // ...but the 90 still counts: the draft is second of two, and the class
+        // average and highest include the issued learner's mark.
+        Assert.Equal(2, draft.ClassPosition);
+        Assert.Equal(2, draft.TotalStudentsInClass);
+        Assert.Equal(2, RowFor(draft, Maths).SubjectPosition);
+        Assert.Equal(70m, RowFor(draft, Maths).ClassAverage);
+        Assert.Equal(90m, RowFor(draft, Maths).HighestInClass);
+    }
+
+    [Fact]
+    public void A_cohort_that_is_entirely_issued_is_left_alone()
+    {
+        var a = ReportWith(ReportStatus.Published, (Maths, 90m));
+        var b = ReportWith(ReportStatus.Approved, (Maths, 50m));
+
+        Assert.Equal(0, ReportCohortStatisticsService.Apply(new[] { a, b }));
+        Assert.Null(a.ClassPosition);
+        Assert.Null(b.ClassPosition);
     }
 
     [Fact]
@@ -221,7 +290,7 @@ public class ReportCohortStatistics_Tests
     [Fact]
     public void An_empty_cohort_is_a_no_op()
     {
-        ReportCohortStatisticsService.Apply(Array.Empty<Report>());
-        ReportCohortStatisticsService.Apply(null);
+        Assert.Equal(0, ReportCohortStatisticsService.Apply(Array.Empty<Report>()));
+        Assert.Equal(0, ReportCohortStatisticsService.Apply(null));
     }
 }

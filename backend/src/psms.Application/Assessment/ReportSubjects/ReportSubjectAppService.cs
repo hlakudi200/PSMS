@@ -128,6 +128,13 @@ public class ReportSubjectAppService : ApplicationService, IReportSubjectAppServ
             throw new UserFriendlyException(AssessmentExceptionCodes.ReportNotEditable,
                 "Cannot modify report subjects on an approved or published report.");
 
+        // RC-07: [Range(0,100)] on each side independently lets 80/80 through,
+        // which would produce a final mark of 160. The DTO's 40/60 defaults only
+        // apply when the client omits the fields.
+        if (!ReportSubject.IsValidWeighting(input.TermWeight, input.ExamWeight))
+            throw new UserFriendlyException(AssessmentExceptionCodes.InvalidSubjectMarkWeighting,
+                $"The term and examination weights must add to 100%. Got {input.TermWeight:0.##}% and {input.ExamWeight:0.##}%.");
+
         reportSubject.RecordMarks(input.TermMark, input.ExamMark, input.TermWeight, input.ExamWeight);
 
         if (input.TeacherComment != null)
@@ -250,8 +257,10 @@ public class ReportSubjectAppService : ApplicationService, IReportSubjectAppServ
         await CurrentUnitOfWork.SaveChangesAsync();
 
         // RC-06: this learner's mark moving reorders the class, so the whole
-        // cohort's positions and subject figures are recomputed.
-        await _cohortStatistics.TryRecalculateAsync(
+        // cohort's positions and subject figures are recomputed — in this unit
+        // of work, so the pass sees the mark just saved and a failure takes the
+        // edit back with it.
+        await _cohortStatistics.RecalculateAsync(
             report.TenantId, report.ClassId, report.TermId, report.ReportType);
     }
 }

@@ -342,6 +342,28 @@ namespace psms.Domain.Assessment.Entities
         public void SetClassPosition(int? position) => ClassPosition = position;
 
         /// <summary>
+        /// How many learners the position is out of — the size of the cohort
+        /// this report was ranked against.
+        /// </summary>
+        public void SetCohortSize(int? total) => TotalStudentsInClass = total;
+
+        /// <summary>
+        /// Whether this card is closed to the cohort pass restating its figures.
+        /// <para>
+        /// An approved or published report card is a document somebody has
+        /// signed off, and in the published case one a parent may already hold
+        /// a PDF of — the National Protocol §25(3) requires a card to carry no
+        /// corrections that compromise its legal status. A later classmate's
+        /// mark must not silently move the position printed on it. Such a
+        /// report still <b>counts in</b> the cohort everyone else is ranked
+        /// against; it is only writing to it that is refused, which is the same
+        /// boundary RecordMarksAsync draws.
+        /// </para>
+        /// </summary>
+        public bool IsLockedForRestatement() =>
+            Status == ReportStatus.Approved || Status == ReportStatus.Published;
+
+        /// <summary>
         /// Sets the URL to the generated PDF
         /// </summary>
         public void SetPdfUrl(string url)
