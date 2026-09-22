@@ -1,6 +1,11 @@
 import { createAction } from "redux-actions";
 import { IReportStateContext } from "./context";
-import { IReport, IReportList, IPagedResult } from "../shared/interfaces";
+import {
+  IReport,
+  IReportList,
+  IPagedResult,
+  IBulkGenerateReportsResult,
+} from "../shared/interfaces";
 
 export enum ReportActionEnums {
   getReportPending = "GET_REPORT_PENDING",
@@ -22,10 +27,6 @@ export enum ReportActionEnums {
   submitForApprovalPending = "SUBMIT_FOR_APPROVAL_PENDING",
   submitForApprovalSuccess = "SUBMIT_FOR_APPROVAL_SUCCESS",
   submitForApprovalError = "SUBMIT_FOR_APPROVAL_ERROR",
-
-  approveReportPending = "APPROVE_REPORT_PENDING",
-  approveReportSuccess = "APPROVE_REPORT_SUCCESS",
-  approveReportError = "APPROVE_REPORT_ERROR",
 
   publishReportPending = "PUBLISH_REPORT_PENDING",
   publishReportSuccess = "PUBLISH_REPORT_SUCCESS",
@@ -58,6 +59,14 @@ export enum ReportActionEnums {
   bulkGeneratePdfsPending = "BULK_GENERATE_PDFS_PENDING",
   bulkGeneratePdfsSuccess = "BULK_GENERATE_PDFS_SUCCESS",
   bulkGeneratePdfsError = "BULK_GENERATE_PDFS_ERROR",
+
+  previewBulkGeneratePending = "PREVIEW_BULK_GENERATE_PENDING",
+  previewBulkGenerateSuccess = "PREVIEW_BULK_GENERATE_SUCCESS",
+  previewBulkGenerateError = "PREVIEW_BULK_GENERATE_ERROR",
+
+  bulkGenerateReportsPending = "BULK_GENERATE_REPORTS_PENDING",
+  bulkGenerateReportsSuccess = "BULK_GENERATE_REPORTS_SUCCESS",
+  bulkGenerateReportsError = "BULK_GENERATE_REPORTS_ERROR",
 }
 
 // Get Single Report Actions
@@ -169,26 +178,6 @@ export const submitForApprovalError = createAction<IReportStateContext>(
   () => ({ isPending: false, isSuccess: false, isError: true })
 );
 
-// Approve Report Actions
-export const approveReportPending = createAction<IReportStateContext>(
-  ReportActionEnums.approveReportPending,
-  () => ({ isPending: true, isSuccess: false, isError: false })
-);
-
-export const approveReportSuccess = createAction<IReportStateContext, IReport>(
-  ReportActionEnums.approveReportSuccess,
-  (report: IReport) => ({
-    isPending: false,
-    isSuccess: true,
-    isError: false,
-    report,
-  })
-);
-
-export const approveReportError = createAction<IReportStateContext>(
-  ReportActionEnums.approveReportError,
-  () => ({ isPending: false, isSuccess: false, isError: true })
-);
 
 // Publish Report Actions
 export const publishReportPending = createAction<IReportStateContext>(
@@ -344,5 +333,60 @@ export const bulkGeneratePdfsSuccess = createAction<IReportStateContext>(
 
 export const bulkGeneratePdfsError = createAction<IReportStateContext>(
   ReportActionEnums.bulkGeneratePdfsError,
+  () => ({ isPending: false, isSuccess: false, isError: true })
+);
+
+// RC-01: bulk generation. Both the preview and the run land their result in
+// state so the screen can render the per-learner outcome list.
+export const previewBulkGeneratePending = createAction<IReportStateContext>(
+  ReportActionEnums.previewBulkGeneratePending,
+  () => ({
+    isPending: true,
+    isSuccess: false,
+    isError: false,
+    // Drop the previous run's result: without this the screen keeps showing a
+    // finished batch on top of a fresh preview, and can never start a second
+    // one — which is the normal end-of-term flow of one class after another.
+    bulkResult: undefined,
+  })
+);
+
+export const previewBulkGenerateSuccess = createAction<
+  IReportStateContext,
+  IBulkGenerateReportsResult
+>(ReportActionEnums.previewBulkGenerateSuccess, (bulkPreview) => ({
+  isPending: false,
+  isSuccess: true,
+  isError: false,
+  bulkPreview,
+}));
+
+export const previewBulkGenerateError = createAction<IReportStateContext>(
+  ReportActionEnums.previewBulkGenerateError,
+  () => ({ isPending: false, isSuccess: false, isError: true })
+);
+
+export const bulkGenerateReportsPending = createAction<IReportStateContext>(
+  ReportActionEnums.bulkGenerateReportsPending,
+  () => ({
+    isPending: true,
+    isSuccess: false,
+    isError: false,
+    bulkResult: undefined,
+  })
+);
+
+export const bulkGenerateReportsSuccess = createAction<
+  IReportStateContext,
+  IBulkGenerateReportsResult
+>(ReportActionEnums.bulkGenerateReportsSuccess, (bulkResult) => ({
+  isPending: false,
+  isSuccess: true,
+  isError: false,
+  bulkResult,
+}));
+
+export const bulkGenerateReportsError = createAction<IReportStateContext>(
+  ReportActionEnums.bulkGenerateReportsError,
   () => ({ isPending: false, isSuccess: false, isError: true })
 );

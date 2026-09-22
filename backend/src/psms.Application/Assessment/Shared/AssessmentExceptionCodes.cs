@@ -56,6 +56,13 @@ public static class AssessmentExceptionCodes
     public const string CannotPublishUnapproved = "ASM_CANNOT_PUBLISH_UNAPPROVED";
     public const string ReportNotEditable = "ASM_REPORT_NOT_EDITABLE";
     public const string ReportNotPublished = "ASM_REPORT_NOT_PUBLISHED";
+
+    /// <summary>
+    /// A report was submitted for approval in a school with no active report
+    /// approval workflow. Approval only happens through the engine, so there
+    /// would be nobody to review it.
+    /// </summary>
+    public const string NoApprovalWorkflowConfigured = "ASM_NO_APPROVAL_WORKFLOW_CONFIGURED";
     public const string MaxMarksReductionInvalid = "ASM_MAX_MARKS_REDUCTION_INVALID";
 
     // ReportSubject

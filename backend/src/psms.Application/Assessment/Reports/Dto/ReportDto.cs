@@ -46,4 +46,15 @@ public class ReportDto : FullAuditedEntityDto<Guid>
 
     // Nested
     public List<ReportSubjectDto> SubjectReports { get; set; }
+
+    /// <summary>
+    /// The live approval workflow for this report, when one is running.
+    /// <para>
+    /// RC-09: while this is set, the report is being approved through the engine
+    /// and the direct Approve action is refused server-side. Callers use it to
+    /// hide that action and link to the approval instead of offering a button
+    /// that can only fail.
+    /// </para>
+    /// </summary>
+    public Guid? ActiveWorkflowInstanceId { get; set; }
 }

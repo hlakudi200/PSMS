@@ -7,6 +7,8 @@ import {
   IGetReportsInput,
   IReportComment,
   IBulkGenerateReportPdfsInput,
+  IBulkGenerateReports,
+  IBulkGenerateReportsResult,
 } from "../shared/interfaces";
 
 export interface IReportStateContext {
@@ -16,6 +18,9 @@ export interface IReportStateContext {
   report?: IReport;
   reports?: IReportList[];
   totalCount?: number;
+  /** RC-01: the last bulk preview, and the last bulk run's per-learner result. */
+  bulkPreview?: IBulkGenerateReportsResult;
+  bulkResult?: IBulkGenerateReportsResult;
 }
 
 export interface IReportActionContext {
@@ -24,7 +29,6 @@ export interface IReportActionContext {
   getByStudentTermAsync: (studentId: string, termId: string, reportType: number) => void;
   generateAsync: (input: IGenerateReport) => void;
   submitForApprovalAsync: (id: string) => void;
-  approveAsync: (id: string) => void;
   publishAsync: (id: string) => void;
   addTeacherCommentAsync: (id: string, input: IReportComment) => void;
   addPrincipalCommentAsync: (id: string, input: IReportComment) => void;
@@ -33,6 +37,8 @@ export interface IReportActionContext {
   deleteAsync: (id: string) => void;
   generatePdfAsync: (id: string) => void;
   bulkGeneratePdfsAsync: (input: IBulkGenerateReportPdfsInput) => void;
+  previewBulkGenerateAsync: (input: IBulkGenerateReports) => void;
+  bulkGenerateAsync: (input: IBulkGenerateReports) => void;
 }
 
 export const INITIAL_STATE: IReportStateContext = {

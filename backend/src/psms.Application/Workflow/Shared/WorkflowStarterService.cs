@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using psms.Domain.Workflow.Entities;
 using psms.Domain.Workflow.Enums;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -35,6 +36,63 @@ public class WorkflowStarterService : ITransientDependency
         _definitionRepository = definitionRepository;
         _transitionRepository = transitionRepository;
         _unitOfWorkManager = unitOfWorkManager;
+    }
+
+    /// <summary>
+    /// Whether this entity currently sits in a workflow that has not finished.
+    /// <para>
+    /// Modules use this to refuse a direct state change that would bypass a live
+    /// approval — approving a report card from the reports list, say, while its
+    /// approval workflow is still sitting in someone's inbox.
+    /// </para>
+    /// </summary>
+    public Task<bool> HasActiveInstanceAsync(
+        int? tenantId,
+        WorkflowEntityType entityType,
+        Guid entityId)
+    {
+        return _instanceRepository
+            .GetAll()
+            .AnyAsync(i => i.TenantId == tenantId
+                && i.EntityType == entityType
+                && i.EntityId == entityId
+                && (i.Status == WorkflowStatus.NotStarted || i.Status == WorkflowStatus.InProgress));
+    }
+
+    /// <summary>
+    /// The live workflow instance for each of these entities, keyed by entity id.
+    /// Entities with no unfinished instance are absent from the map.
+    /// <para>
+    /// This is the list-screen counterpart to <see cref="HasActiveInstanceAsync"/>:
+    /// one query for a page of rows rather than one per row, so a list can hide
+    /// the direct actions a live workflow has taken over and link to the approval
+    /// instead.
+    /// </para>
+    /// </summary>
+    public async Task<Dictionary<Guid, Guid>> GetActiveInstanceIdsAsync(
+        int? tenantId,
+        WorkflowEntityType entityType,
+        IReadOnlyCollection<Guid> entityIds)
+    {
+        if (entityIds == null || entityIds.Count == 0)
+            return new Dictionary<Guid, Guid>();
+
+        var ids = entityIds.Distinct().ToList();
+
+        var rows = await _instanceRepository
+            .GetAll()
+            .Where(i => i.TenantId == tenantId
+                && i.EntityType == entityType
+                && ids.Contains(i.EntityId)
+                && (i.Status == WorkflowStatus.NotStarted || i.Status == WorkflowStatus.InProgress))
+            .Select(i => new { i.Id, i.EntityId })
+            .ToListAsync();
+
+        // An entity should only ever have one live instance; group defensively so a
+        // duplicate cannot throw on the key.
+        return rows
+            .GroupBy(r => r.EntityId)
+            .ToDictionary(g => g.Key, g => g.First().Id);
     }
 
     /// <summary>

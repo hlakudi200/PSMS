@@ -27,6 +27,7 @@ public class AttendanceAppService : ApplicationService, IAttendanceAppService
     private readonly IRepository<Teacher, Guid> _teacherRepository;
     private readonly IRepository<TeacherClass, Guid> _teacherClassRepository;
     private readonly psms.Academic.Students.ICurrentStudentResolver _currentStudent;
+    private readonly psms.Academic.Parents.ICurrentParentResolver _currentParent;
 
     public AttendanceAppService(
         IRepository<Attendance, Guid> attendanceRepository,
@@ -34,7 +35,8 @@ public class AttendanceAppService : ApplicationService, IAttendanceAppService
         IRepository<Class, Guid> classRepository,
         IRepository<Teacher, Guid> teacherRepository,
         IRepository<TeacherClass, Guid> teacherClassRepository,
-        psms.Academic.Students.ICurrentStudentResolver currentStudent)
+        psms.Academic.Students.ICurrentStudentResolver currentStudent,
+        psms.Academic.Parents.ICurrentParentResolver currentParent)
     {
         _attendanceRepository = attendanceRepository;
         _studentRepository = studentRepository;
@@ -42,6 +44,7 @@ public class AttendanceAppService : ApplicationService, IAttendanceAppService
         _teacherRepository = teacherRepository;
         _teacherClassRepository = teacherClassRepository;
         _currentStudent = currentStudent;
+        _currentParent = currentParent;
     }
 
     [AbpAuthorize(PermissionNames.Academic_Attendance_View)]
@@ -63,6 +66,11 @@ public class AttendanceAppService : ApplicationService, IAttendanceAppService
         if (selfId.HasValue && selfId.Value != attendance.StudentId)
             throw new UserFriendlyException(AcademicExceptionCodes.AttendanceNotFound, "Attendance record not found.");
 
+        // MOB-BE-04: a parent may only read their own children's attendance.
+        var childIds = await _currentParent.GetCurrentChildStudentIdsAsync();
+        if (childIds != null && !childIds.Contains(attendance.StudentId))
+            throw new UserFriendlyException(AcademicExceptionCodes.AttendanceNotFound, "Attendance record not found.");
+
         return ObjectMapper.Map<AttendanceDto>(attendance);
     }
 
@@ -71,6 +79,8 @@ public class AttendanceAppService : ApplicationService, IAttendanceAppService
     {
         // LC-10: a student-portal user only ever sees their own attendance.
         var selfId = await _currentStudent.GetCurrentStudentIdAsync();
+        // MOB-BE-04: a parent only ever sees their own children's attendance.
+        var childIds = await _currentParent.GetCurrentChildStudentIdsAsync();
 
         DateTime? startUtc = input.StartDate.HasValue ? LocalDayRangeUtc(input.StartDate.Value).StartUtc : null;
         DateTime? endUtcExclusive = input.EndDate.HasValue ? LocalDayRangeUtc(input.EndDate.Value).EndUtc : null;
@@ -81,6 +91,7 @@ public class AttendanceAppService : ApplicationService, IAttendanceAppService
             .Include(a => a.Class)
             .Where(a => a.TenantId == AbpSession.TenantId)
             .WhereIf(selfId.HasValue, a => a.StudentId == selfId.Value)
+            .WhereIf(childIds != null, a => childIds.Contains(a.StudentId))
             .WhereIf(!string.IsNullOrWhiteSpace(input.Keyword),
                 a => a.Student.FirstName.ToLower().Contains(input.Keyword.ToLower())
                   || a.Student.LastName.ToLower().Contains(input.Keyword.ToLower())
@@ -112,6 +123,11 @@ public class AttendanceAppService : ApplicationService, IAttendanceAppService
         if (selfId.HasValue && selfId.Value != studentId)
             return new ListResultDto<AttendanceListDto>(new System.Collections.Generic.List<AttendanceListDto>());
 
+        // MOB-BE-04: a parent may only read their own children's attendance.
+        var childIds = await _currentParent.GetCurrentChildStudentIdsAsync();
+        if (childIds != null && !childIds.Contains(studentId))
+            return new ListResultDto<AttendanceListDto>(new System.Collections.Generic.List<AttendanceListDto>());
+
         DateTime? startUtc = startDate.HasValue ? LocalDayRangeUtc(startDate.Value).StartUtc : null;
         DateTime? endUtcExclusive = endDate.HasValue ? LocalDayRangeUtc(endDate.Value).EndUtc : null;
 
@@ -134,6 +150,9 @@ public class AttendanceAppService : ApplicationService, IAttendanceAppService
     {
         // LC-10: a student must not read a class register — restrict to their own row.
         var selfId = await _currentStudent.GetCurrentStudentIdAsync();
+        // MOB-BE-04: a parent must not read a class register — restrict to
+        // their own children's rows.
+        var childIds = await _currentParent.GetCurrentChildStudentIdsAsync();
 
         var (startUtc, endUtc) = LocalDayRangeUtc(date);
 
@@ -145,6 +164,7 @@ public class AttendanceAppService : ApplicationService, IAttendanceAppService
                 && a.AttendanceDate >= startUtc && a.AttendanceDate < endUtc
                 && a.TenantId == AbpSession.TenantId)
             .WhereIf(selfId.HasValue, a => a.StudentId == selfId.Value)
+            .WhereIf(childIds != null, a => childIds.Contains(a.StudentId))
             .OrderBy(a => a.Student.LastName)
             .ThenBy(a => a.Student.FirstName)
             .ToListAsync();
@@ -346,6 +366,13 @@ public class AttendanceAppService : ApplicationService, IAttendanceAppService
         if (student == null)
             throw new UserFriendlyException(AcademicExceptionCodes.StudentNotFound, "Student not found.");
 
+        // MOB-BE-04: this report is reachable by the Parent role
+        // (Academic_Attendance_Reports) — a parent may only summarise their
+        // own children's attendance, not an arbitrary student's.
+        var childIds = await _currentParent.GetCurrentChildStudentIdsAsync();
+        if (childIds != null && !childIds.Contains(studentId))
+            throw new UserFriendlyException(AcademicExceptionCodes.StudentNotFound, "Student not found.");
+
         var summaryStartUtc = LocalDayRangeUtc(startDate).StartUtc;
         var summaryEndUtcExclusive = LocalDayRangeUtc(endDate).EndUtc;
         var records = await _attendanceRepository
@@ -364,6 +391,11 @@ public class AttendanceAppService : ApplicationService, IAttendanceAppService
     {
         var classSummaryStartUtc = LocalDayRangeUtc(startDate).StartUtc;
         var classSummaryEndUtcExclusive = LocalDayRangeUtc(endDate).EndUtc;
+
+        // MOB-BE-04: this report is reachable by the Parent role
+        // (Academic_Attendance_Reports) — a parent must not enumerate a whole
+        // class's attendance, only their own children's rows within it.
+        var childIds = await _currentParent.GetCurrentChildStudentIdsAsync();
         var records = await _attendanceRepository
             .GetAll()
             .Include(a => a.Student)
@@ -371,6 +403,7 @@ public class AttendanceAppService : ApplicationService, IAttendanceAppService
                 && a.AttendanceDate >= classSummaryStartUtc
                 && a.AttendanceDate < classSummaryEndUtcExclusive
                 && a.TenantId == AbpSession.TenantId)
+            .WhereIf(childIds != null, a => childIds.Contains(a.StudentId))
             .ToListAsync();
 
         var summaries = records

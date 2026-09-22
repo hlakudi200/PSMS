@@ -25,17 +25,20 @@ public class StudentParentAppService : ApplicationService, IStudentParentAppServ
     private readonly IRepository<Student, Guid> _studentRepository;
     private readonly IRepository<Parent, Guid> _parentRepository;
     private readonly psms.Academic.Students.ICurrentStudentResolver _currentStudent;
+    private readonly psms.Academic.Parents.ICurrentParentResolver _currentParent;
 
     public StudentParentAppService(
         IRepository<StudentParent, Guid> studentParentRepository,
         IRepository<Student, Guid> studentRepository,
         IRepository<Parent, Guid> parentRepository,
-        psms.Academic.Students.ICurrentStudentResolver currentStudent)
+        psms.Academic.Students.ICurrentStudentResolver currentStudent,
+        psms.Academic.Parents.ICurrentParentResolver currentParent)
     {
         _studentParentRepository = studentParentRepository;
         _studentRepository = studentRepository;
         _parentRepository = parentRepository;
         _currentStudent = currentStudent;
+        _currentParent = currentParent;
     }
 
     [AbpAuthorize(PermissionNames.Academic_Students_View)]
@@ -46,6 +49,11 @@ public class StudentParentAppService : ApplicationService, IStudentParentAppServ
         if (selfId.HasValue && selfId.Value != studentId)
             return new ListResultDto<StudentParentDto>(new System.Collections.Generic.List<StudentParentDto>());
 
+        // MOB-BE-04: a parent may only read their own children's parent links.
+        var childIds = await _currentParent.GetCurrentChildStudentIdsAsync();
+        if (childIds != null && !childIds.Contains(studentId))
+            return new ListResultDto<StudentParentDto>(new System.Collections.Generic.List<StudentParentDto>());
+
         var links = await _studentParentRepository
             .GetAll()
             .Include(sp => sp.Student)
@@ -53,6 +61,33 @@ public class StudentParentAppService : ApplicationService, IStudentParentAppServ
             .Where(sp => sp.Student.TenantId == AbpSession.TenantId)
             .Where(sp => sp.StudentId == studentId)
             .OrderBy(sp => sp.RelationshipType)
+            .ToListAsync();
+
+        return new ListResultDto<StudentParentDto>(
+            ObjectMapper.Map<List<StudentParentDto>>(links));
+    }
+
+    /// <summary>
+    /// MOB-BE-04 / MOB-P01: the parent-portal "my children" read. Unlike
+    /// <see cref="GetByParentAsync"/> (staff-only, gated by
+    /// Academic_Parents_View which the Parent role does not hold), this
+    /// resolves the caller's own children from the session and needs no id.
+    /// </summary>
+    [AbpAuthorize(PermissionNames.Academic_Students_View)]
+    public async Task<ListResultDto<StudentParentDto>> GetMyChildrenAsync()
+    {
+        var parentId = await _currentParent.GetCurrentParentIdAsync();
+        if (!parentId.HasValue)
+            return new ListResultDto<StudentParentDto>(new List<StudentParentDto>());
+
+        var links = await _studentParentRepository
+            .GetAll()
+            .Include(sp => sp.Student)
+            .Include(sp => sp.Parent)
+            .Where(sp => sp.Parent.TenantId == AbpSession.TenantId)
+            .Where(sp => sp.ParentId == parentId.Value)
+            .OrderBy(sp => sp.Student.LastName)
+            .ThenBy(sp => sp.Student.FirstName)
             .ToListAsync();
 
         return new ListResultDto<StudentParentDto>(

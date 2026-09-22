@@ -10,9 +10,16 @@ import {
   EyeOutlined,
   FilePdfOutlined,
   DownloadOutlined,
+  FileAddOutlined,
 } from '@ant-design/icons';
 import { EnterpriseTable } from '@/components/shared/enterprise-table';
-import type { ColumnConfig, TableQuery, RowAction, BulkAction } from '@/components/shared/enterprise-table';
+import type {
+  ColumnConfig,
+  TableQuery,
+  RowAction,
+  BulkAction,
+  ToolbarAction,
+} from '@/components/shared/enterprise-table';
 import { ReportProvider, useReportState, useReportActions } from '@/providers/assessment/reports';
 import { AcademicYearProvider, useAcademicYearState, useAcademicYearActions } from '@/providers/academic/academic_years';
 import { TermProvider, useTermState, useTermActions } from '@/providers/academic/terms';
@@ -62,7 +69,13 @@ function ReportsContent() {
   const router = useRouter();
   const portalBase = usePortalBase();
   const { reports, totalCount, isPending, isError } = useReportState();
-  const { getAllAsync, approveAsync, publishAsync, generatePdfAsync, bulkGeneratePdfsAsync } = useReportActions();
+  const {
+    getAllAsync,
+    submitForApprovalAsync,
+    publishAsync,
+    generatePdfAsync,
+    bulkGeneratePdfsAsync,
+  } = useReportActions();
   const { academicYears } = useAcademicYearState();
   const { getAllAsync: getAllAcademicYears } = useAcademicYearActions();
   const { terms } = useTermState();
@@ -155,20 +168,32 @@ function ReportsContent() {
       },
     },
     {
-      key: 'approve',
-      label: 'Approve',
-      icon: <CheckCircleOutlined />,
-      visible: (record) => record.status === ReportStatus.PendingApproval,
-      confirm: { title: 'Approve this report card?', description: 'The report will be ready for publication.' },
+      key: 'submitForApproval',
+      label: 'Submit for approval',
+      icon: <SendOutlined />,
+      // RC-09: this is what starts the approval workflow. Without it a generated
+      // report had no route into review at all.
+      visible: (record) => record.status === ReportStatus.Generated,
+      confirm: { title: 'Send this report for approval?' },
       onClick: async (record) => {
         try {
-          await approveAsync(record.id);
-          message.success('Report approved');
+          await submitForApprovalAsync(record.id);
+          message.success('Sent for approval');
           refreshData();
         } catch {
           // Surfaced by axios interceptor
         }
       },
+    },
+    {
+      key: 'openApproval',
+      label: 'Open approval',
+      icon: <CheckCircleOutlined />,
+      // RC-09: approval happens only in the workflow, so this opens the step
+      // rather than approving here. There is no direct-approve endpoint.
+      visible: (record) => !!record.activeWorkflowInstanceId,
+      onClick: (record) =>
+        router.push(`${portalBase}/workflow/instances/${record.activeWorkflowInstanceId}`),
     },
     {
       key: 'publish',
@@ -204,6 +229,9 @@ function ReportsContent() {
         try {
           await generatePdfAsync(record.id);
           message.success('PDF generation started');
+          // The job writes pdfUrl asynchronously; refresh so the row stops
+          // offering to generate a PDF it has already been asked for.
+          refreshData();
         } catch {
           // Surfaced by axios interceptor
         }
@@ -234,16 +262,16 @@ function ReportsContent() {
 
   const bulkActions: BulkAction<IReportList>[] = [
     {
-      key: 'bulkApprove',
-      label: 'Approve Selected',
-      confirm: { title: 'Approve all selected reports?' },
+      key: 'bulkSubmitForApproval',
+      label: 'Submit Selected for Approval',
+      confirm: { title: 'Send all selected reports for approval?' },
       onClick: async (rows) => {
-        const eligible = rows.filter((r) => r.status === ReportStatus.PendingApproval);
+        const eligible = rows.filter((r) => r.status === ReportStatus.Generated);
         if (eligible.length === 0) {
-          message.warning('No reports in "Pending Approval" status selected');
+          message.warning('No reports in "Generated" status selected');
           return;
         }
-        await runParallel(eligible, approveAsync, 'approved', 'failed');
+        await runParallel(eligible, submitForApprovalAsync, 'sent for approval', 'failed');
       },
     },
     {
@@ -262,7 +290,11 @@ function ReportsContent() {
     {
       key: 'bulkGeneratePdfs',
       label: 'Generate All PDFs',
-      confirm: { title: 'Generate PDFs for all reports matching current filters?' },
+      confirm: {
+        title: 'Generate PDFs for every class on this page?',
+        // Deliberately narrower than "matching current filters": classIds below
+        // are derived from the loaded page, not from the whole result set.
+      },
       onClick: async () => {
         if (!selectedAcademicYearId) {
           message.warning('Please select an academic year first');
@@ -288,6 +320,19 @@ function ReportsContent() {
           message.warning(`PDF generation: ${ok} class(es) started; ${fail} failed.`);
         }
       },
+    },
+  ];
+
+  // RC-02: the entry point to generation. Until this existed there was no way
+  // to create a report card from the application at all.
+  const toolbarActions: ToolbarAction[] = [
+    {
+      key: 'generateReports',
+      label: 'Generate report cards',
+      icon: <FileAddOutlined />,
+      type: 'primary',
+      onClick: () => router.push(`${portalBase}/reports/generate`),
+      requiredPermissions: ['Admin', 'Principal', 'VicePrincipal', 'HOD'],
     },
   ];
 
@@ -368,6 +413,7 @@ function ReportsContent() {
         rowKey="id"
         rowActions={rowActions}
         bulkActions={bulkActions}
+        toolbarActions={toolbarActions}
         selectionMode="multi"
         currentUserRole={currentRole}
         exportConfig={{

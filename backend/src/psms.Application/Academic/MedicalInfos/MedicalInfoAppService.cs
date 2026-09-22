@@ -19,15 +19,18 @@ public class MedicalInfoAppService : ApplicationService, IMedicalInfoAppService
     private readonly IRepository<MedicalInfo, Guid> _medicalInfoRepository;
     private readonly IRepository<Student, Guid> _studentRepository;
     private readonly psms.Academic.Students.ICurrentStudentResolver _currentStudent;
+    private readonly psms.Academic.Parents.ICurrentParentResolver _currentParent;
 
     public MedicalInfoAppService(
         IRepository<MedicalInfo, Guid> medicalInfoRepository,
         IRepository<Student, Guid> studentRepository,
-        psms.Academic.Students.ICurrentStudentResolver currentStudent)
+        psms.Academic.Students.ICurrentStudentResolver currentStudent,
+        psms.Academic.Parents.ICurrentParentResolver currentParent)
     {
         _medicalInfoRepository = medicalInfoRepository;
         _studentRepository = studentRepository;
         _currentStudent = currentStudent;
+        _currentParent = currentParent;
     }
 
     [AbpAuthorize(PermissionNames.Academic_Students_View)]
@@ -36,6 +39,11 @@ public class MedicalInfoAppService : ApplicationService, IMedicalInfoAppService
         // LC-08: a student-portal user may only read their own medical info.
         var selfId = await _currentStudent.GetCurrentStudentIdAsync();
         if (selfId.HasValue && selfId.Value != studentId)
+            throw new UserFriendlyException(AcademicExceptionCodes.MedicalInfoNotFound, "Medical information not found for this student.");
+
+        // MOB-BE-04: a parent may only read their own children's medical info.
+        var childIds = await _currentParent.GetCurrentChildStudentIdsAsync();
+        if (childIds != null && !childIds.Contains(studentId))
             throw new UserFriendlyException(AcademicExceptionCodes.MedicalInfoNotFound, "Medical information not found for this student.");
 
         var medicalInfo = await _medicalInfoRepository

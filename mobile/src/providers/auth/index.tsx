@@ -6,7 +6,7 @@ import { AuthReducer } from "./reducer";
 import { AuthActionContext, AuthStateContext, INITIAL_STATE, type ILoginData } from "./context";
 import {
   bootstrapComplete, getCurrentUserError, getCurrentUserPending, getCurrentUserSuccess,
-  loginUserError, loginUserPending, loginUserSuccess, resetStateFlagsAction, signOutUser,
+  loginUserError, loginUserPending, loginUserSuccess, resetStateFlagsAction, setCurrentStudentId, signOutUser,
 } from "./actions";
 
 const MOBILE_ONLY_MESSAGE = "This mobile application is available to Students and Parents only.";
@@ -36,6 +36,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
       dispatch(loginUserSuccess({ jwtToken, currentRole: mobileRole }));
       dispatch(getCurrentUserSuccess({ currentUser: user, currentTenant: tenant }));
+
+      if (mobileRole === "student") {
+        try {
+          const activeStudents = await instance.get("/api/services/app/Student/GetActiveStudents", {
+            headers: { Authorization: `Bearer ${jwtToken}` },
+          });
+          const self = activeStudents.data.result.items?.[0];
+          dispatch(setCurrentStudentId({ currentStudentId: self?.id, currentClassId: self?.currentClassId }));
+        } catch {
+          // Non-fatal: screens that need it will show their own error state.
+        }
+      }
     } catch (error) {
       dispatch(getCurrentUserError(getApiErrorMessage(error, "Unable to restore your session.")));
     }
