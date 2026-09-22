@@ -25,6 +25,7 @@ public class AttendanceAppService : ApplicationService, IAttendanceAppService
     private readonly IRepository<Student, Guid> _studentRepository;
     private readonly IRepository<Class, Guid> _classRepository;
     private readonly IRepository<Teacher, Guid> _teacherRepository;
+    private readonly IRepository<TeacherClass, Guid> _teacherClassRepository;
     private readonly psms.Academic.Students.ICurrentStudentResolver _currentStudent;
 
     public AttendanceAppService(
@@ -32,12 +33,14 @@ public class AttendanceAppService : ApplicationService, IAttendanceAppService
         IRepository<Student, Guid> studentRepository,
         IRepository<Class, Guid> classRepository,
         IRepository<Teacher, Guid> teacherRepository,
+        IRepository<TeacherClass, Guid> teacherClassRepository,
         psms.Academic.Students.ICurrentStudentResolver currentStudent)
     {
         _attendanceRepository = attendanceRepository;
         _studentRepository = studentRepository;
         _classRepository = classRepository;
         _teacherRepository = teacherRepository;
+        _teacherClassRepository = teacherClassRepository;
         _currentStudent = currentStudent;
     }
 
@@ -169,7 +172,21 @@ public class AttendanceAppService : ApplicationService, IAttendanceAppService
         };
 
         await _attendanceRepository.InsertAsync(attendance);
-        await CurrentUnitOfWork.SaveChangesAsync();
+        // The app-level duplicate check above is a plain read-then-write —
+        // two near-simultaneous requests for the same student+date can both
+        // pass it. IX_Attendances_StudentId_AttendanceDate is the real
+        // backstop; catch its violation here so a race surfaces the same
+        // friendly message as the check that usually catches it first,
+        // instead of a raw 500.
+        try
+        {
+            await CurrentUnitOfWork.SaveChangesAsync();
+        }
+        catch (DbUpdateException ex) when (IsUniqueConstraintViolation(ex))
+        {
+            throw new UserFriendlyException(AcademicExceptionCodes.DuplicateAttendance,
+                "Attendance has already been recorded for this student on this date.");
+        }
 
         return await GetAsync(attendance.Id);
     }
@@ -181,6 +198,9 @@ public class AttendanceAppService : ApplicationService, IAttendanceAppService
         // Shared with single CaptureAsync so the lock can't be bypassed by
         // posting one student at a time.
         await EnsureDateCapturableOrThrowAsync(input.AttendanceDate);
+
+        // T-T21: the calling teacher must actually be assigned to this class.
+        await EnsureTeacherOwnsClassAsync(input.ClassId);
 
         // Validate class exists
         var cls = await _classRepository
@@ -248,7 +268,16 @@ public class AttendanceAppService : ApplicationService, IAttendanceAppService
             createdIds.Add(attendance.Id);
         }
 
-        await CurrentUnitOfWork.SaveChangesAsync();
+        // Same TOCTOU race as CaptureAsync — see the comment there.
+        try
+        {
+            await CurrentUnitOfWork.SaveChangesAsync();
+        }
+        catch (DbUpdateException ex) when (IsUniqueConstraintViolation(ex))
+        {
+            throw new UserFriendlyException(AcademicExceptionCodes.DuplicateAttendance,
+                "Attendance was recorded for one or more of these students in the moment between the check and save. Refresh and try again.");
+        }
 
         var created = await _attendanceRepository
             .GetAll()
@@ -278,6 +307,11 @@ public class AttendanceAppService : ApplicationService, IAttendanceAppService
         // a row can't be edited after its lock via this endpoint either.
         await EnsureDateCapturableOrThrowAsync(attendance.AttendanceDate);
 
+        // T-T21: and only for a class the calling teacher is assigned to —
+        // otherwise Edit alone would let any teacher correct any other
+        // teacher's class register.
+        await EnsureTeacherOwnsClassAsync(attendance.ClassId);
+
         if (input.Status.HasValue) attendance.Status = input.Status.Value;
         if (input.Notes != null) attendance.Notes = input.Notes;
 
@@ -296,8 +330,9 @@ public class AttendanceAppService : ApplicationService, IAttendanceAppService
         if (attendance == null)
             throw new UserFriendlyException(AcademicExceptionCodes.AttendanceNotFound, "Attendance record not found.");
 
-        // Same lock boundary as UpdateAsync — see T-T21 comment there.
+        // Same lock + ownership boundaries as UpdateAsync — see T-T21 comments there.
         await EnsureDateCapturableOrThrowAsync(attendance.AttendanceDate);
+        await EnsureTeacherOwnsClassAsync(attendance.ClassId);
 
         await _attendanceRepository.DeleteAsync(attendance);
     }
@@ -370,6 +405,37 @@ public class AttendanceAppService : ApplicationService, IAttendanceAppService
     }
 
     /// <summary>
+    /// T-T21: a plain teacher may only capture/correct attendance for a
+    /// class they are actually assigned to (as a subject teacher or the
+    /// class/register teacher) — Capture/Edit alone say nothing about
+    /// *which* class, so without this any teacher holding either
+    /// permission could tamper with a class they have no relationship to.
+    /// Admins/principals with the ViewAll permission are exempt — they
+    /// legitimately need to backfill/correct any class's register.
+    /// </summary>
+    private async Task EnsureTeacherOwnsClassAsync(Guid classId)
+    {
+        if (await PermissionChecker.IsGrantedAsync(PermissionNames.Academic_Attendance_ViewAll))
+            return;
+
+        if (AbpSession.UserId == null) return;
+
+        var teacher = await _teacherRepository
+            .FirstOrDefaultAsync(t => t.UserId == AbpSession.UserId.Value && t.TenantId == AbpSession.TenantId);
+        // Not a teacher-linked account (e.g. a student/parent portal user
+        // who somehow holds the permission) — nothing to scope by class.
+        if (teacher == null) return;
+
+        var assigned = await _teacherClassRepository
+            .GetAll()
+            .AnyAsync(tc => tc.TeacherId == teacher.Id && tc.ClassId == classId);
+
+        if (!assigned)
+            throw new UserFriendlyException(AcademicExceptionCodes.AttendanceClassNotAssigned,
+                "You are not assigned to this class.");
+    }
+
+    /// <summary>
     /// AttendanceDate is stored in a `timestamptz` column, so an entity
     /// freshly built from a client's date-only string (Kind=Unspecified,
     /// e.g. Capture/BulkCapture's input) and one just reloaded from the
@@ -407,6 +473,9 @@ public class AttendanceAppService : ApplicationService, IAttendanceAppService
         // Date guard: not future, and (AT-002) not a locked past date.
         await EnsureDateCapturableOrThrowAsync(attendanceDate);
 
+        // T-T21: the calling teacher must actually be assigned to this class.
+        await EnsureTeacherOwnsClassAsync(classId);
+
         // Validate student exists and belongs to class
         var student = await _studentRepository
             .FirstOrDefaultAsync(s => s.Id == studentId && s.TenantId == AbpSession.TenantId);
@@ -443,6 +512,31 @@ public class AttendanceAppService : ApplicationService, IAttendanceAppService
         if (duplicate != null)
             throw new UserFriendlyException(AcademicExceptionCodes.DuplicateAttendance,
                 "Attendance has already been recorded for this student on this date.");
+    }
+
+    // Mirrors LearningMaterialAppService's helper of the same name/shape —
+    // this codebase doesn't have a shared place for it yet, so each service
+    // that needs it keeps its own copy.
+    private static bool IsUniqueConstraintViolation(DbUpdateException ex)
+    {
+        for (var inner = ex.InnerException; inner != null; inner = inner.InnerException)
+        {
+            var typeName = inner.GetType().FullName;
+            if (typeName == "Microsoft.Data.SqlClient.SqlException"
+                || typeName == "System.Data.SqlClient.SqlException")
+            {
+                var numberValue = inner.GetType().GetProperty("Number")?.GetValue(inner);
+                if (numberValue is int number && (number == 2601 || number == 2627))
+                    return true;
+            }
+            else if (typeName == "Npgsql.PostgresException")
+            {
+                var sqlStateValue = inner.GetType().GetProperty("SqlState")?.GetValue(inner);
+                if (sqlStateValue is string sqlState && sqlState == "23505")
+                    return true;
+            }
+        }
+        return false;
     }
 
     private static AttendanceSummaryDto BuildSummary(Guid studentId, string studentName, List<Attendance> records)

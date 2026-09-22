@@ -28,6 +28,7 @@ public class StudentAttendanceEntry
     public Guid StudentId { get; set; }
 
     [Required]
+    [EnumDataType(typeof(AttendanceStatus))]
     public AttendanceStatus Status { get; set; }
 
     [StringLength(500)]
