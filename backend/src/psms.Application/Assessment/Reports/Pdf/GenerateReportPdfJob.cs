@@ -50,11 +50,11 @@ public class GenerateReportPdfJob : AsyncBackgroundJob<GenerateReportPdfJobArgs>
             var report = await _reportRepository.GetAsync(args.ReportId);
             var storagePath = $"reports/{args.TenantId ?? 0}/{report.AcademicYearId}/{report.TermId ?? Guid.Empty}/{data.AdmissionNumber ?? "unknown"}_{args.ReportId}.pdf";
 
-            // Upload to Supabase Storage
-            var url = await _storageService.UploadAsync(storagePath, pdfBytes, "application/pdf");
+            // Private upload: the key is kept, and a short-lived signed URL is
+            // minted per request. Nothing durable points at a child's report.
+            var objectKey = await _storageService.UploadAsync(storagePath, pdfBytes, "application/pdf");
 
-            // Update report with PDF URL
-            report.SetPdfUrl(url);
+            report.SetPdfObjectKey(objectKey);
             await _reportRepository.UpdateAsync(report);
             await CurrentUnitOfWork.SaveChangesAsync();
         }

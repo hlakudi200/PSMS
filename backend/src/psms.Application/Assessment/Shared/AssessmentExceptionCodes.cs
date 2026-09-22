@@ -64,6 +64,12 @@ public static class AssessmentExceptionCodes
     public const string ReportNotPublished = "ASM_REPORT_NOT_PUBLISHED";
 
     /// <summary>
+    /// Someone who is not a parent of the learner tried to record the parent's
+    /// acknowledgement of a report card.
+    /// </summary>
+    public const string NotTheParent = "ASM_NOT_THE_PARENT";
+
+    /// <summary>
     /// A report was submitted for approval in a school with no active report
     /// approval workflow. Approval only happens through the engine, so there
     /// would be nobody to review it.

@@ -42,6 +42,17 @@ public class psmsTestModule : AbpModule
 
         RegisterFakeService<AbpZeroDbMigrator<psmsDbContext>>();
 
+        // File storage talks to Supabase through IConfiguration, which the test
+        // host does not register. Services that merely depend on it — the report
+        // service needs it to sign a download link — could not be constructed at
+        // all, so every test resolving one failed on a DI error rather than on
+        // its own assertion.
+        Configuration.ReplaceService<psms.Domain.Shared.Storage.IFileStorageService>(
+            () => IocManager.IocContainer.Register(
+                Component.For<psms.Domain.Shared.Storage.IFileStorageService>()
+                    .UsingFactoryMethod(() => Substitute.For<psms.Domain.Shared.Storage.IFileStorageService>())
+                    .LifestyleSingleton()));
+
         Configuration.ReplaceService<IEmailSender, NullEmailSender>(DependencyLifeStyle.Transient);
     }
 

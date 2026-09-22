@@ -304,7 +304,12 @@ export interface IReport {
   termName?: string;
   academicYearName?: string;
   promotedToGradeName?: string;
-  pdfUrl?: string;
+  /**
+   * RC-04: whether a PDF exists. The link itself is minted per request and
+   * short-lived, so call getPdfUrlAsync when the user clicks download rather
+   * than holding a URL that would outlive the page.
+   */
+  hasPdf: boolean;
   subjectReports: IReportSubject[];
   /**
    * RC-09. Set while an approval workflow is running for this report. The direct
@@ -332,7 +337,8 @@ export interface IReportList {
   className?: string;
   termName?: string;
   academicYearName?: string;
-  pdfUrl?: string;
+  /** RC-04: see IReport.hasPdf. */
+  hasPdf: boolean;
   subjectCount: number;
   /** RC-09: see IReport.activeWorkflowInstanceId. */
   activeWorkflowInstanceId?: string;

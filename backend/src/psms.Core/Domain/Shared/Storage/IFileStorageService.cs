@@ -10,6 +10,13 @@ public interface IFileStorageService
     /// <summary>
     /// Uploads a file to the default bucket and returns the public URL.
     /// </summary>
+    /// <summary>
+    /// The bucket <see cref="UploadAsync(string, byte[], string)"/> writes to.
+    /// Callers need it to sign a download for something they uploaded through
+    /// the single-argument overload.
+    /// </summary>
+    string DefaultBucketName { get; }
+
     Task<string> UploadAsync(string path, byte[] data, string contentType);
 
     /// <summary>

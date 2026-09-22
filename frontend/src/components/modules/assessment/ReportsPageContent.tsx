@@ -74,6 +74,7 @@ function ReportsContent() {
     submitForApprovalAsync,
     publishAsync,
     generatePdfAsync,
+    getPdfUrlAsync,
     bulkGeneratePdfsAsync,
   } = useReportActions();
   const { academicYears } = useAcademicYearState();
@@ -215,21 +216,28 @@ function ReportsContent() {
       key: 'downloadPdf',
       label: 'Download PDF',
       icon: <DownloadOutlined />,
-      visible: (record) => !!record.pdfUrl,
-      onClick: (record) => {
-        if (record.pdfUrl) window.open(record.pdfUrl, '_blank', 'noopener,noreferrer');
+      // RC-04: the link is minted on click and expires in minutes, so there is
+      // nothing durable to hold or forward.
+      visible: (record) => record.hasPdf,
+      onClick: async (record) => {
+        try {
+          const url = await getPdfUrlAsync(record.id);
+          if (url) window.open(url, '_blank', 'noopener,noreferrer');
+        } catch {
+          // Surfaced by axios interceptor
+        }
       },
     },
     {
       key: 'generatePdf',
       label: 'Generate PDF',
       icon: <FilePdfOutlined />,
-      visible: (record) => !record.pdfUrl && record.status >= ReportStatus.Generated,
+      visible: (record) => !record.hasPdf && record.status >= ReportStatus.Generated,
       onClick: async (record) => {
         try {
           await generatePdfAsync(record.id);
           message.success('PDF generation started');
-          // The job writes pdfUrl asynchronously; refresh so the row stops
+          // The job produces the PDF asynchronously; refresh so the row stops
           // offering to generate a PDF it has already been asked for.
           refreshData();
         } catch {

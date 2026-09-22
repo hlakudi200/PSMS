@@ -102,6 +102,7 @@ public class AssessmentMapper : Profile
     {
         // Entity to DTO (full) — SubjectReports mapped manually in service
         CreateMap<Report, ReportDto>()
+            .ForMember(dest => dest.HasPdf, opt => opt.MapFrom(src => src.HasPdf()))
             .ForMember(dest => dest.StudentName,
                 opt => opt.MapFrom(src => src.Student != null ? src.Student.GetFullName() : null))
             .ForMember(dest => dest.StudentAdmissionNumber,
@@ -118,6 +119,7 @@ public class AssessmentMapper : Profile
 
         // Entity to ListDto (lightweight)
         CreateMap<Report, ReportListDto>()
+            .ForMember(dest => dest.HasPdf, opt => opt.MapFrom(src => src.HasPdf()))
             .ForMember(dest => dest.StudentName,
                 opt => opt.MapFrom(src => src.Student != null ? src.Student.GetFullName() : null))
             .ForMember(dest => dest.StudentAdmissionNumber,

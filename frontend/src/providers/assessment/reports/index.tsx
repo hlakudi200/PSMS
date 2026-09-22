@@ -257,6 +257,14 @@ export const ReportProvider = ({
       });
   };
 
+  // Not dispatched into state on purpose — see IReportActionContext.
+  const getPdfUrlAsync = async (id: string): Promise<string | undefined> => {
+    const response = await instance.get(
+      `/api/services/app/Report/GetReportPdfUrl?id=${id}`
+    );
+    return response.data.result as string | undefined;
+  };
+
   const bulkGeneratePdfsAsync = async (input: IBulkGenerateReportPdfsInput) => {
     dispatch(bulkGeneratePdfsPending());
     const endpoint = `/api/services/app/Report/BulkGenerateReportPdfs`;
@@ -335,6 +343,7 @@ export const ReportProvider = ({
           recordPromotionAsync,
           deleteAsync,
           generatePdfAsync,
+          getPdfUrlAsync,
           bulkGeneratePdfsAsync,
           previewBulkGenerateAsync,
           bulkGenerateAsync,

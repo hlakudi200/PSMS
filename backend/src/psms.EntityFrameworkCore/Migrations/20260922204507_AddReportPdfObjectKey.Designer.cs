@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using psms.EntityFrameworkCore;
@@ -11,9 +12,11 @@ using psms.EntityFrameworkCore;
 namespace psms.Migrations
 {
     [DbContext(typeof(psmsDbContext))]
-    partial class psmsDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260922204507_AddReportPdfObjectKey")]
+    partial class AddReportPdfObjectKey
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -5852,38 +5855,6 @@ namespace psms.Migrations
                     b.ToTable("OnlineLessons");
                 });
 
-            modelBuilder.Entity("psms.Domain.Learning.Entities.OnlineLessonMaterial", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreationTime")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<long?>("CreatorUserId")
-                        .HasColumnType("bigint");
-
-                    b.Property<Guid>("LearningMaterialId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("OnlineLessonId")
-                        .HasColumnType("uuid");
-
-                    b.Property<int?>("TenantId")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("LearningMaterialId");
-
-                    b.HasIndex("OnlineLessonId", "LearningMaterialId")
-                        .IsUnique()
-                        .HasDatabaseName("IX_OnlineLessonMaterials_OnlineLessonId_LearningMaterialId");
-
-                    b.ToTable("OnlineLessonMaterials");
-                });
-
             modelBuilder.Entity("psms.Domain.SASpecific.Entities.AfterCare", b =>
                 {
                     b.Property<Guid>("Id")
@@ -8160,25 +8131,6 @@ namespace psms.Migrations
                         .IsRequired();
 
                     b.Navigation("ClassSubject");
-                });
-
-            modelBuilder.Entity("psms.Domain.Learning.Entities.OnlineLessonMaterial", b =>
-                {
-                    b.HasOne("psms.Domain.Learning.Entities.LearningMaterial", "LearningMaterial")
-                        .WithMany()
-                        .HasForeignKey("LearningMaterialId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("psms.Domain.Learning.Entities.OnlineLesson", "OnlineLesson")
-                        .WithMany()
-                        .HasForeignKey("OnlineLessonId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("LearningMaterial");
-
-                    b.Navigation("OnlineLesson");
                 });
 
             modelBuilder.Entity("psms.Domain.SASpecific.Entities.StudentAfterCare", b =>
