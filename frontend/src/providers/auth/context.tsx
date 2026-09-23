@@ -34,6 +34,18 @@ export interface IAuthStateContext {
   currentTenant?: ITenant;
   jwtToken?: string;
   currentRole?: string;
+  /**
+   * True until the provider has looked in sessionStorage for an existing
+   * session. Nothing may conclude the visitor is signed out before this is
+   * false: on a browser refresh the provider starts from INITIAL_STATE and only
+   * reads the token in a mount effect, and effects run children first — so a
+   * route guard that redirected on `!jwtToken` fired before the token was ever
+   * read, and every refresh bounced the user to the login screen.
+   *
+   * Only an explicit `false` means "we looked". Undefined is treated as still
+   * hydrating, so a payload that omits the flag can never release a guard.
+   */
+  isHydrating?: boolean;
 }
 
 export interface IAuthActionContext {
@@ -51,6 +63,7 @@ export const INITIAL_STATE: IAuthStateContext = {
   currentTenant: undefined,
   jwtToken: undefined,
   currentRole: undefined,
+  isHydrating: true,
 };
 
 export const AuthStateContext = createContext<IAuthStateContext>(INITIAL_STATE);

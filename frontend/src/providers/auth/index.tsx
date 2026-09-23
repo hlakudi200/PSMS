@@ -12,6 +12,7 @@ import {
   getCurrentUserError,
   getCurrentUserPending,
   getCurrentUserSuccess,
+  hydrationSettled,
   loginUserError,
   loginUserPending,
   loginUserSuccess,
@@ -65,6 +66,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       });
   }, [instance]);
 
+  // Restore an existing session on mount. This is the only place the token is
+  // read back, so `isHydrating` must be cleared on both paths — a guard that
+  // redirects on "no token" has to wait for this to have run, or a refresh
+  // signs the user out and takes the school's branding with it.
   useEffect(() => {
     const token = sessionStorage.getItem("accessToken");
     if (token) {
@@ -74,6 +79,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       );
       getCurrentUser(token);
     }
+    dispatch(hydrationSettled());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

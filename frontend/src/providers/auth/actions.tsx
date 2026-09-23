@@ -12,6 +12,7 @@ export enum AuthActionEnums {
 
   signOutUser = "SIGN_OUT_USER",
   resetStateFlagsAction = "RESET_STATE_FLAGS",
+  hydrationSettled = "AUTH_HYDRATION_SETTLED",
 }
 
 // Login actions
@@ -82,4 +83,14 @@ export const signOutUser = createAction<IAuthStateContext>(
 export const resetStateFlagsAction = createAction<IAuthStateContext>(
   AuthActionEnums.resetStateFlagsAction,
   () => ({ isPending: false, isSuccess: false, isError: false })
+);
+
+/**
+ * The provider has finished looking for an existing session. Dispatched whether
+ * or not one was found, because "there is no session" is a conclusion a guard is
+ * only allowed to draw once we have actually looked.
+ */
+export const hydrationSettled = createAction<Partial<IAuthStateContext>>(
+  AuthActionEnums.hydrationSettled,
+  () => ({ isHydrating: false })
 );
