@@ -399,6 +399,16 @@ function ReportDetailContent() {
     .filter(Boolean)
     .map((r) => (r as string).toLowerCase());
   const canManageReport = myRoles.some((r) => managementRoles.includes(r));
+
+  /* RC-12: capturing marks needs ReportCards.Generate, which the HOD holds and
+     the three management roles hold — the HOD was missing from the list above,
+     so the person who reviews the card could not see the button to fix it. */
+  const canCaptureMarks = canManageReport || myRoles.includes('hod');
+
+  /* RC-08: the class and subject teachers write the comments, and hold
+     ReportCards.Comment rather than Generate. They see the same screen with the
+     marks read-only. */
+  const canCommentOnSubjects = canCaptureMarks || myRoles.includes('teacher');
   // Reports detail is reached from the principal reports list and, via the
   // workflow "View full report" link, from the teacher and admin portals.
   const reportsPortalRoot = portalBaseFrom(pathname);
@@ -870,11 +880,13 @@ function ReportDetailContent() {
           come from the automatic aggregation and the per-subject teacher comment
           — a named field of a South African report card — could not be written
           at all. */}
-      {canManageReport && (
+      {canCommentOnSubjects && (
         <SubjectMarksModal
           open={marksOpen}
           reportId={report.id}
-          readOnly={report.status === 4 || report.status === 5}
+          reportStatus={report.status}
+          isYearEnd={isYearEndReport}
+          canEditMarks={canCaptureMarks}
           onClose={() => setMarksOpen(false)}
           onSaved={() => getAsync(report.id)}
         />
@@ -984,9 +996,13 @@ function ReportDetailContent() {
         style={{ marginBottom: 16 }}
         className="no-print"
         extra={
-          canManageReport ? (
+          canCommentOnSubjects ? (
             <Button size="small" onClick={() => setMarksOpen(true)}>
-              {report.status === 4 || report.status === 5 ? 'View marks' : 'Capture marks and comments'}
+              {report.status === 4 || report.status === 5
+                ? 'View marks'
+                : canCaptureMarks
+                  ? 'Capture marks and comments'
+                  : 'Write subject comments'}
             </Button>
           ) : undefined
         }

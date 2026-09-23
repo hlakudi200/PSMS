@@ -324,6 +324,14 @@ Host Admin (Platform Level)
 | **ReportCards.Generate** | ❌ | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ |
 | **ReportCards.Publish** | ❌ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
 | **ReportCards.Download** | ✅ | ✅ | ✅ | ✅ | ✅ | 📚 | 👶 | 🔒 |
+| **ReportCards.Comment** | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
+
+**ReportCards.Comment** (RC-08) is the teacher comment on a report card and on
+each of its subjects. It is split out of Generate because the class and subject
+teachers are who actually write those comments, and a teacher holds no Generate
+— so before this existed, a named field of a South African report card could not
+be written by the person whose name is printed under it. Generating and deleting
+report cards stays with the HOD and up.
 
 ### 6.4 Feedback (TF-001 to TF-005)
 
@@ -559,10 +567,14 @@ namespace psms.Authorization
         public const string Assessment_Quizzes_Create = "Assessment.Quizzes.Create";
         public const string Assessment_Quizzes_Publish = "Assessment.Quizzes.Publish";
 
-        public const string Assessment_Reports = "Assessment.Reports";
-        public const string Assessment_Reports_View = "Assessment.Reports.View";
-        public const string Assessment_Reports_Generate = "Assessment.Reports.Generate";
-        public const string Assessment_Reports_Publish = "Assessment.Reports.Publish";
+        // Named ReportCards, not Reports — this block said Assessment.Reports.*
+        // while the implementation has always used Assessment.ReportCards.*.
+        public const string Assessment_ReportCards = "Assessment.ReportCards";
+        public const string Assessment_ReportCards_View = "Assessment.ReportCards.View";
+        public const string Assessment_ReportCards_Generate = "Assessment.ReportCards.Generate";
+        public const string Assessment_ReportCards_Publish = "Assessment.ReportCards.Publish";
+        public const string Assessment_ReportCards_Download = "Assessment.ReportCards.Download";
+        public const string Assessment_ReportCards_Comment = "Assessment.ReportCards.Comment";
 
         // Communication Module
         public const string Communication = "Communication";

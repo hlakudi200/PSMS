@@ -171,10 +171,13 @@ namespace psms.Domain.Assessment.Entities
             TermWeight = termWeight;
             ExamWeight = examWeight;
 
-            // Marks recorded directly are the school's own, whatever they were
-            // before. Leaving the flag set would print "the examination is not
-            // included in this mark" beside a mark that now includes one.
-            AwaitsExternalExamination = false;
+            // An examination mark entered by hand makes the external-examination
+            // note false — it would print "the examination is not included in
+            // this mark" beside a mark that now includes one. Recording only a
+            // school-based mark, or only a comment, says nothing about the
+            // external paper and leaves the note alone.
+            if (examMark.HasValue)
+                AwaitsExternalExamination = false;
 
             // Calculate final mark. Clearing both marks clears the final mark
             // too — it used to keep the previous one, so a mark entered by

@@ -37,7 +37,7 @@ import {
   useReportSubjectState,
 } from '@/providers/assessment/report_subjects';
 import type { IReportSubject } from '@/providers/assessment/shared/interfaces';
-import { formatPercentage } from '@/utils/marks';
+import { formatMark, formatPercentage } from '@/utils/marks';
 
 const { Text } = Typography;
 
@@ -69,8 +69,16 @@ const rowSchema = z
 interface Props {
   open: boolean;
   reportId: string;
-  /** Marks close at approval, the same boundary the backend draws. */
-  readOnly?: boolean;
+  /** ReportStatus, so the screen can say which of the two closed states it is. */
+  reportStatus?: number;
+  /** A year-end mark is the promotion mark, a whole number under NPPPPR §31(3). */
+  isYearEnd?: boolean;
+  /**
+   * RC-08. Whether this person may change the marks. A teacher holds
+   * ReportCards.Comment but not Generate: they see the marks and write the
+   * comments.
+   */
+  canEditMarks?: boolean;
   onClose: () => void;
   onSaved?: () => void;
 }
@@ -78,18 +86,33 @@ interface Props {
 const SubjectMarksModalInner: React.FC<Props> = ({
   open,
   reportId,
-  readOnly,
+  reportStatus,
+  isYearEnd,
+  canEditMarks,
   onClose,
   onSaved,
 }) => {
-  const { getByReportAsync, bulkRecordMarksAsync } = useReportSubjectActions();
-  const { reportSubjects, isPending } = useReportSubjectState();
+  const { getByReportAsync, bulkRecordMarksAsync, addTeacherCommentAsync } =
+    useReportSubjectActions();
+  const { reportSubjects } = useReportSubjectState();
 
   const [rows, setRows] = useState<DraftRow[]>([]);
+  const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  /* Marks close at approval, the same boundary the backend draws. */
+  const closed = reportStatus === 4 || reportStatus === 5;
+  const marksReadOnly = closed || !canEditMarks;
+  const commentsReadOnly = closed;
+  const readOnly = marksReadOnly && commentsReadOnly;
+
   useEffect(() => {
-    if (open) getByReportAsync(reportId);
+    if (!open) return;
+
+    setLoading(true);
+    Promise.resolve(getByReportAsync(reportId))
+      .catch(() => message.error('Could not load this report\u2019s subjects'))
+      .finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, reportId]);
 
@@ -110,6 +133,25 @@ const SubjectMarksModalInner: React.FC<Props> = ({
     );
   }, [reportSubjects]);
 
+  /** What came back from the server, to compare a save against. */
+  const original = useMemo(
+    () => new Map((reportSubjects ?? []).map((s: IReportSubject) => [s.id, s])),
+    [reportSubjects],
+  );
+
+  const changed = (row: DraftRow): boolean => {
+    const was = original.get(row.reportSubjectId);
+    if (!was) return true;
+
+    return (
+      (was.termMark ?? null) !== (row.termMark ?? null)
+      || (was.examMark ?? null) !== (row.examMark ?? null)
+      || (was.termWeight ?? 40) !== row.termWeight
+      || (was.examWeight ?? 60) !== row.examWeight
+      || (was.teacherComment ?? '') !== (row.teacherComment ?? '')
+    );
+  };
+
   const update = (id: string, patch: Partial<DraftRow>) =>
     setRows((current) =>
       current.map((r) => (r.reportSubjectId === id ? { ...r, ...patch } : r)),
@@ -120,10 +162,17 @@ const SubjectMarksModalInner: React.FC<Props> = ({
     const term = row.termMark ?? undefined;
     const exam = row.examMark ?? undefined;
 
-    if (term !== undefined && exam !== undefined)
-      return (term * row.termWeight) / 100 + (exam * row.examWeight) / 100;
+    const composed =
+      term !== undefined && exam !== undefined
+        ? (term * row.termWeight) / 100 + (exam * row.examWeight) / 100
+        : (term ?? exam);
 
-    return term ?? exam;
+    if (composed === undefined) return undefined;
+
+    /* A year-end mark is the promotion mark, rounded half-up to a whole number
+       under NPPPPR §31(3) — which the server applies, so the preview has to as
+       well or the row shows 74.67 and then saves as 75. */
+    return isYearEnd ? Math.floor(composed + 0.5) : composed;
   };
 
   const invalidRows = useMemo(
@@ -139,24 +188,49 @@ const SubjectMarksModalInner: React.FC<Props> = ({
       return;
     }
 
+    /* Only what actually changed. Re-sending every row rewrote rows nobody
+       touched — and recording a mark clears the external-examination note, so a
+       no-op save on a Grade 12 card would have quietly dropped the footnote off
+       every subject. */
+    const edited = rows.filter(changed);
+
+    if (edited.length === 0) {
+      onClose();
+      return;
+    }
+
     setSaving(true);
     try {
-      await bulkRecordMarksAsync({
-        reportId,
-        subjectMarks: rows.map((r) => ({
-          reportSubjectId: r.reportSubjectId,
-          termMark: r.termMark ?? undefined,
-          examMark: r.examMark ?? undefined,
-          termWeight: r.termWeight,
-          examWeight: r.examWeight,
-          teacherComment: r.teacherComment?.trim() || undefined,
-        })),
-      });
-      message.success('Subject marks saved');
+      if (canEditMarks) {
+        await bulkRecordMarksAsync({
+          reportId,
+          subjectMarks: edited.map((r) => ({
+            reportSubjectId: r.reportSubjectId,
+            termMark: r.termMark ?? undefined,
+            examMark: r.examMark ?? undefined,
+            termWeight: r.termWeight,
+            examWeight: r.examWeight,
+            /* '' rather than undefined, or a comment entered by mistake could
+               never be cleared — the server only writes a non-null value. */
+            teacherComment: r.teacherComment?.trim() ?? '',
+          })),
+        });
+      } else {
+        /* RC-08: a teacher holds the comment permission but not Generate, so
+           their save goes one comment at a time through the endpoint that
+           permission gates. */
+        for (const row of edited) {
+          await addTeacherCommentAsync(row.reportSubjectId, row.teacherComment?.trim() ?? '');
+        }
+      }
+
+      message.success(canEditMarks ? 'Subject marks saved' : 'Subject comments saved');
       onSaved?.();
       onClose();
     } catch {
-      message.error('Could not save the subject marks');
+      message.error(
+        canEditMarks ? 'Could not save the subject marks' : 'Could not save the subject comments',
+      );
     } finally {
       setSaving(false);
     }
@@ -186,7 +260,7 @@ const SubjectMarksModalInner: React.FC<Props> = ({
           min={0}
           max={100}
           value={row.termMark ?? undefined}
-          disabled={readOnly}
+          disabled={marksReadOnly}
           style={{ width: '100%' }}
           onChange={(v) => update(row.reportSubjectId, { termMark: v as number | null })}
         />
@@ -201,7 +275,7 @@ const SubjectMarksModalInner: React.FC<Props> = ({
           min={0}
           max={100}
           value={row.examMark ?? undefined}
-          disabled={readOnly}
+          disabled={marksReadOnly}
           style={{ width: '100%' }}
           onChange={(v) => update(row.reportSubjectId, { examMark: v as number | null })}
         />
@@ -221,7 +295,7 @@ const SubjectMarksModalInner: React.FC<Props> = ({
                 min={0}
                 max={100}
                 value={row.termWeight}
-                disabled={readOnly}
+                disabled={marksReadOnly}
                 style={{ width: 70 }}
                 onChange={(v) =>
                   update(row.reportSubjectId, { termWeight: (v as number) ?? 0 })
@@ -232,7 +306,7 @@ const SubjectMarksModalInner: React.FC<Props> = ({
                 min={0}
                 max={100}
                 value={row.examWeight}
-                disabled={readOnly}
+                disabled={marksReadOnly}
                 style={{ width: 70 }}
                 onChange={(v) =>
                   update(row.reportSubjectId, { examWeight: (v as number) ?? 0 })
@@ -270,7 +344,7 @@ const SubjectMarksModalInner: React.FC<Props> = ({
           rows={1}
           maxLength={1000}
           value={row.teacherComment}
-          disabled={readOnly}
+          disabled={commentsReadOnly}
           placeholder="Strengths and what to work on"
           onChange={(e) =>
             update(row.reportSubjectId, { teacherComment: e.target.value })
@@ -298,21 +372,33 @@ const SubjectMarksModalInner: React.FC<Props> = ({
             disabled={rows.length === 0}
             onClick={handleSave}
           >
-            Save marks
+            {canEditMarks ? 'Save marks' : 'Save comments'}
           </Button>
         ),
       ]}
     >
       <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-        {readOnly && (
+        {closed && (
           <Alert
             type="info"
             showIcon
-            message="This report has been approved, so its marks are fixed."
+            message={
+              reportStatus === 5
+                ? 'This report card has been published, so it can no longer be changed.'
+                : 'This report card has been approved, so its marks and comments are fixed.'
+            }
           />
         )}
 
-        {!readOnly && (
+        {!closed && !canEditMarks && (
+          <Alert
+            type="info"
+            showIcon
+            message="You can write the subject comments here. The marks are set by whoever generates the report."
+          />
+        )}
+
+        {!closed && canEditMarks && (
           <Alert
             type="info"
             showIcon
@@ -329,7 +415,7 @@ const SubjectMarksModalInner: React.FC<Props> = ({
         <Table<DraftRow>
           rowKey="reportSubjectId"
           size="small"
-          loading={isPending && rows.length === 0}
+          loading={loading && rows.length === 0}
           dataSource={rows}
           columns={columns}
           pagination={false}

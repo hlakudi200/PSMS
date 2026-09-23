@@ -256,6 +256,14 @@ public static class PermissionNames
     public const string Assessment_ReportCards_Publish = "Assessment.ReportCards.Publish";
     public const string Assessment_ReportCards_Download = "Assessment.ReportCards.Download";
 
+    /// <summary>
+    /// RC-08. Writing the teacher's comment on a report card, and on each of
+    /// its subjects. Split out of Generate so the class and subject teachers
+    /// who actually write those comments can, without also being able to
+    /// create and delete report cards for the whole school.
+    /// </summary>
+    public const string Assessment_ReportCards_Comment = "Assessment.ReportCards.Comment";
+
     // Feedback
     /// <summary>
     /// The school's SBA / examination split per grade band. Its own permission

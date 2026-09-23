@@ -48,6 +48,7 @@ export const ReportSubjectProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(getReportSubjectError());
+        throw error;
       });
   };
 
@@ -64,6 +65,7 @@ export const ReportSubjectProvider = ({
         .catch((error) => {
             console.error(error);
             dispatch(getByReportError());
+        throw error;
         });
     };
 
@@ -78,6 +80,7 @@ export const ReportSubjectProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(recordMarksError());
+        throw error;
       });
   };
 
@@ -94,6 +97,7 @@ export const ReportSubjectProvider = ({
         .catch((error) => {
             console.error(error);
             dispatch(bulkRecordMarksError());
+        throw error;
         });
     };
 
@@ -108,6 +112,7 @@ export const ReportSubjectProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(addTeacherCommentError());
+        throw error;
       });
   };
 

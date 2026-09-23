@@ -229,7 +229,17 @@ public class DisciplineOutcomeRecordedGuard : IWorkflowStepGuard, ITransientDepe
     }
 }
 
-/// <summary>Report Approval step 1: every subject on the report has a final mark and a teacher comment.</summary>
+/// <summary>
+/// Report Approval step 1: every subject on the report has a final mark.
+/// <para>
+/// RC-12. The guard also required a teacher comment on every subject, and was
+/// left detached for that reason: the HOD who stands at this step holds no
+/// override permission, so a card missing one comment would have hard-blocked
+/// with nobody able to move it. A subject comment is expected on a South
+/// African report card but it is not what makes the card correct — an unmarked
+/// subject is. The comment is prompted for on the capture screen instead.
+/// </para>
+/// </summary>
 public class ReportSubjectsCompleteGuard : IWorkflowStepGuard, ITransientDependency
 {
     private readonly IRepository<ReportSubject, Guid> _subjects;
@@ -237,17 +247,21 @@ public class ReportSubjectsCompleteGuard : IWorkflowStepGuard, ITransientDepende
 
     public string Key => "report.subjects-complete";
     public WorkflowEntityType EntityType => WorkflowEntityType.Report;
-    public string DisplayName => "All subjects have a final mark and teacher comment";
+    public string DisplayName => "All subjects have a final mark";
 
     public async Task<WorkflowGuardResult> EvaluateAsync(Guid entityId)
     {
         var subjects = await _subjects.GetAll().Where(s => s.ReportId == entityId)
-            .Select(s => new { s.FinalMark, s.TeacherComment }).ToListAsync();
-        if (subjects.Count == 0) return WorkflowGuardResult.Fail("The report has no subjects.");
+            .Select(s => new { s.FinalMark }).ToListAsync();
+
+        if (subjects.Count == 0)
+            return WorkflowGuardResult.Fail("The report has no subjects.");
+
         var noMark = subjects.Count(s => !s.FinalMark.HasValue);
-        var noComment = subjects.Count(s => string.IsNullOrWhiteSpace(s.TeacherComment));
-        if (noMark == 0 && noComment == 0) return WorkflowGuardResult.Ok();
-        return WorkflowGuardResult.Fail(
-            $"{(noMark > 0 ? $"{noMark} subject(s) without a final mark" : "")}{(noMark > 0 && noComment > 0 ? "; " : "")}{(noComment > 0 ? $"{noComment} subject(s) without a teacher comment" : "")}.");
+
+        return noMark == 0
+            ? WorkflowGuardResult.Ok()
+            : WorkflowGuardResult.Fail(
+                $"{noMark} subject(s) on this report have no final mark. Capture the marks before sending it on.");
     }
 }

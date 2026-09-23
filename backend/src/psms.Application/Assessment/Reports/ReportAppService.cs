@@ -438,7 +438,7 @@ public class ReportAppService : ApplicationService, IReportAppService
     /// </summary>
     private static void AssertCommentsStillOpen(Report report)
     {
-        if (report.Status == ReportStatus.Published)
+        if (!report.AcceptsComments())
             throw new UserFriendlyException(AssessmentExceptionCodes.ReportNotEditable,
                 "This report card has been published. A published report card cannot be changed.");
     }
@@ -1206,14 +1206,6 @@ public class ReportAppService : ApplicationService, IReportAppService
         await _reportRepository.UpdateAsync(report);
         await CurrentUnitOfWork.SaveChangesAsync();
 
-        // RC-10: publishing is what the parent is waiting for, and until now
-        // nothing told them. Queued through the COMM-01 dispatcher, so channel
-        // preferences and POPIA consent apply, and never allowed to fail the
-        // publish — a card that was legitimately published stays published even
-        // if nothing could be sent about it.
-        var dto = await GetAsync(id);
-        await _publishedNotifier.TryNotifyAsync(report, dto.StudentName, ReportTypeLabel(report.ReportType));
-
         // RC-03: publishing is the moment a parent can see the report, and a
         // report card with nothing to download is not much of a report card.
         // Nothing else produced the PDF — not generate, not approve — so a
@@ -1238,10 +1230,29 @@ public class ReportAppService : ApplicationService, IReportAppService
             }
         }
 
+        // RC-10: publishing is what the parent is waiting for, and until now
+        // nothing told them. Queued through the COMM-01 dispatcher, so channel
+        // preferences and POPIA consent apply, and never allowed to fail the
+        // publish — a card that was legitimately published stays published even
+        // if nothing could be sent about it.
+        //
+        // After the PDF is queued, not before: both are Normal-priority jobs on
+        // the same transaction, and telling a parent the card is ready to view
+        // before the file is being made is a race worth not having.
+        var studentName = await _studentRepository
+            .GetAll()
+            .Where(s => s.Id == report.StudentId && s.TenantId == AbpSession.TenantId)
+            .Select(s => s.FirstName + " " + s.LastName)
+            .FirstOrDefaultAsync();
+
+        await _publishedNotifier.TryNotifyAsync(report, studentName, ReportTypeLabel(report.ReportType));
+
         return await GetAsync(id);
     }
 
-    [AbpAuthorize(PermissionNames.Assessment_ReportCards_Generate)]
+    // RC-08: the class teacher writes this comment, and the Teacher role holds
+    // no Generate. Gated on the comment permission split out for exactly that.
+    [AbpAuthorize(PermissionNames.Assessment_ReportCards_Comment)]
     public async Task<ReportDto> AddTeacherCommentAsync(Guid id, TeacherCommentDto input)
     {
         var report = await _reportRepository

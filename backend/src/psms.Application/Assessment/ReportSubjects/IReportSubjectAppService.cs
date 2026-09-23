@@ -15,5 +15,5 @@ public interface IReportSubjectAppService : IApplicationService
     Task<ListResultDto<ReportSubjectDto>> GetByReportAsync(Guid reportId);
     Task<ReportSubjectDto> RecordMarksAsync(RecordReportSubjectMarksDto input);
     Task<ListResultDto<ReportSubjectDto>> BulkRecordMarksAsync(BulkRecordReportSubjectMarksDto input);
-    Task<ReportSubjectDto> AddTeacherCommentAsync(Guid id, string comment);
+    Task<ReportSubjectDto> AddTeacherCommentAsync(Guid id, SubjectTeacherCommentDto input);
 }

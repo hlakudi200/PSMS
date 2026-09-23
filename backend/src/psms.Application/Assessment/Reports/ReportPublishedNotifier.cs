@@ -99,7 +99,11 @@ public class ReportPublishedNotifier : ITransientDependency
                 $"{name}'s {label.ToLower(DisplayCulture)} has been published and is ready to view.",
             EntityType = nameof(Report),
             EntityId = report.Id,
-            ActionUrl = $"/parent/reports/{report.Id}",
+            // Deliberately no ActionUrl. There is no parent-facing web route
+            // for a report card — parents read them in the mobile app — and the
+            // in-app bell pushes any path it is given, so a made-up one would
+            // land every parent on a 404. The entity type and id are carried
+            // instead, which is what a client needs to route on its own.
             TemplateKey = TemplateKey,
             Variables = new Dictionary<string, string>
             {
