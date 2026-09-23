@@ -33,6 +33,15 @@ import {
   reportTypeLabels,
 } from '@/providers/shared/enums';
 
+/**
+ * Roles that run the report card pipeline. A teacher holds ReportCards.View and
+ * ReportCards.Comment so they can reach their own classes' cards and write the
+ * comment printed under their name, but submitting, approving, publishing and
+ * producing PDFs are all gated on ReportCards.Generate/Publish on the server —
+ * so showing them those controls would only offer a button that returns 403.
+ */
+const REPORT_PIPELINE_ROLES = ['Admin', 'Principal', 'VicePrincipal', 'HOD'];
+
 const reportStatusColors: Record<ReportStatus, string> = {
   [ReportStatus.Draft]: 'default',
   [ReportStatus.Generated]: 'blue',
@@ -170,6 +179,7 @@ function ReportsContent() {
     },
     {
       key: 'submitForApproval',
+      requiredPermissions: REPORT_PIPELINE_ROLES,
       label: 'Submit for approval',
       icon: <SendOutlined />,
       // RC-09: this is what starts the approval workflow. Without it a generated
@@ -188,6 +198,7 @@ function ReportsContent() {
     },
     {
       key: 'openApproval',
+      requiredPermissions: REPORT_PIPELINE_ROLES,
       label: 'Open approval',
       icon: <CheckCircleOutlined />,
       // RC-09: approval happens only in the workflow, so this opens the step
@@ -198,6 +209,7 @@ function ReportsContent() {
     },
     {
       key: 'publish',
+      requiredPermissions: REPORT_PIPELINE_ROLES,
       label: 'Publish',
       icon: <SendOutlined />,
       visible: (record) => record.status === ReportStatus.Approved,
@@ -230,6 +242,7 @@ function ReportsContent() {
     },
     {
       key: 'generatePdf',
+      requiredPermissions: REPORT_PIPELINE_ROLES,
       label: 'Generate PDF',
       icon: <FilePdfOutlined />,
       visible: (record) => !record.hasPdf && record.status >= ReportStatus.Generated,
@@ -271,6 +284,7 @@ function ReportsContent() {
   const bulkActions: BulkAction<IReportList>[] = [
     {
       key: 'bulkSubmitForApproval',
+      requiredPermissions: REPORT_PIPELINE_ROLES,
       label: 'Submit Selected for Approval',
       confirm: { title: 'Send all selected reports for approval?' },
       onClick: async (rows) => {
@@ -284,6 +298,7 @@ function ReportsContent() {
     },
     {
       key: 'bulkPublish',
+      requiredPermissions: REPORT_PIPELINE_ROLES,
       label: 'Publish Selected',
       confirm: { title: 'Publish all selected reports?' },
       onClick: async (rows) => {
@@ -297,6 +312,7 @@ function ReportsContent() {
     },
     {
       key: 'bulkGeneratePdfs',
+      requiredPermissions: REPORT_PIPELINE_ROLES,
       label: 'Generate All PDFs',
       confirm: {
         title: 'Generate PDFs for every class on this page?',
@@ -340,7 +356,7 @@ function ReportsContent() {
       icon: <FileAddOutlined />,
       type: 'primary',
       onClick: () => router.push(`${portalBase}/reports/generate`),
-      requiredPermissions: ['Admin', 'Principal', 'VicePrincipal', 'HOD'],
+      requiredPermissions: REPORT_PIPELINE_ROLES,
     },
   ];
 
