@@ -228,8 +228,10 @@ public class ReportSubjectAppService : ApplicationService, IReportSubjectAppServ
             ObjectMapper.Map<List<ReportSubjectDto>>(updated));
     }
 
-    [AbpAuthorize(PermissionNames.Assessment_ReportCards_Generate)]
-    public async Task<ReportSubjectDto> AddTeacherCommentAsync(Guid id, string comment)
+    // RC-08: the subject teacher writes this comment, and the Teacher role holds
+    // no Generate. Gated on the comment permission split out for exactly that.
+    [AbpAuthorize(PermissionNames.Assessment_ReportCards_Comment)]
+    public async Task<ReportSubjectDto> AddTeacherCommentAsync(Guid id, SubjectTeacherCommentDto input)
     {
         var reportSubject = await _reportSubjectRepository
             .GetAll()
@@ -241,7 +243,14 @@ public class ReportSubjectAppService : ApplicationService, IReportSubjectAppServ
             throw new UserFriendlyException(AssessmentExceptionCodes.ReportSubjectNotFound,
                 "Report subject entry not found.");
 
-        reportSubject.TeacherComment = comment;
+        // RC-10: the two methods beside this one refuse an approved or published
+        // report; this one had no status guard at all, so the comments on a card
+        // a parent had already downloaded could be rewritten afterwards.
+        if (reportSubject.Report.IsLockedForRestatement())
+            throw new UserFriendlyException(AssessmentExceptionCodes.ReportNotEditable,
+                "Cannot modify report subjects on an approved or published report.");
+
+        reportSubject.TeacherComment = input?.Comment;
         await _reportSubjectRepository.UpdateAsync(reportSubject);
         await CurrentUnitOfWork.SaveChangesAsync();
 

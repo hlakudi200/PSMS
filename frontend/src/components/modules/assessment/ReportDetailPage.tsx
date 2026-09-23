@@ -38,6 +38,7 @@ import { useBrandingState } from '@/providers/branding';
 import { getPrintableInk, getReadableForeground } from '@/utils/theme-config';
 import { formatMark, formatPercentage } from '@/utils/marks';
 import { PromotionDecisionModal, promotionDecisionLabels } from './PromotionDecisionModal';
+import { SubjectMarksModal } from './SubjectMarksModal';
 import type { IReport, IReportSubject } from '@/providers/assessment/shared/interfaces';
 
 const { Title, Text, Paragraph } = Typography;
@@ -398,6 +399,16 @@ function ReportDetailContent() {
     .filter(Boolean)
     .map((r) => (r as string).toLowerCase());
   const canManageReport = myRoles.some((r) => managementRoles.includes(r));
+
+  /* RC-12: capturing marks needs ReportCards.Generate, which the HOD holds and
+     the three management roles hold — the HOD was missing from the list above,
+     so the person who reviews the card could not see the button to fix it. */
+  const canCaptureMarks = canManageReport || myRoles.includes('hod');
+
+  /* RC-08: the class and subject teachers write the comments, and hold
+     ReportCards.Comment rather than Generate. They see the same screen with the
+     marks read-only. */
+  const canCommentOnSubjects = canCaptureMarks || myRoles.includes('teacher');
   // Reports detail is reached from the principal reports list and, via the
   // workflow "View full report" link, from the teacher and admin portals.
   const reportsPortalRoot = portalBaseFrom(pathname);
@@ -453,6 +464,7 @@ function ReportDetailContent() {
   };
 
   const [promotionOpen, setPromotionOpen] = useState(false);
+  const [marksOpen, setMarksOpen] = useState(false);
 
   const handlePublish = async () => {
     await publishAsync(reportId);
@@ -863,6 +875,23 @@ function ReportDetailContent() {
         />
       )}
 
+      {/* RC-12: capturing the subject marks and comments. The provider for
+          this existed and was mounted nowhere, so a subject mark could only ever
+          come from the automatic aggregation and the per-subject teacher comment
+          — a named field of a South African report card — could not be written
+          at all. */}
+      {canCommentOnSubjects && (
+        <SubjectMarksModal
+          open={marksOpen}
+          reportId={report.id}
+          reportStatus={report.status}
+          isYearEnd={isYearEndReport}
+          canEditMarks={canCaptureMarks}
+          onClose={() => setMarksOpen(false)}
+          onSaved={() => getAsync(report.id)}
+        />
+      )}
+
       {/* RC-16: the promotion decision. NPPPPR §(2b)(c) requires it to be
           reflected on the learner's report card, and the year-end card is the
           one that carries it. */}
@@ -962,14 +991,41 @@ function ReportDetailContent() {
       </Row>
 
       {/* Subject Breakdown */}
-      <Card title="Subject Breakdown" style={{ marginBottom: 16 }} className="no-print">
+      <Card
+        title="Subject Breakdown"
+        style={{ marginBottom: 16 }}
+        className="no-print"
+        extra={
+          canCommentOnSubjects ? (
+            <Button size="small" onClick={() => setMarksOpen(true)}>
+              {report.status === 4 || report.status === 5
+                ? 'View marks'
+                : canCaptureMarks
+                  ? 'Capture marks and comments'
+                  : 'Write subject comments'}
+            </Button>
+          ) : undefined
+        }
+      >
         <Table<IReportSubject>
           dataSource={subjects}
           columns={subjectColumns}
           rowKey="id"
           pagination={false}
           size="small"
-          locale={{ emptyText: <Empty description="No subject data" image={Empty.PRESENTED_IMAGE_SIMPLE} /> }}
+          locale={{
+            emptyText: (
+              <Empty
+                description={
+                  /* RE-002 NO_SUBJECTS_IN_REPORT: a card with no subjects cannot
+                     be sent for approval or published, so say why rather than
+                     leaving an empty table. */
+                  'No subjects on this report. Check that the class has its subjects configured, then generate it again.'
+                }
+                image={Empty.PRESENTED_IMAGE_SIMPLE}
+              />
+            ),
+          }}
         />
       </Card>
 

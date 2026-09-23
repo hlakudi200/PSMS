@@ -28,6 +28,12 @@ public class WorkflowSeedService : ApplicationService
     /// <summary>Key of the decision form rendered on the principal's step.</summary>
     private const string ReportApprovalDecisionKey = "report.approval";
 
+    /// <summary>
+    /// RC-12. The guard on the review step: every subject on the card has a
+    /// final mark. Matches ReportSubjectsCompleteGuard.Key.
+    /// </summary>
+    private const string ReportSubjectsCompleteGuardKey = "report.subjects-complete";
+
     private readonly IRepository<WorkflowDefinition, Guid> _definitionRepository;
     private readonly IRepository<WorkflowStep, Guid> _stepRepository;
 
@@ -182,7 +188,11 @@ public class WorkflowSeedService : ApplicationService
                 AssignedRole = "HOD",
                 ActionType = WorkflowActionType.Review,
                 IsCommentRequired = true,
-                SlaHours = ReportReviewSlaHours
+                SlaHours = ReportReviewSlaHours,
+                // RC-12: a report card whose subjects have no marks must not
+                // reach a reviewer. Left off until there was a way to capture
+                // the marks; there is one now.
+                GuardKey = ReportSubjectsCompleteGuardKey
             },
             new WorkflowStep
             {
@@ -247,6 +257,14 @@ public class WorkflowSeedService : ApplicationService
             if (!step.SlaHours.HasValue)
             {
                 step.SlaHours = ReportReviewSlaHours;
+                changed = true;
+            }
+
+            // RC-12: schools seeded before the capture screen existed have a
+            // review step with no guard on it.
+            if (step.StepOrder == 1 && string.IsNullOrWhiteSpace(step.GuardKey))
+            {
+                step.GuardKey = ReportSubjectsCompleteGuardKey;
                 changed = true;
             }
 

@@ -275,7 +275,9 @@ namespace psms.Domain.Assessment.Entities
             ApprovedByUserId = null;
             ApprovedDate = null;
             if (!string.IsNullOrWhiteSpace(reason))
-                PrincipalComment = reason.Length > 1000 ? reason.Substring(0, 1000) : reason;
+                PrincipalComment = reason.Length > MaxPrincipalCommentLength
+                    ? reason.Substring(0, MaxPrincipalCommentLength)
+                    : reason;
         }
 
         /// <summary>
@@ -374,6 +376,25 @@ namespace psms.Domain.Assessment.Entities
         /// </summary>
         public bool IsLockedForRestatement() =>
             Status == ReportStatus.Approved || Status == ReportStatus.Published;
+
+        /// <summary>
+        /// RC-10. Whether a comment may still be written on this card.
+        /// <para>
+        /// RE-003 and US-ADM-009 both require a published report to be locked
+        /// from editing, and the National Protocol says why: §25(3), "schools
+        /// should ensure that there are no errors, erasures or corrections that
+        /// will compromise the legal status of the report cards". A parent may
+        /// already hold the PDF; rewriting the comments afterwards makes their
+        /// copy and ours say different things.
+        /// </para>
+        /// <para>
+        /// The boundary is <b>published</b> rather than approved: a comment can
+        /// still be added while the card is with the approver, which is not true
+        /// of the marks — those close at approval, because they are what was
+        /// approved.
+        /// </para>
+        /// </summary>
+        public bool AcceptsComments() => Status != ReportStatus.Published;
 
         /// <summary>
         /// Sets the URL to the generated PDF

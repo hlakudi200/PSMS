@@ -51,6 +51,7 @@ public class ReportAppService : ApplicationService, IReportAppService
     private readonly IRepository<Attendance, Guid> _attendanceRepository;
     private readonly IRepository<AssessmentWeighting, Guid> _weightingRepository;
     private readonly IRepository<Grade, Guid> _gradeRepository;
+    private readonly ReportPublishedNotifier _publishedNotifier;
     private readonly psms.Domain.Shared.Storage.IFileStorageService _fileStorage;
     private readonly IBackgroundJobManager _backgroundJobManager;
     private readonly psms.Academic.Students.ICurrentStudentResolver _currentStudent;
@@ -71,6 +72,7 @@ public class ReportAppService : ApplicationService, IReportAppService
         IRepository<Attendance, Guid> attendanceRepository,
         IRepository<AssessmentWeighting, Guid> weightingRepository,
         IRepository<Grade, Guid> gradeRepository,
+        ReportPublishedNotifier publishedNotifier,
         psms.Domain.Shared.Storage.IFileStorageService fileStorage,
         IBackgroundJobManager backgroundJobManager,
         psms.Academic.Students.ICurrentStudentResolver currentStudent,
@@ -90,6 +92,7 @@ public class ReportAppService : ApplicationService, IReportAppService
         _attendanceRepository = attendanceRepository;
         _weightingRepository = weightingRepository;
         _gradeRepository = gradeRepository;
+        _publishedNotifier = publishedNotifier;
         _fileStorage = fileStorage;
         _backgroundJobManager = backgroundJobManager;
         _currentStudent = currentStudent;
@@ -417,6 +420,30 @@ public class ReportAppService : ApplicationService, IReportAppService
     /// </para>
     /// </summary>
     /// <summary>
+    /// RC-10. Refuses to change a report card that has been issued.
+    /// <para>
+    /// RE-003 and US-ADM-009 both require published reports to be locked from
+    /// editing, and the National Protocol says why: §25(3), "schools should
+    /// ensure that there are no errors, erasures or corrections that will
+    /// compromise the legal status of the report cards". A parent may already
+    /// hold the PDF; rewriting the comments on it afterwards makes the copy they
+    /// have and the copy we hold say different things.
+    /// </para>
+    /// <para>
+    /// The boundary is <b>published</b>, not approved — the same one
+    /// RecordMarksAsync draws for marks, except that marks close at approval
+    /// because they are what was approved, while a comment can still be added
+    /// while the card is with the approver.
+    /// </para>
+    /// </summary>
+    private static void AssertCommentsStillOpen(Report report)
+    {
+        if (!report.AcceptsComments())
+            throw new UserFriendlyException(AssessmentExceptionCodes.ReportNotEditable,
+                "This report card has been published. A published report card cannot be changed.");
+    }
+
+    /// <summary>
     /// RE-002 / RC-05 / RC-12. Refuses to move a blank report card forward.
     /// <para>
     /// Two ways one is reached: a class with no class-subjects configured
@@ -491,6 +518,23 @@ public class ReportAppService : ApplicationService, IReportAppService
 
         return new List<Guid> { termId.Value };
     }
+
+    /// <summary>
+    /// How a report type reads in a notification — "Term 1 report", "Year-end
+    /// report". The PDF has its own copy for the printed heading; this one is
+    /// for prose.
+    /// </summary>
+    private static string ReportTypeLabel(ReportType reportType) => reportType switch
+    {
+        ReportType.Term1 => "Term 1 report",
+        ReportType.Term2 => "Term 2 report",
+        ReportType.Term3 => "Term 3 report",
+        ReportType.Term4 => "Term 4 report",
+        ReportType.MidYear => "Mid-year report",
+        ReportType.YearEnd => "Year-end report",
+        ReportType.Progress => "Progress report",
+        _ => "Report card",
+    };
 
     /// <summary>
     /// Whether this kind of report covers a span of terms rather than one.
@@ -1186,17 +1230,38 @@ public class ReportAppService : ApplicationService, IReportAppService
             }
         }
 
+        // RC-10: publishing is what the parent is waiting for, and until now
+        // nothing told them. Queued through the COMM-01 dispatcher, so channel
+        // preferences and POPIA consent apply, and never allowed to fail the
+        // publish — a card that was legitimately published stays published even
+        // if nothing could be sent about it.
+        //
+        // After the PDF is queued, not before: both are Normal-priority jobs on
+        // the same transaction, and telling a parent the card is ready to view
+        // before the file is being made is a race worth not having.
+        var studentName = await _studentRepository
+            .GetAll()
+            .Where(s => s.Id == report.StudentId && s.TenantId == AbpSession.TenantId)
+            .Select(s => s.FirstName + " " + s.LastName)
+            .FirstOrDefaultAsync();
+
+        await _publishedNotifier.TryNotifyAsync(report, studentName, ReportTypeLabel(report.ReportType));
+
         return await GetAsync(id);
     }
 
-    [AbpAuthorize(PermissionNames.Assessment_ReportCards_Generate)]
-    public async Task<ReportDto> AddTeacherCommentAsync(Guid id, ReportCommentDto input)
+    // RC-08: the class teacher writes this comment, and the Teacher role holds
+    // no Generate. Gated on the comment permission split out for exactly that.
+    [AbpAuthorize(PermissionNames.Assessment_ReportCards_Comment)]
+    public async Task<ReportDto> AddTeacherCommentAsync(Guid id, TeacherCommentDto input)
     {
         var report = await _reportRepository
             .FirstOrDefaultAsync(r => r.Id == id && r.TenantId == AbpSession.TenantId);
 
         if (report == null)
             throw new UserFriendlyException(AssessmentExceptionCodes.ReportNotFound, "Report not found.");
+
+        AssertCommentsStillOpen(report);
 
         report.TeacherComment = input.Comment;
         await _reportRepository.UpdateAsync(report);
@@ -1206,13 +1271,15 @@ public class ReportAppService : ApplicationService, IReportAppService
     }
 
     [AbpAuthorize(PermissionNames.Assessment_ReportCards_Publish)]
-    public async Task<ReportDto> AddPrincipalCommentAsync(Guid id, ReportCommentDto input)
+    public async Task<ReportDto> AddPrincipalCommentAsync(Guid id, PrincipalCommentDto input)
     {
         var report = await _reportRepository
             .FirstOrDefaultAsync(r => r.Id == id && r.TenantId == AbpSession.TenantId);
 
         if (report == null)
             throw new UserFriendlyException(AssessmentExceptionCodes.ReportNotFound, "Report not found.");
+
+        AssertCommentsStillOpen(report);
 
         report.PrincipalComment = input.Comment;
         await _reportRepository.UpdateAsync(report);
@@ -1222,7 +1289,7 @@ public class ReportAppService : ApplicationService, IReportAppService
     }
 
     [AbpAuthorize(PermissionNames.Assessment_ReportCards_View)]
-    public async Task<ReportDto> AcknowledgeByParentAsync(Guid id, ReportCommentDto input)
+    public async Task<ReportDto> AcknowledgeByParentAsync(Guid id, ParentAcknowledgementDto input)
     {
         var report = await _reportRepository
             .FirstOrDefaultAsync(r => r.Id == id && r.TenantId == AbpSession.TenantId);

@@ -395,6 +395,7 @@ public class PsmsRolePermissionSeeder : ITransientDependency
             PermissionNames.Assessment_ReportCards_Generate,
             PermissionNames.Assessment_ReportCards_Publish,
             PermissionNames.Assessment_ReportCards_Download,
+            PermissionNames.Assessment_ReportCards_Comment,
             PermissionNames.Assessment_Feedback,
             PermissionNames.Assessment_Feedback_View,
             PermissionNames.Assessment_Feedback_Create,
@@ -619,6 +620,7 @@ public class PsmsRolePermissionSeeder : ITransientDependency
             PermissionNames.Assessment_ReportCards_Generate,
             PermissionNames.Assessment_ReportCards_Publish,
             PermissionNames.Assessment_ReportCards_Download,
+            PermissionNames.Assessment_ReportCards_Comment,
             PermissionNames.Assessment_Feedback,
             PermissionNames.Assessment_Feedback_View,
             PermissionNames.Assessment_Feedback_Create,
@@ -748,6 +750,7 @@ public class PsmsRolePermissionSeeder : ITransientDependency
             PermissionNames.Assessment_ReportCards_View,
             PermissionNames.Assessment_ReportCards_Generate,
             PermissionNames.Assessment_ReportCards_Download,
+            PermissionNames.Assessment_ReportCards_Comment,
             PermissionNames.Assessment_Feedback,
             PermissionNames.Assessment_Feedback_View,
             PermissionNames.Assessment_Feedback_Create,
@@ -969,6 +972,11 @@ public class PsmsRolePermissionSeeder : ITransientDependency
             PermissionNames.Assessment_ReportCards,
             PermissionNames.Assessment_ReportCards_View,
             PermissionNames.Assessment_ReportCards_Download,
+            // RC-08: the class and subject teachers are who actually write
+            // the comments on a report card. They hold no Generate, so until
+            // this existed a teacher could not write the teacher comment at
+            // all - a named field of a South African report card.
+            PermissionNames.Assessment_ReportCards_Comment,
             PermissionNames.Assessment_Feedback,
             PermissionNames.Assessment_Feedback_View,
             PermissionNames.Assessment_Feedback_Create,
