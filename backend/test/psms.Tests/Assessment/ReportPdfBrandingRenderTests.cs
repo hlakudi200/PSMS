@@ -27,6 +27,15 @@ public class ReportPdfBrandingRenderTests
         AcademicYearName = "2026 Academic Year",
         ReportType = "Term 1 Report",
         GeneratedDate = "21 Sep 2026",
+        ReportCardNumber = "2026/GR8A/STU-2026-023/T1",
+        DaysInTerm = 60,
+        ConductRating = "Very good",
+        DiligenceRating = "Good",
+        BehaviourComments = "Courteous and cooperative; sometimes slow to settle after break.",
+        TeacherSignedBy = "T. Petersen",
+        TeacherSignedDate = "05 Oct 2026",
+        PrincipalSignedBy = "M. Dlamini",
+        PrincipalSignedDate = "06 Oct 2026",
         OverallPercentage = 72.4m,
         OverallAchievementLevel = CapsAchievementLevel.Level6,
         ClassPosition = 4,
@@ -194,6 +203,55 @@ public class ReportPdfBrandingRenderTests
         var text = PdfText.Extract(ReportPdfGenerator.Generate(SampleData("#0066CC", null)));
 
         Assert.DoesNotContain("PROMOTION DECISION", text);
+    }
+
+    [Fact]
+    public void The_card_carries_the_RE_002_fields()
+    {
+        // RC-17. RE-002 names these and none of them existed: the card had no
+        // number, no school-day total to reconcile attendance against, no
+        // conduct or diligence rating, and three blank signature lines that
+        // meant only that somebody had printed it.
+        var pdf = ReportPdfGenerator.Generate(SampleData("#0066CC", null));
+        WriteSample("report-re002.pdf", pdf);
+
+        var text = PdfText.Extract(pdf);
+
+        Assert.Contains("2026/GR8A/STU-2026-023/T1", text);
+        Assert.Contains("SCHOOL DAYS", text);
+        Assert.Contains("CONDUCT AND DILIGENCE", text);
+        Assert.Contains("Very good", text);
+        Assert.Contains("T. Petersen", text);
+        Assert.Contains("M. Dlamini", text);
+    }
+
+    [Fact]
+    public void An_unsigned_card_prints_the_blank_lines_it_always_did()
+    {
+        var data = SampleData("#0066CC", null);
+        data.TeacherSignedBy = null;
+        data.TeacherSignedDate = null;
+        data.PrincipalSignedBy = null;
+        data.PrincipalSignedDate = null;
+
+        var text = PdfText.Extract(ReportPdfGenerator.Generate(data));
+
+        Assert.Contains("Class Teacher", text);
+        Assert.Contains("Principal", text);
+        Assert.DoesNotContain("T. Petersen", text.Split("Class Teacher")[^1]);
+    }
+
+    [Fact]
+    public void A_card_with_no_conduct_recorded_prints_no_conduct_block()
+    {
+        var data = SampleData("#0066CC", null);
+        data.ConductRating = null;
+        data.DiligenceRating = null;
+        data.BehaviourComments = null;
+
+        var text = PdfText.Extract(ReportPdfGenerator.Generate(data));
+
+        Assert.DoesNotContain("CONDUCT AND DILIGENCE", text);
     }
 
     [Fact]

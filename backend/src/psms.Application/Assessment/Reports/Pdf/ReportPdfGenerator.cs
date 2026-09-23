@@ -253,6 +253,15 @@ public static class ReportPdfGenerator
             column.Item().Element(c => ComposeAttendance(c, data));
             column.Item().Height(10);
 
+            // ── RC-17: conduct and diligence (RE-002) ──
+            if (!string.IsNullOrWhiteSpace(data.ConductRating)
+                || !string.IsNullOrWhiteSpace(data.DiligenceRating)
+                || !string.IsNullOrWhiteSpace(data.BehaviourComments))
+            {
+                column.Item().Element(c => ComposeConduct(c, data));
+                column.Item().Height(10);
+            }
+
             // ── RC-16: the promotion decision ──
             // NPPPPR §(2b)(c): "the decision reached at the meeting contemplated
             // above must be reflected on the learner's report card." Printing
@@ -269,7 +278,7 @@ public static class ReportPdfGenerator
             column.Item().Height(16);
 
             // ── Signature Lines ──
-            column.Item().Element(ComposeSignatures);
+            column.Item().Element(c => ComposeSignatures(c, data));
             column.Item().Height(12);
 
             // ── CAPS Legend ──
@@ -299,6 +308,8 @@ public static class ReportPdfGenerator
                     : "N/A";
                 InfoRow(c, "Class Position:", posText);
                 InfoRow(c, "Overall:", data.OverallPercentage.HasValue ? $"{Mark(data.OverallPercentage)}%" : "N/A");
+            // RC-17: RE-002's report card number.
+            InfoRow(c, "Report card no:", data.ReportCardNumber ?? "N/A");
             });
         });
     }
@@ -405,6 +416,39 @@ public static class ReportPdfGenerator
         });
     }
 
+    // ─── RC-17: conduct and diligence, two of RE-002's named fields ───
+    private static void ComposeConduct(IContainer container, ReportPdfData data)
+    {
+        container.Border(1).BorderColor(BorderCol).Column(column =>
+        {
+            column.Item().Background(HeaderBg).Padding(4)
+                .Text("CONDUCT AND DILIGENCE").Bold().FontSize(8);
+
+            column.Item().Padding(6).Column(body =>
+            {
+                body.Item().Row(row =>
+                {
+                    row.RelativeItem().Text(t =>
+                    {
+                        t.Span("Conduct: ").SemiBold().FontSize(9);
+                        t.Span(data.ConductRating ?? "-").FontSize(9);
+                    });
+                    row.RelativeItem().Text(t =>
+                    {
+                        t.Span("Diligence: ").SemiBold().FontSize(9);
+                        t.Span(data.DiligenceRating ?? "-").FontSize(9);
+                    });
+                });
+
+                if (!string.IsNullOrWhiteSpace(data.BehaviourComments))
+                {
+                    body.Item().Height(3);
+                    body.Item().Text(data.BehaviourComments).FontSize(9);
+                }
+            });
+        });
+    }
+
     // ─── RC-16: the promotion decision, which the year-end card exists to carry ───
     private static void ComposePromotion(IContainer container, ReportPdfData data)
     {
@@ -446,14 +490,17 @@ public static class ReportPdfGenerator
     // ─── Attendance cells ───
     private static void ComposeAttendance(IContainer container, ReportPdfData data)
     {
-        var totalDays = data.DaysPresent + data.DaysAbsent;
+        // RC-17: the school days in the period, which RE-002 reconciles the
+        // other two against — not the sum of our own two figures, which would
+        // always agree with itself and prove nothing.
+        var totalDays = data.DaysInTerm ?? (data.DaysPresent + data.DaysAbsent);
 
         container.Row(row =>
         {
             AttendanceCell(row, "DAYS PRESENT", data.DaysPresent.ToString());
             AttendanceCell(row, "DAYS ABSENT", data.DaysAbsent.ToString());
             AttendanceCell(row, "DAYS LATE", data.DaysLate.ToString());
-            AttendanceCell(row, "TOTAL SCHOOL DAYS", totalDays.ToString());
+            AttendanceCell(row, "SCHOOL DAYS", totalDays.ToString());
         });
     }
 
@@ -498,26 +545,45 @@ public static class ReportPdfGenerator
     }
 
     // ─── Signature Lines ───
-    private static void ComposeSignatures(IContainer container)
+    private static void ComposeSignatures(IContainer container, ReportPdfData data)
     {
         container.Row(row =>
         {
-            SignatureBlock(row, "Class Teacher");
+            // RC-17: RE-003 requires a teacher and a principal signature before
+            // a card is issued, and they are recorded now rather than being
+            // three blank lines that meant only that somebody had printed it.
+            SignatureBlock(row, "Class Teacher", data.TeacherSignedBy, data.TeacherSignedDate);
             row.ConstantItem(30); // spacer
-            SignatureBlock(row, "Principal");
+            SignatureBlock(row, "Principal", data.PrincipalSignedBy, data.PrincipalSignedDate);
             row.ConstantItem(30); // spacer
-            SignatureBlock(row, "Parent / Guardian");
+            SignatureBlock(row, "Parent / Guardian", null, null);
         });
     }
 
-    private static void SignatureBlock(RowDescriptor row, string title)
+    private static void SignatureBlock(RowDescriptor row, string title, string signedBy, string signedDate)
     {
         row.RelativeItem().Column(c =>
         {
-            c.Item().Height(30); // space for signature
+            // RC-17: the name of whoever signed sits above the line, so a card
+            // that was signed says who signed it. A line with nothing over it is
+            // a card nobody has signed yet.
+            if (!string.IsNullOrWhiteSpace(signedBy))
+            {
+                c.Item().Height(14);
+                c.Item().AlignCenter().Text(signedBy).SemiBold().FontSize(9);
+                c.Item().Height(2);
+            }
+            else
+            {
+                c.Item().Height(30); // space for a signature by hand
+            }
+
             c.Item().LineHorizontal(1).LineColor(BorderCol);
             c.Item().Height(3);
             c.Item().AlignCenter().Text(title).FontSize(9);
+
+            if (!string.IsNullOrWhiteSpace(signedDate))
+                c.Item().AlignCenter().Text(signedDate).FontSize(7.5f).FontColor(Colors.Grey.Darken1);
         });
     }
 

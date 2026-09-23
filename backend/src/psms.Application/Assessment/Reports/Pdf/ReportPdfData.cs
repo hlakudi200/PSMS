@@ -36,6 +36,31 @@ public class ReportPdfData
     public string ReportType { get; set; }
     public string GeneratedDate { get; set; }
 
+    /// <summary>RC-17. RE-002's report card number.</summary>
+    public string ReportCardNumber { get; set; }
+
+    /// <summary>RC-17. School days in the period, for the attendance to add up to.</summary>
+    public int? DaysInTerm { get; set; }
+
+    /// <summary>RC-17. RE-002's conduct and diligence ratings, already worded.</summary>
+    public string ConductRating { get; set; }
+
+    public string DiligenceRating { get; set; }
+
+    public string BehaviourComments { get; set; }
+
+    /// <summary>
+    /// RC-17. Who signed, so the printed line carries a name rather than being
+    /// blank. Null where nobody has.
+    /// </summary>
+    public string TeacherSignedBy { get; set; }
+
+    public string TeacherSignedDate { get; set; }
+
+    public string PrincipalSignedBy { get; set; }
+
+    public string PrincipalSignedDate { get; set; }
+
     // Overall performance
     public decimal? OverallPercentage { get; set; }
     /// <summary>

@@ -325,7 +325,8 @@ public class ReportAppService : ApplicationService, IReportAppService
             input.DaysPresent,
             input.DaysAbsent,
             input.DaysLate,
-            input.TeacherComment);
+            input.TeacherComment,
+            student.AdmissionNumber);
 
         // RC-06: this learner joining the cohort reorders everybody in it. This
         // runs in the same unit of work as the generation above, so a failure
@@ -352,6 +353,20 @@ public class ReportAppService : ApplicationService, IReportAppService
         public List<ClassSubject> ClassSubjects { get; set; }
 
         public int TotalStudentsInClass { get; set; }
+
+        /// <summary>RC-17. The class's name, for the report card number.</summary>
+        public string ClassName { get; set; }
+
+        /// <summary>RC-17. The academic year's name, for the report card number.</summary>
+        public string AcademicYearName { get; set; }
+
+        /// <summary>
+        /// RC-17. School days in the period this card covers, for RE-002's
+        /// attendance reconciliation. Null when the register has not been kept
+        /// for the period, in which case there is nothing to reconcile against
+        /// and the card cannot be published until somebody says what it was.
+        /// </summary>
+        public int? DaysInTerm { get; set; }
 
         /// <summary>The grade this class sits in, which decides the split.</summary>
         public SouthAfricanGradeLevel GradeLevel { get; set; }
@@ -402,6 +417,55 @@ public class ReportAppService : ApplicationService, IReportAppService
                 classSubject.Subject?.SubjectCode,
                 GradeLevel);
     }
+
+    /// <summary>
+    /// RC-17. The card's reference.
+    /// <para>
+    /// Built from the things that already identify a card uniquely together —
+    /// the academic year, the class, the learner's admission number and the kind
+    /// of report — rather than from a running sequence. A sequence would need a
+    /// lock or a table of its own to stay unique while forty cards are generated
+    /// at once, and would tell a reader nothing the parts do not.
+    /// </para>
+    /// </summary>
+    private static string BuildReportCardNumber(
+        ReportGenerationContext context,
+        string admissionNumber,
+        ReportType reportType)
+    {
+        string Part(string value, string fallback)
+        {
+            var cleaned = new string((value ?? string.Empty)
+                .Where(c => char.IsLetterOrDigit(c) || c == '-')
+                .ToArray());
+
+            return string.IsNullOrWhiteSpace(cleaned) ? fallback : cleaned.ToUpperInvariant();
+        }
+
+        var number = string.Join("/", new[]
+        {
+            Part(context.AcademicYearName, "YEAR"),
+            Part(context.ClassName, "CLASS"),
+            Part(admissionNumber, "LEARNER"),
+            ReportTypeCode(reportType)
+        });
+
+        return number.Length <= Report.MaxReportCardNumberLength
+            ? number
+            : number.Substring(0, Report.MaxReportCardNumberLength);
+    }
+
+    private static string ReportTypeCode(ReportType reportType) => reportType switch
+    {
+        ReportType.Term1 => "T1",
+        ReportType.Term2 => "T2",
+        ReportType.Term3 => "T3",
+        ReportType.Term4 => "T4",
+        ReportType.MidYear => "MID",
+        ReportType.YearEnd => "YE",
+        ReportType.Progress => "PROG",
+        _ => "RPT",
+    };
 
     /// <summary>
     /// RC-05. The terms a report covers.
@@ -475,6 +539,118 @@ public class ReportAppService : ApplicationService, IReportAppService
         if (subjects.All(rs => rs.FinalMark == null))
             throw new UserFriendlyException(AssessmentExceptionCodes.BlankReportCard,
                 "This report card has no marks in any subject. Capture the marks before sending it on.");
+    }
+
+    /// <summary>
+    /// RC-17. RE-002 and RE-003, enforced where they bite: at publication.
+    /// <para>
+    /// RE-002 lists the fields a South African report card must carry and
+    /// references a ValidateSAReportCard() that did not exist anywhere. RE-003
+    /// then requires it to pass, plus a teacher and a principal signature,
+    /// before a card may be published — and publishing checked only that the
+    /// status was Approved.
+    /// </para>
+    /// <para>
+    /// At publication rather than at generation, and rather than at submission:
+    /// a card is assembled over time, and the point at which it must be complete
+    /// is the point at which it goes to a parent.
+    /// </para>
+    /// </summary>
+    private async Task AssertReadyToIssueAsync(Report report)
+    {
+        var subjects = await _reportSubjectRepository
+            .GetAll()
+            .Where(rs => rs.ReportId == report.Id)
+            .Select(rs => new { rs.FinalMark })
+            .ToListAsync();
+
+        var missing = report.ValidateSAReportCard(
+            subjects.Count,
+            subjects.Count(rs => rs.FinalMark.HasValue));
+
+        if (missing.Count > 0)
+            throw new UserFriendlyException(AssessmentExceptionCodes.ReportCardIncomplete,
+                "This report card cannot be issued yet. It still needs "
+                + JoinReadably(missing) + ".");
+
+        if (!report.IsSignedOff())
+            throw new UserFriendlyException(AssessmentExceptionCodes.ReportCardNotSigned,
+                report.TeacherSignedByUserId.HasValue
+                    ? "The principal has not signed this report card."
+                    : "The class teacher has not signed this report card.");
+    }
+
+    /// <summary>"a, b and c" — a list a person reads rather than a bullet dump.</summary>
+    private static string JoinReadably(IReadOnlyList<string> items)
+    {
+        if (items.Count == 1) return items[0];
+
+        return string.Join(", ", items.Take(items.Count - 1)) + " and " + items[items.Count - 1];
+    }
+
+    /// <summary>
+    /// RC-17. Records how the learner conducted themselves and applied
+    /// themselves. RE-002 lists both among the fields a report card carries.
+    /// </summary>
+    [AbpAuthorize(PermissionNames.Assessment_ReportCards_Comment)]
+    public async Task<ReportDto> RecordConductAsync(RecordConductDto input)
+    {
+        var report = await LoadEditableReportAsync(input.ReportId);
+
+        report.RecordConduct(input.ConductRating, input.DiligenceRating, input.BehaviourComments);
+
+        await _reportRepository.UpdateAsync(report);
+        await CurrentUnitOfWork.SaveChangesAsync();
+
+        return await GetAsync(input.ReportId);
+    }
+
+    /// <summary>
+    /// RC-17. The class teacher signs the card off. RE-003 requires this and the
+    /// principal's signature before it may be published.
+    /// </summary>
+    [AbpAuthorize(PermissionNames.Assessment_ReportCards_Comment)]
+    public async Task<ReportDto> SignAsTeacherAsync(Guid id)
+    {
+        var report = await LoadEditableReportAsync(id);
+
+        report.SignAsTeacher(AbpSession.UserId ?? 0);
+
+        await _reportRepository.UpdateAsync(report);
+        await CurrentUnitOfWork.SaveChangesAsync();
+
+        return await GetAsync(id);
+    }
+
+    /// <summary>RC-17. The principal signs the card off.</summary>
+    [AbpAuthorize(PermissionNames.Assessment_ReportCards_Publish)]
+    public async Task<ReportDto> SignAsPrincipalAsync(Guid id)
+    {
+        var report = await LoadEditableReportAsync(id);
+
+        report.SignAsPrincipal(AbpSession.UserId ?? 0);
+
+        await _reportRepository.UpdateAsync(report);
+        await CurrentUnitOfWork.SaveChangesAsync();
+
+        return await GetAsync(id);
+    }
+
+    /// <summary>
+    /// A report that is still open to being changed, or a friendly refusal. A
+    /// published card is closed to all of this — see Report.AcceptsComments.
+    /// </summary>
+    private async Task<Report> LoadEditableReportAsync(Guid id)
+    {
+        var report = await _reportRepository
+            .FirstOrDefaultAsync(r => r.Id == id && r.TenantId == AbpSession.TenantId);
+
+        if (report == null)
+            throw new UserFriendlyException(AssessmentExceptionCodes.ReportNotFound, "Report not found.");
+
+        AssertCommentsStillOpen(report);
+
+        return report;
     }
 
     private async Task<List<Guid>> ResolveTermScopeAsync(
@@ -637,10 +813,48 @@ public class ReportAppService : ApplicationService, IReportAppService
             }
         }
 
+        // RC-17: the pieces the report card number is built from, and the
+        // school days its attendance is reconciled against. Counted as distinct
+        // register days across the scope, which is the same thing the per-learner
+        // attendance counts — so present + absent adds up to it.
+        var naming = await _classRepository
+            .GetAll()
+            .Where(c => c.Id == classId && c.TenantId == AbpSession.TenantId)
+            .Select(c => new { c.ClassName, YearName = c.AcademicYear.YearName })
+            .FirstOrDefaultAsync();
+
+        // Bounded by the terms in scope, or a term 1 card would be reconciled
+        // against every register the class has ever taken.
+        var scope = termIds.ToList();
+        var window = scope.Count == 0
+            ? null
+            : await _termRepository
+                .GetAll()
+                .Where(t => t.TenantId == AbpSession.TenantId && scope.Contains(t.Id))
+                .GroupBy(t => 1)
+                .Select(g => new { From = g.Min(t => t.StartDate), To = g.Max(t => t.EndDate) })
+                .FirstOrDefaultAsync();
+
+        var daysInTerm = window == null
+            ? (int?)null
+            : await _attendanceRepository
+                .GetAll()
+                .Where(a => a.TenantId == AbpSession.TenantId)
+                .Where(a => a.ClassId == classId)
+                .Where(a => a.AttendanceDate.Date >= window.From.Date
+                    && a.AttendanceDate.Date <= window.To.Date)
+                .Where(a => a.Status != AttendanceStatus.Holiday)
+                .Select(a => a.AttendanceDate.Date)
+                .Distinct()
+                .CountAsync();
+
         return new ReportGenerationContext
         {
             ClassSubjects = classSubjects,
             TotalStudentsInClass = totalStudentsInClass,
+            ClassName = naming?.ClassName,
+            AcademicYearName = naming?.YearName,
+            DaysInTerm = daysInTerm > 0 ? daysInTerm : null,
             GradeLevel = gradeLevel.Value,
             SbaPercentage = sba,
             ExamPercentage = exam,
@@ -674,7 +888,8 @@ public class ReportAppService : ApplicationService, IReportAppService
         int daysPresent,
         int daysAbsent,
         int daysLate,
-        string teacherComment)
+        string teacherComment,
+        string admissionNumber)
     {
         var report = new Report(
             Guid.NewGuid(),
@@ -755,6 +970,11 @@ public class ReportAppService : ApplicationService, IReportAppService
         report.RecalculateOverall(subjectFinalMarks);
 
         report.TotalStudentsInClass = context.TotalStudentsInClass;
+
+        // RC-17: RE-002's report card number, and the attendance total its
+        // reconciliation is measured against.
+        report.AssignReportCardNumber(BuildReportCardNumber(context, admissionNumber, reportType));
+        report.DaysInTerm = context.DaysInTerm;
 
         report.Generate();
         await _reportRepository.UpdateAsync(report);
@@ -1008,7 +1228,8 @@ public class ReportAppService : ApplicationService, IReportAppService
                         days.Present,
                         days.Absent,
                         days.Late,
-                        teacherComment: null);
+                        teacherComment: null,
+                        student.AdmissionNumber);
 
                     await uow.CompleteAsync();
 
@@ -1191,7 +1412,9 @@ public class ReportAppService : ApplicationService, IReportAppService
         if (report == null)
             throw new UserFriendlyException(AssessmentExceptionCodes.ReportNotFound, "Report not found.");
 
-        await AssertNotBlankAsync(report);
+        // RC-17: the blank check plus everything else RE-002 asks a card to
+        // carry, and the two signatures RE-003 requires before it is issued.
+        await AssertReadyToIssueAsync(report);
 
         try
         {

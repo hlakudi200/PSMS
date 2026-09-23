@@ -35,6 +35,17 @@ public class ReportDto : FullAuditedEntityDto<Guid>
     /// national requirements.
     /// </summary>
     public string PromotionReason { get; set; }
+
+    // RC-17: the RE-002 fields.
+    public string ReportCardNumber { get; set; }
+    public int? DaysInTerm { get; set; }
+    public ConductDiligenceRating? ConductRating { get; set; }
+    public ConductDiligenceRating? DiligenceRating { get; set; }
+    public string BehaviourComments { get; set; }
+    public long? TeacherSignedByUserId { get; set; }
+    public DateTime? TeacherSignedDate { get; set; }
+    public long? PrincipalSignedByUserId { get; set; }
+    public DateTime? PrincipalSignedDate { get; set; }
     public ReportStatus Status { get; set; }
     public DateTime? GeneratedDate { get; set; }
     public DateTime? PublishedDate { get; set; }

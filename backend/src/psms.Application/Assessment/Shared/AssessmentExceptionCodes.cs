@@ -113,6 +113,18 @@ public static class AssessmentExceptionCodes
     /// </summary>
     public const string BlankReportCard = "ASM_BLANK_REPORT_CARD";
 
+    /// <summary>
+    /// RC-17. A report card was published without one of the fields RE-002
+    /// requires a South African report card to carry.
+    /// </summary>
+    public const string ReportCardIncomplete = "ASM_REPORT_CARD_INCOMPLETE";
+
+    /// <summary>
+    /// RC-17. A report card was published before the class teacher and the
+    /// principal had signed it, which RE-003 requires.
+    /// </summary>
+    public const string ReportCardNotSigned = "ASM_REPORT_CARD_NOT_SIGNED";
+
     public const string ReportNotEditable = "ASM_REPORT_NOT_EDITABLE";
     public const string ReportNotPublished = "ASM_REPORT_NOT_PUBLISHED";
 

@@ -20,6 +20,8 @@ namespace psms.Domain.Assessment.Entities
         public const int MaxPrincipalCommentLength = 1000;
         public const int MaxParentCommentLength = 1000;
         public const int MaxPromotionReasonLength = 1000;
+        public const int MaxBehaviourCommentLength = 1000;
+        public const int MaxReportCardNumberLength = 80;
 
         /// <summary>
         /// Tenant identifier for multi-tenancy
@@ -77,6 +79,28 @@ namespace psms.Domain.Assessment.Entities
         public int? TotalStudentsInClass { get; set; }
 
         /// <summary>
+        /// RC-17. The card's own reference, unique within the school.
+        /// <para>
+        /// RE-002 requires a report card number. It is what a parent quotes when
+        /// they query a card, and what distinguishes a reissued card from the
+        /// one it replaces. Shaped
+        /// <c>{year}/{class}/{sequence}</c> — "2026/GR8A/0041".
+        /// </para>
+        /// </summary>
+        [StringLength(MaxReportCardNumberLength)]
+        public string ReportCardNumber { get; set; }
+
+        /// <summary>
+        /// RC-17. School days in the period this card covers.
+        /// <para>
+        /// RE-002's ATTENDANCE_MISMATCH rule is that days attended plus days
+        /// absent equals the days in the term. Without the total there was
+        /// nothing to reconcile against, so attendance could say anything.
+        /// </para>
+        /// </summary>
+        public int? DaysInTerm { get; set; }
+
+        /// <summary>
         /// Days present in term/year
         /// </summary>
         public int DaysPresent { get; set; }
@@ -102,6 +126,39 @@ namespace psms.Domain.Assessment.Entities
         /// </summary>
         [StringLength(MaxPrincipalCommentLength)]
         public string PrincipalComment { get; set; }
+
+        /// <summary>
+        /// RC-17. How the learner conducted themselves. RE-002 lists it; no
+        /// national policy prescribes the scale, so it is the school's.
+        /// </summary>
+        public ConductDiligenceRating? ConductRating { get; set; }
+
+        /// <summary>RC-17. How diligently the learner applied themselves.</summary>
+        public ConductDiligenceRating? DiligenceRating { get; set; }
+
+        /// <summary>
+        /// RC-17. What the ratings are based on, in words — which is what makes
+        /// a rating useful to a parent rather than a letter with no account.
+        /// </summary>
+        [StringLength(MaxBehaviourCommentLength)]
+        public string BehaviourComments { get; set; }
+
+        /// <summary>
+        /// RC-17. Who signed the card off as the class teacher, and when.
+        /// <para>
+        /// RE-003 requires a teacher and a principal signature before a report
+        /// card may be published. The PDF drew three blank lines and nothing was
+        /// recorded, so "signed" meant only that somebody had printed it.
+        /// </para>
+        /// </summary>
+        public long? TeacherSignedByUserId { get; set; }
+
+        public DateTime? TeacherSignedDate { get; set; }
+
+        /// <summary>RC-17. Who signed the card off as principal, and when.</summary>
+        public long? PrincipalSignedByUserId { get; set; }
+
+        public DateTime? PrincipalSignedDate { get; set; }
 
         /// <summary>
         /// Parent acknowledgement comment
@@ -300,6 +357,123 @@ namespace psms.Domain.Assessment.Entities
             ParentAcknowledgedDate = DateTime.UtcNow;
             ParentComment = comment;
         }
+
+        /// <summary>
+        /// RC-17. Stamps the card with its reference. Set once, at generation:
+        /// a card's number is how it is referred to afterwards, so it does not
+        /// change under it.
+        /// </summary>
+        public void AssignReportCardNumber(string number)
+        {
+            if (string.IsNullOrWhiteSpace(ReportCardNumber))
+                ReportCardNumber = number;
+        }
+
+        /// <summary>
+        /// RC-17. Records the attendance for the period, including the total
+        /// school days it is measured against.
+        /// </summary>
+        public void RecordAttendance(int present, int absent, int late, int? daysInTerm)
+        {
+            DaysPresent = present;
+            DaysAbsent = absent;
+            DaysLate = late;
+            DaysInTerm = daysInTerm;
+        }
+
+        /// <summary>
+        /// RC-17. Records how the learner conducted themselves and applied
+        /// themselves, and what that is based on.
+        /// </summary>
+        public void RecordConduct(
+            ConductDiligenceRating? conduct,
+            ConductDiligenceRating? diligence,
+            string behaviourComments)
+        {
+            ConductRating = conduct;
+            DiligenceRating = diligence;
+            BehaviourComments = string.IsNullOrWhiteSpace(behaviourComments)
+                ? null
+                : behaviourComments.Trim();
+        }
+
+        /// <summary>
+        /// RC-17. Records the class teacher's sign-off.
+        /// </summary>
+        public void SignAsTeacher(long userId)
+        {
+            TeacherSignedByUserId = userId;
+            TeacherSignedDate = DateTime.UtcNow;
+        }
+
+        /// <summary>RC-17. Records the principal's sign-off.</summary>
+        public void SignAsPrincipal(long userId)
+        {
+            PrincipalSignedByUserId = userId;
+            PrincipalSignedDate = DateTime.UtcNow;
+        }
+
+        /// <summary>
+        /// RC-17. Clears both sign-offs, for when the card changes after being
+        /// signed — a signature is on the card that was signed, not on whatever
+        /// it becomes afterwards.
+        /// </summary>
+        public void ClearSignatures()
+        {
+            TeacherSignedByUserId = null;
+            TeacherSignedDate = null;
+            PrincipalSignedByUserId = null;
+            PrincipalSignedDate = null;
+        }
+
+        /// <summary>
+        /// RC-17. The RE-002 check, as a named thing that can be called rather
+        /// than a rule written in a document and implemented nowhere. Returns
+        /// every mandated field that is missing, in the order a reader would fix
+        /// them; an empty list means the card is complete.
+        /// </summary>
+        /// <param name="subjectCount">How many subjects are on the card.</param>
+        /// <param name="markedSubjectCount">How many of them carry a final mark.</param>
+        public IReadOnlyList<string> ValidateSAReportCard(int subjectCount, int markedSubjectCount)
+        {
+            var missing = new List<string>();
+
+            if (string.IsNullOrWhiteSpace(ReportCardNumber))
+                missing.Add("a report card number");
+
+            if (subjectCount == 0)
+                missing.Add("any subjects");
+            else if (markedSubjectCount == 0)
+                missing.Add("a mark in any subject");
+
+            if (!OverallAchievementLevel.HasValue)
+                missing.Add("an overall achievement level");
+
+            // ATTENDANCE_MISMATCH: days attended plus days absent equals the
+            // days in the term. A late arrival still attended, so it is counted
+            // in DaysPresent and is not a third bucket.
+            if (!DaysInTerm.HasValue)
+                missing.Add("the number of school days in the period");
+            else if (DaysPresent + DaysAbsent != DaysInTerm.Value)
+                missing.Add(
+                    $"attendance that adds up ({DaysPresent} present + {DaysAbsent} absent "
+                    + $"is not {DaysInTerm.Value} school days)");
+
+            if (string.IsNullOrWhiteSpace(TeacherComment))
+                missing.Add("the class teacher's comment");
+
+            if (string.IsNullOrWhiteSpace(PrincipalComment))
+                missing.Add("the principal's comment");
+
+            return missing;
+        }
+
+        /// <summary>
+        /// RC-17. Whether the card carries the two signatures RE-003 requires
+        /// before it may be published.
+        /// </summary>
+        public bool IsSignedOff() =>
+            TeacherSignedByUserId.HasValue && PrincipalSignedByUserId.HasValue;
 
         /// <summary>
         /// RC-07. The one place the overall average is decided.

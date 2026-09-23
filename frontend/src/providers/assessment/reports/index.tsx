@@ -12,6 +12,7 @@ import {
   IGetReportsInput,
   IReportComment,
   IRecordPromotion,
+  IRecordConduct,
 } from "../shared/interfaces";
 import { ReportReducer } from "./reducer";
 import { useContext, useReducer } from "react";
@@ -43,6 +44,12 @@ import {
   acknowledgeByParentPending,
   acknowledgeByParentSuccess,
   acknowledgeByParentError,
+  recordConductPending,
+  recordConductSuccess,
+  recordConductError,
+  signReportPending,
+  signReportSuccess,
+  signReportError,
   getPromotionAdvicePending,
   getPromotionAdviceSuccess,
   getPromotionAdviceError,
@@ -282,6 +289,39 @@ export const ReportProvider = ({
       });
   };
 
+  /** RC-17. The conduct and diligence ratings RE-002 lists. */
+  const recordConductAsync = async (input: IRecordConduct) => {
+    dispatch(recordConductPending());
+    await instance
+      .post(`/api/services/app/Report/RecordConduct`, input)
+      .then((response) => {
+        dispatch(recordConductSuccess(response.data.result));
+      })
+      .catch((error) => {
+        console.error(error);
+        dispatch(recordConductError());
+        throw error;
+      });
+  };
+
+  /** RC-17. RE-003 wants both signatures before a card may be published. */
+  const signReportAsync = async (id: string, action: string) => {
+    dispatch(signReportPending());
+    await instance
+      .post(`/api/services/app/Report/${action}?id=${id}`)
+      .then((response) => {
+        dispatch(signReportSuccess(response.data.result));
+      })
+      .catch((error) => {
+        console.error(error);
+        dispatch(signReportError());
+        throw error;
+      });
+  };
+
+  const signAsTeacherAsync = (id: string) => signReportAsync(id, 'SignAsTeacher');
+  const signAsPrincipalAsync = (id: string) => signReportAsync(id, 'SignAsPrincipal');
+
   const generatePdfAsync = async (id: string) => {
     dispatch(generatePdfPending());
     const endpoint = `/api/services/app/Report/GenerateReportPdf?id=${id}`;
@@ -383,6 +423,9 @@ export const ReportProvider = ({
           recordPromotionAsync,
           getPromotionAdviceAsync,
           recordPromotionDecisionAsync,
+          recordConductAsync,
+          signAsTeacherAsync,
+          signAsPrincipalAsync,
           deleteAsync,
           generatePdfAsync,
           getPdfUrlAsync,

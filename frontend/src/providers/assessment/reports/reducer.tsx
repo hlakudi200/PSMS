@@ -115,6 +115,30 @@ export const ReportReducer = handleActions<
       ...state,
       ...action.payload,
     }),
+    [ReportActionEnums.recordConductPending]: (state, action) => ({
+      ...state,
+      ...action.payload,
+    }),
+    [ReportActionEnums.recordConductSuccess]: (state, action) => ({
+      ...state,
+      ...action.payload,
+    }),
+    [ReportActionEnums.recordConductError]: (state, action) => ({
+      ...state,
+      ...action.payload,
+    }),
+    [ReportActionEnums.signReportPending]: (state, action) => ({
+      ...state,
+      ...action.payload,
+    }),
+    [ReportActionEnums.signReportSuccess]: (state, action) => ({
+      ...state,
+      ...action.payload,
+    }),
+    [ReportActionEnums.signReportError]: (state, action) => ({
+      ...state,
+      ...action.payload,
+    }),
     [ReportActionEnums.getPromotionAdvicePending]: (state, action) => ({
       ...state,
       ...action.payload,

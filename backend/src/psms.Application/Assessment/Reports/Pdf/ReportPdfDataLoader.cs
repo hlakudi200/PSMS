@@ -37,6 +37,7 @@ public class ReportPdfDataLoader : ITransientDependency
 
     private readonly IRepository<Report, Guid> _reportRepository;
     private readonly IRepository<SchoolBranding, Guid> _brandingRepository;
+    private readonly IRepository<psms.Authorization.Users.User, long> _userRepository;
     private readonly TenantManager _tenantManager;
     private readonly IUnitOfWorkManager _unitOfWorkManager;
     public Castle.Core.Logging.ILogger Logger { get; set; } = Castle.Core.Logging.NullLogger.Instance;
@@ -44,11 +45,13 @@ public class ReportPdfDataLoader : ITransientDependency
     public ReportPdfDataLoader(
         IRepository<Report, Guid> reportRepository,
         IRepository<SchoolBranding, Guid> brandingRepository,
+        IRepository<psms.Authorization.Users.User, long> userRepository,
         TenantManager tenantManager,
         IUnitOfWorkManager unitOfWorkManager)
     {
         _reportRepository = reportRepository;
         _brandingRepository = brandingRepository;
+        _userRepository = userRepository;
         _tenantManager = tenantManager;
         _unitOfWorkManager = unitOfWorkManager;
     }
@@ -119,6 +122,15 @@ public class ReportPdfDataLoader : ITransientDependency
             AcademicYearName = report.AcademicYear?.YearName ?? "N/A",
             ReportType = GetReportTypeLabel(report.ReportType),
             GeneratedDate = report.GeneratedDate?.ToString("dd MMM yyyy"),
+            ReportCardNumber = report.ReportCardNumber,
+            DaysInTerm = report.DaysInTerm,
+            ConductRating = GetConductLabel(report.ConductRating),
+            DiligenceRating = GetConductLabel(report.DiligenceRating),
+            BehaviourComments = report.BehaviourComments,
+            TeacherSignedBy = await ResolveSignerAsync(report.TeacherSignedByUserId),
+            TeacherSignedDate = report.TeacherSignedDate?.ToString("dd MMM yyyy"),
+            PrincipalSignedBy = await ResolveSignerAsync(report.PrincipalSignedByUserId),
+            PrincipalSignedDate = report.PrincipalSignedDate?.ToString("dd MMM yyyy"),
             OverallPercentage = report.OverallPercentage,
             OverallAchievementLevel = report.OverallAchievementLevel,
             ClassPosition = report.ClassPosition,
@@ -214,6 +226,47 @@ public class ReportPdfDataLoader : ITransientDependency
         psms.Domain.Shared.Enums.PromotionDecision.Retained => "Not promoted — retained",
         psms.Domain.Shared.Enums.PromotionDecision.ConditionalPromotion => "Conditionally promoted",
         psms.Domain.Shared.Enums.PromotionDecision.ProgressedWithSupport => "Progressed with support",
+        _ => null,
+    };
+
+    /// <summary>
+    /// RC-17. The name to print over a signature line. Null when nobody has
+    /// signed, or when the account that did has since been removed — the card
+    /// then prints the blank line it used to, rather than failing over a name.
+    /// </summary>
+    private async Task<string> ResolveSignerAsync(long? userId)
+    {
+        if (!userId.HasValue || userId.Value == 0)
+            return null;
+
+        var user = await _userRepository
+            .GetAll()
+            .Where(u => u.Id == userId.Value)
+            .Select(u => new { u.Name, u.Surname, u.UserName })
+            .FirstOrDefaultAsync();
+
+        if (user == null)
+            return null;
+
+        var full = $"{user.Name} {user.Surname}".Trim();
+
+        return string.IsNullOrWhiteSpace(full) ? user.UserName : full;
+    }
+
+    /// <summary>
+    /// RC-17. A conduct or diligence rating in words. Seven points, matching the
+    /// shape of the achievement scale so a reader is not switching between two
+    /// different-sized rulers on one page.
+    /// </summary>
+    private static string GetConductLabel(ConductDiligenceRating? rating) => rating switch
+    {
+        ConductDiligenceRating.Excellent => "Excellent",
+        ConductDiligenceRating.VeryGood => "Very good",
+        ConductDiligenceRating.Good => "Good",
+        ConductDiligenceRating.Satisfactory => "Satisfactory",
+        ConductDiligenceRating.NeedsImprovement => "Needs improvement",
+        ConductDiligenceRating.Poor => "Poor",
+        ConductDiligenceRating.Unsatisfactory => "Unsatisfactory",
         _ => null,
     };
 
