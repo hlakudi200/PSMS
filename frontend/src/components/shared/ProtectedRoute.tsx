@@ -17,7 +17,7 @@ export const ProtectedRoute = ({
   redirectTo = "/auth/login",
 }: ProtectedRouteProps) => {
   const router = useRouter();
-  const { currentUser, jwtToken, currentRole, isPending } = useAuthState();
+  const { currentUser, jwtToken, currentRole, isPending, isHydrating } = useAuthState();
 
   const isAuthenticated = !isPending && !!jwtToken;
   const roleRequired = !!(allowedRoles && allowedRoles.length > 0);
@@ -30,7 +30,10 @@ export const ProtectedRoute = ({
       : true;
 
   useEffect(() => {
-    if (isPending) return;
+    // Effects run children before parents, so this fires before AuthProvider's
+    // mount effect has read the token out of sessionStorage. Redirecting on
+    // "no token" here is what signed the user out on every browser refresh.
+    if (isHydrating !== false || isPending) return;
     if (!jwtToken) {
       router.push(redirectTo);
       return;
@@ -42,6 +45,7 @@ export const ProtectedRoute = ({
     jwtToken,
     currentRole,
     isPending,
+    isHydrating,
     router,
     redirectTo,
     roleRequired,
@@ -49,7 +53,7 @@ export const ProtectedRoute = ({
   ]);
 
   // Show loading while auth state resolves
-  if (isPending || (jwtToken && !currentUser)) {
+  if (isHydrating !== false || isPending || (jwtToken && !currentUser)) {
     return (
       <div
         style={{
