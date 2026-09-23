@@ -336,6 +336,11 @@ const buildPrintStyles = (ink: string, brandBg: string, brandFg: string) => `
     margin-top: 32px;
     padding-top: 4px;
   }
+  .print-signatures .sig-date {
+    font-size: 8px;
+    color: #444;
+    padding-top: 2px;
+  }
 
   /* ─── CAPS Legend ─── */
   .print-legend {
@@ -784,12 +789,22 @@ function ReportDetailContent() {
       </div>
 
       {/* Signature Lines for Print */}
+      {/* RC-17: the names of whoever signed, so the printed page and the PDF
+          do not disagree about whether the card is signed. */}
+      {/* RC-17: whether the card is signed, and when. The PDF prints the same,
+          and the two must not disagree about a legal attestation. */}
       <div className="print-signatures">
         <div className="sig-block">
           <div className="sig-line">Class Teacher</div>
+          {report.teacherSignedDate && (
+            <div className="sig-date">Signed {dayjs(report.teacherSignedDate).format('DD MMM YYYY')}</div>
+          )}
         </div>
         <div className="sig-block">
           <div className="sig-line">Principal</div>
+          {report.principalSignedDate && (
+            <div className="sig-date">Signed {dayjs(report.principalSignedDate).format('DD MMM YYYY')}</div>
+          )}
         </div>
         <div className="sig-block">
           <div className="sig-line">Parent / Guardian</div>

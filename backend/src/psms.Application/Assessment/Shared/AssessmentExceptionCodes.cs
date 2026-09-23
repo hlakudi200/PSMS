@@ -125,6 +125,12 @@ public static class AssessmentExceptionCodes
     /// </summary>
     public const string ReportCardNotSigned = "ASM_REPORT_CARD_NOT_SIGNED";
 
+    /// <summary>
+    /// RC-17. Somebody who is not the class's teacher tried to sign a report
+    /// card on the Class Teacher line.
+    /// </summary>
+    public const string NotTheClassTeacher = "ASM_NOT_THE_CLASS_TEACHER";
+
     public const string ReportNotEditable = "ASM_REPORT_NOT_EDITABLE";
     public const string ReportNotPublished = "ASM_REPORT_NOT_PUBLISHED";
 

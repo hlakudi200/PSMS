@@ -82,20 +82,33 @@ namespace psms.Domain.Assessment.Entities
         /// RC-17. The card's own reference, unique within the school.
         /// <para>
         /// RE-002 requires a report card number. It is what a parent quotes when
-        /// they query a card, and what distinguishes a reissued card from the
-        /// one it replaces. Shaped
-        /// <c>{year}/{class}/{sequence}</c> — "2026/GR8A/0041".
+        /// they query a card, and what distinguishes a reissued card from the one
+        /// it replaces. Shaped
+        /// <c>{year}/{class}/{admission}/{type}/{card}</c> —
+        /// "2026/GR8A/STU-2026-023/T1/7F3A9C21". The last part is the card's own
+        /// identifier, which is what makes the number unique: without it a
+        /// reissued card, a second progress report in the same term, or two
+        /// learners with no admission number recorded would share one.
         /// </para>
         /// </summary>
         [StringLength(MaxReportCardNumberLength)]
         public string ReportCardNumber { get; set; }
 
         /// <summary>
-        /// RC-17. School days in the period this card covers.
+        /// RC-17. The school days this learner's attendance is measured over.
         /// <para>
         /// RE-002's ATTENDANCE_MISMATCH rule is that days attended plus days
-        /// absent equals the days in the term. Without the total there was
-        /// nothing to reconcile against, so attendance could say anything.
+        /// absent equals the days in the term. Without a total there was nothing
+        /// to reconcile against, so attendance could say anything.
+        /// </para>
+        /// <para>
+        /// <b>Per learner, not per class.</b> A learner who joined in week five
+        /// was not enrolled for the class's first four weeks, and a card reading
+        /// "28 present, 2 absent, 60 school days" would be asking a parent to
+        /// account for thirty days the learner was not there for. It is the days
+        /// the register holds for them — so present plus absent equals it by
+        /// construction, and the check catches an edit that breaks that rather
+        /// than a learner whose circumstances differ from the class's.
         /// </para>
         /// </summary>
         public int? DaysInTerm { get; set; }
@@ -373,12 +386,24 @@ namespace psms.Domain.Assessment.Entities
         /// RC-17. Records the attendance for the period, including the total
         /// school days it is measured against.
         /// </summary>
+        /// <exception cref="ArgumentOutOfRangeException">
+        /// A count is negative. RE-002 rejects negative attendance, and a card is
+        /// not the place to discover that something upstream produced one.
+        /// </exception>
         public void RecordAttendance(int present, int absent, int late, int? daysInTerm)
         {
+            if (present < 0 || absent < 0 || late < 0 || daysInTerm < 0)
+                throw new ArgumentOutOfRangeException(nameof(present),
+                    "Attendance cannot be negative.");
+
             DaysPresent = present;
             DaysAbsent = absent;
             DaysLate = late;
-            DaysInTerm = daysInTerm;
+
+            // The days the learner's attendance is measured over. Where the
+            // register was not consulted there is nothing else it could be: the
+            // two figures a person typed are the whole account of the period.
+            DaysInTerm = daysInTerm ?? (present + absent);
         }
 
         /// <summary>
@@ -449,11 +474,19 @@ namespace psms.Domain.Assessment.Entities
             if (!OverallAchievementLevel.HasValue)
                 missing.Add("an overall achievement level");
 
+            // RE-002 lists conduct among the mandated fields. Diligence and the
+            // behaviour comment are not separately required by it, so they are
+            // not gated on.
+            if (!ConductRating.HasValue)
+                missing.Add("a conduct rating");
+
             // ATTENDANCE_MISMATCH: days attended plus days absent equals the
             // days in the term. A late arrival still attended, so it is counted
             // in DaysPresent and is not a third bucket.
-            if (!DaysInTerm.HasValue)
-                missing.Add("the number of school days in the period");
+            if (DaysPresent < 0 || DaysAbsent < 0 || DaysLate < 0)
+                missing.Add("attendance that is not negative");
+            else if (!DaysInTerm.HasValue)
+                missing.Add("the number of school days the attendance is measured over");
             else if (DaysPresent + DaysAbsent != DaysInTerm.Value)
                 missing.Add(
                     $"attendance that adds up ({DaysPresent} present + {DaysAbsent} absent "

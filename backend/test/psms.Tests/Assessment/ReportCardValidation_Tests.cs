@@ -22,6 +22,7 @@ public class ReportCardValidation_Tests
         report.RecordAttendance(present: 58, absent: 2, late: 3, daysInTerm: 60);
         report.TeacherComment = "Worked steadily all term.";
         report.PrincipalComment = "A pleasing report.";
+        report.RecordConduct(ConductDiligenceRating.VeryGood, ConductDiligenceRating.Good, null);
 
         return report;
     }
@@ -61,8 +62,8 @@ public class ReportCardValidation_Tests
     public void Attendance_has_to_reconcile_against_the_school_days(
         int present, int absent, int daysInTerm, bool reconciles)
     {
-        // RE-002's ATTENDANCE_MISMATCH. Before this there was no school-day
-        // total on the card, so attendance could say anything.
+        // RE-002's ATTENDANCE_MISMATCH. Before this there was no total on the
+        // card, so attendance could say anything.
         var report = Complete();
         report.RecordAttendance(present, absent, late: 0, daysInTerm: daysInTerm);
 
@@ -72,14 +73,54 @@ public class ReportCardValidation_Tests
     }
 
     [Fact]
-    public void A_card_with_no_school_day_total_has_nothing_to_reconcile_against()
+    public void With_no_total_supplied_the_two_figures_are_the_whole_account()
     {
+        // Where no register was read, the two figures a person typed are all
+        // there is — so they are what the attendance is measured over, and the
+        // card is not blocked for want of a number nobody could supply. Before
+        // this, a hand-typed card and a mid-term joiner were both unpublishable.
         var report = Complete();
         report.RecordAttendance(58, 2, 3, daysInTerm: null);
 
+        Assert.Equal(60, report.DaysInTerm);
+        Assert.Empty(report.ValidateSAReportCard(6, 6));
+    }
+
+    [Fact]
+    public void A_learner_who_joined_mid_term_is_not_blocked()
+    {
+        // Their register holds 30 days, not the class's 60. Reconciling them
+        // against the class would refuse to publish a perfectly correct card.
+        var report = Complete();
+        report.RecordAttendance(28, 2, 1, daysInTerm: null);
+
+        Assert.Equal(30, report.DaysInTerm);
+        Assert.Empty(report.ValidateSAReportCard(6, 6));
+    }
+
+    [Fact]
+    public void Negative_attendance_is_refused_at_the_entity_and_named_in_the_validation()
+    {
+        var report = Complete();
+
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => report.RecordAttendance(-1, 2, 0, daysInTerm: 60));
+
+        // and if one ever reaches the card another way, publication says so
+        report.DaysPresent = -1;
         Assert.Contains(
             report.ValidateSAReportCard(6, 6),
-            m => m.Contains("school days in the period"));
+            m => m.Contains("not negative"));
+    }
+
+    [Fact]
+    public void A_card_with_no_conduct_rating_is_not_complete()
+    {
+        // RE-002 lists it among the mandated fields.
+        var report = Complete();
+        report.RecordConduct(null, null, null);
+
+        Assert.Contains(report.ValidateSAReportCard(6, 6), m => m.Contains("conduct rating"));
     }
 
     [Fact]

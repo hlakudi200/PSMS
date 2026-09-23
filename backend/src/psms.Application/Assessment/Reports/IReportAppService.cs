@@ -44,6 +44,12 @@ public interface IReportAppService : IApplicationService
     /// </summary>
     Task<ReportDto> RecordConductAsync(RecordConductDto input);
 
+    /// <summary>
+    /// RC-17. Corrects the attendance on a report card, which nothing could do
+    /// after generation.
+    /// </summary>
+    Task<ReportDto> RecordAttendanceAsync(RecordAttendanceDto input);
+
     /// <summary>RC-17. The class teacher signs the card off (RE-003).</summary>
     Task<ReportDto> SignAsTeacherAsync(Guid id);
 

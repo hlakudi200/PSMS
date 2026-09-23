@@ -272,6 +272,10 @@ public class ReportSubjectAppService : ApplicationService, IReportSubjectAppServ
         // RC-07: one definition of the overall, shared with generation.
         report.RecalculateOverall(subjectRows.Select(rs => rs.FinalMark));
 
+        // RC-17: the marks have moved, so whoever signed this card signed
+        // something else. They are asked to sign the version that now exists.
+        report.ClearSignatures();
+
         await _reportRepository.UpdateAsync(report);
         await CurrentUnitOfWork.SaveChangesAsync();
 
