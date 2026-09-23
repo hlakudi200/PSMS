@@ -419,6 +419,47 @@ public class ReportAppService : ApplicationService, IReportAppService
     }
 
     /// <summary>
+    /// RC-17. The school days in a class's register over a set of terms — what
+    /// RE-002 reconciles a learner's attendance against.
+    /// <para>
+    /// Counted as distinct register dates, which is the same thing the
+    /// per-learner attendance counts, so present plus absent adds up to it. A
+    /// holiday is not a school day. Bounded by the terms in scope, or a term 1
+    /// card would be reconciled against every register the class has ever taken.
+    /// </para>
+    /// </summary>
+    private async Task<int?> CountSchoolDaysAsync(Guid classId, IReadOnlyCollection<Guid> termIds)
+    {
+        var scope = termIds?.ToList() ?? new List<Guid>();
+
+        if (scope.Count == 0)
+            return null;
+
+        var window = await _termRepository
+            .GetAll()
+            .Where(t => t.TenantId == AbpSession.TenantId && scope.Contains(t.Id))
+            .GroupBy(t => 1)
+            .Select(g => new { From = g.Min(t => t.StartDate), To = g.Max(t => t.EndDate) })
+            .FirstOrDefaultAsync();
+
+        if (window == null)
+            return null;
+
+        var days = await _attendanceRepository
+            .GetAll()
+            .Where(a => a.TenantId == AbpSession.TenantId)
+            .Where(a => a.ClassId == classId)
+            .Where(a => a.AttendanceDate.Date >= window.From.Date
+                && a.AttendanceDate.Date <= window.To.Date)
+            .Where(a => a.Status != AttendanceStatus.Holiday)
+            .Select(a => a.AttendanceDate.Date)
+            .Distinct()
+            .CountAsync();
+
+        return days > 0 ? days : (int?)null;
+    }
+
+    /// <summary>
     /// RC-17. The card's reference.
     /// <para>
     /// Built from the things that already identify a card uniquely together —
@@ -558,6 +599,8 @@ public class ReportAppService : ApplicationService, IReportAppService
     /// </summary>
     private async Task AssertReadyToIssueAsync(Report report)
     {
+        await BackfillRe002FieldsAsync(report);
+
         var subjects = await _reportSubjectRepository
             .GetAll()
             .Where(rs => rs.ReportId == report.Id)
@@ -578,6 +621,61 @@ public class ReportAppService : ApplicationService, IReportAppService
                 report.TeacherSignedByUserId.HasValue
                     ? "The principal has not signed this report card."
                     : "The class teacher has not signed this report card.");
+    }
+
+    /// <summary>
+    /// RC-17. Fills in the two RE-002 fields a card generated before they
+    /// existed cannot have.
+    /// <para>
+    /// Without this, every report card already in a school's database would stop
+    /// being publishable the moment this deployed — they carry no report card
+    /// number and no school-day total, and both gate publication. Both are
+    /// derived, not typed, so they can be worked out from the same sources
+    /// generation uses rather than asking somebody to go and fill in a field
+    /// they have never seen.
+    /// </para>
+    /// <para>
+    /// Only ever adds: a card that already has a number keeps it.
+    /// </para>
+    /// </summary>
+    private async Task BackfillRe002FieldsAsync(Report report)
+    {
+        if (!string.IsNullOrWhiteSpace(report.ReportCardNumber) && report.DaysInTerm.HasValue)
+            return;
+
+        var context = new ReportGenerationContext();
+
+        var naming = await _classRepository
+            .GetAll()
+            .Where(c => c.Id == report.ClassId && c.TenantId == AbpSession.TenantId)
+            .Select(c => new { c.ClassName, YearName = c.AcademicYear.YearName })
+            .FirstOrDefaultAsync();
+
+        context.ClassName = naming?.ClassName;
+        context.AcademicYearName = naming?.YearName;
+
+        if (string.IsNullOrWhiteSpace(report.ReportCardNumber))
+        {
+            var admissionNumber = await _studentRepository
+                .GetAll()
+                .Where(s => s.Id == report.StudentId && s.TenantId == AbpSession.TenantId)
+                .Select(s => s.AdmissionNumber)
+                .FirstOrDefaultAsync();
+
+            report.AssignReportCardNumber(
+                BuildReportCardNumber(context, admissionNumber, report.ReportType));
+        }
+
+        if (!report.DaysInTerm.HasValue)
+        {
+            var termIds = await ResolveTermScopeAsync(
+                report.ReportType, report.TermId, report.AcademicYearId);
+
+            report.DaysInTerm = await CountSchoolDaysAsync(report.ClassId, termIds);
+        }
+
+        await _reportRepository.UpdateAsync(report);
+        await CurrentUnitOfWork.SaveChangesAsync();
     }
 
     /// <summary>"a, b and c" — a list a person reads rather than a bullet dump.</summary>
@@ -823,30 +921,7 @@ public class ReportAppService : ApplicationService, IReportAppService
             .Select(c => new { c.ClassName, YearName = c.AcademicYear.YearName })
             .FirstOrDefaultAsync();
 
-        // Bounded by the terms in scope, or a term 1 card would be reconciled
-        // against every register the class has ever taken.
-        var scope = termIds.ToList();
-        var window = scope.Count == 0
-            ? null
-            : await _termRepository
-                .GetAll()
-                .Where(t => t.TenantId == AbpSession.TenantId && scope.Contains(t.Id))
-                .GroupBy(t => 1)
-                .Select(g => new { From = g.Min(t => t.StartDate), To = g.Max(t => t.EndDate) })
-                .FirstOrDefaultAsync();
-
-        var daysInTerm = window == null
-            ? (int?)null
-            : await _attendanceRepository
-                .GetAll()
-                .Where(a => a.TenantId == AbpSession.TenantId)
-                .Where(a => a.ClassId == classId)
-                .Where(a => a.AttendanceDate.Date >= window.From.Date
-                    && a.AttendanceDate.Date <= window.To.Date)
-                .Where(a => a.Status != AttendanceStatus.Holiday)
-                .Select(a => a.AttendanceDate.Date)
-                .Distinct()
-                .CountAsync();
+        var daysInTerm = await CountSchoolDaysAsync(classId, termIds);
 
         return new ReportGenerationContext
         {
@@ -854,7 +929,7 @@ public class ReportAppService : ApplicationService, IReportAppService
             TotalStudentsInClass = totalStudentsInClass,
             ClassName = naming?.ClassName,
             AcademicYearName = naming?.YearName,
-            DaysInTerm = daysInTerm > 0 ? daysInTerm : null,
+            DaysInTerm = daysInTerm,
             GradeLevel = gradeLevel.Value,
             SbaPercentage = sba,
             ExamPercentage = exam,
