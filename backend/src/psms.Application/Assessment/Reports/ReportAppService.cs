@@ -56,6 +56,7 @@ public class ReportAppService : ApplicationService, IReportAppService
     private readonly IBackgroundJobManager _backgroundJobManager;
     private readonly psms.Academic.Students.ICurrentStudentResolver _currentStudent;
     private readonly psms.Academic.Parents.ICurrentParentResolver _currentParent;
+    private readonly psms.Academic.Teachers.ICurrentTeacherResolver _currentTeacher;
     private readonly psms.Workflow.Shared.WorkflowStarterService _workflowStarter;
     private readonly ReportCohortStatisticsService _cohortStatistics;
 
@@ -77,6 +78,7 @@ public class ReportAppService : ApplicationService, IReportAppService
         IBackgroundJobManager backgroundJobManager,
         psms.Academic.Students.ICurrentStudentResolver currentStudent,
         psms.Academic.Parents.ICurrentParentResolver currentParent,
+        psms.Academic.Teachers.ICurrentTeacherResolver currentTeacher,
         psms.Workflow.Shared.WorkflowStarterService workflowStarter,
         ReportCohortStatisticsService cohortStatistics)
     {
@@ -97,6 +99,7 @@ public class ReportAppService : ApplicationService, IReportAppService
         _backgroundJobManager = backgroundJobManager;
         _currentStudent = currentStudent;
         _currentParent = currentParent;
+        _currentTeacher = currentTeacher;
         _workflowStarter = workflowStarter;
         _cohortStatistics = cohortStatistics;
     }
@@ -128,6 +131,11 @@ public class ReportAppService : ApplicationService, IReportAppService
         if (childIds != null && !childIds.Contains(report.StudentId))
             throw new UserFriendlyException(AssessmentExceptionCodes.ReportNotFound, "Report not found.");
 
+        // RC-08: a teacher may only read report cards for classes they teach.
+        var taughtClassIds = await TeacherClassScopeAsync();
+        if (taughtClassIds != null && !taughtClassIds.Contains(report.ClassId))
+            throw new UserFriendlyException(AssessmentExceptionCodes.ReportNotFound, "Report not found.");
+
         var dto = ObjectMapper.Map<ReportDto>(report);
         dto.SubjectReports = ObjectMapper.Map<List<ReportSubjectDto>>(report.SubjectReports.OrderBy(sr => sr.Subject?.SubjectName).ToList());
 
@@ -147,6 +155,8 @@ public class ReportAppService : ApplicationService, IReportAppService
         var selfId = await _currentStudent.GetCurrentStudentIdAsync();
         // MOB-BE-04: a parent only ever sees their own children's report cards.
         var childIds = await _currentParent.GetCurrentChildStudentIdsAsync();
+        // RC-08: a teacher only ever sees the classes they teach.
+        var taughtClassIds = await TeacherClassScopeAsync();
 
         var query = _reportRepository
             .GetAll()
@@ -158,6 +168,7 @@ public class ReportAppService : ApplicationService, IReportAppService
             .Where(r => r.TenantId == AbpSession.TenantId)
             .WhereIf(selfId.HasValue, r => r.StudentId == selfId.Value)
             .WhereIf(childIds != null, r => childIds.Contains(r.StudentId))
+            .WhereIf(taughtClassIds != null, r => taughtClassIds.Contains(r.ClassId))
             .WhereIf(input.StudentId.HasValue, r => r.StudentId == input.StudentId.Value)
             .WhereIf(input.ClassId.HasValue, r => r.ClassId == input.ClassId.Value)
             .WhereIf(input.TermId.HasValue, r => r.TermId == input.TermId.Value)
@@ -769,6 +780,28 @@ public class ReportAppService : ApplicationService, IReportAppService
     }
 
     /// <summary>Whether this user is the class teacher of that class.</summary>
+    /// <summary>
+    /// The classes a teacher-only caller may read report cards for, or null when
+    /// the caller is not confined to any.
+    /// <para>
+    /// ReportCards.View and ReportCards.Comment are school-wide permissions a
+    /// teacher holds so they can write the comment printed under their own name
+    /// and sign the Class Teacher line (RC-08, RC-17). Senior staff hold
+    /// ReportCards.Generate as well, and they are the ones who legitimately see
+    /// the whole school — so anyone without it is confined to the classes they
+    /// register or teach a subject in. Without this, giving teachers a route to
+    /// the report card list would have handed every teacher every learner's
+    /// marks.
+    /// </para>
+    /// </summary>
+    private async Task<List<Guid>> TeacherClassScopeAsync()
+    {
+        if (PermissionChecker.IsGranted(PermissionNames.Assessment_ReportCards_Generate))
+            return null;
+
+        return await _currentTeacher.GetTaughtClassIdsAsync();
+    }
+
     private async Task<bool> IsClassTeacherAsync(Guid classId, long userId)
     {
         return await _classRepository
