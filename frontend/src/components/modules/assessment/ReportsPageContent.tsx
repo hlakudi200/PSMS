@@ -24,6 +24,7 @@ import { ReportProvider, useReportState, useReportActions } from '@/providers/as
 import { AcademicYearProvider, useAcademicYearState, useAcademicYearActions } from '@/providers/academic/academic_years';
 import { TermProvider, useTermState, useTermActions } from '@/providers/academic/terms';
 import { GradeProvider, useGradeState, useGradeActions } from '@/providers/academic/grades';
+import { ClassProvider, useClassState, useClassActions } from '@/providers/academic/classes';
 import { useAuthState } from '@/providers/auth';
 import type { IReportList } from '@/providers/assessment/shared/interfaces';
 import {
@@ -92,17 +93,23 @@ function ReportsContent() {
   const { getByAcademicYearAsync: getTermsByYear } = useTermActions();
   const { activeGrades } = useGradeState();
   const { getActiveGradesAsync } = useGradeActions();
+  const { classes } = useClassState();
+  const { getAllAsync: getAllClasses } = useClassActions();
   const { currentRole } = useAuthState();
 
   const [selectedAcademicYearId, setSelectedAcademicYearId] = useState<string | undefined>(undefined);
   const [selectedTermId, setSelectedTermId] = useState<string | undefined>(undefined);
   const [selectedStatus, setSelectedStatus] = useState<number | undefined>(undefined);
+  // #301: the whole school in one list is unusable — a principal works a class
+  // at a time. The API has always accepted ClassId; nothing sent it.
+  const [selectedClassId, setSelectedClassId] = useState<string | undefined>(undefined);
   const [lastQuery, setLastQuery] = useState<TableQuery | null>(null);
 
   // Load filter dropdowns
   useEffect(() => {
     getAllAcademicYears({ maxResultCount: 50 });
     getActiveGradesAsync();
+    getAllClasses({ maxResultCount: 200 });
   }, []);
 
   // Load terms scoped to the selected academic year
@@ -122,11 +129,12 @@ function ReportsContent() {
       sorting: query.sorting,
       academicYearId: selectedAcademicYearId,
       termId: selectedTermId,
+      classId: selectedClassId,
       status: selectedStatus ?? columnFilters.status as number | undefined,
       studentName: keyword as string | undefined,
       ...columnFilters,
     });
-  }, [getAllAsync, selectedAcademicYearId, selectedTermId, selectedStatus]);
+  }, [getAllAsync, selectedAcademicYearId, selectedTermId, selectedClassId, selectedStatus]);
 
   const refreshData = useCallback(() => {
     if (lastQuery) handleQueryChange(lastQuery);
@@ -135,7 +143,7 @@ function ReportsContent() {
   // Re-fetch when filters change
   useEffect(() => {
     refreshData();
-  }, [selectedAcademicYearId, selectedTermId, selectedStatus]);
+  }, [selectedAcademicYearId, selectedTermId, selectedClassId, selectedStatus]);
 
   const columns: ColumnConfig<IReportList>[] = [
     { key: 'studentName', title: 'Student', dataIndex: 'studentName', sortable: true },
@@ -247,13 +255,33 @@ function ReportsContent() {
       icon: <FilePdfOutlined />,
       visible: (record) => !record.hasPdf && record.status >= ReportStatus.Generated,
       onClick: async (record) => {
+        // #298: the PDF is produced by a background job, so the row still had
+        // hasPdf false when this refreshed a moment later — the Download action
+        // never appeared and pressing Generate looked like it did nothing. Wait
+        // for the job, then refresh, so the download is actually offered.
+        const key = `pdf-${record.id}`;
         try {
           await generatePdfAsync(record.id);
-          message.success('PDF generation started');
-          // The job produces the PDF asynchronously; refresh so the row stops
-          // offering to generate a PDF it has already been asked for.
+          message.loading({ content: `Producing ${record.studentName}'s PDF…`, key, duration: 0 });
+
+          const deadline = Date.now() + 60_000;
+          let url: string | undefined;
+          while (!url && Date.now() < deadline) {
+            await new Promise((r) => setTimeout(r, 2000));
+            url = await getPdfUrlAsync(record.id, { quiet: true });
+          }
+
+          if (url) {
+            message.success({ content: `${record.studentName}'s PDF is ready to download`, key });
+          } else {
+            message.info({
+              content: 'The PDF is still being produced. It will appear on this row shortly.',
+              key,
+            });
+          }
           refreshData();
         } catch {
+          message.destroy(key);
           // Surfaced by axios interceptor
         }
       },
@@ -343,6 +371,9 @@ function ReportsContent() {
         } else {
           message.warning(`PDF generation: ${ok} class(es) started; ${fail} failed.`);
         }
+        // #298: these are background jobs. Without a refresh the rows keep
+        // offering Generate and never offer Download.
+        setTimeout(refreshData, 8000);
       },
     },
   ];
@@ -407,6 +438,23 @@ function ReportsContent() {
             />
           </Col>
           <Col xs={24} sm={8} md={6}>
+            <label style={{ display: 'block', fontSize: 13, marginBottom: 4, fontWeight: 500 }}>Class</label>
+            <Select
+              placeholder="All Classes"
+              value={selectedClassId}
+              onChange={setSelectedClassId}
+              allowClear
+              showSearch
+              optionFilterProp="label"
+              style={{ width: '100%' }}
+              options={
+                [...(classes ?? [])]
+                  .sort((a, b) => (a.className ?? '').localeCompare(b.className ?? ''))
+                  .map((c) => ({ value: c.id, label: c.className })) ?? []
+              }
+            />
+          </Col>
+          <Col xs={24} sm={8} md={6}>
             <label style={{ display: 'block', fontSize: 13, marginBottom: 4, fontWeight: 500 }}>Status</label>
             <Select
               placeholder="All Statuses"
@@ -455,9 +503,11 @@ export default function ReportsPageContent() {
     <AcademicYearProvider>
       <TermProvider>
         <GradeProvider>
-          <ReportProvider>
-            <ReportsContent />
-          </ReportProvider>
+          <ClassProvider>
+            <ReportProvider>
+              <ReportsContent />
+            </ReportProvider>
+          </ClassProvider>
         </GradeProvider>
       </TermProvider>
     </AcademicYearProvider>

@@ -443,11 +443,19 @@ function GenerateReportsContent() {
 
             {isYearScoped && (
               <Alert
-                type="warning"
+                type="info"
                 showIcon
                 style={{ marginTop: 8 }}
-                message="Mid-year and year-end reports do not aggregate marks yet"
-                description="Subjects will be created without marks, and the overall percentage will be empty. Tracked as issue #242 — generate term reports until it is fixed."
+                message={
+                  reportType === ReportType.YearEnd
+                    ? 'A year-end report composes the whole year'
+                    : 'A mid-year report covers terms 1 and 2'
+                }
+                description={
+                  reportType === ReportType.YearEnd
+                    ? "Every subject's mark is drawn from all four terms, with the school-based and examination components combined at the grade band's split, and rounded to a whole number for promotion purposes (NPPPPR §31(3)). Grade 12 reports the school-based component alone — the National Senior Certificate examination is set and marked externally."
+                    : 'Marks are drawn from terms 1 and 2 only. Terms 3 and 4 do not contribute.'
+                }
               />
             )}
 

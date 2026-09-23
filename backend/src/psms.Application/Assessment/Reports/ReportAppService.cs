@@ -2071,6 +2071,12 @@ public class ReportAppService : ApplicationService, IReportAppService
         if (childIds != null && !childIds.Contains(report.StudentId))
             throw new UserFriendlyException(AssessmentExceptionCodes.ReportNotFound, "Report not found.");
 
+        // RC-08: and a teacher only for the classes they teach. The list is
+        // scoped the same way; without this the PDF was reachable by id alone.
+        var taughtClassIds = await TeacherClassScopeAsync();
+        if (taughtClassIds != null && !taughtClassIds.Contains(report.ClassId))
+            throw new UserFriendlyException(AssessmentExceptionCodes.ReportNotFound, "Report not found.");
+
         if (!report.HasPdf())
             throw new UserFriendlyException(AssessmentExceptionCodes.PdfNotGenerated,
                 "No PDF has been generated for this report yet.");

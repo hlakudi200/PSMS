@@ -56,7 +56,13 @@ export interface IReportActionContext {
    * of putting it in state: it expires in minutes and must not be cached or
    * re-rendered from (RC-04).
    */
-  getPdfUrlAsync: (id: string) => Promise<string | undefined>;
+  /**
+   * A short-lived signed link to the report card PDF. The server refuses with
+   * PDF_NOT_GENERATED until the background job has produced one, so pass
+   * `quiet` when polling for readiness: it suppresses the global error dialog
+   * and resolves undefined instead of throwing.
+   */
+  getPdfUrlAsync: (id: string, options?: { quiet?: boolean }) => Promise<string | undefined>;
   bulkGeneratePdfsAsync: (input: IBulkGenerateReportPdfsInput) => void;
   previewBulkGenerateAsync: (input: IBulkGenerateReports) => void;
   bulkGenerateAsync: (input: IBulkGenerateReports) => void;
