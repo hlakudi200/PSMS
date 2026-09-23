@@ -338,7 +338,24 @@ export const ReportProvider = ({
   };
 
   // Not dispatched into state on purpose — see IReportActionContext.
-  const getPdfUrlAsync = async (id: string): Promise<string | undefined> => {
+  const getPdfUrlAsync = async (
+    id: string,
+    options?: { quiet?: boolean }
+  ): Promise<string | undefined> => {
+    // Producing the PDF is a background job, so "not ready yet" is an ordinary
+    // answer while polling, not a failure to shout about.
+    if (options?.quiet) {
+      try {
+        const response = await instance.get(
+          `/api/services/app/Report/GetReportPdfUrl?id=${id}`,
+          { suppressErrorModal: true }
+        );
+        return response.data.result as string | undefined;
+      } catch {
+        return undefined;
+      }
+    }
+
     const response = await instance.get(
       `/api/services/app/Report/GetReportPdfUrl?id=${id}`
     );
