@@ -39,6 +39,7 @@ import { getPrintableInk, getReadableForeground } from '@/utils/theme-config';
 import { formatMark, formatPercentage } from '@/utils/marks';
 import { PromotionDecisionModal, promotionDecisionLabels } from './PromotionDecisionModal';
 import { SubjectMarksModal } from './SubjectMarksModal';
+import { ConductAndSignOffCard, conductRatingLabels } from './ConductAndSignOffCard';
 import type { IReport, IReportSubject } from '@/providers/assessment/shared/interfaces';
 
 const { Title, Text, Paragraph } = Typography;
@@ -210,6 +211,32 @@ const buildPrintStyles = (ink: string, brandBg: string, brandFg: string) => `
     print-color-adjust: exact;
   }
 
+  /* ─── RC-17: conduct and diligence ─── */
+  .print-conduct {
+    display: block !important;
+    border: 1px solid #000;
+    margin-bottom: 10px;
+  }
+  .print-conduct-title {
+    background: #f5f5f5 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    font-size: 9px;
+    font-weight: 700;
+    padding: 3px 6px;
+    border-bottom: 1px solid #000;
+  }
+  .print-conduct-body {
+    display: flex;
+    gap: 40px;
+    font-size: 10px;
+    padding: 6px 6px 0;
+  }
+  .print-conduct-reason {
+    font-size: 10px;
+    padding: 3px 6px 6px;
+  }
+
   /* ─── RC-16: the promotion decision ─── */
   .print-promotion {
     display: block !important;
@@ -309,6 +336,11 @@ const buildPrintStyles = (ink: string, brandBg: string, brandFg: string) => `
     margin-top: 32px;
     padding-top: 4px;
   }
+  .print-signatures .sig-date {
+    font-size: 8px;
+    color: #444;
+    padding-top: 2px;
+  }
 
   /* ─── CAPS Legend ─── */
   .print-legend {
@@ -365,6 +397,7 @@ const buildPrintStyles = (ink: string, brandBg: string, brandFg: string) => `
 .print-header { display: none; }
 .print-student-info { display: none; }
 .print-subject-table { display: none; }
+.print-conduct { display: none; }
 .print-promotion { display: none; }
 .print-external-exam-note { display: none; }
 .print-attendance { display: none; }
@@ -627,6 +660,8 @@ function ReportDetailContent() {
         <div className="info-row"><span className="info-label">Date Generated:</span><span>{report.generatedDate ? dayjs(report.generatedDate).format('DD MMM YYYY') : 'N/A'}</span></div>
         <div className="info-row"><span className="info-label">Class Position:</span><span>{report.classPosition ?? '-'}{report.totalStudentsInClass ? ` of ${report.totalStudentsInClass}` : ''}</span></div>
         <div className="info-row"><span className="info-label">Overall:</span><span>{formatPercentage(report.overallPercentage)}</span></div>
+        {/* RC-17: RE-002's report card number. */}
+        <div className="info-row"><span className="info-label">Report Card No:</span><span>{report.reportCardNumber ?? 'N/A'}</span></div>
       </div>
 
       {/* Subject Table for Print */}
@@ -679,6 +714,20 @@ function ReportDetailContent() {
         <div className="print-external-exam-note">{EXTERNAL_EXAM_NOTE}</div>
       )}
 
+      {/* RC-17: conduct and diligence, printed. The PDF prints the same block. */}
+      {(report.conductRating || report.diligenceRating || report.behaviourComments) && (
+        <div className="print-conduct">
+          <div className="print-conduct-title">CONDUCT AND DILIGENCE</div>
+          <div className="print-conduct-body">
+            <span>Conduct: {report.conductRating ? conductRatingLabels[report.conductRating] : '-'}</span>
+            <span>Diligence: {report.diligenceRating ? conductRatingLabels[report.diligenceRating] : '-'}</span>
+          </div>
+          {report.behaviourComments && (
+            <div className="print-conduct-reason">{report.behaviourComments}</div>
+          )}
+        </div>
+      )}
+
       {/* RC-16: the decision, printed. The PDF prints the same block. */}
       {report.promotionDecision && (
         <div className="print-promotion">
@@ -708,11 +757,15 @@ function ReportDetailContent() {
           <span className="att-value">{report.daysLate ?? '-'}</span>
         </div>
         <div className="att-cell">
-          <span className="att-label">Total School Days</span>
+          <span className="att-label">School Days</span>
+          {/* RC-17: the school days in the period, which RE-002 reconciles the
+              other two against — not the sum of our own two figures, which would
+              always agree with itself and prove nothing. */}
           <span className="att-value">
-            {report.daysPresent != null && report.daysAbsent != null
-              ? report.daysPresent + report.daysAbsent
-              : '-'}
+            {report.daysInTerm
+              ?? (report.daysPresent != null && report.daysAbsent != null
+                ? report.daysPresent + report.daysAbsent
+                : '-')}
           </span>
         </div>
       </div>
@@ -736,12 +789,22 @@ function ReportDetailContent() {
       </div>
 
       {/* Signature Lines for Print */}
+      {/* RC-17: the names of whoever signed, so the printed page and the PDF
+          do not disagree about whether the card is signed. */}
+      {/* RC-17: whether the card is signed, and when. The PDF prints the same,
+          and the two must not disagree about a legal attestation. */}
       <div className="print-signatures">
         <div className="sig-block">
           <div className="sig-line">Class Teacher</div>
+          {report.teacherSignedDate && (
+            <div className="sig-date">Signed {dayjs(report.teacherSignedDate).format('DD MMM YYYY')}</div>
+          )}
         </div>
         <div className="sig-block">
           <div className="sig-line">Principal</div>
+          {report.principalSignedDate && (
+            <div className="sig-date">Signed {dayjs(report.principalSignedDate).format('DD MMM YYYY')}</div>
+          )}
         </div>
         <div className="sig-block">
           <div className="sig-line">Parent / Guardian</div>
@@ -1028,6 +1091,16 @@ function ReportDetailContent() {
           }}
         />
       </Card>
+
+      {/* RC-17: RE-002's conduct and diligence, and RE-003's sign-off. */}
+      {canCommentOnSubjects && (
+        <ConductAndSignOffCard
+          report={report}
+          canRecordConduct={canCommentOnSubjects}
+          canSignAsPrincipal={canManageReport}
+          onChanged={() => getAsync(report.id)}
+        />
+      )}
 
       {/* Comments Section */}
       <Card title="Comments" style={{ marginBottom: 16 }} className="no-print">

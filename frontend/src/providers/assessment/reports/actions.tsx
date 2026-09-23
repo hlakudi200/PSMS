@@ -45,6 +45,12 @@ export enum ReportActionEnums {
   acknowledgeByParentSuccess = "ACKNOWLEDGE_BY_PARENT_SUCCESS",
   acknowledgeByParentError = "ACKNOWLEDGE_BY_PARENT_ERROR",
 
+  recordConductPending = "RECORD_CONDUCT_PENDING",
+  recordConductSuccess = "RECORD_CONDUCT_SUCCESS",
+  recordConductError = "RECORD_CONDUCT_ERROR",
+  signReportPending = "SIGN_REPORT_PENDING",
+  signReportSuccess = "SIGN_REPORT_SUCCESS",
+  signReportError = "SIGN_REPORT_ERROR",
   getPromotionAdvicePending = "GET_PROMOTION_ADVICE_PENDING",
   getPromotionAdviceSuccess = "GET_PROMOTION_ADVICE_SUCCESS",
   getPromotionAdviceError = "GET_PROMOTION_ADVICE_ERROR",
@@ -268,6 +274,36 @@ export const acknowledgeByParentError = createAction<IReportStateContext>(
 );
 
 // Record Promotion Actions
+export const recordConductPending = createAction<IReportStateContext>(
+  ReportActionEnums.recordConductPending,
+  () => ({ isPending: true, isSuccess: false, isError: false })
+);
+
+export const recordConductSuccess = createAction<IReportStateContext, IReport>(
+  ReportActionEnums.recordConductSuccess,
+  (report) => ({ isPending: false, isSuccess: true, isError: false, report })
+);
+
+export const recordConductError = createAction<IReportStateContext>(
+  ReportActionEnums.recordConductError,
+  () => ({ isPending: false, isSuccess: false, isError: true })
+);
+
+export const signReportPending = createAction<IReportStateContext>(
+  ReportActionEnums.signReportPending,
+  () => ({ isPending: true, isSuccess: false, isError: false })
+);
+
+export const signReportSuccess = createAction<IReportStateContext, IReport>(
+  ReportActionEnums.signReportSuccess,
+  (report) => ({ isPending: false, isSuccess: true, isError: false, report })
+);
+
+export const signReportError = createAction<IReportStateContext>(
+  ReportActionEnums.signReportError,
+  () => ({ isPending: false, isSuccess: false, isError: true })
+);
+
 export const getPromotionAdvicePending = createAction<IReportStateContext>(
   ReportActionEnums.getPromotionAdvicePending,
   () => ({ isPending: true, isSuccess: false, isError: false, promotionAdvice: undefined })

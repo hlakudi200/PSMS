@@ -11,6 +11,7 @@ import {
   IBulkGenerateReportsResult,
   IPromotionAdvice,
   IRecordPromotion,
+  IRecordConduct,
 } from "../shared/interfaces";
 
 export interface IReportStateContext {
@@ -42,6 +43,12 @@ export interface IReportActionContext {
   getPromotionAdviceAsync: (id: string) => void;
   /** RC-16: records the decision, with the destination grade and a reason. */
   recordPromotionDecisionAsync: (input: IRecordPromotion) => void;
+  /** RC-17: records the conduct and diligence ratings (RE-002). */
+  recordConductAsync: (input: IRecordConduct) => void;
+  /** RC-17: the class teacher signs the card off (RE-003). */
+  signAsTeacherAsync: (id: string) => void;
+  /** RC-17: the principal signs the card off (RE-003). */
+  signAsPrincipalAsync: (id: string) => void;
   deleteAsync: (id: string) => void;
   generatePdfAsync: (id: string) => void;
   /**

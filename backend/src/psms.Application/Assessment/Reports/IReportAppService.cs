@@ -37,6 +37,24 @@ public interface IReportAppService : IApplicationService
     /// year — whether they are met, and clause by clause which are not.
     /// </summary>
     Task<PromotionAdviceDto> GetPromotionAdviceAsync(Guid id);
+
+    /// <summary>
+    /// RC-17. Records the conduct and diligence ratings and the behaviour
+    /// comment — RE-002 fields that had no property to write to.
+    /// </summary>
+    Task<ReportDto> RecordConductAsync(RecordConductDto input);
+
+    /// <summary>
+    /// RC-17. Corrects the attendance on a report card, which nothing could do
+    /// after generation.
+    /// </summary>
+    Task<ReportDto> RecordAttendanceAsync(RecordAttendanceDto input);
+
+    /// <summary>RC-17. The class teacher signs the card off (RE-003).</summary>
+    Task<ReportDto> SignAsTeacherAsync(Guid id);
+
+    /// <summary>RC-17. The principal signs the card off (RE-003).</summary>
+    Task<ReportDto> SignAsPrincipalAsync(Guid id);
     Task DeleteAsync(Guid id);
     Task GenerateReportPdfAsync(Guid id);
     Task<int> BulkGenerateReportPdfsAsync(BulkGenerateReportPdfsInput input);

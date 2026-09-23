@@ -325,7 +325,8 @@ public class ReportAppService : ApplicationService, IReportAppService
             input.DaysPresent,
             input.DaysAbsent,
             input.DaysLate,
-            input.TeacherComment);
+            input.TeacherComment,
+            student.AdmissionNumber);
 
         // RC-06: this learner joining the cohort reorders everybody in it. This
         // runs in the same unit of work as the generation above, so a failure
@@ -352,6 +353,12 @@ public class ReportAppService : ApplicationService, IReportAppService
         public List<ClassSubject> ClassSubjects { get; set; }
 
         public int TotalStudentsInClass { get; set; }
+
+        /// <summary>RC-17. The class's name, for the report card number.</summary>
+        public string ClassName { get; set; }
+
+        /// <summary>RC-17. The academic year's name, for the report card number.</summary>
+        public string AcademicYearName { get; set; }
 
         /// <summary>The grade this class sits in, which decides the split.</summary>
         public SouthAfricanGradeLevel GradeLevel { get; set; }
@@ -402,6 +409,65 @@ public class ReportAppService : ApplicationService, IReportAppService
                 classSubject.Subject?.SubjectCode,
                 GradeLevel);
     }
+
+    /// <summary>
+    /// RC-17. The card's reference.
+    /// <para>
+    /// Built from the things that already identify a card uniquely together —
+    /// the academic year, the class, the learner's admission number and the kind
+    /// of report — rather than from a running sequence. A sequence would need a
+    /// lock or a table of its own to stay unique while forty cards are generated
+    /// at once, and would tell a reader nothing the parts do not.
+    /// </para>
+    /// </summary>
+    private static string BuildReportCardNumber(
+        ReportGenerationContext context,
+        string admissionNumber,
+        ReportType reportType,
+        Guid reportId)
+    {
+        string Part(string value, string fallback)
+        {
+            var cleaned = new string((value ?? string.Empty)
+                .Where(c => char.IsLetterOrDigit(c) || c == '-')
+                .ToArray());
+
+            return string.IsNullOrWhiteSpace(cleaned) ? fallback : cleaned.ToUpperInvariant();
+        }
+
+        // The card's own identifier closes the door on the collisions the
+        // readable parts leave open: a reissued card after a delete, a second
+        // progress report in the same term, two learners with no admission
+        // number recorded, or two long names truncated to the same string.
+        var tail = reportId.ToString("N").Substring(0, 8).ToUpperInvariant();
+
+        var readable = string.Join("/", new[]
+        {
+            Part(context.AcademicYearName, "YEAR"),
+            Part(context.ClassName, "CLASS"),
+            Part(admissionNumber, "LEARNER"),
+            ReportTypeCode(reportType)
+        });
+
+        var room = Report.MaxReportCardNumberLength - tail.Length - 1;
+
+        if (readable.Length > room)
+            readable = readable.Substring(0, room);
+
+        return readable + "/" + tail;
+    }
+
+    private static string ReportTypeCode(ReportType reportType) => reportType switch
+    {
+        ReportType.Term1 => "T1",
+        ReportType.Term2 => "T2",
+        ReportType.Term3 => "T3",
+        ReportType.Term4 => "T4",
+        ReportType.MidYear => "MID",
+        ReportType.YearEnd => "YE",
+        ReportType.Progress => "PROG",
+        _ => "RPT",
+    };
 
     /// <summary>
     /// RC-05. The terms a report covers.
@@ -476,6 +542,269 @@ public class ReportAppService : ApplicationService, IReportAppService
             throw new UserFriendlyException(AssessmentExceptionCodes.BlankReportCard,
                 "This report card has no marks in any subject. Capture the marks before sending it on.");
     }
+
+    /// <summary>
+    /// RC-17. RE-002 and RE-003, enforced where they bite: at publication.
+    /// <para>
+    /// RE-002 lists the fields a South African report card must carry and
+    /// references a ValidateSAReportCard() that did not exist anywhere. RE-003
+    /// then requires it to pass, plus a teacher and a principal signature,
+    /// before a card may be published — and publishing checked only that the
+    /// status was Approved.
+    /// </para>
+    /// <para>
+    /// At publication rather than at generation, and rather than at submission:
+    /// a card is assembled over time, and the point at which it must be complete
+    /// is the point at which it goes to a parent.
+    /// </para>
+    /// </summary>
+    private async Task AssertReadyToIssueAsync(Report report)
+    {
+        await BackfillRe002FieldsAsync(report);
+
+        var subjects = await _reportSubjectRepository
+            .GetAll()
+            .Where(rs => rs.ReportId == report.Id)
+            .Select(rs => new { rs.FinalMark })
+            .ToListAsync();
+
+        // The two blank cases keep the code they have always raised, so
+        // anything keyed on it still matches.
+        if (subjects.Count == 0)
+            throw new UserFriendlyException(AssessmentExceptionCodes.BlankReportCard,
+                "This report card has no subjects on it. Check that the class has its subjects configured, "
+                + "then generate it again.");
+
+        if (subjects.All(rs => rs.FinalMark == null))
+            throw new UserFriendlyException(AssessmentExceptionCodes.BlankReportCard,
+                "This report card has no marks in any subject. Capture the marks before sending it on.");
+
+        var missing = report.ValidateSAReportCard(
+            subjects.Count,
+            subjects.Count(rs => rs.FinalMark.HasValue));
+
+        if (missing.Count > 0)
+            throw new UserFriendlyException(AssessmentExceptionCodes.ReportCardIncomplete,
+                "This report card cannot be issued yet. It still needs "
+                + JoinReadably(missing) + ".");
+
+        if (!report.IsSignedOff())
+            throw new UserFriendlyException(AssessmentExceptionCodes.ReportCardNotSigned,
+                report.TeacherSignedByUserId.HasValue
+                    ? "The principal has not signed this report card."
+                    : "The class teacher has not signed this report card.");
+    }
+
+    /// <summary>
+    /// RC-17. Fills in the two RE-002 fields a card generated before they
+    /// existed cannot have.
+    /// <para>
+    /// Without this, every report card already in a school's database would stop
+    /// being publishable the moment this deployed — they carry no report card
+    /// number and no school-day total, and both gate publication. Both are
+    /// derived, not typed, so they can be worked out from the same sources
+    /// generation uses rather than asking somebody to go and fill in a field
+    /// they have never seen.
+    /// </para>
+    /// <para>
+    /// Only ever adds: a card that already has a number keeps it.
+    /// </para>
+    /// </summary>
+    private async Task BackfillRe002FieldsAsync(Report report)
+    {
+        if (!string.IsNullOrWhiteSpace(report.ReportCardNumber) && report.DaysInTerm.HasValue)
+            return;
+
+        var context = new ReportGenerationContext();
+
+        var naming = await _classRepository
+            .GetAll()
+            .Where(c => c.Id == report.ClassId && c.TenantId == AbpSession.TenantId)
+            .Select(c => new { c.ClassName, YearName = c.AcademicYear.YearName })
+            .FirstOrDefaultAsync();
+
+        context.ClassName = naming?.ClassName;
+        context.AcademicYearName = naming?.YearName;
+
+        if (string.IsNullOrWhiteSpace(report.ReportCardNumber))
+        {
+            var admissionNumber = await _studentRepository
+                .GetAll()
+                .Where(s => s.Id == report.StudentId && s.TenantId == AbpSession.TenantId)
+                .Select(s => s.AdmissionNumber)
+                .FirstOrDefaultAsync();
+
+            report.AssignReportCardNumber(
+                BuildReportCardNumber(context, admissionNumber, report.ReportType, report.Id));
+        }
+
+        if (!report.DaysInTerm.HasValue)
+        {
+            // All an older card holds is the two figures it was generated with,
+            // and they are the whole account of the period as far as anyone
+            // recorded it. Re-reading the register now would measure something
+            // else — the class's days, not this learner's — and could refuse to
+            // publish a card that was correct when it was made.
+            report.RecordAttendance(
+                report.DaysPresent, report.DaysAbsent, report.DaysLate, daysInTerm: null);
+        }
+
+        await _reportRepository.UpdateAsync(report);
+        await CurrentUnitOfWork.SaveChangesAsync();
+    }
+
+    /// <summary>"a, b and c" — a list a person reads rather than a bullet dump.</summary>
+    private static string JoinReadably(IReadOnlyList<string> items)
+    {
+        if (items.Count == 1) return items[0];
+
+        return string.Join(", ", items.Take(items.Count - 1)) + " and " + items[items.Count - 1];
+    }
+
+    /// <summary>
+    /// RC-17. Records how the learner conducted themselves and applied
+    /// themselves. RE-002 lists both among the fields a report card carries.
+    /// </summary>
+    [AbpAuthorize(PermissionNames.Assessment_ReportCards_Comment)]
+    public async Task<ReportDto> RecordConductAsync(RecordConductDto input)
+    {
+        var report = await LoadEditableReportAsync(input.ReportId);
+
+        report.RecordConduct(input.ConductRating, input.DiligenceRating, input.BehaviourComments);
+        WithdrawSignatures(report);
+
+        await _reportRepository.UpdateAsync(report);
+        await CurrentUnitOfWork.SaveChangesAsync();
+
+        return await GetAsync(input.ReportId);
+    }
+
+    /// <summary>
+    /// RC-17. Corrects the attendance on a report card.
+    /// <para>
+    /// RE-002 reconciles days present and days absent against the days the
+    /// learner's attendance is measured over, and nothing could change any of
+    /// them after generation — so a card generated before a register was
+    /// captured, or with a figure typed wrongly, had no way to be put right
+    /// short of deleting it and generating again.
+    /// </para>
+    /// </summary>
+    [AbpAuthorize(PermissionNames.Assessment_ReportCards_Generate)]
+    public async Task<ReportDto> RecordAttendanceAsync(RecordAttendanceDto input)
+    {
+        var report = await LoadEditableReportAsync(input.ReportId);
+
+        try
+        {
+            report.RecordAttendance(
+                input.DaysPresent, input.DaysAbsent, input.DaysLate, input.DaysInTerm);
+        }
+        catch (ArgumentOutOfRangeException)
+        {
+            throw new UserFriendlyException(AssessmentExceptionCodes.ReportCardIncomplete,
+                "Attendance cannot be negative.");
+        }
+
+        WithdrawSignatures(report);
+
+        await _reportRepository.UpdateAsync(report);
+        await CurrentUnitOfWork.SaveChangesAsync();
+
+        return await GetAsync(input.ReportId);
+    }
+
+    /// <summary>
+    /// RC-17. The class teacher signs the card off. RE-003 requires this and the
+    /// principal's signature before it may be published.
+    /// </summary>
+    [AbpAuthorize(PermissionNames.Assessment_ReportCards_Comment)]
+    public async Task<ReportDto> SignAsTeacherAsync(Guid id)
+    {
+        var report = await LoadEditableReportAsync(id);
+        var userId = RequireSignedInUser();
+
+        // The permission is held by every teacher in the school, and the line
+        // this signs is "Class Teacher" on a legal document. Whoever signs it
+        // has to be this class's teacher, or somebody senior enough to generate
+        // the card in the first place.
+        if (!await IsClassTeacherAsync(report.ClassId, userId)
+            && !PermissionChecker.IsGranted(PermissionNames.Assessment_ReportCards_Generate))
+            throw new UserFriendlyException(AssessmentExceptionCodes.NotTheClassTeacher,
+                "Only this class's teacher can sign the report card as the class teacher.");
+
+        report.SignAsTeacher(userId);
+
+        await _reportRepository.UpdateAsync(report);
+        await CurrentUnitOfWork.SaveChangesAsync();
+
+        return await GetAsync(id);
+    }
+
+    /// <summary>RC-17. The principal signs the card off.</summary>
+    [AbpAuthorize(PermissionNames.Assessment_ReportCards_Publish)]
+    public async Task<ReportDto> SignAsPrincipalAsync(Guid id)
+    {
+        var report = await LoadEditableReportAsync(id);
+
+        report.SignAsPrincipal(RequireSignedInUser());
+
+        await _reportRepository.UpdateAsync(report);
+        await CurrentUnitOfWork.SaveChangesAsync();
+
+        return await GetAsync(id);
+    }
+
+    /// <summary>
+    /// The signed-in user, or a refusal. A signature attributed to nobody is
+    /// worse than no signature: IsSignedOff would pass while the printed line
+    /// stayed blank.
+    /// </summary>
+    private long RequireSignedInUser()
+    {
+        if (!AbpSession.UserId.HasValue || AbpSession.UserId.Value == 0)
+            throw new UserFriendlyException(AssessmentExceptionCodes.ReportCardNotSigned,
+                "A signature has to belong to somebody. Sign in again and try once more.");
+
+        return AbpSession.UserId.Value;
+    }
+
+    /// <summary>Whether this user is the class teacher of that class.</summary>
+    private async Task<bool> IsClassTeacherAsync(Guid classId, long userId)
+    {
+        return await _classRepository
+            .GetAll()
+            .Where(c => c.Id == classId && c.TenantId == AbpSession.TenantId)
+            .AnyAsync(c => c.ClassTeacher.UserId == userId);
+    }
+
+    /// <summary>
+    /// A report that is still open to being changed, or a friendly refusal. A
+    /// published card is closed to all of this — see Report.AcceptsComments.
+    /// </summary>
+    private async Task<Report> LoadEditableReportAsync(Guid id)
+    {
+        var report = await _reportRepository
+            .FirstOrDefaultAsync(r => r.Id == id && r.TenantId == AbpSession.TenantId);
+
+        if (report == null)
+            throw new UserFriendlyException(AssessmentExceptionCodes.ReportNotFound, "Report not found.");
+
+        AssertCommentsStillOpen(report);
+
+        return report;
+    }
+
+    /// <summary>
+    /// RC-17. A signature is on the card that was signed, not on whatever it
+    /// becomes afterwards. Anything that changes what the card says withdraws
+    /// the sign-offs, and whoever signed is asked to sign the new version.
+    /// <para>
+    /// Without this the PDF would print "signed by X on the 5th" over content
+    /// edited on the 9th, which is the thing RE-003's signature exists to rule
+    /// out.
+    /// </para>
+    /// </summary>
+    private static void WithdrawSignatures(Report report) => report.ClearSignatures();
 
     private async Task<List<Guid>> ResolveTermScopeAsync(
         ReportType reportType,
@@ -637,10 +966,23 @@ public class ReportAppService : ApplicationService, IReportAppService
             }
         }
 
+        // RC-17: the pieces the report card number is built from, and the
+        // school days its attendance is reconciled against. Counted as distinct
+        // register days across the scope, which is the same thing the per-learner
+        // attendance counts — so present + absent adds up to it.
+        var naming = await _classRepository
+            .GetAll()
+            .Where(c => c.Id == classId && c.TenantId == AbpSession.TenantId)
+            .Select(c => new { c.ClassName, YearName = c.AcademicYear.YearName })
+            .FirstOrDefaultAsync();
+
+
         return new ReportGenerationContext
         {
             ClassSubjects = classSubjects,
             TotalStudentsInClass = totalStudentsInClass,
+            ClassName = naming?.ClassName,
+            AcademicYearName = naming?.YearName,
             GradeLevel = gradeLevel.Value,
             SbaPercentage = sba,
             ExamPercentage = exam,
@@ -674,7 +1016,8 @@ public class ReportAppService : ApplicationService, IReportAppService
         int daysPresent,
         int daysAbsent,
         int daysLate,
-        string teacherComment)
+        string teacherComment,
+        string admissionNumber)
     {
         var report = new Report(
             Guid.NewGuid(),
@@ -685,11 +1028,16 @@ public class ReportAppService : ApplicationService, IReportAppService
             reportType,
             termId)
         {
-            DaysPresent = daysPresent,
-            DaysAbsent = daysAbsent,
-            DaysLate = daysLate,
             TeacherComment = teacherComment
         };
+
+        // RC-17: the days the learner's attendance is measured over. Where the
+        // register was read, present plus absent IS the count of register days
+        // for that learner — see ResolveAttendanceAsync, which counts days and
+        // not rows — so the two reconcile by construction and the RE-002 check
+        // catches a later edit that breaks them rather than a learner whose
+        // circumstances differ from the class's.
+        report.RecordAttendance(daysPresent, daysAbsent, daysLate, daysInTerm: null);
 
         await _reportRepository.InsertAsync(report);
 
@@ -755,6 +1103,11 @@ public class ReportAppService : ApplicationService, IReportAppService
         report.RecalculateOverall(subjectFinalMarks);
 
         report.TotalStudentsInClass = context.TotalStudentsInClass;
+
+        // RC-17: RE-002's report card number, and the attendance total its
+        // reconciliation is measured against.
+        report.AssignReportCardNumber(
+            BuildReportCardNumber(context, admissionNumber, reportType, report.Id));
 
         report.Generate();
         await _reportRepository.UpdateAsync(report);
@@ -1008,7 +1361,8 @@ public class ReportAppService : ApplicationService, IReportAppService
                         days.Present,
                         days.Absent,
                         days.Late,
-                        teacherComment: null);
+                        teacherComment: null,
+                        student.AdmissionNumber);
 
                     await uow.CompleteAsync();
 
@@ -1191,7 +1545,9 @@ public class ReportAppService : ApplicationService, IReportAppService
         if (report == null)
             throw new UserFriendlyException(AssessmentExceptionCodes.ReportNotFound, "Report not found.");
 
-        await AssertNotBlankAsync(report);
+        // RC-17: the blank check plus everything else RE-002 asks a card to
+        // carry, and the two signatures RE-003 requires before it is issued.
+        await AssertReadyToIssueAsync(report);
 
         try
         {
@@ -1264,6 +1620,7 @@ public class ReportAppService : ApplicationService, IReportAppService
         AssertCommentsStillOpen(report);
 
         report.TeacherComment = input.Comment;
+        WithdrawSignatures(report);
         await _reportRepository.UpdateAsync(report);
         await CurrentUnitOfWork.SaveChangesAsync();
 
@@ -1282,6 +1639,7 @@ public class ReportAppService : ApplicationService, IReportAppService
         AssertCommentsStillOpen(report);
 
         report.PrincipalComment = input.Comment;
+        WithdrawSignatures(report);
         await _reportRepository.UpdateAsync(report);
         await CurrentUnitOfWork.SaveChangesAsync();
 

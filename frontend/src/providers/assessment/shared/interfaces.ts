@@ -295,6 +295,16 @@ export interface IReport {
   promotedToGradeId?: string;
   /** RC-16: why, when the decision departs from the national requirements. */
   promotionReason?: string;
+  /** RC-17: the RE-002 fields. */
+  reportCardNumber?: string;
+  daysInTerm?: number;
+  conductRating?: number;
+  diligenceRating?: number;
+  behaviourComments?: string;
+  teacherSignedByUserId?: number;
+  teacherSignedDate?: string;
+  principalSignedByUserId?: number;
+  principalSignedDate?: string;
   status: number;
   generatedDate?: string;
   publishedDate?: string;
@@ -494,6 +504,14 @@ export interface IPromotionAdvice {
   /** RC-16: why, when the decision departs from the national requirements. */
   promotionReason?: string;
   gradeOptions?: IPromotionGradeOption[];
+}
+
+/** RC-17: input for recording the conduct and diligence ratings (RE-002). */
+export interface IRecordConduct {
+  reportId: string;
+  conductRating?: number;
+  diligenceRating?: number;
+  behaviourComments?: string;
 }
 
 /** RC-16: input for recording the promotion decision on a year-end card. */
