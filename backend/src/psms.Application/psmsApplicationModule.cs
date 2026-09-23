@@ -61,11 +61,27 @@ public class psmsApplicationModule : AbpModule
         // are discovered by base interface (WorkflowExtensionRegistry.ResolveAll) —
         // convention registration only binds an interface that matches the class
         // name, so they need this explicit registration.
+        //
+        // The distinct component name is what makes it take effect. Every one of
+        // these classes also carries ITransientDependency, so
+        // RegisterAssemblyByConvention above has already registered it under its
+        // implementation type's full name, and Windsor's Classes.FromAssembly
+        // SILENTLY SKIPS a type that is already registered. Without a name of its
+        // own this whole block was a no-op: ResolveAll<IWorkflowStepGuard>()
+        // returned nothing, WorkflowExtension/GetAvailable reported no guards,
+        // effects, schemas or entity handler for any entity type, and any step
+        // carrying a GuardKey failed with WF_EXTENSION_NOT_FOUND — which is what
+        // happened to report card approval the moment the seeder attached
+        // report.subjects-complete to the HOD Review step.
         IocManager.IocContainer.Register(
-            Classes.FromAssembly(thisAssembly).BasedOn<psms.Workflow.Engine.IWorkflowStepGuard>().WithService.Base().LifestyleTransient(),
-            Classes.FromAssembly(thisAssembly).BasedOn<psms.Workflow.Engine.IWorkflowStepEffect>().WithService.Base().LifestyleTransient(),
-            Classes.FromAssembly(thisAssembly).BasedOn<psms.Workflow.Engine.IWorkflowDecisionSchema>().WithService.Base().LifestyleTransient(),
-            Classes.FromAssembly(thisAssembly).BasedOn<psms.Workflow.Engine.IWorkflowEntityHandler>().WithService.Base().LifestyleTransient());
+            Classes.FromAssembly(thisAssembly).BasedOn<psms.Workflow.Engine.IWorkflowStepGuard>()
+                .WithService.Base().Configure(c => c.Named("wfext:" + c.Implementation.FullName)).LifestyleTransient(),
+            Classes.FromAssembly(thisAssembly).BasedOn<psms.Workflow.Engine.IWorkflowStepEffect>()
+                .WithService.Base().Configure(c => c.Named("wfext:" + c.Implementation.FullName)).LifestyleTransient(),
+            Classes.FromAssembly(thisAssembly).BasedOn<psms.Workflow.Engine.IWorkflowDecisionSchema>()
+                .WithService.Base().Configure(c => c.Named("wfext:" + c.Implementation.FullName)).LifestyleTransient(),
+            Classes.FromAssembly(thisAssembly).BasedOn<psms.Workflow.Engine.IWorkflowEntityHandler>()
+                .WithService.Base().Configure(c => c.Named("wfext:" + c.Implementation.FullName)).LifestyleTransient());
 
         Configuration.Modules.AbpAutoMapper().Configurators.Add(
             // Scan the assembly for classes which inherit from AutoMapper.Profile
