@@ -43,6 +43,30 @@ import {
  */
 const REPORT_PIPELINE_ROLES = ['Admin', 'Principal', 'VicePrincipal', 'HOD'];
 
+/**
+ * Above this many report cards, don't watch the PDFs appear — enqueue and say
+ * so instead.
+ *
+ * Waiting is done by asking for each card's download link until it exists, and
+ * that link is MINTED on Supabase per call rather than read from our database.
+ * At a whole grade — 120 cards — that is 120 storage calls every few seconds
+ * for several minutes, which costs far more than the generation it is watching.
+ *
+ * The real fix is one server-side batch record the screen can poll once per
+ * cycle whatever the size; tracked as issue #312. Until then this keeps the
+ * progress view for the batch sizes it was built for and steps out of the way
+ * for the rest.
+ */
+const PDF_PROGRESS_WATCH_LIMIT = 25;
+
+/**
+ * How many PDFs to ask for at once. One request per card, all in parallel, put
+ * 29 concurrent POSTs on the API and some came back 500; a whole grade would be
+ * 120. Queuing a job is cheap server-side, so there is nothing to win by
+ * flooding it.
+ */
+const PDF_QUEUE_CHUNK = 5;
+
 const reportStatusColors: Record<ReportStatus, string> = {
   [ReportStatus.Draft]: 'default',
   [ReportStatus.Generated]: 'blue',
@@ -377,13 +401,59 @@ function ReportsContent() {
 
         const key = 'bulk-pdf';
         try {
-          await Promise.all(eligible.map((r) => Promise.resolve(generatePdfAsync(r.id))));
-          message.loading({ content: `Producing ${eligible.length} PDF(s)…`, key, duration: 0 });
+          /* Queued a few at a time rather than all at once. Firing one request
+             per card in parallel put 29 concurrent POSTs on the API and some
+             came back 500; at a whole grade it would be 120. Queuing is cheap
+             server-side, so there is nothing to gain from the concurrency. */
+          message.loading({ content: `Queueing ${eligible.length} PDF(s)…`, key, duration: 0 });
+          let queued = 0;
+          const failed: string[] = [];
+          for (let i = 0; i < eligible.length; i += PDF_QUEUE_CHUNK) {
+            const chunk = eligible.slice(i, i + PDF_QUEUE_CHUNK);
+            const settled = await Promise.allSettled(
+              chunk.map((r) => Promise.resolve(generatePdfAsync(r.id, { quiet: true }))),
+            );
+            settled.forEach((res, n) => {
+              if (res.status === 'fulfilled') queued++;
+              else failed.push(chunk[n].studentName ?? chunk[n].id);
+            });
+          }
+
+          if (queued === 0) {
+            message.error({ content: 'None of the PDFs could be queued. Please try again.', key });
+            return;
+          }
+          if (failed.length) {
+            message.warning({
+              content: `${queued} of ${eligible.length} PDFs queued; ${failed.length} could not be started `
+                + `(${failed.slice(0, 3).join(', ')}${failed.length > 3 ? '…' : ''}). Try those again.`,
+              key,
+              duration: 10,
+            });
+          }
+
+          if (eligible.length > PDF_PROGRESS_WATCH_LIMIT) {
+            if (!failed.length) {
+              message.success({
+                content: `${queued} report card PDFs queued. They are produced in the background — `
+                  + `refresh this list in a few minutes to download them.`,
+                key,
+                duration: 8,
+              });
+            }
+            /* One refresh well after the queue has had a chance, rather than
+               polling every card. */
+            setTimeout(refreshData, 30_000);
+            return;
+          }
+
+          message.loading({ content: `Producing ${queued} PDF(s)…`, key, duration: 0 });
 
           /* The PDFs are produced by a background job, so wait for them rather
              than refreshing into rows that still offer Generate (#298). */
           const deadline = Date.now() + 120_000;
-          const waiting = new Map(eligible.map((r) => [r.id, r.studentName]));
+          const queuedRows = eligible.filter((r) => !failed.includes(r.studentName ?? r.id));
+          const waiting = new Map(queuedRows.map((r) => [r.id, r.studentName]));
           while (waiting.size > 0 && Date.now() < deadline) {
             await new Promise((r) => setTimeout(r, 3000));
             const settled = await Promise.all(
@@ -393,10 +463,10 @@ function ReportsContent() {
           }
 
           if (waiting.size === 0) {
-            message.success({ content: `${eligible.length} PDF(s) ready to download`, key });
+            message.success({ content: `${queuedRows.length} PDF(s) ready to download`, key });
           } else {
             message.info({
-              content: `${eligible.length - waiting.size} of ${eligible.length} PDFs ready; the rest are still being produced.`,
+              content: `${queuedRows.length - waiting.size} of ${queuedRows.length} PDFs ready; the rest are still being produced.`,
               key,
             });
           }
