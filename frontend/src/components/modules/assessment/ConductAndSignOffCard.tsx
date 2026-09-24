@@ -68,7 +68,12 @@ type ConductFormValues = z.infer<typeof schema>;
 
 interface Props {
   report: IReport;
-  /** ReportCards.Comment — the class teacher and up. */
+  /**
+   * Whether this user records the conduct and diligence ratings on THIS card.
+   * The class teacher and up — these are a judgement of the learner across the
+   * whole school day, not within one subject, which is why the card attributes
+   * them to the class teacher and why they sign for them.
+   */
   canRecordConduct: boolean;
   /**
    * Whether this user may sign the Class Teacher line on THIS card. Separate
@@ -158,6 +163,9 @@ export const ConductAndSignOffCard: React.FC<Props> = ({
           <Button size="small" icon={<EditOutlined />} onClick={() => setEditing(true)}>
             Edit
           </Button>
+        ) : !canRecordConduct && !closed ? (
+          /* Say why rather than leaving the panel looking broken. */
+          <Text type="secondary">The class teacher records these</Text>
         ) : undefined
       }
     >

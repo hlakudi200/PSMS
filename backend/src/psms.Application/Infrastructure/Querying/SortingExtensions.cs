@@ -64,7 +64,15 @@ public static class SortingExtensions
             var path = Translate<T>(field, map);
             if (path == null) continue;   // not something this entity can be ordered by
 
-            terms.Add(descending ? $"{path} DESC" : $"{path} ASC");
+            // A mapped column can expand to several entity columns — studentName
+            // becomes "Student.LastName, Student.FirstName". The direction has to
+            // be applied to each of them: appending it once to the whole string
+            // left every column but the last sorted ascending, so "descending"
+            // returned the same order as "ascending" and the header looked dead.
+            var direction = descending ? "DESC" : "ASC";
+            terms.AddRange(path
+                .Split(',', StringSplitOptions.RemoveEmptyEntries)
+                .Select(column => $"{column.Trim()} {direction}"));
         }
 
         return terms.Count > 0 ? string.Join(", ", terms) : null;
