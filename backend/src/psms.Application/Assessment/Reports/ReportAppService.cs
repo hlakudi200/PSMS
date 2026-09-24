@@ -17,6 +17,7 @@ using psms.Domain.Assessment;
 using psms.Domain.Assessment.Entities;
 using psms.Domain.Assessment.Promotion;
 using psms.Domain.Shared.Enums;
+using psms.Infrastructure.Querying;
 using psms.Domain.Workflow.Enums;
 using System;
 using System.Collections.Generic;
@@ -104,6 +105,28 @@ public class ReportAppService : ApplicationService, IReportAppService
         _cohortStatistics = cohortStatistics;
     }
 
+    /// <summary>
+    /// The report list's sortable columns, as the screen names them, mapped to
+    /// what the entity can actually be ordered by. Without this, clicking a
+    /// column header on Student, Adm #, Class, Term or Year returned a 500.
+    /// </summary>
+    private static readonly IReadOnlyDictionary<string, string> ReportSortMap =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["studentName"] = "Student.LastName, Student.FirstName",
+            ["studentAdmissionNumber"] = "Student.AdmissionNumber",
+            ["className"] = "Class.ClassName",
+            ["termName"] = "Term.TermNumber",
+            ["academicYearName"] = "AcademicYear.YearName",
+            ["overallPercentage"] = "OverallPercentage",
+            ["classPosition"] = "ClassPosition",
+            ["subjectCount"] = "SubjectReports.Count",
+            ["status"] = "Status",
+            ["reportType"] = "ReportType",
+            ["generatedDate"] = "GeneratedDate",
+            ["publishedDate"] = "PublishedDate",
+        };
+
     [AbpAuthorize(PermissionNames.Assessment_ReportCards_View)]
     public async Task<ReportDto> GetAsync(Guid id)
     {
@@ -186,7 +209,7 @@ public class ReportAppService : ApplicationService, IReportAppService
         var totalCount = await query.CountAsync();
 
         var items = await query
-            .OrderBy(input.Sorting ?? "Student.LastName ASC")
+            .ApplySorting(input.Sorting, "Student.LastName ASC", ReportSortMap)
             .PageBy(input)
             .ToListAsync();
 

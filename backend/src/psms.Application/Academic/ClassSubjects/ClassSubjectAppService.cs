@@ -15,6 +15,7 @@ using System.Linq;
 using System.Linq.Dynamic.Core;
 using System.Threading.Tasks;
 using AssessmentEntity = psms.Domain.Assessment.Entities.Assessment;
+using psms.Infrastructure.Querying;
 
 namespace psms.Academic.ClassSubjects;
 
@@ -25,6 +26,20 @@ namespace psms.Academic.ClassSubjects;
 [AbpAuthorize(PermissionNames.Academic_ClassSubjects)]
 public class ClassSubjectAppService : ApplicationService, IClassSubjectAppService
 {
+    /// <summary>
+    /// The class-subject list's sortable columns.
+    /// </summary>
+    private static readonly IReadOnlyDictionary<string, string> ClassSubjectSortMap =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["className"] = "Class.ClassName",
+            ["subjectName"] = "Subject.SubjectName",
+            ["subjectCode"] = "Subject.SubjectCode",
+            ["teacherName"] = "Teacher.LastName",
+            ["periodsPerWeek"] = "PeriodsPerWeek",
+            ["isActive"] = "IsActive",
+        };
+
     private readonly IRepository<ClassSubject, Guid> _classSubjectRepository;
     private readonly IRepository<Class, Guid> _classRepository;
     private readonly IRepository<Subject, Guid> _subjectRepository;
@@ -85,7 +100,7 @@ public class ClassSubjectAppService : ApplicationService, IClassSubjectAppServic
         var totalCount = await query.CountAsync();
 
         var items = await query
-            .OrderBy(input.Sorting ?? "Class.ClassName ASC, Subject.SubjectName ASC")
+            .ApplySorting(input.Sorting, "Class.ClassName ASC, Subject.SubjectName ASC", ClassSubjectSortMap)
             .PageBy(input)
             .ToListAsync();
 

@@ -16,6 +16,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Dynamic.Core;
 using System.Threading.Tasks;
+using psms.Infrastructure.Querying;
 
 namespace psms.Academic.Parents;
 
@@ -25,6 +26,20 @@ namespace psms.Academic.Parents;
 [AbpAuthorize(PermissionNames.Academic_Parents)]
 public class ParentAppService : ApplicationService, IParentAppService
 {
+    /// <summary>
+    /// The parent list's sortable columns.
+    /// </summary>
+    private static readonly IReadOnlyDictionary<string, string> ParentSortMap =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fullName"] = "LastName, FirstName",
+            ["firstName"] = "FirstName",
+            ["lastName"] = "LastName",
+            ["email"] = "Email",
+            ["phone"] = "Phone",
+            ["occupation"] = "Occupation",
+        };
+
     private readonly IRepository<Parent, Guid> _parentRepository;
 
     public ParentAppService(IRepository<Parent, Guid> parentRepository)
@@ -60,7 +75,7 @@ public class ParentAppService : ApplicationService, IParentAppService
         var totalCount = await query.CountAsync();
 
         var parents = await query
-            .OrderBy(input.Sorting ?? "LastName ASC")
+            .ApplySorting(input.Sorting, "LastName ASC", ParentSortMap)
             .PageBy(input)
             .ToListAsync();
 

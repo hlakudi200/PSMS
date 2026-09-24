@@ -18,6 +18,7 @@ using System.Linq;
 using System.Linq.Dynamic.Core;
 using System.Threading.Tasks;
 using AssessmentEntity = psms.Domain.Assessment.Entities.Assessment;
+using psms.Infrastructure.Querying;
 
 namespace psms.Assessment.Assessments;
 
@@ -27,6 +28,24 @@ namespace psms.Assessment.Assessments;
 [AbpAuthorize(PermissionNames.Assessment_Marks)]
 public class AssessmentAppService : ApplicationService, IAssessmentAppService
 {
+    /// <summary>
+    /// The assessment list's sortable columns.
+    /// </summary>
+    private static readonly IReadOnlyDictionary<string, string> AssessmentSortMap =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["name"] = "Name",
+            ["className"] = "ClassSubject.Class.ClassName",
+            ["subjectName"] = "ClassSubject.Subject.SubjectName",
+            ["termName"] = "Term.TermNumber",
+            ["assessmentType"] = "AssessmentType",
+            ["maxMarks"] = "MaxMarks",
+            ["weight"] = "Weight",
+            ["scheduledDate"] = "ScheduledDate",
+            ["dueDate"] = "DueDate",
+            ["isPublished"] = "IsPublished",
+        };
+
     private readonly IRepository<AssessmentEntity, Guid> _assessmentRepository;
     private readonly IRepository<ClassSubject, Guid> _classSubjectRepository;
     private readonly IRepository<Term, Guid> _termRepository;
@@ -100,7 +119,7 @@ public class AssessmentAppService : ApplicationService, IAssessmentAppService
         var totalCount = await query.CountAsync();
 
         var items = await query
-            .OrderBy(input.Sorting ?? "Name ASC")
+            .ApplySorting(input.Sorting, "Name ASC", AssessmentSortMap)
             .PageBy(input)
             .ToListAsync();
 
