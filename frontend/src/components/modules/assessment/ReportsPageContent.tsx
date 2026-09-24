@@ -85,7 +85,6 @@ function ReportsContent() {
     publishAsync,
     generatePdfAsync,
     getPdfUrlAsync,
-    bulkGeneratePdfsAsync,
   } = useReportActions();
   const { academicYears } = useAcademicYearState();
   const { getAllAsync: getAllAcademicYears } = useAcademicYearActions();
@@ -357,39 +356,55 @@ function ReportsContent() {
     {
       key: 'bulkGeneratePdfs',
       requiredPermissions: REPORT_PIPELINE_ROLES,
-      label: 'Generate All PDFs',
-      confirm: {
-        title: 'Generate PDFs for every class on this page?',
-        // Deliberately narrower than "matching current filters": classIds below
-        // are derived from the loaded page, not from the whole result set.
-      },
-      onClick: async () => {
-        if (!selectedAcademicYearId) {
-          message.warning('Please select an academic year first');
+      label: 'Generate PDFs for Selected',
+      confirm: { title: 'Generate PDFs for the selected report cards?' },
+      onClick: async (rows) => {
+        /* Was "Generate All PDFs", and did none of what it looked like it did:
+           it refused unless an Academic Year filter was set — a year it never
+           sent to the API — ignored the rows you had ticked, and then generated
+           for every report in each class on the page, not the page and not the
+           selection. It now does what its neighbours do and works on what you
+           selected. */
+        const eligible = rows.filter((r) => !r.hasPdf && r.status >= ReportStatus.Generated);
+        if (eligible.length === 0) {
+          message.info(
+            rows.every((r) => r.hasPdf)
+              ? 'Every selected report card already has a PDF.'
+              : 'None of the selected report cards can have a PDF yet — generate them first.',
+          );
           return;
         }
-        const classIds = [...new Set(reports?.map((r) => r.classId) ?? [])];
-        if (classIds.length === 0) {
-          message.warning('No reports found to generate PDFs for');
-          return;
+
+        const key = 'bulk-pdf';
+        try {
+          await Promise.all(eligible.map((r) => Promise.resolve(generatePdfAsync(r.id))));
+          message.loading({ content: `Producing ${eligible.length} PDF(s)…`, key, duration: 0 });
+
+          /* The PDFs are produced by a background job, so wait for them rather
+             than refreshing into rows that still offer Generate (#298). */
+          const deadline = Date.now() + 120_000;
+          const waiting = new Map(eligible.map((r) => [r.id, r.studentName]));
+          while (waiting.size > 0 && Date.now() < deadline) {
+            await new Promise((r) => setTimeout(r, 3000));
+            const settled = await Promise.all(
+              [...waiting.keys()].map(async (id) => [id, await getPdfUrlAsync(id, { quiet: true })] as const),
+            );
+            for (const [id, url] of settled) if (url) waiting.delete(id);
+          }
+
+          if (waiting.size === 0) {
+            message.success({ content: `${eligible.length} PDF(s) ready to download`, key });
+          } else {
+            message.info({
+              content: `${eligible.length - waiting.size} of ${eligible.length} PDFs ready; the rest are still being produced.`,
+              key,
+            });
+          }
+          refreshData();
+        } catch {
+          message.destroy(key);
+          // Surfaced by axios interceptor
         }
-        const results = await Promise.allSettled(
-          classIds.map((classId) =>
-            Promise.resolve(
-              bulkGeneratePdfsAsync({ classId, termId: selectedTermId }) as unknown
-            )
-          )
-        );
-        const ok = results.filter((r) => r.status === 'fulfilled').length;
-        const fail = results.length - ok;
-        if (fail === 0) {
-          message.success(`PDF generation started for ${ok} class(es)`);
-        } else {
-          message.warning(`PDF generation: ${ok} class(es) started; ${fail} failed.`);
-        }
-        // #298: these are background jobs. Without a refresh the rows keep
-        // offering Generate and never offer Download.
-        setTimeout(refreshData, 8000);
       },
     },
   ];
