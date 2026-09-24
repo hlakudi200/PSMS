@@ -70,6 +70,14 @@ interface Props {
   report: IReport;
   /** ReportCards.Comment — the class teacher and up. */
   canRecordConduct: boolean;
+  /**
+   * Whether this user may sign the Class Teacher line on THIS card. Separate
+   * from canRecordConduct: every teacher in the school holds the comment
+   * permission, but only the class's own teacher signs for it, so tying the
+   * button to the permission offered the whole staff a signature the server
+   * refuses with "Only this class's teacher can sign".
+   */
+  canSignAsClassTeacher: boolean;
   /** ReportCards.Publish — the principal. */
   canSignAsPrincipal: boolean;
   onChanged: () => void;
@@ -78,6 +86,7 @@ interface Props {
 export const ConductAndSignOffCard: React.FC<Props> = ({
   report,
   canRecordConduct,
+  canSignAsClassTeacher,
   canSignAsPrincipal,
   onChanged,
 }) => {
@@ -206,7 +215,7 @@ export const ConductAndSignOffCard: React.FC<Props> = ({
               <Tag icon={<CheckCircleTwoTone twoToneColor="#52c41a" />} color="success">
                 Class teacher signed {signedOn(report.teacherSignedDate)}
               </Tag>
-            ) : canRecordConduct && !closed ? (
+            ) : canSignAsClassTeacher && !closed ? (
               <Popconfirm
                 title="Sign this report card as the class teacher?"
                 description="A signature says the card is correct as it stands."
@@ -217,7 +226,10 @@ export const ConductAndSignOffCard: React.FC<Props> = ({
                 </Button>
               </Popconfirm>
             ) : (
-              <Text type="secondary">Not signed by the class teacher</Text>
+              <Text type="secondary">
+                Not signed by the class teacher
+                {!canSignAsClassTeacher && !closed && ' — only this class’s teacher can'}
+              </Text>
             )}
           </Col>
           <Col xs={24} md={12}>

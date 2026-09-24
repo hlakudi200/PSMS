@@ -329,6 +329,8 @@ export interface IReport {
    * approval instead of offering a button that can only fail.
    */
   activeWorkflowInstanceId?: string;
+  /** Whether the signed-in user may sign this card's Class Teacher line. */
+  canSignAsClassTeacher?: boolean;
 }
 
 export interface IReportList {
@@ -351,6 +353,8 @@ export interface IReportList {
   academicYearName?: string;
   /** RC-04: see IReport.hasPdf. */
   hasPdf: boolean;
+  /** True when the signed-in user is this class's class teacher. */
+  isMyRegisterClass?: boolean;
   subjectCount: number;
   /** RC-09: see IReport.activeWorkflowInstanceId. */
   activeWorkflowInstanceId?: string;
