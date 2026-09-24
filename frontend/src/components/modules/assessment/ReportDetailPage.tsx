@@ -30,6 +30,8 @@ import {
   FilePdfOutlined,
   DownloadOutlined,
   LoadingOutlined,
+  EyeOutlined,
+  FormOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { ReportProvider, useReportState, useReportActions } from '@/providers/assessment/reports';
@@ -1060,13 +1062,28 @@ function ReportDetailContent() {
         className="no-print"
         extra={
           canCommentOnSubjects ? (
-            <Button size="small" onClick={() => setMarksOpen(true)}>
-              {report.status === 4 || report.status === 5
-                ? 'View marks'
-                : canCaptureMarks
-                  ? 'Capture marks and comments'
-                  : 'Write subject comments'}
-            </Button>
+            /* This is the only way into the subject marks and comments, and as a
+               small default button in a card header it read as decoration —
+               teachers were not finding it. Primary and full size while there is
+               something to write; once the card is approved or published there
+               is nothing to do but look, so it steps back down. */
+            (() => {
+              const readOnly = report.status === 4 || report.status === 5;
+              return (
+                <Button
+                  type={readOnly ? 'default' : 'primary'}
+                  size={readOnly ? 'small' : 'middle'}
+                  icon={readOnly ? <EyeOutlined /> : <FormOutlined />}
+                  onClick={() => setMarksOpen(true)}
+                >
+                  {readOnly
+                    ? 'View marks'
+                    : canCaptureMarks
+                      ? 'Capture marks and comments'
+                      : 'Write subject comments'}
+                </Button>
+              );
+            })()
           ) : undefined
         }
       >
