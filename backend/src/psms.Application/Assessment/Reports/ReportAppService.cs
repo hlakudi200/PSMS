@@ -717,6 +717,7 @@ public class ReportAppService : ApplicationService, IReportAppService
     public async Task<ReportDto> RecordConductAsync(RecordConductDto input)
     {
         var report = await LoadEditableReportAsync(input.ReportId);
+        await AssertIsTheClassTeacherAsync(report.ClassId);
 
         report.RecordConduct(input.ConductRating, input.DiligenceRating, input.BehaviourComments);
         WithdrawSignatures(report);
@@ -871,6 +872,29 @@ public class ReportAppService : ApplicationService, IReportAppService
 
         return await IsClassTeacherAsync(classId, userId.Value)
             || PermissionChecker.IsGranted(PermissionNames.Assessment_ReportCards_Generate);
+    }
+
+    /// <summary>
+    /// RC-08. The parts of the card that belong to the class teacher: the
+    /// conduct and diligence ratings, the behaviour note and the class teacher's
+    /// comment.
+    /// <para>
+    /// These are a judgement of the learner across the whole school day, not
+    /// within one subject, which is why the printed card attributes them to the
+    /// class teacher and why that teacher signs for them. ReportCards.Comment is
+    /// held by every teacher in the school, so gating on it alone let a subject
+    /// teacher who sees the learner a few periods a week overwrite the class
+    /// teacher's conduct rating. Senior staff, who hold Generate, still can.
+    /// </para>
+    /// </summary>
+    private async Task AssertIsTheClassTeacherAsync(Guid classId)
+    {
+        if (await CanSignAsClassTeacherAsync(classId))
+            return;
+
+        throw new UserFriendlyException(AssessmentExceptionCodes.NotTheClassTeacher,
+            "Only this class's teacher records the conduct, diligence and class teacher's "
+            + "comment on a report card.");
     }
 
     private async Task<bool> IsClassTeacherAsync(Guid classId, long userId)
@@ -1722,6 +1746,7 @@ public class ReportAppService : ApplicationService, IReportAppService
             throw new UserFriendlyException(AssessmentExceptionCodes.ReportNotFound, "Report not found.");
 
         AssertCommentsStillOpen(report);
+        await AssertIsTheClassTeacherAsync(report.ClassId);
 
         report.TeacherComment = input.Comment;
         WithdrawSignatures(report);

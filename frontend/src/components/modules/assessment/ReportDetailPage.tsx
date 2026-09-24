@@ -1096,7 +1096,11 @@ function ReportDetailContent() {
       {canCommentOnSubjects && (
         <ConductAndSignOffCard
           report={report}
-          canRecordConduct={canCommentOnSubjects}
+          /* Conduct, diligence and the behaviour note are the class teacher's
+             judgement of the learner across the school day, so they belong to
+             whoever signs for them rather than to anyone holding the school-wide
+             comment permission. */
+          canRecordConduct={report.canSignAsClassTeacher ?? canCommentOnSubjects}
           /* Falls back to the old, permissive behaviour when the field is
              absent — the frontend deploys ahead of the API, and the server
              refuses a signature from the wrong teacher either way. Hiding the
