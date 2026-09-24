@@ -14,6 +14,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Dynamic.Core;
 using System.Threading.Tasks;
+using psms.Infrastructure.Querying;
 
 namespace psms.Academic.Classes;
 
@@ -23,6 +24,20 @@ namespace psms.Academic.Classes;
 [AbpAuthorize(PermissionNames.Academic_Classes)]
 public class ClassAppService : ApplicationService, IClassAppService
 {
+    /// <summary>
+    /// The class list's sortable columns.
+    /// </summary>
+    private static readonly IReadOnlyDictionary<string, string> ClassSortMap =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["className"] = "ClassName",
+            ["gradeName"] = "Grade.GradeLevel",
+            ["academicYearName"] = "AcademicYear.YearName",
+            ["classTeacherName"] = "ClassTeacher.LastName",
+            ["maxCapacity"] = "MaxCapacity",
+            ["isActive"] = "IsActive",
+        };
+
     private readonly IRepository<Class, Guid> _classRepository;
     private readonly IRepository<Grade, Guid> _gradeRepository;
     private readonly IRepository<AcademicYear, Guid> _academicYearRepository;
@@ -76,7 +91,7 @@ public class ClassAppService : ApplicationService, IClassAppService
         var totalCount = await query.CountAsync();
 
         var classes = await query
-            .OrderBy(input.Sorting ?? "ClassName ASC")
+            .ApplySorting(input.Sorting, "ClassName ASC", ClassSortMap)
             .PageBy(input)
             .ToListAsync();
 

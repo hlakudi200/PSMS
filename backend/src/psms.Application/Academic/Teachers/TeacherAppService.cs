@@ -15,6 +15,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Dynamic.Core;
 using System.Threading.Tasks;
+using psms.Infrastructure.Querying;
 
 namespace psms.Academic.Teachers;
 
@@ -24,6 +25,22 @@ namespace psms.Academic.Teachers;
 [AbpAuthorize(PermissionNames.Academic_Teachers)]
 public class TeacherAppService : ApplicationService, ITeacherAppService
 {
+    /// <summary>
+    /// The teacher list's sortable columns.
+    /// </summary>
+    private static readonly IReadOnlyDictionary<string, string> TeacherSortMap =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fullName"] = "LastName, FirstName",
+            ["firstName"] = "FirstName",
+            ["lastName"] = "LastName",
+            ["employeeNumber"] = "EmployeeNumber",
+            ["email"] = "Email",
+            ["dateOfJoining"] = "DateOfJoining",
+            ["employmentStatus"] = "EmploymentStatus",
+            ["isActive"] = "IsActive",
+        };
+
     private readonly IRepository<Teacher, Guid> _teacherRepository;
 
     public TeacherAppService(IRepository<Teacher, Guid> teacherRepository)
@@ -83,7 +100,7 @@ public class TeacherAppService : ApplicationService, ITeacherAppService
         var totalCount = await query.CountAsync();
 
         var teachers = await query
-            .OrderBy(input.Sorting ?? "LastName ASC")
+            .ApplySorting(input.Sorting, "LastName ASC", TeacherSortMap)
             .PageBy(input)
             .ToListAsync();
 

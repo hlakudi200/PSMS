@@ -19,6 +19,7 @@ using System.Linq.Dynamic.Core;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using AssessmentEntity = psms.Domain.Assessment.Entities.Assessment;
+using psms.Infrastructure.Querying;
 
 namespace psms.Assessment.Marks;
 
@@ -28,6 +29,22 @@ namespace psms.Assessment.Marks;
 [AbpAuthorize(PermissionNames.Assessment_Marks)]
 public class MarkAppService : ApplicationService, IMarkAppService
 {
+    /// <summary>
+    /// The mark sheet's sortable columns.
+    /// </summary>
+    private static readonly IReadOnlyDictionary<string, string> MarkSortMap =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["studentName"] = "Student.LastName, Student.FirstName",
+            ["studentAdmissionNumber"] = "Student.AdmissionNumber",
+            ["assessmentName"] = "Assessment.Name",
+            ["rawMark"] = "RawMark",
+            ["percentage"] = "Percentage",
+            ["achievementLevel"] = "AchievementLevel",
+            ["status"] = "Status",
+            ["markedDate"] = "MarkedDate",
+        };
+
     private readonly IRepository<Mark, Guid> _markRepository;
     private readonly IRepository<AssessmentEntity, Guid> _assessmentRepository;
     private readonly IRepository<Student, Guid> _studentRepository;
@@ -104,7 +121,7 @@ public class MarkAppService : ApplicationService, IMarkAppService
         var totalCount = await query.CountAsync();
 
         var items = await query
-            .OrderBy(input.Sorting ?? "Student.LastName ASC")
+            .ApplySorting(input.Sorting, "Student.LastName ASC", MarkSortMap)
             .PageBy(input)
             .ToListAsync();
 

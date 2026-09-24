@@ -16,6 +16,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Dynamic.Core;
 using System.Threading.Tasks;
+using psms.Infrastructure.Querying;
 
 namespace psms.Academic.Students;
 
@@ -25,6 +26,26 @@ namespace psms.Academic.Students;
 [AbpAuthorize(PermissionNames.Academic_Students)]
 public class StudentAppService : ApplicationService, IStudentAppService
 {
+    /// <summary>
+    /// The student list's sortable columns. Name, class and grade are flattened
+    /// onto the DTO, so sorting by them used to 500.
+    /// </summary>
+    private static readonly IReadOnlyDictionary<string, string> StudentSortMap =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fullName"] = "LastName, FirstName",
+            ["firstName"] = "FirstName",
+            ["lastName"] = "LastName",
+            ["admissionNumber"] = "AdmissionNumber",
+            ["currentClassName"] = "CurrentClass.ClassName",
+            ["currentGradeName"] = "CurrentGrade.GradeLevel",
+            ["dateOfBirth"] = "DateOfBirth",
+            ["age"] = "DateOfBirth",
+            ["gender"] = "Gender",
+            ["isActive"] = "IsActive",
+            ["admissionDate"] = "AdmissionDate",
+        };
+
     private readonly IRepository<Student, Guid> _studentRepository;
     private readonly IRepository<Grade, Guid> _gradeRepository;
     private readonly IRepository<Class, Guid> _classRepository;
@@ -143,7 +164,7 @@ public class StudentAppService : ApplicationService, IStudentAppService
         var totalCount = await query.CountAsync();
 
         var students = await query
-            .OrderBy(input.Sorting ?? "LastName ASC")
+            .ApplySorting(input.Sorting, "LastName ASC", StudentSortMap)
             .PageBy(input)
             .ToListAsync();
 
