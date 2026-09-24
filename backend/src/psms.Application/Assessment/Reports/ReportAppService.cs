@@ -238,6 +238,13 @@ public class ReportAppService : ApplicationService, IReportAppService
         if (report == null)
             throw new UserFriendlyException(AssessmentExceptionCodes.ReportNotFound, "Report not found.");
 
+        // RC-08: and a teacher only for the classes they teach. Scoping GetAll
+        // and Get alone left this route open — a learner id, a term id and a
+        // report type are all guessable from a class list.
+        var taughtClassIds = await TeacherClassScopeAsync();
+        if (taughtClassIds != null && !taughtClassIds.Contains(report.ClassId))
+            throw new UserFriendlyException(AssessmentExceptionCodes.ReportNotFound, "Report not found.");
+
         var dto = ObjectMapper.Map<ReportDto>(report);
         dto.SubjectReports = ObjectMapper.Map<List<ReportSubjectDto>>(report.SubjectReports.OrderBy(sr => sr.Subject?.SubjectName).ToList());
 
@@ -1849,6 +1856,13 @@ public class ReportAppService : ApplicationService, IReportAppService
         // MOB-BE-04: a parent may only read their own children's report cards.
         var childIds = await _currentParent.GetCurrentChildStudentIdsAsync();
         if (childIds != null && !childIds.Contains(report.StudentId))
+            throw new UserFriendlyException(AssessmentExceptionCodes.ReportNotFound, "Report not found.");
+
+        // RC-08: the Teacher role holds ReportCards.View too, and this response
+        // carries the same subject names and percentages. A teacher may only
+        // read promotion advice for the classes they teach.
+        var taughtClassIds = await TeacherClassScopeAsync();
+        if (taughtClassIds != null && !taughtClassIds.Contains(report.ClassId))
             throw new UserFriendlyException(AssessmentExceptionCodes.ReportNotFound, "Report not found.");
 
         // Projected as a nullable level, not an anonymous type: Grade is

@@ -27,6 +27,7 @@ public class ReportSubjectAppService : ApplicationService, IReportSubjectAppServ
     private readonly IRepository<Report, Guid> _reportRepository;
     private readonly psms.Academic.Students.ICurrentStudentResolver _currentStudent;
     private readonly psms.Academic.Parents.ICurrentParentResolver _currentParent;
+    private readonly psms.Academic.Teachers.ICurrentTeacherResolver _currentTeacher;
     private readonly psms.Assessment.Reports.ReportCohortStatisticsService _cohortStatistics;
 
     public ReportSubjectAppService(
@@ -34,12 +35,14 @@ public class ReportSubjectAppService : ApplicationService, IReportSubjectAppServ
         IRepository<Report, Guid> reportRepository,
         psms.Academic.Students.ICurrentStudentResolver currentStudent,
         psms.Academic.Parents.ICurrentParentResolver currentParent,
+        psms.Academic.Teachers.ICurrentTeacherResolver currentTeacher,
         psms.Assessment.Reports.ReportCohortStatisticsService cohortStatistics)
     {
         _reportSubjectRepository = reportSubjectRepository;
         _reportRepository = reportRepository;
         _currentStudent = currentStudent;
         _currentParent = currentParent;
+        _currentTeacher = currentTeacher;
         _cohortStatistics = cohortStatistics;
     }
 
@@ -72,6 +75,9 @@ public class ReportSubjectAppService : ApplicationService, IReportSubjectAppServ
             throw new UserFriendlyException(AssessmentExceptionCodes.ReportSubjectNotFound,
                 "Report subject entry not found.");
 
+        await AssertTeacherTeachesAsync(reportSubject.Report.ClassId,
+            AssessmentExceptionCodes.ReportSubjectNotFound, "Report subject entry not found.");
+
         return ObjectMapper.Map<ReportSubjectDto>(reportSubject);
     }
 
@@ -95,6 +101,9 @@ public class ReportSubjectAppService : ApplicationService, IReportSubjectAppServ
         var childIds = await _currentParent.GetCurrentChildStudentIdsAsync();
         if (childIds != null && !childIds.Contains(report.StudentId))
             throw new UserFriendlyException(AssessmentExceptionCodes.ReportNotFound, "Report not found.");
+
+        await AssertTeacherTeachesAsync(report.ClassId,
+            AssessmentExceptionCodes.ReportNotFound, "Report not found.");
 
         var items = await _reportSubjectRepository
             .GetAll()
@@ -243,6 +252,12 @@ public class ReportSubjectAppService : ApplicationService, IReportSubjectAppServ
             throw new UserFriendlyException(AssessmentExceptionCodes.ReportSubjectNotFound,
                 "Report subject entry not found.");
 
+        // RC-08: and only for a class this teacher actually teaches. Without
+        // this a teacher could write a comment onto any learner's report card in
+        // the school by subject-row id.
+        await AssertTeacherTeachesAsync(reportSubject.Report.ClassId,
+            AssessmentExceptionCodes.ReportSubjectNotFound, "Report subject entry not found.");
+
         // RC-10: the two methods beside this one refuse an approved or published
         // report; this one had no status guard at all, so the comments on a card
         // a parent had already downloaded could be rewritten afterwards.
@@ -255,6 +270,26 @@ public class ReportSubjectAppService : ApplicationService, IReportSubjectAppServ
         await CurrentUnitOfWork.SaveChangesAsync();
 
         return await GetAsync(id);
+    }
+
+    /// <summary>
+    /// RC-08. A teacher may only reach report card rows for classes they teach.
+    /// <para>
+    /// ReportCards.View and ReportCards.Comment are school-wide, so scoping the
+    /// report list alone was not enough: these per-subject routes take a report
+    /// or subject id and returned — and in AddTeacherComment's case wrote —
+    /// another class's card. Senior staff hold ReportCards.Generate and are not
+    /// confined.
+    /// </para>
+    /// </summary>
+    private async Task AssertTeacherTeachesAsync(Guid classId, string code, string message)
+    {
+        if (PermissionChecker.IsGranted(PermissionNames.Assessment_ReportCards_Generate))
+            return;
+
+        var taught = await _currentTeacher.GetTaughtClassIdsAsync();
+        if (taught != null && !taught.Contains(classId))
+            throw new UserFriendlyException(code, message);
     }
 
     private async Task RecalculateReportOverall(Guid reportId)
