@@ -130,6 +130,7 @@ public static class AssessmentExceptionCodes
     /// card on the Class Teacher line.
     /// </summary>
     public const string NotTheClassTeacher = "ASM_NOT_THE_CLASS_TEACHER";
+    public const string NotTheSubjectTeacher = "ASM_NOT_THE_SUBJECT_TEACHER";
 
     public const string ReportNotEditable = "ASM_REPORT_NOT_EDITABLE";
     public const string ReportNotPublished = "ASM_REPORT_NOT_PUBLISHED";

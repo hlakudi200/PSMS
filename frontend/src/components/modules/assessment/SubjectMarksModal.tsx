@@ -36,6 +36,11 @@ import {
   useReportSubjectActions,
   useReportSubjectState,
 } from '@/providers/assessment/report_subjects';
+import {
+  TeacherProvider,
+  useTeacherState,
+  useTeacherActions,
+} from '@/providers/academic/teachers';
 import type { IReportSubject } from '@/providers/assessment/shared/interfaces';
 import { formatMark, formatPercentage } from '@/utils/marks';
 
@@ -51,6 +56,8 @@ interface DraftRow {
   examWeight: number;
   teacherComment?: string;
   awaitsExternalExamination?: boolean;
+  /** Whose subject this is, so a teacher only writes their own comment. */
+  teacherId?: string;
 }
 
 const rowSchema = z
@@ -95,6 +102,8 @@ const SubjectMarksModalInner: React.FC<Props> = ({
   const { getByReportAsync, bulkRecordMarksAsync, addTeacherCommentAsync } =
     useReportSubjectActions();
   const { reportSubjects } = useReportSubjectState();
+  const { teacher: me } = useTeacherState();
+  const { getByCurrentUserAsync } = useTeacherActions();
 
   const [rows, setRows] = useState<DraftRow[]>([]);
   const [loading, setLoading] = useState(false);
@@ -105,6 +114,23 @@ const SubjectMarksModalInner: React.FC<Props> = ({
   const marksReadOnly = closed || !canEditMarks;
   const commentsReadOnly = closed;
   const readOnly = marksReadOnly && commentsReadOnly;
+
+  /* RC-08: the comment prints under the subject as that teacher's judgement, so
+     a teacher writes only their own subject's. Senior staff (who capture marks)
+     are not restricted; neither is a caller whose teacher profile did not
+     resolve, since the server has the final say either way. */
+  const mayCommentOn = (row: DraftRow): boolean => {
+    if (commentsReadOnly) return false;
+    if (canEditMarks || !me?.id) return true;
+    return row.teacherId === me.id;
+  };
+
+  /* Who am I, so the comment boxes that are not mine can be closed. Only
+     needed for a comment-only caller; senior staff write any subject's. */
+  useEffect(() => {
+    if (open && !canEditMarks) getByCurrentUserAsync();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, canEditMarks]);
 
   useEffect(() => {
     if (!open) return;
@@ -129,6 +155,7 @@ const SubjectMarksModalInner: React.FC<Props> = ({
         examWeight: s.examWeight ?? 60,
         teacherComment: s.teacherComment ?? '',
         awaitsExternalExamination: s.awaitsExternalExamination,
+        teacherId: s.teacherId,
       })),
     );
   }, [reportSubjects]);
@@ -219,7 +246,7 @@ const SubjectMarksModalInner: React.FC<Props> = ({
         /* RC-08: a teacher holds the comment permission but not Generate, so
            their save goes one comment at a time through the endpoint that
            permission gates. */
-        for (const row of edited) {
+        for (const row of edited.filter(mayCommentOn)) {
           await addTeacherCommentAsync(row.reportSubjectId, row.teacherComment?.trim() ?? '');
         }
       }
@@ -344,8 +371,12 @@ const SubjectMarksModalInner: React.FC<Props> = ({
           rows={1}
           maxLength={1000}
           value={row.teacherComment}
-          disabled={commentsReadOnly}
-          placeholder="Strengths and what to work on"
+          disabled={!mayCommentOn(row)}
+          placeholder={
+            mayCommentOn(row)
+              ? 'Strengths and what to work on'
+              : `Written by ${row.teacherId ? 'this subject’s teacher' : 'the subject teacher'}`
+          }
           onChange={(e) =>
             update(row.reportSubjectId, { teacherComment: e.target.value })
           }
@@ -428,9 +459,11 @@ const SubjectMarksModalInner: React.FC<Props> = ({
 
 /** Mounts the provider the screen needs, which nothing had mounted before. */
 export const SubjectMarksModal: React.FC<Props> = (props) => (
-  <ReportSubjectProvider>
-    <SubjectMarksModalInner {...props} />
-  </ReportSubjectProvider>
+  <TeacherProvider>
+    <ReportSubjectProvider>
+      <SubjectMarksModalInner {...props} />
+    </ReportSubjectProvider>
+  </TeacherProvider>
 );
 
 export default SubjectMarksModal;
