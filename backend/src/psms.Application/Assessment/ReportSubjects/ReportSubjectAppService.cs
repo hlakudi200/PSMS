@@ -25,6 +25,7 @@ public class ReportSubjectAppService : ApplicationService, IReportSubjectAppServ
 {
     private readonly IRepository<ReportSubject, Guid> _reportSubjectRepository;
     private readonly IRepository<Report, Guid> _reportRepository;
+    private readonly IRepository<psms.Domain.Academic.Entities.ClassSubject, Guid> _classSubjectRepository;
     private readonly psms.Academic.Students.ICurrentStudentResolver _currentStudent;
     private readonly psms.Academic.Parents.ICurrentParentResolver _currentParent;
     private readonly psms.Academic.Teachers.ICurrentTeacherResolver _currentTeacher;
@@ -33,6 +34,7 @@ public class ReportSubjectAppService : ApplicationService, IReportSubjectAppServ
     public ReportSubjectAppService(
         IRepository<ReportSubject, Guid> reportSubjectRepository,
         IRepository<Report, Guid> reportRepository,
+        IRepository<psms.Domain.Academic.Entities.ClassSubject, Guid> classSubjectRepository,
         psms.Academic.Students.ICurrentStudentResolver currentStudent,
         psms.Academic.Parents.ICurrentParentResolver currentParent,
         psms.Academic.Teachers.ICurrentTeacherResolver currentTeacher,
@@ -40,6 +42,7 @@ public class ReportSubjectAppService : ApplicationService, IReportSubjectAppServ
     {
         _reportSubjectRepository = reportSubjectRepository;
         _reportRepository = reportRepository;
+        _classSubjectRepository = classSubjectRepository;
         _currentStudent = currentStudent;
         _currentParent = currentParent;
         _currentTeacher = currentTeacher;
@@ -258,6 +261,9 @@ public class ReportSubjectAppService : ApplicationService, IReportSubjectAppServ
         await AssertTeacherTeachesAsync(reportSubject.Report.ClassId,
             AssessmentExceptionCodes.ReportSubjectNotFound, "Report subject entry not found.");
 
+        // RC-08: and only on the subject they teach that learner.
+        await AssertTeachesThisSubjectAsync(reportSubject);
+
         // RC-10: the two methods beside this one refuse an approved or published
         // report; this one had no status guard at all, so the comments on a card
         // a parent had already downloaded could be rewritten afterwards.
@@ -270,6 +276,50 @@ public class ReportSubjectAppService : ApplicationService, IReportSubjectAppServ
         await CurrentUnitOfWork.SaveChangesAsync();
 
         return await GetAsync(id);
+    }
+
+    /// <summary>
+    /// RC-08. Only the teacher of THAT subject writes that subject's comment.
+    /// <para>
+    /// The comment prints under the subject on the card and reads as the subject
+    /// teacher's professional judgement, so the Accounting teacher has no
+    /// business writing the Mathematics one. Being connected to the class is not
+    /// enough — that is what <see cref="AssertTeacherTeachesAsync"/> checks, and
+    /// on its own it let any teacher in the class comment on all nine subjects.
+    /// </para>
+    /// <para>
+    /// Measured against the CURRENT class-subject assignment rather than the
+    /// TeacherId stamped on the row at generation, so a teacher who takes a
+    /// class over mid-year can comment and their predecessor cannot. Where the
+    /// class-subject has no teacher assigned, the row's own TeacherId is used,
+    /// and if that is empty too only senior staff can write it — there is nobody
+    /// else it could belong to. The class teacher is not an exception here: they
+    /// have their own overall comment on the report, and they sign the card.
+    /// </para>
+    /// </summary>
+    private async Task AssertTeachesThisSubjectAsync(ReportSubject reportSubject)
+    {
+        if (PermissionChecker.IsGranted(PermissionNames.Assessment_ReportCards_Generate))
+            return;
+
+        var teacherId = await _currentTeacher.GetCurrentTeacherIdAsync();
+        if (teacherId == null)
+            return; // not a teacher at all; the class-level guard governs
+
+        var assigned = await _classSubjectRepository
+            .GetAll()
+            .Where(cs => cs.TenantId == AbpSession.TenantId
+                && cs.ClassId == reportSubject.Report.ClassId
+                && cs.SubjectId == reportSubject.SubjectId
+                && cs.IsActive)
+            .Select(cs => cs.TeacherId)
+            .FirstOrDefaultAsync();
+
+        var owner = assigned ?? reportSubject.TeacherId;
+
+        if (owner != teacherId.Value)
+            throw new UserFriendlyException(AssessmentExceptionCodes.NotTheSubjectTeacher,
+                "Only the teacher who teaches this subject can write its comment on the report card.");
     }
 
     /// <summary>
