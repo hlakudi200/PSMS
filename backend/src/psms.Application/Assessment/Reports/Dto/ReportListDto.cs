@@ -48,4 +48,12 @@ public class ReportListDto : EntityDto<Guid>
     /// Report/GetReportPdfUrl when the user actually clicks download (RC-04).
     /// </summary>
     public bool HasPdf { get; set; }
+
+    /// <summary>
+    /// True when the signed-in user is the class teacher of this report's class
+    /// — the one who signs the Class Teacher line. A teacher who teaches a
+    /// subject in several classes only registers one of them, so without this
+    /// the list gives them no way to tell which cards are theirs to sign.
+    /// </summary>
+    public bool IsMyRegisterClass { get; set; }
 }

@@ -138,6 +138,7 @@ public class ReportAppService : ApplicationService, IReportAppService
 
         var dto = ObjectMapper.Map<ReportDto>(report);
         dto.SubjectReports = ObjectMapper.Map<List<ReportSubjectDto>>(report.SubjectReports.OrderBy(sr => sr.Subject?.SubjectName).ToList());
+        dto.CanSignAsClassTeacher = await CanSignAsClassTeacherAsync(report.ClassId);
 
         // RC-09: see ReportListDto.ActiveWorkflowInstanceId.
         var live = await _workflowStarter.GetActiveInstanceIdsAsync(
@@ -199,10 +200,15 @@ public class ReportAppService : ApplicationService, IReportAppService
             WorkflowEntityType.Report,
             dtos.Select(d => d.Id).ToList());
 
+        // Which of these are mine to sign. One query for the page, not one per row.
+        var registerClassIds = await MyRegisterClassIdsAsync();
+
         foreach (var dto in dtos)
         {
             if (liveWorkflows.TryGetValue(dto.Id, out var instanceId))
                 dto.ActiveWorkflowInstanceId = instanceId;
+
+            dto.IsMyRegisterClass = registerClassIds.Contains(dto.ClassId);
         }
 
         return new PagedResultDto<ReportListDto>(totalCount, dtos);
@@ -247,6 +253,7 @@ public class ReportAppService : ApplicationService, IReportAppService
 
         var dto = ObjectMapper.Map<ReportDto>(report);
         dto.SubjectReports = ObjectMapper.Map<List<ReportSubjectDto>>(report.SubjectReports.OrderBy(sr => sr.Subject?.SubjectName).ToList());
+        dto.CanSignAsClassTeacher = await CanSignAsClassTeacherAsync(report.ClassId);
 
         // RC-09: see ReportListDto.ActiveWorkflowInstanceId.
         var live = await _workflowStarter.GetActiveInstanceIdsAsync(
@@ -807,6 +814,40 @@ public class ReportAppService : ApplicationService, IReportAppService
             return null;
 
         return await _currentTeacher.GetTaughtClassIdsAsync();
+    }
+
+    /// <summary>
+    /// The classes the signed-in user is the class teacher of — the register
+    /// classes, whose cards are theirs to sign. Narrower than
+    /// <see cref="TeacherClassScopeAsync"/>, which also includes classes they
+    /// only teach a subject in.
+    /// </summary>
+    private async Task<HashSet<Guid>> MyRegisterClassIdsAsync()
+    {
+        var userId = AbpSession.UserId;
+        if (userId == null) return new HashSet<Guid>();
+
+        var ids = await _classRepository
+            .GetAll()
+            .Where(c => c.TenantId == AbpSession.TenantId && c.ClassTeacher.UserId == userId.Value)
+            .Select(c => c.Id)
+            .ToListAsync();
+
+        return ids.ToHashSet();
+    }
+
+    /// <summary>
+    /// Whether the signed-in user may sign the Class Teacher line on a card for
+    /// this class. The same rule SignAsTeacherAsync enforces, so the screen can
+    /// offer the signature only to whoever can actually give it.
+    /// </summary>
+    private async Task<bool> CanSignAsClassTeacherAsync(Guid classId)
+    {
+        var userId = AbpSession.UserId;
+        if (userId == null) return false;
+
+        return await IsClassTeacherAsync(classId, userId.Value)
+            || PermissionChecker.IsGranted(PermissionNames.Assessment_ReportCards_Generate);
     }
 
     private async Task<bool> IsClassTeacherAsync(Guid classId, long userId)

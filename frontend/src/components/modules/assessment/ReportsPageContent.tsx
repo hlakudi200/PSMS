@@ -3,7 +3,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { usePortalBase } from '@/utils/portal-base';
-import { Card, Col, Row, Select, message } from 'antd';
+import { Card, Col, Row, Select, Space, Switch, Tag, Tooltip, Typography, message } from 'antd';
 import {
   CheckCircleOutlined,
   SendOutlined,
@@ -103,6 +103,7 @@ function ReportsContent() {
   // #301: the whole school in one list is unusable — a principal works a class
   // at a time. The API has always accepted ClassId; nothing sent it.
   const [selectedClassId, setSelectedClassId] = useState<string | undefined>(undefined);
+  const [onlyMyRegisterClass, setOnlyMyRegisterClass] = useState(false);
   const [lastQuery, setLastQuery] = useState<TableQuery | null>(null);
 
   // Load filter dropdowns
@@ -148,7 +149,22 @@ function ReportsContent() {
   const columns: ColumnConfig<IReportList>[] = [
     { key: 'studentName', title: 'Student', dataIndex: 'studentName', sortable: true },
     { key: 'studentAdmissionNumber', title: 'Adm #', dataIndex: 'studentAdmissionNumber', sortable: true, width: 100 },
-    { key: 'className', title: 'Class', dataIndex: 'className', sortable: true },
+    {
+      key: 'className', title: 'Class', dataIndex: 'className', sortable: true,
+      // Whose card is whose to sign. A teacher teaches subjects across several
+      // classes but registers only one, and the Class Teacher line is theirs
+      // alone — without this the list gave them no way to tell them apart.
+      render: (value: string, record: IReportList) => (
+        <Space size={6}>
+          <span>{value}</span>
+          {record.isMyRegisterClass && (
+            <Tooltip title="You are the class teacher — this card's Class Teacher line is yours to sign">
+              <Tag color="blue" style={{ marginInlineEnd: 0 }}>My class</Tag>
+            </Tooltip>
+          )}
+        </Space>
+      ),
+    },
     { key: 'termName', title: 'Term', dataIndex: 'termName', sortable: true },
     { key: 'academicYearName', title: 'Year', dataIndex: 'academicYearName', sortable: true, hideOnMobile: true },
     {
@@ -391,6 +407,14 @@ function ReportsContent() {
     },
   ];
 
+  /* Applied to the loaded page rather than the query: whether a card is mine to
+     sign is computed per row from the class register, not stored on the report,
+     so there is nothing for the server to filter on. */
+  const visibleReports = onlyMyRegisterClass
+    ? (reports ?? []).filter((r) => r.isMyRegisterClass)
+    : (reports ?? []);
+  const myRegisterCount = (reports ?? []).filter((r) => r.isMyRegisterClass).length;
+
   // Filter terms by selected academic year
   const filteredTerms = selectedAcademicYearId
     ? terms?.filter(t => t.academicYearId === selectedAcademicYearId)
@@ -471,13 +495,33 @@ function ReportsContent() {
             />
           </Col>
         </Row>
+        {myRegisterCount > 0 && (
+          <Row style={{ marginTop: 12 }}>
+            <Col xs={24}>
+              <Space size={8}>
+                <Switch
+                  size="small"
+                  checked={onlyMyRegisterClass}
+                  onChange={setOnlyMyRegisterClass}
+                  id="only-my-register-class"
+                />
+                <Typography.Text>
+                  Only my register class
+                </Typography.Text>
+                <Typography.Text type="secondary">
+                  ({myRegisterCount} of {(reports ?? []).length} on this page {myRegisterCount === 1 ? 'is' : 'are'} mine to sign)
+                </Typography.Text>
+              </Space>
+            </Col>
+          </Row>
+        )}
       </Card>
 
       {/* Reports Table */}
       <EnterpriseTable<IReportList>
         title="Report Cards"
         columns={columns}
-        data={reports ?? []}
+        data={visibleReports}
         totalCount={totalCount}
         loading={isPending}
         error={isError}

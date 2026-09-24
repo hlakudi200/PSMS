@@ -44,6 +44,15 @@ public class ReportDto : FullAuditedEntityDto<Guid>
     public string BehaviourComments { get; set; }
     public long? TeacherSignedByUserId { get; set; }
     public DateTime? TeacherSignedDate { get; set; }
+    /// <summary>
+    /// Whether the signed-in user may sign the Class Teacher line on THIS card —
+    /// they register the class, or they are senior enough to generate it.
+    /// Mirrors what SignAsTeacherAsync enforces, so the screen can offer the
+    /// signature only to whoever can actually give it instead of showing every
+    /// teacher a button that returns "Only this class's teacher can sign".
+    /// </summary>
+    public bool CanSignAsClassTeacher { get; set; }
+
     public long? PrincipalSignedByUserId { get; set; }
     public DateTime? PrincipalSignedDate { get; set; }
     public ReportStatus Status { get; set; }

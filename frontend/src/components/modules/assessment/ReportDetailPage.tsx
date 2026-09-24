@@ -1097,6 +1097,12 @@ function ReportDetailContent() {
         <ConductAndSignOffCard
           report={report}
           canRecordConduct={canCommentOnSubjects}
+          /* Falls back to the old, permissive behaviour when the field is
+             absent — the frontend deploys ahead of the API, and the server
+             refuses a signature from the wrong teacher either way. Hiding the
+             button on a missing field would instead lock everyone out of
+             signing for the length of that window. */
+          canSignAsClassTeacher={report.canSignAsClassTeacher ?? canCommentOnSubjects}
           canSignAsPrincipal={canManageReport}
           onChanged={() => getAsync(report.id)}
         />
