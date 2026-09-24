@@ -322,11 +322,11 @@ export const ReportProvider = ({
   const signAsTeacherAsync = (id: string) => signReportAsync(id, 'SignAsTeacher');
   const signAsPrincipalAsync = (id: string) => signReportAsync(id, 'SignAsPrincipal');
 
-  const generatePdfAsync = async (id: string) => {
+  const generatePdfAsync = async (id: string, options?: { quiet?: boolean }) => {
     dispatch(generatePdfPending());
     const endpoint = `/api/services/app/Report/GenerateReportPdf?id=${id}`;
     await instance
-      .post(endpoint)
+      .post(endpoint, undefined, { suppressErrorModal: options?.quiet === true })
       .then(() => {
         dispatch(generatePdfSuccess());
       })

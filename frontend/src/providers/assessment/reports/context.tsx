@@ -50,7 +50,12 @@ export interface IReportActionContext {
   /** RC-17: the principal signs the card off (RE-003). */
   signAsPrincipalAsync: (id: string) => void;
   deleteAsync: (id: string) => void;
-  generatePdfAsync: (id: string) => void;
+  /**
+   * Queues the report card's PDF. Pass `quiet` when doing many at once: the
+   * caller counts the failures and reports one summary, instead of the global
+   * interceptor throwing a dialog for each.
+   */
+  generatePdfAsync: (id: string, options?: { quiet?: boolean }) => Promise<void>;
   /**
    * Returns a short-lived signed link. Deliberately returns the value instead
    * of putting it in state: it expires in minutes and must not be cached or
