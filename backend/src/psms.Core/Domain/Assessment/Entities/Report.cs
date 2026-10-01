@@ -170,6 +170,14 @@ namespace psms.Domain.Assessment.Entities
 
         /// <summary>RC-17. Who signed the card off as principal, and when.</summary>
         /// <summary>
+        /// Opaque code behind the QR on the printed card. See
+        /// <see cref="AssignVerificationToken"/> for why it is not the report
+        /// card number.
+        /// </summary>
+        [MaxLength(64)]
+        public string VerificationToken { get; set; }
+
+        /// <summary>
         /// The class teacher's handwritten signature as it was drawn when they
         /// signed THIS card — copied from their stored signature at that moment,
         /// not read from it later. Redrawing their signature afterwards must not
@@ -393,6 +401,23 @@ namespace psms.Domain.Assessment.Entities
         {
             if (string.IsNullOrWhiteSpace(ReportCardNumber))
                 ReportCardNumber = number;
+        }
+
+        /// <summary>
+        /// The code behind the QR on the printed card, which a recipient follows
+        /// to confirm the card came from this school.
+        /// <para>
+        /// Deliberately NOT the report card number. That number spells out the
+        /// learner's admission number and class, so putting it in a scannable
+        /// link would make other learners' records guessable by editing the URL.
+        /// This is random and meaningless, and set once: the whole point is that
+        /// a code printed on an issued card keeps resolving to it.
+        /// </para>
+        /// </summary>
+        public void AssignVerificationToken(string token)
+        {
+            if (string.IsNullOrWhiteSpace(VerificationToken))
+                VerificationToken = token;
         }
 
         /// <summary>
