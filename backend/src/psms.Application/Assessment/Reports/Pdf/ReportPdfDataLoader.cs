@@ -40,6 +40,7 @@ public class ReportPdfDataLoader : ITransientDependency
     private readonly IRepository<psms.Authorization.Users.User, long> _userRepository;
     private readonly TenantManager _tenantManager;
     private readonly IUnitOfWorkManager _unitOfWorkManager;
+    private readonly Microsoft.Extensions.Configuration.IConfiguration _configuration;
     public Castle.Core.Logging.ILogger Logger { get; set; } = Castle.Core.Logging.NullLogger.Instance;
 
     public ReportPdfDataLoader(
@@ -47,13 +48,15 @@ public class ReportPdfDataLoader : ITransientDependency
         IRepository<SchoolBranding, Guid> brandingRepository,
         IRepository<psms.Authorization.Users.User, long> userRepository,
         TenantManager tenantManager,
-        IUnitOfWorkManager unitOfWorkManager)
+        IUnitOfWorkManager unitOfWorkManager,
+        Microsoft.Extensions.Configuration.IConfiguration configuration)
     {
         _reportRepository = reportRepository;
         _brandingRepository = brandingRepository;
         _userRepository = userRepository;
         _tenantManager = tenantManager;
         _unitOfWorkManager = unitOfWorkManager;
+        _configuration = configuration;
     }
 
     public async Task<ReportPdfData> LoadAsync(Guid reportId, int? tenantId)
@@ -133,6 +136,7 @@ public class ReportPdfDataLoader : ITransientDependency
             PrincipalSignedBy = await ResolveSignerAsync(report.PrincipalSignedByUserId),
             PrincipalSignedDate = report.PrincipalSignedDate?.ToString("dd MMM yyyy"),
             PrincipalSignatureSvg = report.PrincipalSignatureSvg,
+            VerificationUrl = BuildVerificationUrl(report.VerificationToken),
             OverallPercentage = report.OverallPercentage,
             OverallAchievementLevel = report.OverallAchievementLevel,
             ClassPosition = report.ClassPosition,
@@ -232,10 +236,51 @@ public class ReportPdfDataLoader : ITransientDependency
     };
 
     /// <summary>
+    /// Where the QR on the card points. Null when the card has no code yet —
+    /// anything generated before verification existed — which simply leaves the
+    /// strip off rather than printing a link that resolves to nothing.
+    /// <para>
+    /// Also null when the address configured is one only this machine can
+    /// reach. A report card is issued once and, under National Protocol §25(3),
+    /// is not withdrawn afterwards; a QR pointing at localhost would sit on a
+    /// parent's copy forever, scanning to nothing and looking for all the world
+    /// like the card is a forgery. A card with no QR can be reissued with one.
+    /// A card with the wrong QR cannot be taken back, so a deployment that has
+    /// not been told its own public address prints no code and says why.
+    /// </para>
+    /// </summary>
+    private string BuildVerificationUrl(string token)
+    {
+        if (string.IsNullOrWhiteSpace(token)) return null;
+
+        var root = _configuration["App:ClientRootAddress"];
+        if (string.IsNullOrWhiteSpace(root)) return null;
+
+        if (!Uri.TryCreate(root, UriKind.Absolute, out var uri)
+            || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+        {
+            Logger.Warn($"App:ClientRootAddress is not an absolute http(s) address ('{root}'), "
+                + "so report cards are printing without a verification QR code.");
+            return null;
+        }
+
+        if (uri.IsLoopback || uri.Host.Equals("0.0.0.0", StringComparison.Ordinal))
+        {
+            Logger.Warn($"App:ClientRootAddress points at this machine ('{root}'), which nobody "
+                + "scanning a printed report card can reach, so cards are printing without a "
+                + "verification QR code. Set it to the address parents use.");
+            return null;
+        }
+
+        return $"{root.TrimEnd('/')}/verify/{token}";
+    }
+
+    /// <summary>
     /// RC-17. The name to print over a signature line. Null when nobody has
     /// signed, or when the account that did has since been removed — the card
     /// then prints the blank line it used to, rather than failing over a name.
     /// </summary>
+
     private async Task<string> ResolveSignerAsync(long? userId)
     {
         if (!userId.HasValue || userId.Value == 0)
