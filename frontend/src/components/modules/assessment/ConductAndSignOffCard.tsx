@@ -34,6 +34,11 @@ import {
 } from 'antd';
 import { CheckCircleTwoTone, EditOutlined, SignatureOutlined } from '@ant-design/icons';
 import { SignatureDrawModal } from './SignatureDrawModal';
+import {
+  StaffSignatureProvider,
+  useStaffSignatureActions,
+  useStaffSignatureState,
+} from '@/providers/assessment/staff_signature';
 import { z } from 'zod';
 import dayjs from 'dayjs';
 import { useReportActions } from '@/providers/assessment/reports';
@@ -89,7 +94,7 @@ interface Props {
   onChanged: () => void;
 }
 
-export const ConductAndSignOffCard: React.FC<Props> = ({
+const ConductAndSignOffCardInner: React.FC<Props> = ({
   report,
   canRecordConduct,
   canSignAsClassTeacher,
@@ -106,6 +111,13 @@ export const ConductAndSignOffCard: React.FC<Props> = ({
      settings page. */
   const [drawOpen, setDrawOpen] = useState(false);
   const [signAfterDrawing, setSignAfterDrawing] = useState<'teacher' | 'principal' | null>(null);
+  const { signature, isLoaded } = useStaffSignatureState();
+  const { getMineAsync } = useStaffSignatureActions();
+  /* Signing needs a signature on file. Ask once when the card opens so the
+     panel can offer to set one up, rather than letting the first attempt fail
+     just to discover it. */
+  useEffect(() => { if (!isLoaded) getMineAsync(); }, [isLoaded, getMineAsync]);
+  const hasSignature = Boolean(signature?.svgContent);
 
   /* Published cards are closed to all of this — the National Protocol §25(3)
      asks that an issued card carry no corrections. */
@@ -246,15 +258,27 @@ export const ConductAndSignOffCard: React.FC<Props> = ({
                 Class teacher signed {signedOn(report.teacherSignedDate)}
               </Tag>
             ) : canSignAsClassTeacher && !closed ? (
-              <Popconfirm
-                title="Sign this report card as the class teacher?"
-                description="A signature says the card is correct as it stands."
-                onConfirm={() => sign('teacher')}
-              >
-                <Button size="small" icon={<SignatureOutlined />}>
-                  Sign as class teacher
+              hasSignature ? (
+                <Popconfirm
+                  title="Sign this report card as the class teacher?"
+                  description="A signature says the card is correct as it stands."
+                  onConfirm={() => sign('teacher')}
+                >
+                  <Button size="small" icon={<SignatureOutlined />}>
+                    Sign as class teacher
+                  </Button>
+                </Popconfirm>
+              ) : (
+                /* Nothing to sign with yet. Say so and offer the pad, rather
+                   than a Sign button whose only outcome is a refusal. */
+                <Button
+                  size="small"
+                  icon={<SignatureOutlined />}
+                  onClick={() => { setSignAfterDrawing('teacher'); setDrawOpen(true); }}
+                >
+                  Set up your signature to sign
                 </Button>
-              </Popconfirm>
+              )
             ) : (
               <Text type="secondary">
                 Not signed by the class teacher
@@ -268,15 +292,25 @@ export const ConductAndSignOffCard: React.FC<Props> = ({
                 Principal signed {signedOn(report.principalSignedDate)}
               </Tag>
             ) : canSignAsPrincipal && !closed ? (
-              <Popconfirm
-                title="Sign this report card as principal?"
-                description="A signature says the card is correct as it stands."
-                onConfirm={() => sign('principal')}
-              >
-                <Button size="small" icon={<SignatureOutlined />}>
-                  Sign as principal
+              hasSignature ? (
+                <Popconfirm
+                  title="Sign this report card as principal?"
+                  description="A signature says the card is correct as it stands."
+                  onConfirm={() => sign('principal')}
+                >
+                  <Button size="small" icon={<SignatureOutlined />}>
+                    Sign as principal
+                  </Button>
+                </Popconfirm>
+              ) : (
+                <Button
+                  size="small"
+                  icon={<SignatureOutlined />}
+                  onClick={() => { setSignAfterDrawing('principal'); setDrawOpen(true); }}
+                >
+                  Set up your signature to sign
                 </Button>
-              </Popconfirm>
+              )
             ) : (
               <Text type="secondary">Not signed by the principal</Text>
             )}
@@ -304,5 +338,12 @@ export const ConductAndSignOffCard: React.FC<Props> = ({
     </Card>
   );
 };
+
+/** Mounts the signature provider the sign-off panel reads. */
+export const ConductAndSignOffCard: React.FC<Props> = (props) => (
+  <StaffSignatureProvider>
+    <ConductAndSignOffCardInner {...props} />
+  </StaffSignatureProvider>
+);
 
 export default ConductAndSignOffCard;

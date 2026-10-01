@@ -21,7 +21,7 @@ interface Props {
 
 /** Draw-once signature capture. SVG, so it stays sharp on the printed card. */
 const SignatureDrawModalInner: React.FC<Props> = ({ open, onClose, onSaved }) => {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [canvas, setCanvas] = useState<HTMLCanvasElement | null>(null);
   const padRef = useRef<SignaturePad | null>(null);
   const [empty, setEmpty] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -32,17 +32,35 @@ const SignatureDrawModalInner: React.FC<Props> = ({ open, onClose, onSaved }) =>
     if (open && !isLoaded) getMineAsync();
   }, [open, isLoaded, getMineAsync]);
 
-  /* The canvas is only in the DOM once the modal has opened, so the pad is
-     built here rather than on mount. The backing store is scaled to the
-     device's pixel ratio or the stroke is blurry on a laptop screen. */
-  const attach = useCallback((canvas: HTMLCanvasElement | null) => {
-    canvasRef.current = canvas;
-    if (!canvas) { padRef.current = null; return; }
+  /* The backing store is scaled to the device's pixel ratio, or the stroke is
+     blurry on a laptop screen.
+
+     Sizing it is the whole trick. The modal animates open, so on the frame the
+     canvas mounts it can still measure 0 x 0 — and a pad built against a canvas
+     of no size records strokes quite happily while writing viewBox="0 0 0 0"
+     around them, which prints as a blank line above the teacher's name. So the
+     size is taken when the element actually has one, and again whenever it
+     changes; resizing a canvas wipes it, so the strokes are put back. */
+  const resize = useCallback(() => {
+    const pad = padRef.current;
+    if (!canvas || !pad) return;
 
     const ratio = Math.max(window.devicePixelRatio || 1, 1);
-    canvas.width = canvas.offsetWidth * ratio;
-    canvas.height = canvas.offsetHeight * ratio;
+    const width = Math.round(canvas.offsetWidth * ratio);
+    const height = Math.round(canvas.offsetHeight * ratio);
+    if (width === 0 || height === 0) return;            // not laid out yet
+    if (canvas.width === width && canvas.height === height) return;
+
+    const strokes = pad.toData();
+    canvas.width = width;
+    canvas.height = height;
     canvas.getContext('2d')?.scale(ratio, ratio);
+    pad.clear();
+    if (strokes.length) pad.fromData(strokes);
+  }, [canvas]);
+
+  useEffect(() => {
+    if (!open || !canvas) return undefined;
 
     const pad = new SignaturePad(canvas, {
       penColor: '#1a1a1a',
@@ -50,10 +68,22 @@ const SignatureDrawModalInner: React.FC<Props> = ({ open, onClose, onSaved }) =>
       maxWidth: 2.2,
       backgroundColor: 'rgba(255,255,255,0)',
     });
-    pad.addEventListener('endStroke', () => setEmpty(pad.isEmpty()));
+    const onEnd = () => setEmpty(pad.isEmpty());
+    pad.addEventListener('endStroke', onEnd);
     padRef.current = pad;
     setEmpty(true);
-  }, []);
+    resize();
+
+    const observer = new ResizeObserver(resize);
+    observer.observe(canvas);
+
+    return () => {
+      observer.disconnect();
+      pad.removeEventListener('endStroke', onEnd);
+      pad.off();
+      padRef.current = null;
+    };
+  }, [open, canvas, resize]);
 
   const clear = () => { padRef.current?.clear(); setEmpty(true); };
 
@@ -68,6 +98,14 @@ const SignatureDrawModalInner: React.FC<Props> = ({ open, onClose, onSaved }) =>
       /* SVG rather than PNG: it is what the pad draws natively, it stays sharp
          at print resolution, and it is a few KB of text instead of an image. */
       const svg = pad.toSVG();
+
+      /* A drawing with no canvas around it saves without complaint and then
+         prints as nothing. Catch it here rather than on the report card. */
+      if (!canvas?.width || !canvas?.height || /viewBox="[\d.\s]*?\s0\s+0"/.test(svg)) {
+        message.error('That did not come out. Clear the box and draw your signature again.');
+        return;
+      }
+
       await saveMineAsync(svg);
       message.success('Signature saved. It will be used whenever you sign a report card.');
       onSaved?.();
@@ -120,7 +158,7 @@ const SignatureDrawModalInner: React.FC<Props> = ({ open, onClose, onSaved }) =>
           }}
         >
           <canvas
-            ref={attach}
+            ref={setCanvas}
             style={{ width: '100%', height: 180, display: 'block', touchAction: 'none', cursor: 'crosshair' }}
           />
           <div

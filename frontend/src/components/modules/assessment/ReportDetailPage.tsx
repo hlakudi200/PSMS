@@ -561,7 +561,12 @@ function ReportDetailContent() {
     );
   }
 
-  if (isError || (!isPending && !report)) {
+  /* "Not found" means there is no report to show — not that the last thing you
+     did failed. Treating any error as a missing record is what made a healthy
+     card disappear the moment a sign-off was refused, taking the panel that
+     would have explained why down with it. Failures that leave the report
+     loaded are reported where they happened. */
+  if (!isPending && !report) {
     return (
       <div style={{ padding: 24 }}>
         <Button icon={<ArrowLeftOutlined />} onClick={goBack} style={{ marginBottom: 16 }}>
