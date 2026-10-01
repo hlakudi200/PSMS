@@ -169,9 +169,22 @@ namespace psms.Domain.Assessment.Entities
         public DateTime? TeacherSignedDate { get; set; }
 
         /// <summary>RC-17. Who signed the card off as principal, and when.</summary>
+        /// <summary>
+        /// The class teacher's handwritten signature as it was drawn when they
+        /// signed THIS card — copied from their stored signature at that moment,
+        /// not read from it later. Redrawing their signature afterwards must not
+        /// change a card they have already signed.
+        /// </summary>
+        [MaxLength(StaffSignature.MaxSvgLength)]
+        public string TeacherSignatureSvg { get; set; }
+
         public long? PrincipalSignedByUserId { get; set; }
 
         public DateTime? PrincipalSignedDate { get; set; }
+
+        /// <summary>The principal's signature, snapshotted the same way.</summary>
+        [MaxLength(StaffSignature.MaxSvgLength)]
+        public string PrincipalSignatureSvg { get; set; }
 
         /// <summary>
         /// Parent acknowledgement comment
@@ -425,17 +438,19 @@ namespace psms.Domain.Assessment.Entities
         /// <summary>
         /// RC-17. Records the class teacher's sign-off.
         /// </summary>
-        public void SignAsTeacher(long userId)
+        public void SignAsTeacher(long userId, string signatureSvg = null)
         {
             TeacherSignedByUserId = userId;
             TeacherSignedDate = DateTime.UtcNow;
+            TeacherSignatureSvg = signatureSvg;
         }
 
         /// <summary>RC-17. Records the principal's sign-off.</summary>
-        public void SignAsPrincipal(long userId)
+        public void SignAsPrincipal(long userId, string signatureSvg = null)
         {
             PrincipalSignedByUserId = userId;
             PrincipalSignedDate = DateTime.UtcNow;
+            PrincipalSignatureSvg = signatureSvg;
         }
 
         /// <summary>
@@ -447,8 +462,10 @@ namespace psms.Domain.Assessment.Entities
         {
             TeacherSignedByUserId = null;
             TeacherSignedDate = null;
+            TeacherSignatureSvg = null;
             PrincipalSignedByUserId = null;
             PrincipalSignedDate = null;
+            PrincipalSignatureSvg = null;
         }
 
         /// <summary>

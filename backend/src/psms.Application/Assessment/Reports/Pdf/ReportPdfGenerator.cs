@@ -552,15 +552,17 @@ public static class ReportPdfGenerator
             // RC-17: RE-003 requires a teacher and a principal signature before
             // a card is issued, and they are recorded now rather than being
             // three blank lines that meant only that somebody had printed it.
-            SignatureBlock(row, "Class Teacher", data.TeacherSignedBy, data.TeacherSignedDate);
+            SignatureBlock(row, "Class Teacher", data.TeacherSignedBy, data.TeacherSignedDate, data.TeacherSignatureSvg);
             row.ConstantItem(30); // spacer
-            SignatureBlock(row, "Principal", data.PrincipalSignedBy, data.PrincipalSignedDate);
+            SignatureBlock(row, "Principal", data.PrincipalSignedBy, data.PrincipalSignedDate, data.PrincipalSignatureSvg);
             row.ConstantItem(30); // spacer
-            SignatureBlock(row, "Parent / Guardian", null, null);
+            // Signed by hand on the printed card, so this one keeps its blank line.
+            SignatureBlock(row, "Parent / Guardian", null, null, null);
         });
     }
 
-    private static void SignatureBlock(RowDescriptor row, string title, string signedBy, string signedDate)
+    private static void SignatureBlock(
+        RowDescriptor row, string title, string signedBy, string signedDate, string signatureSvg)
     {
         row.RelativeItem().Column(c =>
         {
@@ -569,7 +571,27 @@ public static class ReportPdfGenerator
             // a card nobody has signed yet.
             if (!string.IsNullOrWhiteSpace(signedBy))
             {
-                c.Item().Height(14);
+                // Their handwriting, where they have drawn one. It sits above
+                // the name rather than replacing it: the drawing is for a reader,
+                // the typed name is what survives a signature that will not render.
+                if (!string.IsNullOrWhiteSpace(signatureSvg))
+                {
+                    try
+                    {
+                        c.Item().Height(26).AlignCenter().Svg(signatureSvg).FitArea();
+                    }
+                    catch (Exception)
+                    {
+                        // A drawing that will not render must not cost the school
+                        // the whole report card; the name and date still print.
+                        c.Item().Height(26);
+                    }
+                }
+                else
+                {
+                    c.Item().Height(14);
+                }
+
                 c.Item().AlignCenter().Text(signedBy).SemiBold().FontSize(9);
                 c.Item().Height(2);
             }

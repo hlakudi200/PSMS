@@ -33,6 +33,7 @@ import {
   message,
 } from 'antd';
 import { CheckCircleTwoTone, EditOutlined, SignatureOutlined } from '@ant-design/icons';
+import { SignatureDrawModal } from './SignatureDrawModal';
 import { z } from 'zod';
 import dayjs from 'dayjs';
 import { useReportActions } from '@/providers/assessment/reports';
@@ -100,6 +101,11 @@ export const ConductAndSignOffCard: React.FC<Props> = ({
 
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  /* Opened when signing is refused for want of a signature on file, so the
+     teacher draws one and carries straight on rather than hunting for a
+     settings page. */
+  const [drawOpen, setDrawOpen] = useState(false);
+  const [signAfterDrawing, setSignAfterDrawing] = useState<'teacher' | 'principal' | null>(null);
 
   /* Published cards are closed to all of this — the National Protocol §25(3)
      asks that an issued card carry no corrections. */
@@ -143,11 +149,27 @@ export const ConductAndSignOffCard: React.FC<Props> = ({
 
   const sign = async (who: 'teacher' | 'principal') => {
     try {
-      await (who === 'teacher' ? signAsTeacherAsync(report.id) : signAsPrincipalAsync(report.id));
+      await (who === 'teacher'
+        ? signAsTeacherAsync(report.id, { quiet: true })
+        : signAsPrincipalAsync(report.id, { quiet: true }));
       message.success('Signed');
       onChanged();
-    } catch {
-      message.error('Could not sign this report card');
+    } catch (error) {
+      /* RC-17: the server refuses to sign for somebody who has not drawn a
+         signature yet. That is a thing to do, not an error — open the pad and
+         sign once it is saved. */
+      const abp = (error as {
+        response?: { data?: { error?: { message?: string; details?: string } } };
+      })?.response?.data?.error;
+
+      if (abp?.message === 'ASM_SIGNATURE_MISSING') {
+        setSignAfterDrawing(who);
+        setDrawOpen(true);
+        return;
+      }
+      /* ABP puts the sentence in details and the code in message, so show the
+         sentence — "Only this class's teacher can sign…" rather than a code. */
+      message.error(abp?.details || 'Could not sign this report card');
     }
   };
 
@@ -268,6 +290,16 @@ export const ConductAndSignOffCard: React.FC<Props> = ({
             message="A report card needs both signatures before it can be published."
           />
         )}
+
+        <SignatureDrawModal
+          open={drawOpen}
+          onClose={() => { setDrawOpen(false); setSignAfterDrawing(null); }}
+          onSaved={() => {
+            const who = signAfterDrawing;
+            setSignAfterDrawing(null);
+            if (who) sign(who);
+          }}
+        />
       </Space>
     </Card>
   );
