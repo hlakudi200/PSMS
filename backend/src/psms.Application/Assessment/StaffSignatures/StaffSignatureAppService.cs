@@ -7,7 +7,9 @@ using psms.Assessment.Shared;
 using psms.Authorization;
 using psms.Domain.Assessment.Entities;
 using System;
+using System.Globalization;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 namespace psms.Assessment.StaffSignatures;
@@ -149,6 +151,41 @@ public class StaffSignatureAppService : ApplicationService, IStaffSignatureAppSe
                     "That does not look like a signature. Draw it in the box rather than pasting a file.");
         }
 
+        if (!lowered.Contains("<path"))
+            throw new UserFriendlyException(AssessmentExceptionCodes.SignatureInvalid,
+                "Draw your signature before saving it.");
+
+        if (!HasDrawableArea(lowered))
+            throw new UserFriendlyException(AssessmentExceptionCodes.SignatureInvalid,
+                "That signature did not come out. Draw it again — the box may not have finished "
+                + "opening the first time.");
+
         return svg;
+    }
+
+    /// <summary>
+    /// Whether the drawing has a canvas to be drawn on.
+    /// <para>
+    /// A signature pad that reads its canvas before the panel has been laid out
+    /// writes viewBox="0 0 0 0" around perfectly good strokes. Stored, that
+    /// looks like a signature everywhere except the printed card, where it
+    /// renders as nothing at all and the line above the name comes out blank.
+    /// Refusing it here keeps it off the card and out of the database.
+    /// </para>
+    /// </summary>
+    private static bool HasDrawableArea(string loweredSvg)
+    {
+        var box = Regex.Match(loweredSvg, "viewbox\\s*=\\s*\"([^\"]*)\"");
+        if (!box.Success)
+            return true;    // no viewBox at all: the renderer falls back to width/height
+
+        var parts = box.Groups[1].Value
+            .Split(new[] { ' ', ',', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+
+        return parts.Length == 4
+            && double.TryParse(parts[2], NumberStyles.Float, CultureInfo.InvariantCulture, out var width)
+            && double.TryParse(parts[3], NumberStyles.Float, CultureInfo.InvariantCulture, out var height)
+            && width > 0
+            && height > 0;
     }
 }
