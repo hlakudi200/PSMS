@@ -438,6 +438,16 @@ public class psmsDbContext : AbpZeroDbContext<Tenant, Role, User, psmsDbContext>
             .HasFilter("\"IsDeleted\" = false")
             .HasDatabaseName("IX_StaffSignatures_TenantId_UserId");
 
+        // The code a QR on a printed card resolves to. Unique across the whole
+        // table rather than per tenant: whoever scans it is not signed in and
+        // has no tenant, so the lookup is by token alone and two schools must
+        // never be able to issue the same one.
+        modelBuilder.Entity<Report>()
+            .HasIndex(r => r.VerificationToken)
+            .IsUnique()
+            .HasFilter("\"VerificationToken\" IS NOT NULL AND \"IsDeleted\" = false")
+            .HasDatabaseName("IX_Reports_VerificationToken");
+
         modelBuilder.Entity<SchoolBranding>()
             .HasIndex(b => b.TenantId)
             .IsUnique()

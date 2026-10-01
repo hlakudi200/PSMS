@@ -67,6 +67,12 @@ public class ReportPdfData
     /// <summary>The principal's handwriting, as drawn when they signed.</summary>
     public string PrincipalSignatureSvg { get; set; }
 
+    /// <summary>
+    /// The address the QR on the card resolves to, where a recipient can
+    /// confirm the school issued it. Null leaves the strip off entirely.
+    /// </summary>
+    public string VerificationUrl { get; set; }
+
     // Overall performance
     public decimal? OverallPercentage { get; set; }
     /// <summary>
