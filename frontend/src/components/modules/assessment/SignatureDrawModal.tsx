@@ -5,7 +5,6 @@ import { Alert, Button, Modal, Space, Typography, message } from 'antd';
 import { ClearOutlined } from '@ant-design/icons';
 import SignaturePad from 'signature_pad';
 import {
-  StaffSignatureProvider,
   useStaffSignatureActions,
   useStaffSignatureState,
 } from '@/providers/assessment/staff_signature';
@@ -179,10 +178,12 @@ const SignatureDrawModalInner: React.FC<Props> = ({ open, onClose, onSaved }) =>
   );
 };
 
-export const SignatureDrawModal: React.FC<Props> = (props) => (
-  <StaffSignatureProvider>
-    <SignatureDrawModalInner {...props} />
-  </StaffSignatureProvider>
-);
+/**
+ * Deliberately not wrapped in its own StaffSignatureProvider. It used to be,
+ * which shadowed the caller's: the save landed in the modal's private copy of
+ * the state and the screen behind it went on showing no signature. Every caller
+ * already provides one, and sharing it means a save is visible immediately.
+ */
+export const SignatureDrawModal = SignatureDrawModalInner;
 
 export default SignatureDrawModal;
