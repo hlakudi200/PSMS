@@ -1266,6 +1266,11 @@ public class ReportAppService : ApplicationService, IReportAppService
         report.AssignReportCardNumber(
             BuildReportCardNumber(context, admissionNumber, reportType, report.Id));
 
+        // The code behind the QR on the printed card. Assigned at generation so
+        // it is on every PDF the card ever produces, not only the ones made
+        // after it was published.
+        report.AssignVerificationToken(ReportVerificationAppService.NewToken());
+
         report.Generate();
         await _reportRepository.UpdateAsync(report);
         await CurrentUnitOfWork.SaveChangesAsync();

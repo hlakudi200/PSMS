@@ -40,6 +40,7 @@ public class ReportPdfDataLoader : ITransientDependency
     private readonly IRepository<psms.Authorization.Users.User, long> _userRepository;
     private readonly TenantManager _tenantManager;
     private readonly IUnitOfWorkManager _unitOfWorkManager;
+    private readonly Microsoft.Extensions.Configuration.IConfiguration _configuration;
     public Castle.Core.Logging.ILogger Logger { get; set; } = Castle.Core.Logging.NullLogger.Instance;
 
     public ReportPdfDataLoader(
@@ -47,13 +48,15 @@ public class ReportPdfDataLoader : ITransientDependency
         IRepository<SchoolBranding, Guid> brandingRepository,
         IRepository<psms.Authorization.Users.User, long> userRepository,
         TenantManager tenantManager,
-        IUnitOfWorkManager unitOfWorkManager)
+        IUnitOfWorkManager unitOfWorkManager,
+        Microsoft.Extensions.Configuration.IConfiguration configuration)
     {
         _reportRepository = reportRepository;
         _brandingRepository = brandingRepository;
         _userRepository = userRepository;
         _tenantManager = tenantManager;
         _unitOfWorkManager = unitOfWorkManager;
+        _configuration = configuration;
     }
 
     public async Task<ReportPdfData> LoadAsync(Guid reportId, int? tenantId)
@@ -133,6 +136,7 @@ public class ReportPdfDataLoader : ITransientDependency
             PrincipalSignedBy = await ResolveSignerAsync(report.PrincipalSignedByUserId),
             PrincipalSignedDate = report.PrincipalSignedDate?.ToString("dd MMM yyyy"),
             PrincipalSignatureSvg = report.PrincipalSignatureSvg,
+            VerificationUrl = BuildVerificationUrl(report.VerificationToken),
             OverallPercentage = report.OverallPercentage,
             OverallAchievementLevel = report.OverallAchievementLevel,
             ClassPosition = report.ClassPosition,
@@ -236,6 +240,21 @@ public class ReportPdfDataLoader : ITransientDependency
     /// signed, or when the account that did has since been removed — the card
     /// then prints the blank line it used to, rather than failing over a name.
     /// </summary>
+    /// <summary>
+    /// Where the QR on the card points. Null when the card has no code yet —
+    /// anything generated before verification existed — which simply leaves the
+    /// strip off rather than printing a link that resolves to nothing.
+    /// </summary>
+    private string BuildVerificationUrl(string token)
+    {
+        if (string.IsNullOrWhiteSpace(token)) return null;
+
+        var root = _configuration["App:ClientRootAddress"];
+        if (string.IsNullOrWhiteSpace(root)) return null;
+
+        return $"{root.TrimEnd('/')}/verify/{token}";
+    }
+
     private async Task<string> ResolveSignerAsync(long? userId)
     {
         if (!userId.HasValue || userId.Value == 0)

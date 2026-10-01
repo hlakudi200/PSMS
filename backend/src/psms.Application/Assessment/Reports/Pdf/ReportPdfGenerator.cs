@@ -281,6 +281,13 @@ public static class ReportPdfGenerator
             column.Item().Element(c => ComposeSignatures(c, data));
             column.Item().Height(12);
 
+            // ── How to check this card is real ──
+            if (!string.IsNullOrWhiteSpace(data.VerificationUrl))
+            {
+                column.Item().Element(c => ComposeVerification(c, data));
+                column.Item().Height(10);
+            }
+
             // ── CAPS Legend ──
             column.Item().Element(ComposeLegend);
         });
@@ -545,6 +552,65 @@ public static class ReportPdfGenerator
     }
 
     // ─── Signature Lines ───
+    /// <summary>
+    /// The strip a recipient uses to confirm the card is genuine.
+    /// <para>
+    /// This is the only part of the document that actually proves anything. The
+    /// signatures above are a picture — anyone holding one card can lift them —
+    /// and the PDF carries no signing certificate, so a mark in it can be
+    /// edited. Scanning this checks the card against the school's own records.
+    /// </para>
+    /// </summary>
+    private static void ComposeVerification(IContainer container, ReportPdfData data)
+    {
+        container
+            .Background(Colors.Grey.Lighten4)
+            .Border(0.5f).BorderColor(BorderCol)
+            .Padding(8)
+            .Row(row =>
+            {
+                var qr = TryRenderQr(data.VerificationUrl);
+                if (qr != null)
+                {
+                    row.ConstantItem(58).Height(58).Image(qr).FitArea();
+                    row.ConstantItem(10);
+                }
+
+                row.RelativeItem().Column(c =>
+                {
+                    c.Item().Text("Check this report card is genuine")
+                        .SemiBold().FontSize(9);
+                    c.Item().Height(2);
+                    c.Item().Text("Scan the code, or visit the address below. The school's records "
+                        + "will confirm whether this card was issued and to whom.")
+                        .FontSize(7.5f).FontColor(Colors.Grey.Darken1);
+                    c.Item().Height(3);
+                    c.Item().Text(data.VerificationUrl).FontSize(7).FontColor(Colors.Grey.Darken2);
+                });
+            });
+    }
+
+    /// <summary>
+    /// The QR as a PNG, or null. A code that will not render must not cost the
+    /// school the whole report card, so the strip simply loses its square and
+    /// keeps the printed address.
+    /// </summary>
+    private static byte[] TryRenderQr(string url)
+    {
+        try
+        {
+            using var generator = new QRCoder.QRCodeGenerator();
+            // Q corrects around 25% damage, which is what a code printed on paper
+            // that gets folded, stamped and photocopied actually needs.
+            using var data = generator.CreateQrCode(url, QRCoder.QRCodeGenerator.ECCLevel.Q);
+            return new QRCoder.PngByteQRCode(data).GetGraphic(8);
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+    }
+
     private static void ComposeSignatures(IContainer container, ReportPdfData data)
     {
         container.Row(row =>
