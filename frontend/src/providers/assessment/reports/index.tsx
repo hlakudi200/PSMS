@@ -305,10 +305,11 @@ export const ReportProvider = ({
   };
 
   /** RC-17. RE-003 wants both signatures before a card may be published. */
-  const signReportAsync = async (id: string, action: string) => {
+  const signReportAsync = async (id: string, action: string, options?: { quiet?: boolean }) => {
     dispatch(signReportPending());
     await instance
-      .post(`/api/services/app/Report/${action}?id=${id}`)
+      .post(`/api/services/app/Report/${action}?id=${id}`, undefined,
+        { suppressErrorModal: options?.quiet === true })
       .then((response) => {
         dispatch(signReportSuccess(response.data.result));
       })
@@ -319,8 +320,10 @@ export const ReportProvider = ({
       });
   };
 
-  const signAsTeacherAsync = (id: string) => signReportAsync(id, 'SignAsTeacher');
-  const signAsPrincipalAsync = (id: string) => signReportAsync(id, 'SignAsPrincipal');
+  const signAsTeacherAsync = (id: string, options?: { quiet?: boolean }) =>
+    signReportAsync(id, 'SignAsTeacher', options);
+  const signAsPrincipalAsync = (id: string, options?: { quiet?: boolean }) =>
+    signReportAsync(id, 'SignAsPrincipal', options);
 
   const generatePdfAsync = async (id: string, options?: { quiet?: boolean }) => {
     dispatch(generatePdfPending());

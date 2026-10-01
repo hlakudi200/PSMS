@@ -58,6 +58,7 @@ public class ReportAppService : ApplicationService, IReportAppService
     private readonly psms.Academic.Students.ICurrentStudentResolver _currentStudent;
     private readonly psms.Academic.Parents.ICurrentParentResolver _currentParent;
     private readonly psms.Academic.Teachers.ICurrentTeacherResolver _currentTeacher;
+    private readonly IRepository<StaffSignature, Guid> _staffSignatureRepository;
     private readonly psms.Workflow.Shared.WorkflowStarterService _workflowStarter;
     private readonly ReportCohortStatisticsService _cohortStatistics;
 
@@ -80,6 +81,7 @@ public class ReportAppService : ApplicationService, IReportAppService
         psms.Academic.Students.ICurrentStudentResolver currentStudent,
         psms.Academic.Parents.ICurrentParentResolver currentParent,
         psms.Academic.Teachers.ICurrentTeacherResolver currentTeacher,
+        IRepository<StaffSignature, Guid> staffSignatureRepository,
         psms.Workflow.Shared.WorkflowStarterService workflowStarter,
         ReportCohortStatisticsService cohortStatistics)
     {
@@ -101,6 +103,7 @@ public class ReportAppService : ApplicationService, IReportAppService
         _currentStudent = currentStudent;
         _currentParent = currentParent;
         _currentTeacher = currentTeacher;
+        _staffSignatureRepository = staffSignatureRepository;
         _workflowStarter = workflowStarter;
         _cohortStatistics = cohortStatistics;
     }
@@ -781,7 +784,7 @@ public class ReportAppService : ApplicationService, IReportAppService
             throw new UserFriendlyException(AssessmentExceptionCodes.NotTheClassTeacher,
                 "Only this class's teacher can sign the report card as the class teacher.");
 
-        report.SignAsTeacher(userId);
+        report.SignAsTeacher(userId, await SignatureForAsync(userId));
 
         await _reportRepository.UpdateAsync(report);
         await CurrentUnitOfWork.SaveChangesAsync();
@@ -795,7 +798,8 @@ public class ReportAppService : ApplicationService, IReportAppService
     {
         var report = await LoadEditableReportAsync(id);
 
-        report.SignAsPrincipal(RequireSignedInUser());
+        var principalUserId = RequireSignedInUser();
+        report.SignAsPrincipal(principalUserId, await SignatureForAsync(principalUserId));
 
         await _reportRepository.UpdateAsync(report);
         await CurrentUnitOfWork.SaveChangesAsync();
@@ -872,6 +876,31 @@ public class ReportAppService : ApplicationService, IReportAppService
 
         return await IsClassTeacherAsync(classId, userId.Value)
             || PermissionChecker.IsGranted(PermissionNames.Assessment_ReportCards_Generate);
+    }
+
+    /// <summary>
+    /// The signer's stored handwriting, or a refusal.
+    /// <para>
+    /// Taken from the signature they drew and saved, never from the request:
+    /// a signature a caller can post is a picture anybody can send. The drawing
+    /// is then copied onto the card, so redrawing it later leaves cards already
+    /// signed exactly as they were.
+    /// </para>
+    /// </summary>
+    private async Task<string> SignatureForAsync(long userId)
+    {
+        var svg = await _staffSignatureRepository
+            .GetAll()
+            .Where(s => s.TenantId == AbpSession.TenantId && s.UserId == userId)
+            .Select(s => s.SvgContent)
+            .FirstOrDefaultAsync();
+
+        if (string.IsNullOrWhiteSpace(svg))
+            throw new UserFriendlyException(AssessmentExceptionCodes.SignatureMissing,
+                "You have not set up your signature yet. Draw it once and it will be used "
+                + "whenever you sign a report card.");
+
+        return svg;
     }
 
     /// <summary>

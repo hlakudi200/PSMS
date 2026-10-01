@@ -131,6 +131,9 @@ public static class AssessmentExceptionCodes
     /// </summary>
     public const string NotTheClassTeacher = "ASM_NOT_THE_CLASS_TEACHER";
     public const string NotTheSubjectTeacher = "ASM_NOT_THE_SUBJECT_TEACHER";
+    public const string SignatureInvalid = "ASM_SIGNATURE_INVALID";
+    public const string UserNotSignedIn = "ASM_USER_NOT_SIGNED_IN";
+    public const string SignatureMissing = "ASM_SIGNATURE_MISSING";
 
     public const string ReportNotEditable = "ASM_REPORT_NOT_EDITABLE";
     public const string ReportNotPublished = "ASM_REPORT_NOT_PUBLISHED";

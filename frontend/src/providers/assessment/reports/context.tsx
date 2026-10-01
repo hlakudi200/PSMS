@@ -46,9 +46,10 @@ export interface IReportActionContext {
   /** RC-17: records the conduct and diligence ratings (RE-002). */
   recordConductAsync: (input: IRecordConduct) => void;
   /** RC-17: the class teacher signs the card off (RE-003). */
-  signAsTeacherAsync: (id: string) => void;
+  /** Pass `quiet` to handle the refusal yourself rather than raising the global dialog. */
+  signAsTeacherAsync: (id: string, options?: { quiet?: boolean }) => Promise<void>;
   /** RC-17: the principal signs the card off (RE-003). */
-  signAsPrincipalAsync: (id: string) => void;
+  signAsPrincipalAsync: (id: string, options?: { quiet?: boolean }) => Promise<void>;
   deleteAsync: (id: string) => void;
   /**
    * Queues the report card's PDF. Pass `quiet` when doing many at once: the

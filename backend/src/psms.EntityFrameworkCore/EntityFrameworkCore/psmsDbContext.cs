@@ -234,6 +234,8 @@ public class psmsDbContext : AbpZeroDbContext<Tenant, Role, User, psmsDbContext>
     /// </summary>
     public DbSet<ReportSubject> ReportSubjects { get; set; }
 
+    public DbSet<StaffSignature> StaffSignatures { get; set; }
+
     /* ==================== Learning Module ==================== */
 
     /// <summary>
@@ -424,6 +426,17 @@ public class psmsDbContext : AbpZeroDbContext<Tenant, Role, User, psmsDbContext>
             .IsUnique()
             .HasFilter("\"IsDeleted\" = false")
             .HasDatabaseName("IX_AssessmentWeightings_TenantId_Band");
+
+        // RC-17: one signature per staff member. The save path looks the row up
+        // and then inserts or updates it, so without this two saves racing each
+        // other would leave the person with two signatures and no telling which
+        // one a report card would pick up. Soft-deleted rows must not hold the
+        // slot, so a signature that was deleted can be drawn again.
+        modelBuilder.Entity<psms.Domain.Assessment.Entities.StaffSignature>()
+            .HasIndex(s => new { s.TenantId, s.UserId })
+            .IsUnique()
+            .HasFilter("\"IsDeleted\" = false")
+            .HasDatabaseName("IX_StaffSignatures_TenantId_UserId");
 
         modelBuilder.Entity<SchoolBranding>()
             .HasIndex(b => b.TenantId)

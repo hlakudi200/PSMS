@@ -57,9 +57,15 @@ public class ReportPdfData
 
     public string TeacherSignedDate { get; set; }
 
+    /// <summary>The class teacher's handwriting, as drawn when they signed.</summary>
+    public string TeacherSignatureSvg { get; set; }
+
     public string PrincipalSignedBy { get; set; }
 
     public string PrincipalSignedDate { get; set; }
+
+    /// <summary>The principal's handwriting, as drawn when they signed.</summary>
+    public string PrincipalSignatureSvg { get; set; }
 
     // Overall performance
     public decimal? OverallPercentage { get; set; }
