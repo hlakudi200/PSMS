@@ -236,14 +236,18 @@ public class ReportPdfDataLoader : ITransientDependency
     };
 
     /// <summary>
-    /// RC-17. The name to print over a signature line. Null when nobody has
-    /// signed, or when the account that did has since been removed — the card
-    /// then prints the blank line it used to, rather than failing over a name.
-    /// </summary>
-    /// <summary>
     /// Where the QR on the card points. Null when the card has no code yet —
     /// anything generated before verification existed — which simply leaves the
     /// strip off rather than printing a link that resolves to nothing.
+    /// <para>
+    /// Also null when the address configured is one only this machine can
+    /// reach. A report card is issued once and, under National Protocol §25(3),
+    /// is not withdrawn afterwards; a QR pointing at localhost would sit on a
+    /// parent's copy forever, scanning to nothing and looking for all the world
+    /// like the card is a forgery. A card with no QR can be reissued with one.
+    /// A card with the wrong QR cannot be taken back, so a deployment that has
+    /// not been told its own public address prints no code and says why.
+    /// </para>
     /// </summary>
     private string BuildVerificationUrl(string token)
     {
@@ -252,8 +256,30 @@ public class ReportPdfDataLoader : ITransientDependency
         var root = _configuration["App:ClientRootAddress"];
         if (string.IsNullOrWhiteSpace(root)) return null;
 
+        if (!Uri.TryCreate(root, UriKind.Absolute, out var uri)
+            || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+        {
+            Logger.Warn($"App:ClientRootAddress is not an absolute http(s) address ('{root}'), "
+                + "so report cards are printing without a verification QR code.");
+            return null;
+        }
+
+        if (uri.IsLoopback || uri.Host.Equals("0.0.0.0", StringComparison.Ordinal))
+        {
+            Logger.Warn($"App:ClientRootAddress points at this machine ('{root}'), which nobody "
+                + "scanning a printed report card can reach, so cards are printing without a "
+                + "verification QR code. Set it to the address parents use.");
+            return null;
+        }
+
         return $"{root.TrimEnd('/')}/verify/{token}";
     }
+
+    /// <summary>
+    /// RC-17. The name to print over a signature line. Null when nobody has
+    /// signed, or when the account that did has since been removed — the card
+    /// then prints the blank line it used to, rather than failing over a name.
+    /// </summary>
 
     private async Task<string> ResolveSignerAsync(long? userId)
     {
