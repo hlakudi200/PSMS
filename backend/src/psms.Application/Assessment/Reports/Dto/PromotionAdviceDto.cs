@@ -1,4 +1,4 @@
-using psms.Domain.Shared.Enums;
+﻿using psms.Domain.Shared.Enums;
 using System;
 using System.Collections.Generic;
 
@@ -61,4 +61,52 @@ public class PromotionAdviceDto
     /// promotion, and the one they are in for a retention.
     /// </summary>
     public List<PromotionGradeOptionDto> GradeOptions { get; set; } = new();
+
+    /// <summary>
+    /// RC-25. What retaining this learner again would mean — NPPPPR §8(4),
+    /// §21(2) and §29(2). Null when the learner's history cannot be read.
+    /// </summary>
+    public RetentionStandingDto RetentionStanding { get; set; }
+}
+
+/// <summary>
+/// RC-25. A learner's standing against the retention limits for the phase they
+/// are in.
+/// <para>
+/// NPPPPR §8(4): "a learner may only be retained <b>once in the intermediate
+/// phase</b> in order to prevent the learner being retained in this phase for
+/// longer than four years." §21(2) and §29(2) say the same of the senior and
+/// further education and training phases.
+/// </para>
+/// <para>
+/// This is advice, not a block. The decision belongs to the school, and a
+/// system that silently refused it would be making a child's year turn on a
+/// rule it had inferred from enrolment records. It says what the rule is and
+/// what the records show; a person decides.
+/// </para>
+/// </summary>
+public class RetentionStandingDto
+{
+    /// <summary>"Intermediate Phase", as a reader would name it.</summary>
+    public string PhaseName { get; set; }
+
+    /// <summary>
+    /// Academic years the learner has been enrolled in this phase, counting the
+    /// current one.
+    /// </summary>
+    public int YearsInPhase { get; set; }
+
+    /// <summary>Year-end decisions in this phase that were a retention.</summary>
+    public int TimesRetainedInPhase { get; set; }
+
+    /// <summary>
+    /// Whether retaining the learner now would take them past what the phase
+    /// allows — a second retention, or a fifth year.
+    /// </summary>
+    public bool RetainingAgainWouldBreachTheLimit { get; set; }
+
+    /// <summary>
+    /// What to say to whoever is deciding, or null when nothing needs saying.
+    /// </summary>
+    public string Warning { get; set; }
 }

@@ -514,6 +514,19 @@ export interface IPromotionRequirement {
 }
 
 /** RC-16: a grade the learner could be moved into. */
+/**
+ * RC-25. NPPPPR s8(4), s21(2), s29(2): a learner may be retained only once in a
+ * phase, "in order to prevent the learner being retained in this phase for
+ * longer than four years". Advice, not a block — the decision is the school's.
+ */
+export interface IRetentionStanding {
+  phaseName?: string;
+  yearsInPhase?: number;
+  timesRetainedInPhase?: number;
+  retainingAgainWouldBreachTheLimit?: boolean;
+  warning?: string | null;
+}
+
 export interface IPromotionGradeOption {
   id: string;
   gradeName?: string;
@@ -542,6 +555,8 @@ export interface IPromotionAdvice {
   /** RC-16: why, when the decision departs from the national requirements. */
   promotionReason?: string;
   gradeOptions?: IPromotionGradeOption[];
+  /** RC-25. How the learner stands against the retention limits for their phase. */
+  retentionStanding?: IRetentionStanding;
 }
 
 /** RC-17: input for recording the conduct and diligence ratings (RE-002). */
