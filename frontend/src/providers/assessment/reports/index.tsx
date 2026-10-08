@@ -89,10 +89,13 @@ export const ReportProvider = ({
       .then((response) => {
         dispatch(getReportSuccess(response.data.result));
       })
-      .catch((error) => {
-        console.error(error);
+      .catch(() => {
+        /* The failure is the isError flag, which is what every caller reads.
+           Rethrowing as well produced an unhandled rejection, because this is
+           loaded from an effect that has nothing to catch it: opening a report
+           card that does not exist logged "Request failed with status code 500"
+           as an uncaught error on top of the page's own "Report not found". */
         dispatch(getReportError());
-        throw error;
       });
   };
 
