@@ -1,4 +1,4 @@
-using Abp.Application.Services;
+﻿using Abp.Application.Services;
 using Abp.Application.Services.Dto;
 using Abp.Authorization;
 using Abp.Domain.Repositories;
@@ -87,7 +87,16 @@ public class MarkAppService : ApplicationService, IMarkAppService
         if (childIds != null && !childIds.Contains(mark.StudentId))
             throw new UserFriendlyException(AssessmentExceptionCodes.MarkNotFound, "Mark not found.");
 
-        return ObjectMapper.Map<MarkDto>(mark);
+        var dto = ObjectMapper.Map<MarkDto>(mark);
+
+        // RC-23. The exemption note is the school's record and may rest on a
+        // medical basis — POPIA §26 special personal information. A family can
+        // see that the task was excused, from the status, but not what the
+        // school wrote against it.
+        if (selfId.HasValue || childIds != null)
+            dto.ExemptionReason = null;
+
+        return dto;
     }
 
     [AbpAuthorize(PermissionNames.Assessment_Marks_View)]
@@ -466,6 +475,77 @@ public class MarkAppService : ApplicationService, IMarkAppService
                 "Cannot edit a locked mark. Marks have been released. Use unlock first.");
 
         mark.MarkAsAbsent();
+        await _markRepository.UpdateAsync(mark);
+        await CurrentUnitOfWork.SaveChangesAsync();
+
+        return await GetAsync(id);
+    }
+
+    /// <summary>
+    /// RC-23. Excuses a learner from a task, on a stated basis.
+    /// <para>
+    /// National Protocol §8(9): a learner who cannot offer the Physical
+    /// Education Task "may be exempted … provided a valid medical reason is
+    /// submitted. If the learner's request for exemption is successful, his or
+    /// her marks for Life Orientation will be recalculated in terms of four
+    /// tasks."
+    /// </para>
+    /// <para>
+    /// The recalculation is not a separate step: an exempted task carries no
+    /// percentage, so it drops out of the subject average and the remaining
+    /// four carry the mark. Recording a zero instead would punish the learner
+    /// for an absence the policy excuses.
+    /// </para>
+    /// </summary>
+    [AbpAuthorize(PermissionNames.Assessment_Marks_Edit)]
+    public async Task<MarkDto> ExemptAsync(Guid id, ExemptMarkDto input)
+    {
+        if (string.IsNullOrWhiteSpace(input?.Reason))
+            throw new UserFriendlyException(AssessmentExceptionCodes.ExemptionReasonRequired,
+                "Say what the exemption was granted on. A learner may be excused a task "
+                + "on a valid reason submitted to the school, and the card has to show one "
+                + "was recorded.");
+
+        var mark = await _markRepository
+            .GetAll()
+            .Include(m => m.Assessment)
+            .FirstOrDefaultAsync(m => m.Id == id && m.TenantId == AbpSession.TenantId);
+
+        if (mark == null)
+            throw new UserFriendlyException(AssessmentExceptionCodes.MarkNotFound, "Mark not found.");
+
+        // GA-002: Cannot edit locked marks (Completed + released)
+        if (mark.Status == MarkStatus.Completed && mark.Assessment.MarksReleased)
+            throw new UserFriendlyException(AssessmentExceptionCodes.CannotEditLockedMark,
+                "Cannot edit a locked mark. Marks have been released. Use unlock first.");
+
+        mark.Exempt(input.Reason);
+        await _markRepository.UpdateAsync(mark);
+        await CurrentUnitOfWork.SaveChangesAsync();
+
+        return await GetAsync(id);
+    }
+
+    /// <summary>
+    /// RC-23. Withdraws an exemption, putting the task back in the learner's
+    /// programme with no mark recorded yet.
+    /// </summary>
+    [AbpAuthorize(PermissionNames.Assessment_Marks_Edit)]
+    public async Task<MarkDto> ClearExemptionAsync(Guid id)
+    {
+        var mark = await _markRepository
+            .GetAll()
+            .Include(m => m.Assessment)
+            .FirstOrDefaultAsync(m => m.Id == id && m.TenantId == AbpSession.TenantId);
+
+        if (mark == null)
+            throw new UserFriendlyException(AssessmentExceptionCodes.MarkNotFound, "Mark not found.");
+
+        if (mark.Assessment.MarksReleased)
+            throw new UserFriendlyException(AssessmentExceptionCodes.CannotEditLockedMark,
+                "Cannot edit a locked mark. Marks have been released. Use unlock first.");
+
+        mark.ClearExemption();
         await _markRepository.UpdateAsync(mark);
         await CurrentUnitOfWork.SaveChangesAsync();
 

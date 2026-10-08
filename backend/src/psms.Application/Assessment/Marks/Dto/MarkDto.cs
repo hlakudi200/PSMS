@@ -1,4 +1,4 @@
-using Abp.Application.Services.Dto;
+﻿using Abp.Application.Services.Dto;
 using psms.Domain.Shared.Enums;
 using System;
 
@@ -16,6 +16,17 @@ public class MarkDto : FullAuditedEntityDto<Guid>
     public CapsAchievementLevel? AchievementLevel { get; set; }
     public MarkStatus Status { get; set; }
     public bool WasAbsent { get; set; }
+
+    /// <summary>
+    /// RC-23. What an exemption from this task was granted on — §8(9).
+    /// <para>
+    /// Staff only. Blanked for a learner reading their own marks and for a
+    /// parent reading their child's: the note may reference a medical basis,
+    /// which POPIA §26 treats as special personal information, and the portal
+    /// is not where the school's file should be read back.
+    /// </para>
+    /// </summary>
+    public string ExemptionReason { get; set; }
     public bool IsReassessment { get; set; }
     public string TeacherComment { get; set; }
     public string Feedback { get; set; }
