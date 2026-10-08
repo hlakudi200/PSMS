@@ -1,4 +1,4 @@
-using Abp.Application.Services.Dto;
+﻿using Abp.Application.Services.Dto;
 using psms.Domain.Shared.Enums;
 using System;
 
@@ -30,6 +30,18 @@ public class ReportListDto : EntityDto<Guid>
 
     // Computed
     public int SubjectCount { get; set; }
+
+    /// <summary>
+    /// Whether this learner's phase is reported in percentages at all.
+    /// <para>
+    /// RC-19, §17(4): Foundation Phase is reported on the 1–7 achievement
+    /// scale, and the Protocol does not rank Foundation Phase learners against
+    /// one another. The card and the printed PDF both honour that; the list did
+    /// not, and showed a Grade R learner an overall percentage and a class
+    /// position in two columns.
+    /// </para>
+    /// </summary>
+    public bool ReportsPercentages { get; set; } = true;
 
     /// <summary>
     /// The live approval workflow for this report, when one is running.

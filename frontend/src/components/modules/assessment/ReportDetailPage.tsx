@@ -603,6 +603,21 @@ function ReportDetailContent() {
      phase but one reports percentages. */
   const reportsPercentages = report.reportsPercentages !== false;
 
+  /* Nothing recorded is not the same as a learner who attended nothing: three
+     zeros state that the child was present on none of zero school days. The
+     printed card says "—" in that case; the tiles on this page said 0, so the
+     same card made two different statements about the same register. One
+     account of it now, read by both. */
+  const schoolDays =
+    report.daysInTerm
+    ?? ((report.daysPresent ?? 0) + (report.daysAbsent ?? 0));
+  const attendanceWasRecorded =
+    schoolDays > 0
+    || (report.daysPresent ?? 0) > 0
+    || (report.daysAbsent ?? 0) > 0
+    || (report.daysLate ?? 0) > 0;
+  const days = (value?: number) => (attendanceWasRecorded ? String(value ?? 0) : '—');
+
   const percentageColumns = [
     {
       title: 'Term Mark', dataIndex: 'termMark', key: 'termMark', width: 100,
@@ -828,38 +843,22 @@ function ReportDetailContent() {
             Nothing recorded is not the same as a learner who attended nothing:
             four zeros would state on a legal document that the child was
             present on none of zero school days. A dash says what is true. */}
-        {(() => {
-          const schoolDays =
-            report.daysInTerm
-            ?? ((report.daysPresent ?? 0) + (report.daysAbsent ?? 0));
-          const recorded =
-            schoolDays > 0
-            || (report.daysPresent ?? 0) > 0
-            || (report.daysAbsent ?? 0) > 0
-            || (report.daysLate ?? 0) > 0;
-          const days = (v?: number) => (recorded ? String(v ?? 0) : '-');
-
-          return (
-            <>
-              <div className="att-cell">
-                <span className="att-label">Days Present</span>
-                <span className="att-value">{days(report.daysPresent)}</span>
-              </div>
-              <div className="att-cell">
-                <span className="att-label">Days Absent</span>
-                <span className="att-value">{days(report.daysAbsent)}</span>
-              </div>
-              <div className="att-cell">
-                <span className="att-label">Days Late</span>
-                <span className="att-value">{days(report.daysLate)}</span>
-              </div>
-              <div className="att-cell">
-                <span className="att-label">School Days</span>
-                <span className="att-value">{days(schoolDays)}</span>
-              </div>
-            </>
-          );
-        })()}
+        <div className="att-cell">
+          <span className="att-label">Days Present</span>
+          <span className="att-value">{days(report.daysPresent)}</span>
+        </div>
+        <div className="att-cell">
+          <span className="att-label">Days Absent</span>
+          <span className="att-value">{days(report.daysAbsent)}</span>
+        </div>
+        <div className="att-cell">
+          <span className="att-label">Days Late</span>
+          <span className="att-value">{days(report.daysLate)}</span>
+        </div>
+        <div className="att-cell">
+          <span className="att-label">School Days</span>
+          <span className="att-value">{days(schoolDays)}</span>
+        </div>
       </div>
 
       {/* Comments for Print */}
@@ -1142,12 +1141,58 @@ function ReportDetailContent() {
         </Col>
       </Row>
 
-      {/* Attendance Row */}
+      {/* Attendance Row. Reads the same account of the register the printed
+          card does, including the school days RE-002 reconciles against, so the
+          screen and the card cannot say different things. */}
       <Row gutter={16} style={{ marginBottom: 16 }} className="no-print">
-        <Col xs={8}><Card size="small"><Statistic title="Days Present" value={report.daysPresent} valueStyle={{ color: '#3f8600' }} /></Card></Col>
-        <Col xs={8}><Card size="small"><Statistic title="Days Absent" value={report.daysAbsent} valueStyle={{ color: report.daysAbsent > 0 ? '#cf1322' : undefined }} /></Card></Col>
-        <Col xs={8}><Card size="small"><Statistic title="Days Late" value={report.daysLate} valueStyle={{ color: report.daysLate > 0 ? '#faad14' : undefined }} /></Card></Col>
+        <Col xs={12} sm={6}>
+          <Card size="small">
+            <Statistic
+              title="Days Present"
+              value={days(report.daysPresent)}
+              valueStyle={{ color: attendanceWasRecorded ? '#3f8600' : undefined }}
+            />
+          </Card>
+        </Col>
+        <Col xs={12} sm={6}>
+          <Card size="small">
+            <Statistic
+              title="Days Absent"
+              value={days(report.daysAbsent)}
+              valueStyle={{ color: attendanceWasRecorded && (report.daysAbsent ?? 0) > 0 ? '#cf1322' : undefined }}
+            />
+          </Card>
+        </Col>
+        <Col xs={12} sm={6}>
+          <Card size="small">
+            <Statistic
+              title="Days Late"
+              value={days(report.daysLate)}
+              valueStyle={{ color: attendanceWasRecorded && (report.daysLate ?? 0) > 0 ? '#faad14' : undefined }}
+            />
+          </Card>
+        </Col>
+        <Col xs={12} sm={6}>
+          <Card size="small">
+            <Statistic title="School Days" value={days(schoolDays)} />
+          </Card>
+        </Col>
       </Row>
+
+      {!attendanceWasRecorded && (
+        <Alert
+          type="info"
+          showIcon
+          className="no-print"
+          style={{ marginBottom: 16 }}
+          message="No attendance was recorded for this period"
+          description={
+            'The register has nothing for this learner over this term, so the card prints a dash '
+            + 'rather than a zero. Capture the register, or correct the attendance on this card, '
+            + 'before it is issued.'
+          }
+        />
+      )}
 
       {/* Subject Breakdown */}
       <Card
