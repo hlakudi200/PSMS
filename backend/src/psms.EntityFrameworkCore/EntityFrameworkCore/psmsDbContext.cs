@@ -1,4 +1,4 @@
-using Abp.Zero.EntityFrameworkCore;
+﻿using Abp.Zero.EntityFrameworkCore;
 using psms.Authorization.Roles;
 using psms.Authorization.Users;
 using psms.MultiTenancy;
@@ -498,12 +498,14 @@ public class psmsDbContext : AbpZeroDbContext<Tenant, Role, User, psmsDbContext>
         modelBuilder.Entity<Student>()
             .HasIndex(s => new { s.TenantId, s.AdmissionNumber })
             .IsUnique()
+            .HasFilter("\"IsDeleted\" = false")
             .HasDatabaseName("IX_Students_TenantId_AdmissionNumber");
 
         // Teacher - unique employee number per tenant
         modelBuilder.Entity<Teacher>()
             .HasIndex(t => new { t.TenantId, t.EmployeeNumber })
             .IsUnique()
+            .HasFilter("\"IsDeleted\" = false")
             .HasDatabaseName("IX_Teachers_TenantId_EmployeeNumber");
 
         // Class - unique class name per grade per academic year (soft-delete aware)
@@ -517,6 +519,7 @@ public class psmsDbContext : AbpZeroDbContext<Tenant, Role, User, psmsDbContext>
         modelBuilder.Entity<StudentClass>()
             .HasIndex(sc => new { sc.StudentId, sc.ClassId, sc.AcademicYearId })
             .IsUnique()
+            .HasFilter("\"IsDeleted\" = false")
             .HasDatabaseName("IX_StudentClasses_StudentId_ClassId_AcademicYearId");
 
         // StudentParent - prevent duplicate relationships
@@ -529,6 +532,7 @@ public class psmsDbContext : AbpZeroDbContext<Tenant, Role, User, psmsDbContext>
         modelBuilder.Entity<ClassSubject>()
             .HasIndex(cs => new { cs.ClassId, cs.SubjectId })
             .IsUnique()
+            .HasFilter("\"IsDeleted\" = false")
             .HasDatabaseName("IX_ClassSubjects_ClassId_SubjectId");
 
         // GradeSubject - prevent duplicate grade-subject assignments
@@ -604,12 +608,14 @@ public class psmsDbContext : AbpZeroDbContext<Tenant, Role, User, psmsDbContext>
         modelBuilder.Entity<Waitlist>()
             .HasIndex(w => w.ApplicationId)
             .IsUnique()
+            .HasFilter("\"IsDeleted\" = false")
             .HasDatabaseName("IX_Waitlists_ApplicationId");
 
         // AdmissionSettings - unique per academic year and grade
         modelBuilder.Entity<AdmissionSettings>()
             .HasIndex(s => new { s.AcademicYearId, s.GradeId })
             .IsUnique()
+            .HasFilter("\"IsDeleted\" = false")
             .HasDatabaseName("IX_AdmissionSettings_AcademicYearId_GradeId");
     }
 
@@ -626,6 +632,7 @@ public class psmsDbContext : AbpZeroDbContext<Tenant, Role, User, psmsDbContext>
         modelBuilder.Entity<StudentFee>()
             .HasIndex(sf => new { sf.StudentId, sf.FeeStructureId })
             .IsUnique()
+            .HasFilter("\"IsDeleted\" = false")
             .HasDatabaseName("IX_StudentFees_StudentId_FeeStructureId");
     }
 
@@ -635,13 +642,21 @@ public class psmsDbContext : AbpZeroDbContext<Tenant, Role, User, psmsDbContext>
         modelBuilder.Entity<Mark>()
             .HasIndex(m => new { m.AssessmentId, m.StudentId })
             .IsUnique()
+            .HasFilter("\"IsDeleted\" = false")
             .HasDatabaseName("IX_Marks_AssessmentId_StudentId");
 
-        // Report - one report per student per term
+        // Report - one report per student per term.
+        //
+        // The filter has to exclude deleted cards as well as null terms. A soft
+        // deleted card still sits in the table, so without "IsDeleted" = false
+        // it went on holding the learner's slot forever: GenerateAsync's own
+        // duplicate check reads through the soft-delete filter and saw nothing,
+        // then the insert hit this index and the request failed with a 500. A
+        // learner whose card had been deleted could never be given another one.
         modelBuilder.Entity<Report>()
             .HasIndex(r => new { r.StudentId, r.TermId, r.ReportType })
             .IsUnique()
-            .HasFilter("\"TermId\" IS NOT NULL")
+            .HasFilter("\"TermId\" IS NOT NULL AND \"IsDeleted\" = false")
             .HasDatabaseName("IX_Reports_StudentId_TermId_ReportType");
 
         // ReportSubject - one entry per report per subject
@@ -666,6 +681,7 @@ public class psmsDbContext : AbpZeroDbContext<Tenant, Role, User, psmsDbContext>
         modelBuilder.Entity<LearningMaterialVersion>()
             .HasIndex(v => new { v.LearningMaterialId, v.VersionNumber })
             .IsUnique()
+            .HasFilter("\"IsDeleted\" = false")
             .HasDatabaseName("IX_LearningMaterialVersions_MaterialId_VersionNumber");
     }
 
@@ -731,18 +747,21 @@ public class psmsDbContext : AbpZeroDbContext<Tenant, Role, User, psmsDbContext>
         modelBuilder.Entity<StudentTransport>()
             .HasIndex(st => new { st.StudentId, st.SchoolTransportId, st.AcademicYearId })
             .IsUnique()
+            .HasFilter("\"IsDeleted\" = false")
             .HasDatabaseName("IX_StudentTransports_StudentId_TransportId_YearId");
 
         // StudentAfterCare - one enrollment per student per program per year
         modelBuilder.Entity<StudentAfterCare>()
             .HasIndex(sac => new { sac.StudentId, sac.AfterCareId, sac.AcademicYearId })
             .IsUnique()
+            .HasFilter("\"IsDeleted\" = false")
             .HasDatabaseName("IX_StudentAfterCares_StudentId_AfterCareId_YearId");
 
         // StudentExtramural - one enrollment per student per activity per year
         modelBuilder.Entity<StudentExtramural>()
             .HasIndex(se => new { se.StudentId, se.ExtramuralActivityId, se.AcademicYearId })
             .IsUnique()
+            .HasFilter("\"IsDeleted\" = false")
             .HasDatabaseName("IX_StudentExtramurals_StudentId_ActivityId_YearId");
     }
 
@@ -759,6 +778,7 @@ public class psmsDbContext : AbpZeroDbContext<Tenant, Role, User, psmsDbContext>
         modelBuilder.Entity<WorkflowStep>()
             .HasIndex(s => new { s.WorkflowDefinitionId, s.StepOrder })
             .IsUnique()
+            .HasFilter("\"IsDeleted\" = false")
             .HasDatabaseName("IX_WorkflowSteps_DefinitionId_StepOrder");
 
         // WorkflowStep.AssignedUserId -> AbpUsers (WF-06). DB-level integrity
@@ -778,7 +798,7 @@ public class psmsDbContext : AbpZeroDbContext<Tenant, Role, User, psmsDbContext>
         modelBuilder.Entity<WorkflowInstance>()
             .HasIndex(i => new { i.TenantId, i.EntityType, i.EntityId })
             .IsUnique()
-            .HasFilter("\"Status\" IN (1, 2)")
+            .HasFilter("\"Status\" IN (1, 2) AND \"IsDeleted\" = false")
             .HasDatabaseName("IX_WorkflowInstances_TenantId_EntityType_EntityId_Active");
 
         // WorkflowInstance - dashboard query index
