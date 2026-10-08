@@ -1,4 +1,4 @@
-using Abp.Application.Services;
+﻿using Abp.Application.Services;
 using Abp.Application.Services.Dto;
 using Abp.Authorization;
 using Abp.Domain.Repositories;
@@ -89,7 +89,9 @@ public class SubjectAppService : ApplicationService, ISubjectAppService
             input.SubjectCode,
             input.IsCore)
         {
-            Description = input.Description
+            Description = input.Description,
+            // RC-20, §17(6): the level a language is offered at.
+            LanguageLevel = input.LanguageLevel,
         };
 
         await _subjectRepository.InsertAsync(subject);
@@ -118,6 +120,11 @@ public class SubjectAppService : ApplicationService, ISubjectAppService
         if (input.SubjectCode != null) subject.SubjectCode = input.SubjectCode;
         if (input.Description != null) subject.Description = input.Description;
         if (input.IsCore.HasValue) subject.IsCore = input.IsCore.Value;
+        // RC-20. Set on a language subject, and set to null to clear it on a
+        // subject that is not one — so the update has to distinguish "not
+        // supplied" from "cleared", which the DTO's own nullability cannot.
+        if (input.ClearLanguageLevel) subject.LanguageLevel = null;
+        else if (input.LanguageLevel.HasValue) subject.LanguageLevel = input.LanguageLevel.Value;
         if (input.IsActive.HasValue) subject.IsActive = input.IsActive.Value;
 
         await _subjectRepository.UpdateAsync(subject);
