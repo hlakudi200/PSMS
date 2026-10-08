@@ -61,13 +61,24 @@ const conductOptions = Object.entries(conductRatingLabels)
   .map(([value, label]) => ({ value: Number(value), label }))
   .sort((a, b) => b.value - a.value);
 
+/* Every field here is genuinely optional, and all three arrive as null rather
+   than undefined: that is what the server sends for a field nobody has filled
+   in, and what an AntD Select leaves behind when it is cleared.
+
+   `.optional()` accepts undefined and nothing else, so a card whose behaviour
+   note had never been written failed its own form the moment Save was pressed
+   — with "Invalid input: expected string, received null", which means nothing
+   to a teacher — and no request was ever sent. Rating a learner's conduct and
+   leaving the note blank is the ordinary case, so that was most cards. Conduct
+   is one of the fields a report card must carry before it can be issued, so
+   this sat in the way of issuing one. */
 const schema = z.object({
-  conductRating: z.number().int().min(1).max(7).optional(),
-  diligenceRating: z.number().int().min(1).max(7).optional(),
+  conductRating: z.number().int().min(1).max(7).nullish(),
+  diligenceRating: z.number().int().min(1).max(7).nullish(),
   behaviourComments: z
     .string()
     .max(1000, 'Keep the behaviour comment under 1000 characters')
-    .optional(),
+    .nullish(),
 });
 
 type ConductFormValues = z.infer<typeof schema>;
@@ -142,18 +153,33 @@ const ConductAndSignOffCardInner: React.FC<Props> = ({
 
     const parsed = schema.safeParse(values);
     if (!parsed.success) {
-      message.error(parsed.error.issues[0]?.message ?? 'Check the form');
+      /* Zod's own wording describes the shape of the data, not what the person
+         did wrong, so only our own messages are worth showing. */
+      const issue = parsed.error.issues[0];
+      message.error(issue?.message && !/^Invalid input/i.test(issue.message)
+        ? issue.message
+        : 'Check the conduct and diligence, and try again.');
       return;
     }
 
     setSaving(true);
     try {
-      await recordConductAsync({ reportId: report.id, ...parsed.data });
+      /* "Cleared" and "never set" are the same thing to this endpoint, so an
+         absent field says both. */
+      await recordConductAsync({
+        reportId: report.id,
+        conductRating: parsed.data.conductRating ?? undefined,
+        diligenceRating: parsed.data.diligenceRating ?? undefined,
+        behaviourComments: parsed.data.behaviourComments ?? undefined,
+      });
       message.success('Conduct and diligence saved');
       setEditing(false);
       onChanged();
-    } catch {
-      message.error('Could not save the conduct and diligence');
+    } catch (error) {
+      const abp = (error as {
+        response?: { data?: { error?: { message?: string; details?: string } } };
+      })?.response?.data?.error;
+      message.error(abp?.message || abp?.details || 'Could not save the conduct and diligence');
     } finally {
       setSaving(false);
     }
