@@ -42,6 +42,9 @@ public static class AssessmentExceptionCodes
     // RC-23. National Protocol §8(9) grants an exemption "provided a valid
     // medical reason is submitted", so one with nothing recorded is not it.
     public const string ExemptionReasonRequired = "ASM_EXEMPTION_REASON_REQUIRED";
+    // RC-26. NPPPPR §(2b)(b): the parent meeting happens "before the
+    // learner's school report is handed to them".
+    public const string ParentMeetingRequiredBeforeIssuing = "ASM_PARENT_MEETING_REQUIRED";
     public const string NoRawMarkToModerate = "ASM_NO_RAW_MARK_TO_MODERATE";
     public const string AssessmentNotPublished = "ASM_ASSESSMENT_NOT_PUBLISHED";
     public const string StudentNotFound = "ASM_STUDENT_NOT_FOUND";

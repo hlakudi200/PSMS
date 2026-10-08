@@ -48,6 +48,8 @@ public class ReportAppService : ApplicationService, IReportAppService
     // RC-25: one row per learner per academic year, which is where "how
     // many years has this learner been in this phase" is answerable from.
     private readonly IRepository<StudentClass, Guid> _studentClassRepository;
+    // RC-26: the §(2b) procedure around a retention.
+    private readonly IRepository<RetentionProcedure, Guid> _retentionProcedureRepository;
     private readonly IRepository<AcademicYear, Guid> _academicYearRepository;
     private readonly IRepository<Term, Guid> _termRepository;
     private readonly IRepository<Mark, Guid> _markRepository;
@@ -72,6 +74,7 @@ public class ReportAppService : ApplicationService, IReportAppService
         IRepository<Student, Guid> studentRepository,
         IRepository<Class, Guid> classRepository,
         IRepository<StudentClass, Guid> studentClassRepository,
+        IRepository<RetentionProcedure, Guid> retentionProcedureRepository,
         IRepository<AcademicYear, Guid> academicYearRepository,
         IRepository<Term, Guid> termRepository,
         IRepository<Mark, Guid> markRepository,
@@ -95,6 +98,7 @@ public class ReportAppService : ApplicationService, IReportAppService
         _studentRepository = studentRepository;
         _classRepository = classRepository;
         _studentClassRepository = studentClassRepository;
+        _retentionProcedureRepository = retentionProcedureRepository;
         _academicYearRepository = academicYearRepository;
         _termRepository = termRepository;
         _markRepository = markRepository;
@@ -692,6 +696,8 @@ public class ReportAppService : ApplicationService, IReportAppService
                 "This report card cannot be issued yet. It still needs "
                 + JoinReadably(missing) + ".");
 
+        await AssertParentHasBeenSeenAboutARetentionAsync(report);
+
         if (!report.IsSignedOff())
             throw new UserFriendlyException(AssessmentExceptionCodes.ReportCardNotSigned,
                 report.TeacherSignedByUserId.HasValue
@@ -980,6 +986,43 @@ public class ReportAppService : ApplicationService, IReportAppService
 
         if (selfId.HasValue || childIds != null)
             throw new UserFriendlyException(AssessmentExceptionCodes.ReportNotFound, "Report not found.");
+    }
+
+    /// <summary>
+    /// RC-26. A retained learner's card is not handed over before the parent has
+    /// been seen.
+    /// <para>
+    /// NPPPPR §(2b)(b): where the decision is a retention, "a meeting must be
+    /// held with the parent/guardian so that the advice is carefully and clearly
+    /// explained … <b>before the learner's school report is handed to them</b>".
+    /// Publishing is the moment the card reaches the family, so that ordering
+    /// belongs here.
+    /// </para>
+    /// <para>
+    /// Only the meeting is required. §(2b)(c)'s written confirmation is
+    /// recorded but does not gate publishing: the Protocol puts the meeting
+    /// before handover, not the signature, and a card held back waiting for one
+    /// would run straight into §25(13) — a report card may not be withheld for
+    /// any reason.
+    /// </para>
+    /// </summary>
+    private async Task AssertParentHasBeenSeenAboutARetentionAsync(Report report)
+    {
+        if (report.PromotionDecision != PromotionDecision.Retained)
+            return;
+
+        var procedure = await _retentionProcedureRepository
+            .FirstOrDefaultAsync(rp => rp.ReportId == report.Id
+                && rp.TenantId == AbpSession.TenantId);
+
+        if (procedure != null && procedure.ParentHasBeenMet())
+            return;
+
+        throw new UserFriendlyException(
+            AssessmentExceptionCodes.ParentMeetingRequiredBeforeIssuing,
+            "This learner is being retained, and the meeting with the parent has to be held "
+            + "and recorded before the report card is handed over. Record the parent meeting "
+            + "on the retention record, then issue the card.");
     }
 
     /// <summary>

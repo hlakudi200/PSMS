@@ -236,6 +236,12 @@ public class psmsDbContext : AbpZeroDbContext<Tenant, Role, User, psmsDbContext>
 
     public DbSet<StaffSignature> StaffSignatures { get; set; }
 
+    /// <summary>
+    /// RC-26. What had to happen around a decision to retain a learner —
+    /// NPPPPR §(2b) and §(2c).
+    /// </summary>
+    public DbSet<RetentionProcedure> RetentionProcedures { get; set; }
+
     /* ==================== Learning Module ==================== */
 
     /// <summary>
@@ -644,6 +650,13 @@ public class psmsDbContext : AbpZeroDbContext<Tenant, Role, User, psmsDbContext>
             .IsUnique()
             .HasFilter("\"IsDeleted\" = false")
             .HasDatabaseName("IX_Marks_AssessmentId_StudentId");
+
+        // RC-26: one retention procedure per report.
+        modelBuilder.Entity<RetentionProcedure>()
+            .HasIndex(rp => rp.ReportId)
+            .IsUnique()
+            .HasFilter("\"IsDeleted\" = false")
+            .HasDatabaseName("IX_RetentionProcedures_ReportId");
 
         // Report - one report per student per term.
         //
