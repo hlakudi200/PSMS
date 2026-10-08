@@ -1,4 +1,4 @@
-using Abp.AspNetCore;
+﻿using Abp.AspNetCore;
 using Abp.AspNetCore.Mvc.Antiforgery;
 using Abp.AspNetCore.SignalR.Hubs;
 using Abp.Castle.Logging.Log4Net;
@@ -63,6 +63,10 @@ namespace psms.Web.Host.Startup
                         .AllowAnyHeader()
                         .AllowAnyMethod()
                         .AllowCredentials()
+                        // Which refusal this was. A browser can only read a
+                        // response header the server names here, and
+                        // AllowAnyHeader covers the request side only.
+                        .WithExposedHeaders(psms.Web.Startup.PsmsExceptionFilter.ErrorCodeHeader)
                 )
             );
 

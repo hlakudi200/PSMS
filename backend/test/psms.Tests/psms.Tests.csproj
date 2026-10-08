@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <VersionPrefix>1.0.0.0</VersionPrefix>
     <TargetFramework>net9.0</TargetFramework>
@@ -13,6 +13,9 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\psms.Application\psms.Application.csproj" />
     <ProjectReference Include="..\..\src\psms.EntityFrameworkCore\psms.EntityFrameworkCore.csproj" />
+    <!-- For the exception filter and the error-info converter, which decide
+         what status a refused request answers with and what the caller is shown. -->
+    <ProjectReference Include="..\..\src\psms.Web.Core\psms.Web.Core.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.0" />

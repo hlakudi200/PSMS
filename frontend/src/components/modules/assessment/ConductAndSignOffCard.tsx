@@ -170,18 +170,26 @@ const ConductAndSignOffCardInner: React.FC<Props> = ({
       /* RC-17: the server refuses to sign for somebody who has not drawn a
          signature yet. That is a thing to do, not an error — open the pad and
          sign once it is saved. */
-      const abp = (error as {
-        response?: { data?: { error?: { message?: string; details?: string } } };
-      })?.response?.data?.error;
+      const response = (error as {
+        response?: {
+          data?: { error?: { message?: string; details?: string } };
+          headers?: Record<string, string | undefined>;
+        };
+      })?.response;
+      const abp = response?.data?.error;
 
-      if (abp?.message === 'ASM_SIGNATURE_MISSING') {
+      /* The code travels in a header now, so the message can be the sentence
+         the server wrote for whoever is reading it. Older payloads put the code
+         in the message, which is why both are checked. */
+      const code = response?.headers?.['x-error-code'] ?? abp?.message;
+
+      if (code === 'ASM_SIGNATURE_MISSING') {
         setSignAfterDrawing(who);
         setDrawOpen(true);
         return;
       }
-      /* ABP puts the sentence in details and the code in message, so show the
-         sentence — "Only this class's teacher can sign…" rather than a code. */
-      message.error(abp?.details || 'Could not sign this report card');
+
+      message.error(abp?.message || abp?.details || 'Could not sign this report card');
     }
   };
 

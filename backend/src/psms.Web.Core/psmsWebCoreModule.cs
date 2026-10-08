@@ -1,7 +1,12 @@
 ﻿using Abp.AspNetCore;
 using Abp.AspNetCore.Configuration;
 using Abp.AspNetCore.SignalR;
+using Abp.Configuration.Startup;
 using Abp.Modules;
+using psms.Web.Startup;
+using Abp.Web.Models;
+using Abp.Dependency;
+using Abp.AspNetCore.Mvc.ExceptionHandling;
 using Abp.Reflection.Extensions;
 using Abp.Zero.Configuration;
 using psms.Authentication.JwtBearer;
@@ -48,6 +53,11 @@ namespace psms
                  );
 
             ConfigureTokenAuth();
+
+            // A refused request is not a server error, and the code is not the
+            // message. See PsmsExceptionFilter and PsmsErrorInfoConverter.
+            Configuration.ReplaceService<AbpExceptionFilter, PsmsExceptionFilter>(
+                DependencyLifeStyle.Transient);
         }
 
         private void ConfigureTokenAuth()
@@ -71,6 +81,11 @@ namespace psms
         {
             IocManager.Resolve<ApplicationPartManager>()
                 .AddApplicationPartsIfNotAddedBefore(typeof(psmsWebCoreModule).Assembly);
+
+            // Added here rather than in PreInitialize: the builder resolves the
+            // chain it already has, and ours wraps it.
+            IocManager.Resolve<IErrorInfoBuilder>()
+                .AddExceptionConverter(new PsmsErrorInfoConverter());
         }
     }
 }
