@@ -495,6 +495,17 @@ public class ReportAppService : ApplicationService, IReportAppService
                 classSubject.Subject?.SubjectName,
                 classSubject.Subject?.SubjectCode,
                 GradeLevel);
+
+        /// <summary>
+        /// RC-23. Whether a Practical Assessment Task is a compulsory part of
+        /// this subject's examination mark — National Protocol §7(1), with
+        /// §7(2) setting it at 25% of that mark.
+        /// </summary>
+        public bool RequiresPracticalAssessmentTask(ClassSubject classSubject) =>
+            SubjectAssessmentRules.RequiresPracticalAssessmentTask(
+                classSubject.Subject?.SubjectName,
+                classSubject.Subject?.SubjectCode,
+                GradeLevel);
     }
 
     /// <summary>
@@ -1212,7 +1223,13 @@ public class ReportAppService : ApplicationService, IReportAppService
                     .Select(m => new AssessmentContribution(
                         m.Percentage,
                         m.Weight,
-                        m.AssessmentType == AcademicAssessmentType.Exam))
+                        m.AssessmentType == AcademicAssessmentType.Exam,
+                        // RC-23. The Practical Assessment Task is the practical,
+                        // and for a language §7(1)(c) makes it the oral. Whether
+                        // it means anything is the subject's business, decided
+                        // where the mark is composed.
+                        m.AssessmentType == AcademicAssessmentType.Practical
+                            || m.AssessmentType == AcademicAssessmentType.Oral))
                     .ToList();
             }
         }
@@ -1333,7 +1350,11 @@ public class ReportAppService : ApplicationService, IReportAppService
                         marks,
                         fullySchoolBased ? 100 : context.SbaPercentage,
                         fullySchoolBased ? 0 : context.ExamPercentage,
-                        examinationIsExternal: context.ExaminationIsExternal && !fullySchoolBased);
+                        examinationIsExternal: context.ExaminationIsExternal && !fullySchoolBased,
+                        // RC-23. §7(2): a quarter of the examination mark in the
+                        // subjects §7(1) names.
+                        practicalCountsTowardExamination:
+                            context.RequiresPracticalAssessmentTask(classSubject));
                 }
                 else
                 {
