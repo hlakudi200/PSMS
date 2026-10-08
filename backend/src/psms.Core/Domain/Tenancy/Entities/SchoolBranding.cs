@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Text.RegularExpressions;
@@ -66,6 +66,17 @@ namespace psms.Domain.Tenancy.Entities
         /// <summary>Storage object key backing <see cref="FaviconUrl"/>.</summary>
         [StringLength(MaxUrlLength)]
         public string FaviconObjectKey { get; set; }
+
+        /// <summary>
+        /// The school's stamp, printed on a report card beside the signatures.
+        /// National Protocol §25(8)(b) names it among the essential components
+        /// of a report card; without one the card is missing something the
+        /// policy asks for.
+        /// </summary>
+        public string StampUrl { get; set; }
+
+        /// <summary>The stored object behind <see cref="StampUrl"/>.</summary>
+        public string StampObjectKey { get; set; }
 
         /// <summary>
         /// Display name shown in the sidebar, header and login page. Falls back
@@ -141,6 +152,23 @@ namespace psms.Domain.Tenancy.Entities
         {
             FaviconUrl = null;
             FaviconObjectKey = null;
+        }
+
+        /// <summary>Points the stamp at a newly uploaded object.</summary>
+        public void SetStamp(string stampUrl, string objectKey)
+        {
+            StampUrl = stampUrl;
+            StampObjectKey = objectKey;
+        }
+
+        /// <summary>
+        /// Clears the stamp. Report cards then print without one, as they did
+        /// before the school uploaded it — never a broken image.
+        /// </summary>
+        public void ClearStamp()
+        {
+            StampUrl = null;
+            StampObjectKey = null;
         }
     }
 }

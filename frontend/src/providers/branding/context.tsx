@@ -15,6 +15,8 @@ export interface IBranding {
   logoUrl?: string | null;
   /** Public favicon URL, or null for the stock icon. */
   faviconUrl?: string | null;
+  /** The school's stamp, printed on report cards beside the signatures (§25(8)(b)). */
+  stampUrl?: string | null;
   /** Display name for the sidebar, header and login page. Always populated. */
   schoolName: string;
   /**
@@ -31,7 +33,7 @@ export interface IUpdateBrandingInput {
   schoolName?: string;
 }
 
-export type BrandingAssetType = "Logo" | "Favicon";
+export type BrandingAssetType = "Logo" | "Favicon" | "Stamp";
 
 /**
  * One-time signed upload URL minted by the backend. The browser PUTs the file
@@ -53,6 +55,7 @@ export const DEFAULT_BRANDING: IBranding = {
   secondaryColor: "#003D73",
   logoUrl: null,
   faviconUrl: null,
+  stampUrl: null,
   schoolName: "Private School Management System",
   configuredSchoolName: null,
 };

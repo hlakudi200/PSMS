@@ -71,6 +71,33 @@ public static class ReportPdfGenerator
     /// primary. Branding is validated on the way in, but a report card must not
     /// be the thing that falls over if a bad value ever reaches it.
     /// </summary>
+    /// <summary>
+    /// Whether these bytes are an image QuestPDF will actually draw.
+    /// <para>
+    /// The logo and the stamp are whatever a school uploaded, fetched over HTTP
+    /// at render time. Handing QuestPDF something that is not an image throws
+    /// out of document composition and takes the whole report card with it — so
+    /// a school with a corrupt logo could not print any card at all, and no
+    /// message would say why. Decided once here rather than guessed at each
+    /// call site.
+    /// </para>
+    /// </summary>
+    private static bool IsRenderableImage(byte[] bytes)
+    {
+        if (bytes == null || bytes.Length == 0) return false;
+
+        try
+        {
+            // QuestPDF's own decoder, so this answers the question the renderer
+            // will ask rather than a different one.
+            return QuestPDF.Infrastructure.Image.FromBinaryData(bytes) != null;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+
     private static string SafeColor(string hex)
     {
         var value = (hex ?? string.Empty).Trim();
@@ -186,7 +213,7 @@ public static class ReportPdfGenerator
         {
             // The school's logo, when it has one. Constrained so a tall or wide
             // upload cannot push the rest of the card off the page.
-            if (data.LogoBytes != null && data.LogoBytes.Length > 0)
+            if (IsRenderableImage(data.LogoBytes))
             {
                 column.Item().AlignCenter()
                     .MaxHeight(LogoMaxHeight).MaxWidth(LogoMaxWidth)
@@ -753,6 +780,22 @@ public static class ReportPdfGenerator
             row.ConstantItem(30); // spacer
             // Signed by hand on the printed card, so this one keeps its blank line.
             SignatureBlock(row, "Parent / Guardian", null, null, null);
+
+            // RC-21, §25(8)(b): the school stamp, beside the signatures it
+            // authenticates. Only when the school has uploaded one — a card
+            // with no stamp prints as it always did rather than leaving a
+            // labelled gap where one should be.
+            if (IsRenderableImage(data.StampBytes))
+            {
+                row.ConstantItem(14);
+                row.ConstantItem(54).AlignBottom().Column(c =>
+                {
+                    c.Item().Height(44).AlignCenter().Image(data.StampBytes).FitArea();
+                    c.Item().Height(3);
+                    c.Item().AlignCenter().Text("School Stamp").FontSize(7.5f)
+                        .FontColor(Colors.Grey.Darken1);
+                });
+            }
         });
     }
 

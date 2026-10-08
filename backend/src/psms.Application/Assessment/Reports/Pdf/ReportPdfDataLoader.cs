@@ -86,6 +86,7 @@ public class ReportPdfDataLoader : ITransientDependency
         var primaryColor = BrandingDefaults.PrimaryColor;
         var secondaryColor = BrandingDefaults.SecondaryColor;
         string logoUrl = null;
+        string stampUrl = null;
 
         if (tenantId.HasValue)
         {
@@ -102,6 +103,7 @@ public class ReportPdfDataLoader : ITransientDependency
                 if (SchoolBranding.IsValidHexColor(branding.SecondaryColor))
                     secondaryColor = branding.SecondaryColor;
                 logoUrl = branding.LogoUrl;
+                stampUrl = branding.StampUrl;
             }
 
             if (string.IsNullOrWhiteSpace(schoolName))
@@ -117,7 +119,9 @@ public class ReportPdfDataLoader : ITransientDependency
             SchoolName = string.IsNullOrWhiteSpace(schoolName) ? "School" : schoolName,
             PrimaryColor = primaryColor,
             SecondaryColor = secondaryColor,
-            LogoBytes = await TryFetchLogoAsync(logoUrl),
+            LogoBytes = await TryFetchImageAsync(logoUrl, "logo"),
+            // §25(8)(b): the school stamp.
+            StampBytes = await TryFetchImageAsync(stampUrl, "stamp"),
             StudentName = report.Student?.GetFullName() ?? "Unknown Student",
             AdmissionNumber = report.Student?.AdmissionNumber,
             ClassName = report.Class?.ClassName ?? "N/A",
@@ -193,15 +197,15 @@ public class ReportPdfDataLoader : ITransientDependency
     /// going wrong — a slow host, a 404, a file that is not an image — because a
     /// report card has to print with or without the badge on it.
     /// </summary>
-    private async Task<byte[]> TryFetchLogoAsync(string logoUrl)
+    private async Task<byte[]> TryFetchImageAsync(string url, string what)
     {
-        if (string.IsNullOrWhiteSpace(logoUrl))
+        if (string.IsNullOrWhiteSpace(url))
             return null;
 
-        if (!Uri.TryCreate(logoUrl, UriKind.Absolute, out var uri)
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri)
             || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
         {
-            Logger.Warn($"School logo URL is not a usable http(s) address, skipping it: {logoUrl}");
+            Logger.Warn($"School {what} URL is not a usable http(s) address, skipping it: {url}");
             return null;
         }
 
@@ -212,13 +216,13 @@ public class ReportPdfDataLoader : ITransientDependency
 
             if (!response.IsSuccessStatusCode)
             {
-                Logger.Warn($"School logo fetch returned {(int)response.StatusCode}, printing without it.");
+                Logger.Warn($"School {what} fetch returned {(int)response.StatusCode}, printing without it.");
                 return null;
             }
 
             if (response.Content.Headers.ContentLength > MaxLogoBytes)
             {
-                Logger.Warn("School logo is larger than the embed limit, printing without it.");
+                Logger.Warn($"School {what} is larger than the embed limit, printing without it.");
                 return null;
             }
 
@@ -227,7 +231,7 @@ public class ReportPdfDataLoader : ITransientDependency
         }
         catch (Exception ex)
         {
-            Logger.Warn($"Could not read the school logo for the report card: {ex.Message}");
+            Logger.Warn($"Could not read the school {what} for the report card: {ex.Message}");
             return null;
         }
     }

@@ -41,6 +41,7 @@ const ENDPOINT = "/api/services/app/SchoolBranding";
 const ASSET_TYPE_VALUE: Record<BrandingAssetType, number> = {
   Logo: 1,
   Favicon: 2,
+  Stamp: 3,
 };
 
 /** Narrows an API payload to IBranding, filling any gap with the defaults. */
@@ -49,6 +50,7 @@ const toBranding = (raw: Partial<IBranding> | undefined | null): IBranding => ({
   secondaryColor: raw?.secondaryColor || DEFAULT_BRANDING.secondaryColor,
   logoUrl: raw?.logoUrl ?? null,
   faviconUrl: raw?.faviconUrl ?? null,
+  stampUrl: raw?.stampUrl ?? null,
   schoolName: raw?.schoolName || DEFAULT_BRANDING.schoolName,
   // Absent from the anonymous payload, and legitimately null when unset —
   // `?? null` keeps those two indistinguishable, which is correct here since
