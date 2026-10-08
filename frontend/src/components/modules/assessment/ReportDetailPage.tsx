@@ -478,14 +478,16 @@ function ReportDetailContent() {
     submitForApprovalAsync,
     publishAsync,
     addPrincipalCommentAsync,
+    addTeacherCommentAsync,
     withdrawAsync,
     generatePdfAsync,
     getPdfUrlAsync,
   } = useReportActions();
 
   const [principalComment, setPrincipalComment] = useState('');
+  const [teacherComment, setTeacherComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [commentSaving, setCommentSaving] = useState(false);
+  const [commentSaving, setCommentSaving] = useState<'teacher' | 'principal' | null>(null);
   const [pdfGenerating, setPdfGenerating] = useState(false);
 
   useEffect(() => {
@@ -495,6 +497,10 @@ function ReportDetailContent() {
   useEffect(() => {
     if (report?.principalComment) setPrincipalComment(report.principalComment);
   }, [report?.principalComment]);
+
+  useEffect(() => {
+    if (report?.teacherComment) setTeacherComment(report.teacherComment);
+  }, [report?.teacherComment]);
 
   const refresh = useCallback(() => {
     getAsync(reportId);
@@ -543,19 +549,43 @@ function ReportDetailContent() {
     }
   };
 
-  const handleSaveComment = async () => {
-    if (!principalComment.trim()) return;
-    setCommentSaving(true);
+  /* The server writes a sentence for whoever is reading it; show that rather
+     than a message of our own, which can only be vaguer. */
+  const saidByTheServer = (error: unknown) =>
+    (error as { response?: { data?: { error?: { message?: string; details?: string } } } })
+      ?.response?.data?.error;
+
+  const saveComment = async (
+    who: 'teacher' | 'principal',
+    text: string,
+    save: (comment: string) => Promise<void>,
+  ) => {
+    if (!text.trim()) return;
+    setCommentSaving(who);
     try {
-      await addPrincipalCommentAsync(reportId, { comment: principalComment.trim() });
+      await save(text.trim());
       message.success('Comment saved');
       refresh();
-    } catch {
-      message.error('Failed to save comment');
+    } catch (error) {
+      const abp = saidByTheServer(error);
+      message.error(abp?.message || abp?.details || 'Could not save the comment');
     } finally {
-      setCommentSaving(false);
+      setCommentSaving(null);
     }
   };
+
+  const handleSaveComment = () =>
+    saveComment('principal', principalComment, (comment) =>
+      addPrincipalCommentAsync(reportId, { comment }));
+
+  /* RC-08. The class teacher's comment is a named field of a South African
+     report card and one of the things a card must carry before it can be
+     issued — and until now there was nowhere in the application to write it.
+     The endpoint and the provider call both existed; nothing mounted them, so
+     no card could be published through the screens at all. */
+  const handleSaveTeacherComment = () =>
+    saveComment('teacher', teacherComment, (comment) =>
+      addTeacherCommentAsync(reportId, { comment }));
 
   const handlePrint = () => {
     window.print();
@@ -623,6 +653,21 @@ function ReportDetailContent() {
      decides which phase this is; undefined means an older payload, and every
      phase but one reports percentages. */
   const reportsPercentages = report.reportsPercentages !== false;
+
+  /* A published card is the record of what the school issued, so the server
+     refuses any change to it. Show that rather than an editor whose Save can
+     only fail. */
+  const commentsAreClosed = report.status === 5;
+
+  /* RC-08. The server takes the class teacher's comment from the class teacher
+     and nobody else. canSignAsClassTeacher is the same answer the sign button
+     uses, with the same fallback for a payload from an older API: the server
+     refuses the wrong teacher either way, and hiding the box on a missing field
+     would lock everyone out of writing a comment for the length of that window. */
+  const canWriteTheTeacherComment =
+    !commentsAreClosed && (report.canSignAsClassTeacher ?? canCommentOnSubjects);
+
+  const canWriteThePrincipalComment = !commentsAreClosed && canManageReport;
 
   /* Nothing recorded is not the same as a learner who attended nothing: three
      zeros state that the child was present on none of zero school days. The
@@ -1336,26 +1381,64 @@ function ReportDetailContent() {
         />
       )}
 
-      {/* Comments Section */}
+      {/* Comments Section.
+
+          Both of these are named fields of a South African report card and both
+          are checked before a card may be issued. The principal's had an editor;
+          the class teacher's was rendered read-only and written nowhere, so a
+          card could not be completed — and therefore not published — from these
+          screens at all.
+
+          Each block offers an editor to whoever the server will accept it from,
+          and otherwise shows what is there. */}
       <Card title="Comments" style={{ marginBottom: 16 }} className="no-print">
-        {report.teacherComment && (
+        {canWriteTheTeacherComment ? (
           <div style={{ marginBottom: 16 }}>
-            <Text strong>Class Teacher Comment</Text>
-            <Paragraph style={{ marginTop: 4, padding: '8px 12px', background: '#f6f8fa', borderRadius: 4 }}>
-              {report.teacherComment}
-            </Paragraph>
+            <Text strong>Class teacher&apos;s comment</Text>
+            <Input.TextArea
+              id="report-teacher-comment"
+              value={teacherComment}
+              onChange={(e) => setTeacherComment(e.target.value)}
+              rows={3}
+              placeholder="How the learner worked this term, and what to carry into the next one."
+              maxLength={1000}
+              showCount
+              style={{ marginTop: 4 }}
+            />
+            <Button
+              type="primary"
+              size="small"
+              icon={<MessageOutlined />}
+              onClick={handleSaveTeacherComment}
+              loading={commentSaving === 'teacher'}
+              disabled={!teacherComment.trim()}
+              style={{ marginTop: 8 }}
+            >
+              Save comment
+            </Button>
           </div>
+        ) : (
+          report.teacherComment && (
+            <div style={{ marginBottom: 16 }}>
+              <Text strong>Class teacher&apos;s comment</Text>
+              <Paragraph style={{ marginTop: 4, padding: '8px 12px', background: '#f6f8fa', borderRadius: 4 }}>
+                {report.teacherComment}
+              </Paragraph>
+            </div>
+          )
         )}
 
-        {canManageReport ? (
+        {canWriteThePrincipalComment ? (
           <div style={{ marginBottom: 16 }}>
-            <Text strong>Principal Comment</Text>
+            <Text strong>Principal&apos;s comment</Text>
             <Input.TextArea
+              id="report-principal-comment"
               value={principalComment}
               onChange={(e) => setPrincipalComment(e.target.value)}
               rows={3}
               placeholder="Add your comment..."
               maxLength={1000}
+              showCount
               style={{ marginTop: 4 }}
             />
             <Button
@@ -1363,17 +1446,17 @@ function ReportDetailContent() {
               size="small"
               icon={<MessageOutlined />}
               onClick={handleSaveComment}
-              loading={commentSaving}
+              loading={commentSaving === 'principal'}
               disabled={!principalComment.trim()}
               style={{ marginTop: 8 }}
             >
-              Save Comment
+              Save comment
             </Button>
           </div>
         ) : (
           report.principalComment && (
             <div style={{ marginBottom: 16 }}>
-              <Text strong>Principal Comment</Text>
+              <Text strong>Principal&apos;s comment</Text>
               <Paragraph style={{ marginTop: 4, padding: '8px 12px', background: '#f6f8fa', borderRadius: 4 }}>
                 {report.principalComment}
               </Paragraph>
@@ -1381,9 +1464,33 @@ function ReportDetailContent() {
           )
         )}
 
+        {/* Saving a comment changes what the card says, so it withdraws the
+            signatures on it — nobody's signature stays on a card that moved
+            after they signed. Worth saying before they type, not after. */}
+        {(canWriteTheTeacherComment || canWriteThePrincipalComment)
+          && (report.teacherSignedDate || report.principalSignedDate) && (
+          <Alert
+            type="info"
+            showIcon
+            style={{ marginBottom: 16 }}
+            message="Saving a comment will need the card signed again"
+            description="A signature belongs to the card as it was signed, so changing what the card says withdraws it."
+          />
+        )}
+
+        {commentsAreClosed && (
+          <Alert
+            type="info"
+            showIcon
+            style={{ marginBottom: 16 }}
+            message="This card has been issued, so its comments are fixed."
+            description="Withdraw it if something on it needs changing."
+          />
+        )}
+
         {report.parentComment && (
           <div>
-            <Text strong>Parent Comment</Text>
+            <Text strong>Parent comment</Text>
             <Paragraph style={{ marginTop: 4, padding: '8px 12px', background: '#f6f8fa', borderRadius: 4 }}>
               {report.parentComment}
             </Paragraph>
