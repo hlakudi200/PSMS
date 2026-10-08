@@ -12,6 +12,7 @@ import {
   IGetReportsInput,
   IReportComment,
   IRecordPromotion,
+  IRecordRetentionProcedure,
   IRecordConduct,
 } from "../shared/interfaces";
 import { ReportReducer } from "./reducer";
@@ -277,6 +278,29 @@ export const ReportProvider = ({
   };
 
   /** RC-16. Records the decision, with the destination grade and a reason. */
+  /**
+   * RC-26. What the school did around a retention — NPPPPR s(2b). The parent
+   * meeting is the one the card cannot be handed over without, so this is not
+   * paperwork: without it the server refuses to publish.
+   *
+   * Deliberately does not dispatch into report state. It is a record beside the
+   * report rather than part of it, and the caller reads the result directly.
+   */
+  const recordRetentionProcedureAsync = async (
+    reportId: string,
+    input: IRecordRetentionProcedure,
+  ) => {
+    const endpoint = `/api/services/app/RetentionProcedure/Record?reportId=${reportId}`;
+    const response = await instance.post(endpoint, input);
+    return response.data?.result;
+  };
+
+  const getRetentionProcedureAsync = async (reportId: string) => {
+    const endpoint = `/api/services/app/RetentionProcedure/Get?reportId=${reportId}`;
+    const response = await instance.get(endpoint, { suppressErrorModal: true });
+    return response.data?.result;
+  };
+
   const recordPromotionDecisionAsync = async (input: IRecordPromotion) => {
     dispatch(recordPromotionPending());
     const endpoint = `/api/services/app/Report/RecordPromotionDecision`;
@@ -446,6 +470,8 @@ export const ReportProvider = ({
           recordPromotionAsync,
           getPromotionAdviceAsync,
           recordPromotionDecisionAsync,
+          recordRetentionProcedureAsync,
+          getRetentionProcedureAsync,
           recordConductAsync,
           signAsTeacherAsync,
           signAsPrincipalAsync,
