@@ -1,4 +1,4 @@
-using Abp.Application.Services;
+﻿using Abp.Application.Services;
 using Abp.Application.Services.Dto;
 using psms.Academic.Shared;
 using psms.Academic.Students.Dto;
@@ -32,6 +32,12 @@ public interface IStudentAppService : IApplicationService
 
     /// <summary>Assigns a student to a different class (within same grade).</summary>
     Task<StudentDto> AssignClassAsync(Guid id, Guid classId);
+
+    /// <summary>
+    /// Writes the current year's enrolment for every learner who has a class
+    /// but no record of being in it. Idempotent, and records this year only.
+    /// </summary>
+    Task<int> BackfillCurrentYearEnrolmentsAsync();
 
     Task ActivateAsync(Guid id);
     Task DeactivateAsync(Guid id);
