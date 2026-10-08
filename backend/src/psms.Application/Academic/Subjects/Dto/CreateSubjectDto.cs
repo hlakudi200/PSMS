@@ -1,3 +1,4 @@
+﻿using psms.Domain.Shared.Enums;
 using System.ComponentModel.DataAnnotations;
 
 namespace psms.Academic.Subjects.Dto;
@@ -20,4 +21,11 @@ public class CreateSubjectDto
 
     /// <summary>Whether this is a core (required) subject</summary>
     public bool IsCore { get; set; }
+
+    /// <summary>
+    /// RC-20. The level a language is offered at — National Protocol §17(6).
+    /// Null for a subject that is not a language. Where it is null on a language
+    /// subject, the level is read from the subject's name instead.
+    /// </summary>
+    public LanguageLevel? LanguageLevel { get; set; }
 }

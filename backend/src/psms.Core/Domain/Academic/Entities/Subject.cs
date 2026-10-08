@@ -1,8 +1,9 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Abp.Domain.Entities;
+using psms.Domain.Shared.Enums;
 using Abp.Domain.Entities.Auditing;
 
 namespace psms.Domain.Academic.Entities
@@ -46,6 +47,31 @@ namespace psms.Domain.Academic.Entities
         /// Indicates if subject is core (required)
         /// </summary>
         public bool IsCore { get; set; }
+
+        /// <summary>
+        /// RC-20. The level this language is offered at, or null when the
+        /// subject is not a language.
+        /// <para>
+        /// National Protocol §17(6) requires each language to be "recorded and
+        /// reported on separately according to the different levels on which
+        /// they are offered".
+        /// </para>
+        /// <para>
+        /// It sits on the subject rather than on the class-subject because in
+        /// CAPS a language at Home Language level and the same language at
+        /// First Additional level are not one subject taught two ways — they are
+        /// different subjects, with different curricula, different papers and
+        /// different promotion requirements. The Protocol's own example names
+        /// them separately, and schools already record them as separate rows:
+        /// "English Home Language" and "IsiZulu First Additional Language".
+        /// </para>
+        /// <para>
+        /// Null on a language subject does not mean "no level" — it means
+        /// nobody has set one, and <c>SubjectLanguageRules</c> falls back to
+        /// reading the subject's name, so existing rows keep working.
+        /// </para>
+        /// </summary>
+        public LanguageLevel? LanguageLevel { get; set; }
 
         /// <summary>
         /// Indicates if subject is active

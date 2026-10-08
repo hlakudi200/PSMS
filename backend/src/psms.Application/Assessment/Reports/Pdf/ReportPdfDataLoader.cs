@@ -172,7 +172,11 @@ public class ReportPdfDataLoader : ITransientDependency
             .OrderBy(sr => sr.Subject?.SubjectName)
             .Select(sr => new SubjectEntry
             {
-                SubjectName = sr.Subject?.SubjectName ?? "Unknown",
+                // RC-20, §17(6): a language is reported at the level it is
+                // offered at. Most schools already put it in the subject's name,
+                // so it is appended only where it would otherwise be missing.
+                SubjectName = psms.Domain.Assessment.SubjectLanguageRules.NameWithLevel(
+                    sr.Subject?.SubjectName, sr.Subject?.LanguageLevel) ?? "Unknown",
                 SubjectCode = sr.Subject?.SubjectCode,
                 TermMark = sr.TermMark,
                 ExamMark = sr.ExamMark,

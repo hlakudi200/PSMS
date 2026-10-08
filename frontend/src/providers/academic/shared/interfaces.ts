@@ -141,6 +141,9 @@ export interface ISubject {
   subjectCode: string;
   description?: string;
   isCore: boolean;
+  /** RC-20. 1 Home, 2 First Additional, 3 Second Additional. Null when the
+   *  subject is not a language. National Protocol s17(6). */
+  languageLevel?: number | null;
   isActive: boolean;
   gradeCount: number;
   teacherCount: number;
@@ -151,6 +154,9 @@ export interface ICreateSubject {
   subjectCode: string;
   description?: string;
   isCore: boolean;
+  /** RC-20. 1 Home, 2 First Additional, 3 Second Additional. Null when the
+   *  subject is not a language. National Protocol s17(6). */
+  languageLevel?: number | null;
 }
 
 export interface IUpdateSubject {
@@ -499,6 +505,9 @@ export interface IGradeSubject {
   subjectName?: string;
   subjectCode?: string;
   isCore: boolean;
+  /** RC-20. 1 Home, 2 First Additional, 3 Second Additional. Null when the
+   *  subject is not a language. National Protocol s17(6). */
+  languageLevel?: number | null;
 }
 
 export interface IAssignSubjectToGrade {
