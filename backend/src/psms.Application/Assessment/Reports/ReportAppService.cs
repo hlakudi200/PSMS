@@ -162,6 +162,10 @@ public class ReportAppService : ApplicationService, IReportAppService
         if (taughtClassIds != null && !taughtClassIds.Contains(report.ClassId))
             throw new UserFriendlyException(AssessmentExceptionCodes.ReportNotFound, "Report not found.");
 
+        // RE-004: a family reads a card the school has issued, and that is the
+        // only condition on it.
+        await AssertIssuedIfReadingAsFamilyAsync(report);
+
         var dto = ObjectMapper.Map<ReportDto>(report);
         dto.SubjectReports = ObjectMapper.Map<List<ReportSubjectDto>>(report.SubjectReports.OrderBy(sr => sr.Subject?.SubjectName).ToList());
         dto.CanSignAsClassTeacher = await CanSignAsClassTeacherAsync(report.ClassId);
@@ -209,6 +213,12 @@ public class ReportAppService : ApplicationService, IReportAppService
             .WhereIf(selfId.HasValue, r => r.StudentId == selfId.Value)
             .WhereIf(childIds != null, r => childIds.Contains(r.StudentId))
             .WhereIf(taughtClassIds != null, r => taughtClassIds.Contains(r.ClassId))
+            // RE-004. A family sees a card once the school has issued it, and
+            // nothing else gates them — no fee balance, no returned textbook.
+            // Before publishing it is a draft the school is still working on,
+            // and a mark that is still being corrected is not something to hand
+            // a parent (§25(3)).
+            .WhereIf(selfId.HasValue || childIds != null, r => r.Status == ReportStatus.Published)
             .WhereIf(input.StudentId.HasValue, r => r.StudentId == input.StudentId.Value)
             .WhereIf(input.ClassId.HasValue, r => r.ClassId == input.ClassId.Value)
             .WhereIf(input.TermId.HasValue, r => r.TermId == input.TermId.Value)
@@ -927,6 +937,32 @@ public class ReportAppService : ApplicationService, IReportAppService
                 + "whenever you sign a report card.");
 
         return svg;
+    }
+
+    /// <summary>
+    /// RE-004. A parent or a learner reads a card the school has published.
+    /// <para>
+    /// National Protocol §25(13): "Schools may not withhold report cards from
+    /// learners for any reason whatsoever", and §25(12) gives parents a right of
+    /// access. So this is the <i>only</i> condition on a family's access —
+    /// there is deliberately no fee balance, no disciplinary flag and no
+    /// per-learner release step anywhere on these paths.
+    /// </para>
+    /// <para>
+    /// Publication is not withholding: before it, the card is a draft the
+    /// school is still correcting, and §25(3) asks that an issued card carry no
+    /// corrections that compromise its legal status. Staff are unaffected.
+    /// </para>
+    /// </summary>
+    private async Task AssertIssuedIfReadingAsFamilyAsync(Report report)
+    {
+        if (report.Status == ReportStatus.Published) return;
+
+        var selfId = await _currentStudent.GetCurrentStudentIdAsync();
+        var childIds = await _currentParent.GetCurrentChildStudentIdsAsync();
+
+        if (selfId.HasValue || childIds != null)
+            throw new UserFriendlyException(AssessmentExceptionCodes.ReportNotFound, "Report not found.");
     }
 
     /// <summary>
@@ -2271,6 +2307,10 @@ public class ReportAppService : ApplicationService, IReportAppService
         var taughtClassIds = await TeacherClassScopeAsync();
         if (taughtClassIds != null && !taughtClassIds.Contains(report.ClassId))
             throw new UserFriendlyException(AssessmentExceptionCodes.ReportNotFound, "Report not found.");
+
+        // RE-004: the file a family downloads is the issued card, nothing
+        // earlier. Nothing else gates this — deliberately no fees check.
+        await AssertIssuedIfReadingAsFamilyAsync(report);
 
         if (!report.HasPdf())
             throw new UserFriendlyException(AssessmentExceptionCodes.PdfNotGenerated,

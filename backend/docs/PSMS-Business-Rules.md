@@ -1292,6 +1292,65 @@ public class Report : FullAuditedAggregateRoot<Guid>, IMultiTenant
 
 ---
 
+### RE-004: A Report Card May Not Be Withheld
+
+**Rule**: Once a report card has been issued, it is the learner's. The school
+may not make access to it conditional on anything.
+
+> **National Protocol for Assessment Grades R–12, §25(13)**
+> "Schools may **not withhold report cards from learners for any reason
+> whatsoever**."
+>
+> **§25(12)** "The parents or guardians have the **right of access** to report
+> cards of their children."
+
+Withholding a report card over unpaid school fees is a common practice and it is
+explicitly not permitted. **A school management system that offers it as a
+feature is offering a school a way to break policy**, so this is written down
+here rather than left to be discovered by whoever next builds a publish gate or
+a fees check.
+
+**What this forbids**, concretely:
+
+- No condition on a fee balance, a library book, a returned textbook, a
+  disciplinary matter, or a signed form.
+- No "release" step between publishing and a parent being able to read it.
+- No permission that an administrator can revoke per learner.
+
+**What is still allowed**, and is not withholding:
+
+- The card is not visible until the school has **published** it. An unpublished
+  card is a draft, not an issued document — see RE-003 and RC-10.
+- A parent sees their own children's cards and nobody else's; a learner sees
+  their own. That is data protection, not withholding.
+
+**Implementation**: `ReportAppService.GetAllAsync`, `GetAsync` and
+`GetReportPdfUrlAsync` scope a parent to their own children and a learner to
+themselves, and to **published** cards only. Nothing else gates them. There is
+deliberately no fees check on any of those paths.
+
+---
+
+### RE-005: An Issued Report Card Is a Legal Document
+
+**Rule**: A published report card is not edited. A correction is a reissue.
+
+> **§25(3)** "Schools should ensure that there are **no errors, erasures or
+> corrections that will compromise the legal status of the report cards**."
+>
+> **§26(8)** A signed end-of-year schedule "**constitutes a legal document**".
+
+This is the policy basis for locking a published report card. Editing a mark on
+a card a parent is already holding produces two documents with the same report
+card number and different contents, which is precisely the compromise §25(3)
+names.
+
+See RC-10 (#247) for the locking work, and RC-22 (#282) for the schedule, which
+is the legal record of the promotion decision and a separate artefact from the
+report card.
+
+---
+
 ## Financial Management Rules
 
 ### FI-001: Fee Structure Validation
