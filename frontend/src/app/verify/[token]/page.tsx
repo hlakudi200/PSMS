@@ -41,18 +41,32 @@ export default function VerifyReportCardPage() {
   const token = Array.isArray(params?.token) ? params.token[0] : params?.token;
   const [result, setResult] = useState<IVerification | null>(null);
   const [loading, setLoading] = useState(true);
+  /* A check that could not be run is not the same answer as a code that does
+     not match, and must not be shown as one. */
+  const [unreachable, setUnreachable] = useState(false);
 
   useEffect(() => {
     if (!token) return;
     const instance = getAxiosInstance();
     instance
-      .get(`/api/services/app/ReportVerification/Verify?token=${encodeURIComponent(token)}`, {
+      /* POST, because that is what ABP exposes this as: a method not named
+         Get* is routed as POST, and the GET this used to send came back 405.
+         The catch below then rendered that transport failure as "no report
+         card matches this code" — so every genuine code on every printed card
+         was told it was not genuine. */
+      .post(`/api/services/app/ReportVerification/Verify?token=${encodeURIComponent(token)}`, null, {
         // A code that does not resolve is an answer for the reader, not a
         // dialog thrown over an otherwise blank page.
         suppressErrorModal: true,
       })
-      .then((res) => setResult(res.data?.result ?? null))
-      .catch(() => setResult(null))
+      .then((res) => {
+        setResult(res.data?.result ?? null);
+        setUnreachable(false);
+      })
+      .catch(() => {
+        setResult(null);
+        setUnreachable(true);
+      })
       .finally(() => setLoading(false));
   }, [token]);
 
@@ -69,6 +83,20 @@ export default function VerifyReportCardPage() {
   );
 
   if (loading) return shell(<Card><Skeleton active paragraph={{ rows: 5 }} /></Card>);
+
+  /* Say what actually happened. Telling a parent their card is not genuine
+     because the server could not be reached is worse than saying nothing. */
+  if (unreachable) {
+    return shell(
+      <Card>
+        <Result
+          icon={<ExclamationCircleTwoTone twoToneColor="#faad14" />}
+          title="This code could not be checked right now"
+          subTitle="The school's records could not be reached. Try again in a moment — this does not mean the card is not genuine."
+        />
+      </Card>,
+    );
+  }
 
   if (!result || !result.found) {
     return shell(
