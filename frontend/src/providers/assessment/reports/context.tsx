@@ -39,8 +39,10 @@ export interface IReportActionContext {
   publishAsync: (id: string) => void;
   /** Takes an issued card back. The reason goes on the record. */
   withdrawAsync: (id: string, reason: string) => Promise<void>;
-  addTeacherCommentAsync: (id: string, input: IReportComment) => void;
-  addPrincipalCommentAsync: (id: string, input: IReportComment) => void;
+  /* These reject when the server refuses, and the screen shows what it said,
+     so the promise is part of the contract rather than something to ignore. */
+  addTeacherCommentAsync: (id: string, input: IReportComment) => Promise<void>;
+  addPrincipalCommentAsync: (id: string, input: IReportComment) => Promise<void>;
   acknowledgeByParentAsync: (id: string, input: IReportComment) => void;
   recordPromotionAsync: (id: string, decision: number, promotedToGradeId?: string) => void;
   /** RC-16: what the national requirements make of this learner's year. */
