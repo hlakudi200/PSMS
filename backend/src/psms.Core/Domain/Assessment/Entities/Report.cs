@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
@@ -650,6 +650,7 @@ namespace psms.Domain.Assessment.Entities
         /// </summary>
         public void SetPdfUrl(string url)
         {
+            PdfGeneratedDate = DateTime.UtcNow;
             PdfUrl = url;
         }
 
@@ -657,8 +658,42 @@ namespace psms.Domain.Assessment.Entities
         /// Records where the generated PDF lives. A signed URL is minted from
         /// this per request, so nothing durable points at the file.
         /// </summary>
+        /// <summary>
+        /// When the stored PDF was produced, so it can be told apart from a
+        /// card that has changed since.
+        /// </summary>
+        public DateTime? PdfGeneratedDate { get; set; }
+
+        /// <summary>
+        /// Whether the stored PDF is older than the card it claims to be.
+        /// <para>
+        /// The file is produced once and kept. Nothing rebuilt it when the card
+        /// changed, so a PDF made before the signatures went on stayed on the
+        /// record unsigned — and publishing only built one when none existed at
+        /// all, so that unsigned file is what a parent downloaded. The same
+        /// held for a comment, a conduct rating or a promotion decision
+        /// recorded after the file was made.
+        /// </para>
+        /// <para>
+        /// A second of slack because writing the PDF is itself a change to the
+        /// report: the save that records the file also moves
+        /// LastModificationTime, and without the tolerance every card would
+        /// call its own freshly built PDF stale.
+        /// </para>
+        /// </summary>
+        public bool PdfIsStale()
+        {
+            if (!HasPdf()) return false;
+            if (PdfGeneratedDate == null) return true;   // made before this was tracked
+
+            var changedAt = LastModificationTime ?? CreationTime;
+
+            return changedAt > PdfGeneratedDate.Value.AddSeconds(1);
+        }
+
         public void SetPdfObjectKey(string objectKey)
         {
+            PdfGeneratedDate = DateTime.UtcNow;
             PdfObjectKey = objectKey;
         }
 
