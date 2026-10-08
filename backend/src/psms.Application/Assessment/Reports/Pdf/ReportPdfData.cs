@@ -27,6 +27,14 @@ public class ReportPdfData
     /// </summary>
     public byte[] LogoBytes { get; set; }
 
+    /// <summary>
+    /// RC-21. The school's stamp, which National Protocol §25(8)(b) names among
+    /// the essential components of a report card. Null when the school has not
+    /// uploaded one, and the card then prints without it rather than leaving a
+    /// gap where a stamp should be.
+    /// </summary>
+    public byte[] StampBytes { get; set; }
+
     // Student info
     public string StudentName { get; set; }
     public string AdmissionNumber { get; set; }

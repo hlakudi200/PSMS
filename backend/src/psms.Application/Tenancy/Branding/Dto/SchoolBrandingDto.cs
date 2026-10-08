@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 
 namespace psms.Tenancy.Branding.Dto;
 
@@ -23,6 +23,12 @@ public class SchoolBrandingDto
 
     /// <summary>Public logo URL, or null to fall back to the school name.</summary>
     public string LogoUrl { get; set; }
+
+    /// <summary>
+    /// Public URL of the school's stamp, or null when none has been uploaded.
+    /// Printed on the report card beside the signatures — §25(8)(b).
+    /// </summary>
+    public string StampUrl { get; set; }
 
     /// <summary>Public favicon URL, or null for the stock icon.</summary>
     public string FaviconUrl { get; set; }

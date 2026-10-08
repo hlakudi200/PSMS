@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -39,6 +39,13 @@ public class SchoolBrandingAppService : ApplicationService, ISchoolBrandingAppSe
     // that, so it gets a tighter ceiling of its own.
     private const long MaxLogoBytes = 2 * 1024 * 1024;
     private const long MaxFaviconBytes = 512 * 1024;
+
+    /// <summary>
+    /// A stamp is printed small — about 15mm on paper — so it needs no more
+    /// resolution than a logo, and the same ceiling keeps one school's upload
+    /// from being the reason a report card takes a second to render.
+    /// </summary>
+    private const long MaxStampBytes = 2 * 1024 * 1024;
 
     private static readonly HashSet<string> LogoExtensions =
         new(StringComparer.OrdinalIgnoreCase) { ".png", ".jpg", ".jpeg" };
@@ -210,7 +217,12 @@ public class SchoolBrandingAppService : ApplicationService, ISchoolBrandingAppSe
         // The bytes are already in the bucket by this point, so a rejection has
         // to delete them — otherwise every rejected attempt leaves a permanent,
         // publicly-readable orphan and the caller can repeat it without bound.
-        var maxBytes = input.AssetType == BrandingAssetType.Logo ? MaxLogoBytes : MaxFaviconBytes;
+        var maxBytes = input.AssetType switch
+        {
+            BrandingAssetType.Logo => MaxLogoBytes,
+            BrandingAssetType.Stamp => MaxStampBytes,
+            _ => MaxFaviconBytes,
+        };
         if (info.SizeBytes > maxBytes)
         {
             await TryDeleteStoredObjectAsync(input.ObjectKey, null);
@@ -229,14 +241,20 @@ public class SchoolBrandingAppService : ApplicationService, ISchoolBrandingAppSe
         var branding = await GetOrCreateForCurrentTenantAsync();
         var publicUrl = _fileStorage.GetPublicUrl(BrandingBucket, input.ObjectKey);
 
-        var previousKey = input.AssetType == BrandingAssetType.Logo
-            ? branding.LogoObjectKey
-            : branding.FaviconObjectKey;
+        var previousKey = ObjectKeyFor(branding, input.AssetType);
 
-        if (input.AssetType == BrandingAssetType.Logo)
-            branding.SetLogo(publicUrl, input.ObjectKey);
-        else
-            branding.SetFavicon(publicUrl, input.ObjectKey);
+        switch (input.AssetType)
+        {
+            case BrandingAssetType.Logo:
+                branding.SetLogo(publicUrl, input.ObjectKey);
+                break;
+            case BrandingAssetType.Stamp:
+                branding.SetStamp(publicUrl, input.ObjectKey);
+                break;
+            default:
+                branding.SetFavicon(publicUrl, input.ObjectKey);
+                break;
+        }
 
         await _brandingRepository.UpdateAsync(branding);
         await CurrentUnitOfWork.SaveChangesAsync();
@@ -253,14 +271,20 @@ public class SchoolBrandingAppService : ApplicationService, ISchoolBrandingAppSe
 
         var branding = await GetOrCreateForCurrentTenantAsync();
 
-        var previousKey = input.AssetType == BrandingAssetType.Logo
-            ? branding.LogoObjectKey
-            : branding.FaviconObjectKey;
+        var previousKey = ObjectKeyFor(branding, input.AssetType);
 
-        if (input.AssetType == BrandingAssetType.Logo)
-            branding.ClearLogo();
-        else
-            branding.ClearFavicon();
+        switch (input.AssetType)
+        {
+            case BrandingAssetType.Logo:
+                branding.ClearLogo();
+                break;
+            case BrandingAssetType.Stamp:
+                branding.ClearStamp();
+                break;
+            default:
+                branding.ClearFavicon();
+                break;
+        }
 
         await _brandingRepository.UpdateAsync(branding);
         await CurrentUnitOfWork.SaveChangesAsync();
@@ -382,7 +406,8 @@ public class SchoolBrandingAppService : ApplicationService, ISchoolBrandingAppSe
                StringComparison.OrdinalIgnoreCase)
            || !string.IsNullOrWhiteSpace(branding.SchoolName)
            || !string.IsNullOrWhiteSpace(branding.LogoUrl)
-           || !string.IsNullOrWhiteSpace(branding.FaviconUrl);
+           || !string.IsNullOrWhiteSpace(branding.FaviconUrl)
+           || !string.IsNullOrWhiteSpace(branding.StampUrl);
 
     private static SchoolBrandingDto BuildDefaultDto(int? tenantId) => new()
     {
@@ -392,6 +417,7 @@ public class SchoolBrandingAppService : ApplicationService, ISchoolBrandingAppSe
         SecondaryColor = BrandingDefaults.SecondaryColor,
         LogoUrl = null,
         FaviconUrl = null,
+        StampUrl = null,
         SchoolName = BrandingDefaults.SchoolName,
         ConfiguredSchoolName = null,
         IsConfigured = false,
@@ -405,6 +431,18 @@ public class SchoolBrandingAppService : ApplicationService, ISchoolBrandingAppSe
         FaviconUrl = null,
         SchoolName = BrandingDefaults.SchoolName,
     };
+
+    /// <summary>
+    /// The stored object behind an asset, so an upload or a clear can delete
+    /// the one it replaces rather than leaving an orphan in the bucket.
+    /// </summary>
+    private static string ObjectKeyFor(SchoolBranding branding, BrandingAssetType assetType) =>
+        assetType switch
+        {
+            BrandingAssetType.Logo => branding.LogoObjectKey,
+            BrandingAssetType.Stamp => branding.StampObjectKey,
+            _ => branding.FaviconObjectKey,
+        };
 
     private static string ResolveSchoolName(string stored)
         => string.IsNullOrWhiteSpace(stored) ? BrandingDefaults.SchoolName : stored;

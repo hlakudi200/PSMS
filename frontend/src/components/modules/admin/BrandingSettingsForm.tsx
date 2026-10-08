@@ -43,6 +43,14 @@ const FAVICON_MAX_BYTES = 512 * 1024;
 const FAVICON_ACCEPT = ['image/png', 'image/x-icon', 'image/vnd.microsoft.icon'];
 const FAVICON_EXTENSIONS = ['.png', '.ico'];
 
+/* RC-21. The school stamp is printed on a report card beside the signatures —
+   National Protocol §25(8)(b) names it among a card's essential components.
+   It is not the logo: the logo is the school's mark on a screen, the stamp is
+   what authenticates a document on paper. */
+const STAMP_MAX_BYTES = 2 * 1024 * 1024;
+const STAMP_ACCEPT = ['image/png', 'image/jpeg'];
+const STAMP_EXTENSIONS = ['.png', '.jpg', '.jpeg'];
+
 /**
  * Normalises an Ant Design ColorPicker value to the "#RRGGBB" the API accepts.
  *
@@ -363,6 +371,21 @@ export default function BrandingSettingsForm() {
             )
           }
           onClear={() => handleAssetClear('Favicon')}
+        />
+
+        <AssetRow
+          label="School Stamp"
+          description="PNG or JPG, up to 2MB. Printed on report cards beside the signatures. A transparent PNG stamps best."
+          url={branding.stampUrl}
+          accept=".png,.jpg,.jpeg"
+          previewHeight={48}
+          busy={busy}
+          onSelect={(file) =>
+            handleAssetSelect(
+              'Stamp', file, STAMP_MAX_BYTES, STAMP_ACCEPT, STAMP_EXTENSIONS
+            )
+          }
+          onClear={() => handleAssetClear('Stamp')}
         />
 
         <Button type="primary" onClick={handleSave} loading={saving} disabled={isPending}>
