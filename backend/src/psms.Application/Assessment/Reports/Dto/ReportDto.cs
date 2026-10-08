@@ -73,6 +73,23 @@ public class ReportDto : FullAuditedEntityDto<Guid>
     public bool ReportsPercentages { get; set; } = true;
 
     public string ClassName { get; set; }
+
+    /// <summary>RC-21, §25(8)(a): the grade, which the class name may not say.</summary>
+    public string GradeName { get; set; }
+
+    /// <summary>RC-21, §25(8)(a): the learner's date of birth.</summary>
+    public DateTime? StudentDateOfBirth { get; set; }
+
+    /// <summary>RC-21, §25(8)(b): the dates the school opened and closed for this term.</summary>
+    public DateTime? SchoolOpensOn { get; set; }
+
+    public DateTime? SchoolClosesOn { get; set; }
+
+    /// <summary>
+    /// RC-21, §25(8)(d): last term's result for this learner, already phrased,
+    /// so the print view says exactly what the PDF says.
+    /// </summary>
+    public string PreviousPerformance { get; set; }
     public string TermName { get; set; }
     public string AcademicYearName { get; set; }
     public string PromotedToGradeName { get; set; }

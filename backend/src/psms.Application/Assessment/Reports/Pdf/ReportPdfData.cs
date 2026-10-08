@@ -31,6 +31,31 @@ public class ReportPdfData
     public string StudentName { get; set; }
     public string AdmissionNumber { get; set; }
     public string ClassName { get; set; }
+
+    /// <summary>
+    /// RC-21. §25(8)(a) asks for the grade <i>and</i> the class. We printed the
+    /// class alone, and "11C (Arts Stream)" does not say Grade 11 to a reader
+    /// who does not already know the school's class names.
+    /// </summary>
+    public string GradeName { get; set; }
+
+    /// <summary>RC-21. §25(8)(a): the learner's date of birth.</summary>
+    public string DateOfBirth { get; set; }
+
+    /// <summary>
+    /// RC-21. §25(8)(b): "dates of closing and opening of school". These are the
+    /// term's own dates, which the card never showed.
+    /// </summary>
+    public string SchoolOpensOn { get; set; }
+
+    public string SchoolClosesOn { get; set; }
+
+    /// <summary>
+    /// RC-21. §25(8)(d): feedback "in relation to his or her previous
+    /// performance". The previous term's result for this learner, already
+    /// phrased for printing, or null when this is their first card of the year.
+    /// </summary>
+    public string PreviousPerformance { get; set; }
     public string TermName { get; set; }
     public string AcademicYearName { get; set; }
     public string ReportType { get; set; }

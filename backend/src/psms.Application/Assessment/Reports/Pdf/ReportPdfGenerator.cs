@@ -217,6 +217,17 @@ public static class ReportPdfGenerator
 
             column.Item().AlignCenter().Text(subtitle).SemiBold().FontSize(10.5f);
 
+            // RC-21, §25(8)(b): "dates of closing and opening of school". These
+            // describe the term rather than the learner, so they sit under the
+            // term in the header instead of taking a row of the details grid.
+            if (!string.IsNullOrWhiteSpace(data.SchoolOpensOn)
+                || !string.IsNullOrWhiteSpace(data.SchoolClosesOn))
+            {
+                column.Item().AlignCenter()
+                    .Text($"School opens {data.SchoolOpensOn ?? "?"}  ·  closes {data.SchoolClosesOn ?? "?"}")
+                    .FontSize(8).FontColor(Colors.Grey.Darken2);
+            }
+
             column.Item().Height(3);
 
             // Double rule — the heavy line takes the school's colour, the hairline
@@ -305,12 +316,20 @@ public static class ReportPdfGenerator
         {
             grid.Item().Row(row =>
             {
-                // Left column
+                // Left column — §25(8)(a): name, grade and class, date of birth.
                 row.RelativeItem().Column(c =>
                 {
                     InfoRow(c, "Student Name:", data.StudentName);
                     InfoRow(c, "Admission No:", data.AdmissionNumber ?? "N/A");
-                    InfoRow(c, "Class:", data.ClassName ?? "N/A");
+                    InfoRow(c, "Date of Birth:", data.DateOfBirth ?? "N/A");
+                    // §25(8)(a) asks for the grade and the class. They are one
+                    // fact about where the learner sits, so they share a line
+                    // rather than spending two rows of a card that has to fit
+                    // on one page.
+                    InfoRow(c, "Grade / Class:", string.Join("  ·  ",
+                        new[] { data.GradeName, data.ClassName }
+                            .Where(x => !string.IsNullOrWhiteSpace(x))
+                            .Distinct()));
                 });
 
                 // Right column
@@ -332,6 +351,11 @@ public static class ReportPdfGenerator
                         InfoRow(c, "Overall:",
                             data.OverallPercentage.HasValue ? $"{Mark(data.OverallPercentage)}%" : "N/A");
                     }
+
+                    // §25(8)(d): this term read against the last one.
+                    if (!string.IsNullOrWhiteSpace(data.PreviousPerformance))
+                        InfoRow(c, "Previously:", data.PreviousPerformance);
+
                 });
             });
 
@@ -348,7 +372,7 @@ public static class ReportPdfGenerator
 
     private static void InfoRow(ColumnDescriptor column, string label, string value)
     {
-        column.Item().BorderBottom(0.5f).BorderColor(LightBorder).PaddingVertical(1.5f).Row(r =>
+        column.Item().BorderBottom(0.5f).BorderColor(LightBorder).PaddingVertical(1f).Row(r =>
         {
             r.ConstantItem(88).Text(label).Bold().FontSize(8.5f);
             r.RelativeItem().Text(value ?? "").FontSize(8.5f);

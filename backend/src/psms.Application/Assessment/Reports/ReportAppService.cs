@@ -171,6 +171,14 @@ public class ReportAppService : ApplicationService, IReportAppService
         dto.ReportsPercentages = psms.Domain.Assessment.ReportingScale
             .ReportsPercentages(report.Class?.Grade?.GradeLevel);
 
+        // RC-21, §25(8): the fields the print view was missing. Loaded here
+        // rather than mapped so the browser's card carries what the PDF does.
+        dto.GradeName = report.Class?.Grade?.GradeName;
+        dto.StudentDateOfBirth = report.Student?.DateOfBirth;
+        dto.SchoolOpensOn = report.Term?.StartDate;
+        dto.SchoolClosesOn = report.Term?.EndDate;
+        dto.PreviousPerformance = await PreviousPerformanceAsync(report, dto.ReportsPercentages);
+
         // RC-09: see ReportListDto.ActiveWorkflowInstanceId.
         var live = await _workflowStarter.GetActiveInstanceIdsAsync(
             AbpSession.TenantId, WorkflowEntityType.Report, new[] { dto.Id });
@@ -290,6 +298,14 @@ public class ReportAppService : ApplicationService, IReportAppService
         // same scale as the PDF.
         dto.ReportsPercentages = psms.Domain.Assessment.ReportingScale
             .ReportsPercentages(report.Class?.Grade?.GradeLevel);
+
+        // RC-21, §25(8): the fields the print view was missing. Loaded here
+        // rather than mapped so the browser's card carries what the PDF does.
+        dto.GradeName = report.Class?.Grade?.GradeName;
+        dto.StudentDateOfBirth = report.Student?.DateOfBirth;
+        dto.SchoolOpensOn = report.Term?.StartDate;
+        dto.SchoolClosesOn = report.Term?.EndDate;
+        dto.PreviousPerformance = await PreviousPerformanceAsync(report, dto.ReportsPercentages);
 
         // RC-09: see ReportListDto.ActiveWorkflowInstanceId.
         var live = await _workflowStarter.GetActiveInstanceIdsAsync(
@@ -911,6 +927,38 @@ public class ReportAppService : ApplicationService, IReportAppService
                 + "whenever you sign a report card.");
 
         return svg;
+    }
+
+    /// <summary>
+    /// RC-21, §25(8)(d). Last term's result for this learner, phrased exactly
+    /// as the PDF phrases it — the wording lives in the domain precisely so the
+    /// two cannot drift (RC-07).
+    /// </summary>
+    private async Task<string> PreviousPerformanceAsync(Report report, bool reportsPercentages)
+    {
+        if (report.TermId == null) return null;
+
+        var previous = await _reportRepository
+            .GetAll()
+            .Include(r => r.Term)
+            .Where(r => r.TenantId == report.TenantId
+                && r.StudentId == report.StudentId
+                && r.AcademicYearId == report.AcademicYearId
+                && r.Id != report.Id
+                && r.Term != null
+                && report.Term != null
+                && r.Term.TermNumber < report.Term.TermNumber)
+            .OrderByDescending(r => r.Term.TermNumber)
+            .FirstOrDefaultAsync();
+
+        if (previous == null) return null;
+
+        return psms.Domain.Assessment.PreviousPerformance.Describe(
+            previous.Term?.TermName,
+            previous.OverallPercentage,
+            previous.OverallAchievementLevel,
+            report.OverallPercentage,
+            reportsPercentages);
     }
 
     /// <summary>

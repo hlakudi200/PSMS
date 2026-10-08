@@ -694,19 +694,33 @@ function ReportDetailContent() {
         <div style={{ fontSize: 11, marginTop: 2 }}>
           {report.termName ?? ''} {report.termName && report.academicYearName ? ' — ' : ''} {report.academicYearName ?? ''}
         </div>
+        {/* RC-21, §25(8)(b): "dates of closing and opening of school". They
+            describe the term rather than the learner, so they sit here rather
+            than in the details grid — as they do on the PDF. */}
+        {(report.schoolOpensOn || report.schoolClosesOn) && (
+          <div style={{ fontSize: 9, marginTop: 1, color: '#595959' }}>
+            School opens {report.schoolOpensOn ? dayjs(report.schoolOpensOn).format('DD MMM YYYY') : '?'}
+            {'  ·  closes '}
+            {report.schoolClosesOn ? dayjs(report.schoolClosesOn).format('DD MMM YYYY') : '?'}
+          </div>
+        )}
       </div>
 
       {/* Student Info */}
       <div className="print-student-info">
         <div className="info-row"><span className="info-label">Student Name:</span><span>{report.studentName}</span></div>
         <div className="info-row"><span className="info-label">Admission No:</span><span>{report.studentAdmissionNumber ?? 'N/A'}</span></div>
-        <div className="info-row"><span className="info-label">Class:</span><span>{report.className ?? 'N/A'}</span></div>
+        <div className="info-row"><span className="info-label">Date of Birth:</span><span>{report.studentDateOfBirth ? dayjs(report.studentDateOfBirth).format('DD MMM YYYY') : 'N/A'}</span></div>
+        <div className="info-row"><span className="info-label">Grade / Class:</span><span>{[report.gradeName, report.className].filter(Boolean).join('  ·  ') || 'N/A'}</span></div>
         <div className="info-row"><span className="info-label">Date Generated:</span><span>{report.generatedDate ? dayjs(report.generatedDate).format('DD MMM YYYY') : 'N/A'}</span></div>
         <div className="info-row"><span className="info-label">Class Position:</span><span>{report.classPosition ?? '-'}{report.totalStudentsInClass ? ` of ${report.totalStudentsInClass}` : ''}</span></div>
         {reportsPercentages && (
           <div className="info-row"><span className="info-label">Overall:</span><span>{formatPercentage(report.overallPercentage)}</span></div>
         )}
         {/* RC-17: RE-002's report card number. */}
+        {report.previousPerformance && (
+          <div className="info-row"><span className="info-label">Previously:</span><span>{report.previousPerformance}</span></div>
+        )}
         <div className="info-row"><span className="info-label">Report Card No:</span><span>{report.reportCardNumber ?? 'N/A'}</span></div>
       </div>
 
