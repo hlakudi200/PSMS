@@ -67,6 +67,7 @@ public class ReportAppService : ApplicationService, IReportAppService
     private readonly IRepository<StaffSignature, Guid> _staffSignatureRepository;
     private readonly psms.Workflow.Shared.WorkflowStarterService _workflowStarter;
     private readonly ReportCohortStatisticsService _cohortStatistics;
+    private readonly ReportPdfDataLoader _reportPdfData;
 
     public ReportAppService(
         IRepository<Report, Guid> reportRepository,
@@ -91,7 +92,8 @@ public class ReportAppService : ApplicationService, IReportAppService
         psms.Academic.Teachers.ICurrentTeacherResolver currentTeacher,
         IRepository<StaffSignature, Guid> staffSignatureRepository,
         psms.Workflow.Shared.WorkflowStarterService workflowStarter,
-        ReportCohortStatisticsService cohortStatistics)
+        ReportCohortStatisticsService cohortStatistics,
+        ReportPdfDataLoader reportPdfData)
     {
         _reportRepository = reportRepository;
         _reportSubjectRepository = reportSubjectRepository;
@@ -116,6 +118,7 @@ public class ReportAppService : ApplicationService, IReportAppService
         _staffSignatureRepository = staffSignatureRepository;
         _workflowStarter = workflowStarter;
         _cohortStatistics = cohortStatistics;
+        _reportPdfData = reportPdfData;
     }
 
     /// <summary>
@@ -993,22 +996,37 @@ public class ReportAppService : ApplicationService, IReportAppService
     /// turn a download into an error the reader cannot act on — they are
     /// already being told the file is out of date.
     /// </summary>
-    private async Task EnqueuePdfRebuildAsync(Report report)
+    /// <summary>
+    /// Rebuild the stored PDF for a card whose contents have moved on, here in
+    /// the request rather than on a queue.
+    /// <para>
+    /// This was a background job and a "try again in a moment" message, and
+    /// both halves were wrong. The job row is written through the same unit of
+    /// work as the request, so throwing in order to deliver the message rolled
+    /// that row back with everything else: the rebuild never ran, and the
+    /// download refused for good. A caller who took the advice and retried
+    /// queued another one it would also never get.
+    /// </para>
+    /// <para>
+    /// Building it here costs the download a second or two and hands back the
+    /// card as it stands, which is what pressing Download asked for.
+    /// </para>
+    /// </summary>
+    private async Task RebuildPdfAsync(Report report)
     {
-        try
-        {
-            await _backgroundJobManager.EnqueueAsync<GenerateReportPdfJob, GenerateReportPdfJobArgs>(
-                new GenerateReportPdfJobArgs
-                {
-                    ReportId = report.Id,
-                    TenantId = AbpSession.TenantId,
-                    UserId = AbpSession.UserId ?? 0
-                });
-        }
-        catch (Exception ex)
-        {
-            Logger.Warn($"Could not queue a rebuild of the report card PDF for {report.Id}: {ex.Message}");
-        }
+        var data = await _reportPdfData.LoadAsync(report.Id, report.TenantId);
+        if (data == null)
+            throw new UserFriendlyException(AssessmentExceptionCodes.PdfNotGenerated,
+                "No PDF has been generated for this report yet.");
+
+        var objectKey = await _fileStorage.UploadAsync(
+            ReportPdfStorage.PathFor(report, data.AdmissionNumber),
+            ReportPdfGenerator.Generate(data),
+            "application/pdf");
+
+        report.SetPdfObjectKey(objectKey);
+        await _reportRepository.UpdateAsync(report);
+        await CurrentUnitOfWork.SaveChangesAsync();
     }
 
     /// <summary>
@@ -2507,14 +2525,7 @@ public class ReportAppService : ApplicationService, IReportAppService
         // Checked here because this is the single door to the file: a mutation
         // added later cannot forget to invalidate it.
         if (report.PdfIsStale())
-        {
-            await EnqueuePdfRebuildAsync(report);
-
-            throw new UserFriendlyException(AssessmentExceptionCodes.PdfOutOfDate,
-                "This report card has changed since its PDF was made — a signature, a comment "
-                + "or a mark. A fresh one is being produced now; try the download again in a "
-                + "moment.");
-        }
+            await RebuildPdfAsync(report);
 
         // RC-04: mint a short-lived signed URL rather than handing back a
         // durable link. The file itself is private, so the URL is the only way

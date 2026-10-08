@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Threading.Tasks;
 using Abp.BackgroundJobs;
 using Abp.Dependency;
@@ -48,7 +48,7 @@ public class GenerateReportPdfJob : AsyncBackgroundJob<GenerateReportPdfJobArgs>
 
             // Build storage path
             var report = await _reportRepository.GetAsync(args.ReportId);
-            var storagePath = $"reports/{args.TenantId ?? 0}/{report.AcademicYearId}/{report.TermId ?? Guid.Empty}/{data.AdmissionNumber ?? "unknown"}_{args.ReportId}.pdf";
+            var storagePath = ReportPdfStorage.PathFor(report, data.AdmissionNumber);
 
             // Private upload: the key is kept, and a short-lived signed URL is
             // minted per request. Nothing durable points at a child's report.
