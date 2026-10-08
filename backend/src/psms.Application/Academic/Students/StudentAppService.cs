@@ -1,4 +1,4 @@
-using Abp.Application.Services;
+﻿using Abp.Application.Services;
 using Abp.Application.Services.Dto;
 using Abp.Authorization;
 using Abp.Domain.Repositories;
@@ -49,12 +49,17 @@ public class StudentAppService : ApplicationService, IStudentAppService
     private readonly IRepository<Student, Guid> _studentRepository;
     private readonly IRepository<Grade, Guid> _gradeRepository;
     private readonly IRepository<Class, Guid> _classRepository;
+    // Where a learner sat each year, which CurrentClassId cannot say.
+    private readonly IRepository<StudentClass, Guid> _studentClassRepository;
+    private readonly IRepository<AcademicYear, Guid> _academicYearRepository;
     private readonly IStudentLoginProvisioner _loginProvisioner;
     private readonly ICurrentStudentResolver _currentStudent;
     private readonly psms.Academic.Parents.ICurrentParentResolver _currentParent;
 
     public StudentAppService(
         IRepository<Student, Guid> studentRepository,
+        IRepository<StudentClass, Guid> studentClassRepository,
+        IRepository<AcademicYear, Guid> academicYearRepository,
         IRepository<Grade, Guid> gradeRepository,
         IRepository<Class, Guid> classRepository,
         IStudentLoginProvisioner loginProvisioner,
@@ -62,6 +67,8 @@ public class StudentAppService : ApplicationService, IStudentAppService
         psms.Academic.Parents.ICurrentParentResolver currentParent)
     {
         _studentRepository = studentRepository;
+        _studentClassRepository = studentClassRepository;
+        _academicYearRepository = academicYearRepository;
         _gradeRepository = gradeRepository;
         _classRepository = classRepository;
         _loginProvisioner = loginProvisioner;
@@ -503,9 +510,158 @@ public class StudentAppService : ApplicationService, IStudentAppService
 
         student.CurrentClassId = classId;
         await _studentRepository.UpdateAsync(student);
+
+        // Where the learner sat this year, not only where they sit now.
+        await RecordEnrolmentAsync(student.Id, classId);
+
         await CurrentUnitOfWork.SaveChangesAsync();
 
         return await GetAsync(id);
+    }
+
+    /// <summary>
+    /// Writes the current year's enrolment for every learner who has a class
+    /// but no record of being in it.
+    /// <para>
+    /// Until now nothing wrote the year-by-year record, so a school that has
+    /// been running has learners placed in classes and no history at all. Going
+    /// forward <see cref="AssignClassAsync"/> keeps it, but that only helps a
+    /// learner who is moved; everyone else would stay invisible to anything
+    /// that asks about their years.
+    /// </para>
+    /// <para>
+    /// It records <b>this year and nothing else</b>. The school never wrote
+    /// down where these learners sat in previous years, and inventing those
+    /// rows would put guesses into a record that later gets read as fact —
+    /// including by the retention check, which is about whether a child repeats
+    /// a year. Safe to run more than once: a learner who already has a row for
+    /// the year is skipped.
+    /// </para>
+    /// </summary>
+    [AbpAuthorize(PermissionNames.Academic_Students_AssignClass)]
+    public async Task<int> BackfillCurrentYearEnrolmentsAsync()
+    {
+        var currentYear = await _academicYearRepository
+            .GetAll()
+            .Where(ay => ay.TenantId == AbpSession.TenantId && ay.IsCurrent)
+            .Select(ay => (Guid?)ay.Id)
+            .FirstOrDefaultAsync();
+
+        if (!currentYear.HasValue)
+            throw new UserFriendlyException(AcademicExceptionCodes.AcademicYearNotFound,
+                "No academic year is marked as current, so there is no year to record these "
+                + "enrolments against. Set the current academic year first.");
+
+        var placed = await _studentRepository
+            .GetAll()
+            // CurrentClassId is not nullable, so an unplaced learner carries
+            // the empty guid rather than null.
+            .Where(st => st.TenantId == AbpSession.TenantId && st.CurrentClassId != Guid.Empty)
+            .Select(st => new { st.Id, ClassId = st.CurrentClassId })
+            .ToListAsync();
+
+        var alreadyRecorded = await _studentClassRepository
+            .GetAll()
+            .Where(sc => sc.TenantId == AbpSession.TenantId && sc.AcademicYearId == currentYear.Value)
+            .Select(sc => sc.StudentId)
+            .ToListAsync();
+
+        var known = alreadyRecorded.ToHashSet();
+        var written = 0;
+
+        foreach (var learner in placed.Where(l => !known.Contains(l.Id)))
+        {
+            await _studentClassRepository.InsertAsync(new StudentClass(
+                Guid.NewGuid(),
+                AbpSession.TenantId,
+                learner.Id,
+                learner.ClassId,
+                currentYear.Value,
+                DateTime.UtcNow));
+
+            written++;
+        }
+
+        await CurrentUnitOfWork.SaveChangesAsync();
+
+        return written;
+    }
+
+    /// <summary>
+    /// Records that this learner is in this class for the current academic
+    /// year.
+    /// <para>
+    /// CurrentClassId is a single value with no year attached: it is overwritten
+    /// each time a learner moves, so it answers "where is this learner now" and
+    /// nothing else. Every question of the form "what did this learner do in
+    /// year X" — how many years they have been in a phase, whether they have
+    /// already repeated one, what the district schedule has to show — needs the
+    /// year-by-year record, and nothing was writing it.
+    /// </para>
+    /// <para>
+    /// Moving a learner between classes <i>within</i> a year is a correction,
+    /// not a second enrolment, so the year's row is updated rather than a new
+    /// one added. A learner has one class per year.
+    /// </para>
+    /// <para>
+    /// Silent when no academic year is marked current. A school mid-setup
+    /// should still be able to place a learner in a class, and a wrong year on
+    /// this record is worse than none — it would be read later as fact.
+    /// </para>
+    /// </summary>
+    private async Task RecordEnrolmentAsync(Guid studentId, Guid classId)
+    {
+        var currentYear = await _academicYearRepository
+            .GetAll()
+            .Where(ay => ay.TenantId == AbpSession.TenantId && ay.IsCurrent)
+            .Select(ay => (Guid?)ay.Id)
+            .FirstOrDefaultAsync();
+
+        if (!currentYear.HasValue)
+            return;
+
+        var thisYear = await _studentClassRepository
+            .GetAll()
+            .FirstOrDefaultAsync(sc => sc.TenantId == AbpSession.TenantId
+                && sc.StudentId == studentId
+                && sc.AcademicYearId == currentYear.Value);
+
+        if (thisYear != null)
+        {
+            if (thisYear.ClassId == classId && thisYear.IsCurrent && thisYear.IsActive)
+                return;
+
+            thisYear.ClassId = classId;
+            thisYear.IsCurrent = true;
+            thisYear.IsActive = true;
+            thisYear.EndDate = null;
+            await _studentClassRepository.UpdateAsync(thisYear);
+            return;
+        }
+
+        // A new year for this learner. Close last year's row so "where are they
+        // now" has one answer.
+        var previous = await _studentClassRepository
+            .GetAll()
+            .Where(sc => sc.TenantId == AbpSession.TenantId
+                && sc.StudentId == studentId
+                && sc.IsCurrent)
+            .ToListAsync();
+
+        foreach (var row in previous)
+        {
+            row.IsCurrent = false;
+            row.EndDate ??= DateTime.UtcNow;
+            await _studentClassRepository.UpdateAsync(row);
+        }
+
+        await _studentClassRepository.InsertAsync(new StudentClass(
+            Guid.NewGuid(),
+            AbpSession.TenantId,
+            studentId,
+            classId,
+            currentYear.Value,
+            DateTime.UtcNow));
     }
 
     [AbpAuthorize(PermissionNames.Academic_Students_Edit)]
