@@ -164,9 +164,6 @@ public static class AssessmentExceptionCodes
 
     // Report PDF
     public const string PdfNotGenerated = "ASM_PDF_NOT_GENERATED";
-    // The stored file is older than the card it claims to be — a signature,
-    // a comment or a mark landed after it was produced.
-    public const string PdfOutOfDate = "ASM_PDF_OUT_OF_DATE";
     public const string PdfGenerationFailed = "ASM_PDF_GENERATION_FAILED";
     public const string ReportNotGeneratedForPdf = "ASM_REPORT_NOT_GENERATED_FOR_PDF";
 }
