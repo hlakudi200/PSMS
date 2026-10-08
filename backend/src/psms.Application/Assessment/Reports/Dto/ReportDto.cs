@@ -1,4 +1,4 @@
-using Abp.Application.Services.Dto;
+﻿using Abp.Application.Services.Dto;
 using psms.Assessment.ReportSubjects.Dto;
 using psms.Domain.Shared.Enums;
 using System;
@@ -64,6 +64,14 @@ public class ReportDto : FullAuditedEntityDto<Guid>
     // Flattened
     public string StudentName { get; set; }
     public string StudentAdmissionNumber { get; set; }
+    /// <summary>
+    /// RC-19. Whether this card may show percentages. False for the Foundation
+    /// Phase (Grades R–3), which National Protocol §17(4)(a) says reports in
+    /// national codes and their achievement descriptions only. The screen and
+    /// the print view follow this so they cannot disagree with the PDF.
+    /// </summary>
+    public bool ReportsPercentages { get; set; } = true;
+
     public string ClassName { get; set; }
     public string TermName { get; set; }
     public string AcademicYearName { get; set; }

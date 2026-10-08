@@ -1,4 +1,4 @@
-using psms.Assessment.Reports.Pdf;
+﻿using psms.Assessment.Reports.Pdf;
 using psms.Domain.Shared.Enums;
 using System;
 using System.Collections.Generic;
@@ -12,6 +12,7 @@ namespace psms.Tests.Assessment;
 /// behaviour that matters: a school's colour and logo reach the page, and a
 /// missing or broken logo still produces a report.
 /// </summary>
+[Collection(PdfRenderCollection.Name)]
 public class ReportPdfBrandingRenderTests
 {
     private static ReportPdfData SampleData(string primary, byte[] logo) => new ReportPdfData
@@ -239,19 +240,23 @@ public class ReportPdfBrandingRenderTests
         Assert.Contains("Class Teacher", text);
         Assert.Contains("Principal", text);
 
-        // Counted rather than positional. "T. Petersen" is also the Mathematics
-        // teacher in the subject table, so the name is on the card either way;
-        // what an unsigned card must not do is print it a second time, over the
-        // signature line. Asserting on the text after the last "Class Teacher"
-        // read the words in extraction order, and PdfPig does not promise a
-        // stable order for words that sit close together — once the layout
-        // tightened, the table and the signature block were near enough that
-        // the two flipped between runs and the test failed perhaps one run in
-        // three.
-        Assert.Equal(1, Occurrences(text, "T. Petersen"));
+        // Counted, and counted on a single word.
+        //
+        // "T. Petersen" is also the Mathematics teacher in the subject table, so
+        // the name is on the card either way; what an unsigned card must not do
+        // is print it a second time, over the signature line. Asserting on the
+        // text after the last "Class Teacher" read the words in extraction
+        // order, and PdfPig promises no stable order for words that sit close
+        // together — once the layout tightened, the table and the signature
+        // block were near enough that the two flipped between runs.
+        //
+        // Counting "T. Petersen" was still not enough: the substring only
+        // appears while those two words stay adjacent, so a flip made the count
+        // fall rather than move. One word cannot be reordered out of existence.
+        Assert.Equal(1, Occurrences(text, "Petersen"));
 
         var signed = PdfText.Extract(ReportPdfGenerator.Generate(SampleData("#0066CC", null)));
-        Assert.Equal(2, Occurrences(signed, "T. Petersen"));
+        Assert.Equal(2, Occurrences(signed, "Petersen"));
     }
 
     private static int Occurrences(string haystack, string needle)

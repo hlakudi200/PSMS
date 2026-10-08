@@ -1,4 +1,4 @@
-using Abp.Application.Services;
+﻿using Abp.Application.Services;
 using Abp.Application.Services.Dto;
 using Abp.Authorization;
 using Abp.BackgroundJobs;
@@ -136,7 +136,7 @@ public class ReportAppService : ApplicationService, IReportAppService
         var report = await _reportRepository
             .GetAll()
             .Include(r => r.Student)
-            .Include(r => r.Class)
+            .Include(r => r.Class).ThenInclude(c => c.Grade)
             .Include(r => r.Term)
             .Include(r => r.AcademicYear)
             .Include(r => r.PromotedToGrade)
@@ -166,6 +166,11 @@ public class ReportAppService : ApplicationService, IReportAppService
         dto.SubjectReports = ObjectMapper.Map<List<ReportSubjectDto>>(report.SubjectReports.OrderBy(sr => sr.Subject?.SubjectName).ToList());
         dto.CanSignAsClassTeacher = await CanSignAsClassTeacherAsync(report.ClassId);
 
+        // RC-19: the screen and the print view read this so they report on the
+        // same scale as the PDF.
+        dto.ReportsPercentages = psms.Domain.Assessment.ReportingScale
+            .ReportsPercentages(report.Class?.Grade?.GradeLevel);
+
         // RC-09: see ReportListDto.ActiveWorkflowInstanceId.
         var live = await _workflowStarter.GetActiveInstanceIdsAsync(
             AbpSession.TenantId, WorkflowEntityType.Report, new[] { dto.Id });
@@ -188,7 +193,7 @@ public class ReportAppService : ApplicationService, IReportAppService
         var query = _reportRepository
             .GetAll()
             .Include(r => r.Student)
-            .Include(r => r.Class)
+            .Include(r => r.Class).ThenInclude(c => c.Grade)
             .Include(r => r.Term)
             .Include(r => r.AcademicYear)
             .Include(r => r.SubjectReports)
@@ -256,7 +261,7 @@ public class ReportAppService : ApplicationService, IReportAppService
         var report = await _reportRepository
             .GetAll()
             .Include(r => r.Student)
-            .Include(r => r.Class)
+            .Include(r => r.Class).ThenInclude(c => c.Grade)
             .Include(r => r.Term)
             .Include(r => r.AcademicYear)
             .Include(r => r.PromotedToGrade)
@@ -280,6 +285,11 @@ public class ReportAppService : ApplicationService, IReportAppService
         var dto = ObjectMapper.Map<ReportDto>(report);
         dto.SubjectReports = ObjectMapper.Map<List<ReportSubjectDto>>(report.SubjectReports.OrderBy(sr => sr.Subject?.SubjectName).ToList());
         dto.CanSignAsClassTeacher = await CanSignAsClassTeacherAsync(report.ClassId);
+
+        // RC-19: the screen and the print view read this so they report on the
+        // same scale as the PDF.
+        dto.ReportsPercentages = psms.Domain.Assessment.ReportingScale
+            .ReportsPercentages(report.Class?.Grade?.GradeLevel);
 
         // RC-09: see ReportListDto.ActiveWorkflowInstanceId.
         var live = await _workflowStarter.GetActiveInstanceIdsAsync(

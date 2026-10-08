@@ -90,6 +90,21 @@ const achievementLabelsShort: Record<number, string> = {
   1: '1', 2: '2', 3: '3', 4: '4', 5: '5', 6: '6', 7: '7',
 };
 
+/**
+ * RC-19. The achievement description a Foundation Phase card reports instead of
+ * a mark. The wording matches CapsAchievementScale.DescriptorFor on the server,
+ * so the screen, the print view and the PDF all say the same thing.
+ */
+const achievementDescriptions: Record<number, string> = {
+  1: 'Not achieved',
+  2: 'Elementary achievement',
+  3: 'Moderate achievement',
+  4: 'Adequate achievement',
+  5: 'Substantial achievement',
+  6: 'Meritorious achievement',
+  7: 'Outstanding achievement',
+};
+
 function getAchievementTag(level?: number) {
   if (!level) return <Text type="secondary">-</Text>;
   const info = achievementLabels[level];
@@ -582,9 +597,13 @@ function ReportDetailContent() {
   const status = statusMap[report.status] ?? { label: 'Unknown', color: 'default' };
   const subjects = report.subjectReports ?? [];
 
-  const subjectColumns = [
-    { title: 'Subject', dataIndex: 'subjectName', key: 'subjectName', render: (v: string) => <Text strong>{v}</Text> },
-    { title: 'Code', dataIndex: 'subjectCode', key: 'subjectCode', width: 80 },
+  /* RC-19. National Protocol s17(4)(a): the Foundation Phase reports in national
+     codes and their achievement descriptions, not percentages. The server
+     decides which phase this is; undefined means an older payload, and every
+     phase but one reports percentages. */
+  const reportsPercentages = report.reportsPercentages !== false;
+
+  const percentageColumns = [
     {
       title: 'Term Mark', dataIndex: 'termMark', key: 'termMark', width: 100,
       render: (v: number | undefined) => formatPercentage(v),
@@ -599,12 +618,12 @@ function ReportDetailContent() {
         ? <Text strong>{formatPercentage(v)}{s.awaitsExternalExamination ? ' †' : ''}</Text>
         : '-',
     },
-    {
-      title: 'Level', dataIndex: 'achievementLevel', key: 'achievementLevel', width: 160,
-      render: (v: number | undefined) => getAchievementTag(v),
-    },
-    /* RC-06: the cohort figures. Blank until the class statistics pass has run
-       for this term — an empty cell rather than a 0 that reads as a real mark. */
+  ];
+
+  /* RC-06: the cohort figures. Blank until the class statistics pass has run
+     for this term — an empty cell rather than a 0 that reads as a real mark.
+     All three are percentages, so the Foundation Phase does not carry them. */
+  const cohortColumns = [
     {
       title: 'Class Avg', dataIndex: 'classAverage', key: 'classAverage', width: 100,
       render: (v: number | undefined) => v != null ? formatPercentage(v) : <Text type="secondary">-</Text>,
@@ -620,6 +639,24 @@ function ReportDetailContent() {
           ? <Text type="secondary">{formatPercentage(s.lowestInClass)} – {formatPercentage(s.highestInClass)}</Text>
           : <Text type="secondary">-</Text>,
     },
+  ];
+
+  const subjectColumns = [
+    { title: 'Subject', dataIndex: 'subjectName', key: 'subjectName', render: (v: string) => <Text strong>{v}</Text> },
+    { title: 'Code', dataIndex: 'subjectCode', key: 'subjectCode', width: 80 },
+    ...(reportsPercentages ? percentageColumns : []),
+    {
+      title: 'Level', dataIndex: 'achievementLevel', key: 'achievementLevel', width: 160,
+      render: (v: number | undefined) => getAchievementTag(v),
+    },
+    /* The phase reports the description, so it is a column of its own rather
+       than a legend the reader has to cross-reference. */
+    ...(reportsPercentages ? [] : [{
+      title: 'Achievement', dataIndex: 'achievementLevel', key: 'achievementDesc', width: 200,
+      render: (v: number | undefined) =>
+        v ? achievementDescriptions[v] : <Text type="secondary">-</Text>,
+    }]),
+    ...(reportsPercentages ? cohortColumns : []),
     { title: 'Teacher', dataIndex: 'teacherName', key: 'teacherName' },
     {
       title: 'Comment', dataIndex: 'teacherComment', key: 'teacherComment',
@@ -666,7 +703,9 @@ function ReportDetailContent() {
         <div className="info-row"><span className="info-label">Class:</span><span>{report.className ?? 'N/A'}</span></div>
         <div className="info-row"><span className="info-label">Date Generated:</span><span>{report.generatedDate ? dayjs(report.generatedDate).format('DD MMM YYYY') : 'N/A'}</span></div>
         <div className="info-row"><span className="info-label">Class Position:</span><span>{report.classPosition ?? '-'}{report.totalStudentsInClass ? ` of ${report.totalStudentsInClass}` : ''}</span></div>
-        <div className="info-row"><span className="info-label">Overall:</span><span>{formatPercentage(report.overallPercentage)}</span></div>
+        {reportsPercentages && (
+          <div className="info-row"><span className="info-label">Overall:</span><span>{formatPercentage(report.overallPercentage)}</span></div>
+        )}
         {/* RC-17: RE-002's report card number. */}
         <div className="info-row"><span className="info-label">Report Card No:</span><span>{report.reportCardNumber ?? 'N/A'}</span></div>
       </div>
@@ -677,12 +716,13 @@ function ReportDetailContent() {
           <tr>
             <th style={{ textAlign: 'left', width: '20%' }}>Subject</th>
             <th style={{ width: '6%' }}>Code</th>
-            <th style={{ width: '9%' }}>Term Mark (%)</th>
-            <th style={{ width: '9%' }}>Exam Mark (%)</th>
-            <th style={{ width: '9%' }}>Final Mark (%)</th>
+            {reportsPercentages && <th style={{ width: '9%' }}>Term Mark (%)</th>}
+            {reportsPercentages && <th style={{ width: '9%' }}>Exam Mark (%)</th>}
+            {reportsPercentages && <th style={{ width: '9%' }}>Final Mark (%)</th>}
             <th style={{ width: '6%' }}>Level</th>
-            <th style={{ width: '9%' }}>Class Avg (%)</th>
-            <th style={{ width: '5%' }}>Pos</th>
+            {!reportsPercentages && <th style={{ textAlign: 'left', width: '22%' }}>Achievement</th>}
+            {reportsPercentages && <th style={{ width: '9%' }}>Class Avg (%)</th>}
+            {reportsPercentages && <th style={{ width: '5%' }}>Pos</th>}
             <th style={{ width: '12%' }}>Teacher</th>
             <th style={{ textAlign: 'left', width: '15%' }}>Comment</th>
           </tr>
@@ -692,27 +732,38 @@ function ReportDetailContent() {
             <tr key={s.id}>
               <td>{s.subjectName}</td>
               <td>{s.subjectCode ?? '-'}</td>
-              <td>{formatMark(s.termMark)}</td>
-              <td>{formatMark(s.examMark)}</td>
-              <td style={{ fontWeight: 700 }}>
-                {formatMark(s.finalMark)}{s.awaitsExternalExamination ? ' †' : ''}
-              </td>
+              {reportsPercentages && <td>{formatMark(s.termMark)}</td>}
+              {reportsPercentages && <td>{formatMark(s.examMark)}</td>}
+              {reportsPercentages && (
+                <td style={{ fontWeight: 700 }}>
+                  {formatMark(s.finalMark)}{s.awaitsExternalExamination ? ' †' : ''}
+                </td>
+              )}
               <td>{s.achievementLevel ? achievementLabelsShort[s.achievementLevel] : '-'}</td>
-              <td>{formatMark(s.classAverage)}</td>
-              <td>{s.subjectPosition ?? '-'}</td>
+              {!reportsPercentages && (
+                <td style={{ textAlign: 'left' }}>
+                  {s.achievementLevel ? achievementDescriptions[s.achievementLevel] : '-'}
+                </td>
+              )}
+              {reportsPercentages && <td>{formatMark(s.classAverage)}</td>}
+              {reportsPercentages && <td>{s.subjectPosition ?? '-'}</td>}
               <td style={{ fontSize: 9, textAlign: 'left' }}>{s.teacherName ?? '-'}</td>
               <td style={{ fontSize: 9, textAlign: 'left' }}>{s.teacherComment ?? '-'}</td>
             </tr>
           ))}
         </tbody>
-        <tfoot>
-          <tr>
-            <td colSpan={4} style={{ textAlign: 'right' }}>Overall Average:</td>
-            <td>{overallAvg}%</td>
-            <td>{report.overallAchievementLevel ? achievementLabelsShort[report.overallAchievementLevel] : '-'}</td>
-            <td colSpan={4}></td>
-          </tr>
-        </tfoot>
+        {/* RC-19: no aggregate for the Foundation Phase — it is a percentage,
+            and an averaged percentage is what s17(4)(a) does not provide for. */}
+        {reportsPercentages && (
+          <tfoot>
+            <tr>
+              <td colSpan={4} style={{ textAlign: 'right' }}>Overall Average:</td>
+              <td>{overallAvg}%</td>
+              <td>{report.overallAchievementLevel ? achievementLabelsShort[report.overallAchievementLevel] : '-'}</td>
+              <td colSpan={4}></td>
+            </tr>
+          </tfoot>
+        )}
       </table>
 
       {/* RC-15: what the dagger means, when anything carries one. The PDF
@@ -1022,16 +1073,18 @@ function ReportDetailContent() {
 
       {/* Summary Stats */}
       <Row gutter={16} style={{ marginBottom: 16 }} className="no-print">
-        <Col xs={12} sm={6}>
-          <Card size="small">
-            <Statistic
-              title="Overall"
-              value={report.overallPercentage ?? 0}
-              suffix="%"
-              valueStyle={{ color: (report.overallPercentage ?? 0) >= 50 ? '#3f8600' : '#cf1322' }}
-            />
-          </Card>
-        </Col>
+        {reportsPercentages && (
+          <Col xs={12} sm={6}>
+            <Card size="small">
+              <Statistic
+                title="Overall"
+                value={report.overallPercentage ?? 0}
+                suffix="%"
+                valueStyle={{ color: (report.overallPercentage ?? 0) >= 50 ? '#3f8600' : '#cf1322' }}
+              />
+            </Card>
+          </Col>
+        )}
         <Col xs={12} sm={6}>
           <Card size="small">
             <Statistic

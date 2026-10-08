@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using psms.Domain.Shared.Enums;
 
@@ -58,6 +58,13 @@ public class ReportPdfData
     public string TeacherSignedDate { get; set; }
 
     /// <summary>The class teacher's handwriting, as drawn when they signed.</summary>
+    /// <summary>
+    /// RC-19. Whether this card may print percentages at all. False for the
+    /// Foundation Phase, which the National Protocol §17(4)(a) says reports in
+    /// national codes and their achievement descriptions and nothing else.
+    /// </summary>
+    public bool ReportsPercentages { get; set; } = true;
+
     public string TeacherSignatureSvg { get; set; }
 
     public string PrincipalSignedBy { get; set; }
