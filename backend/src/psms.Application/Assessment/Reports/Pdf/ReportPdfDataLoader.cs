@@ -121,6 +121,12 @@ public class ReportPdfDataLoader : ITransientDependency
             StudentName = report.Student?.GetFullName() ?? "Unknown Student",
             AdmissionNumber = report.Student?.AdmissionNumber,
             ClassName = report.Class?.ClassName ?? "N/A",
+            // RC-21, §25(8)(a) and (b): the grade, the learner's date of birth
+            // and the term's own opening and closing dates.
+            GradeName = report.Class?.Grade?.GradeName,
+            DateOfBirth = report.Student?.DateOfBirth.ToString("dd MMM yyyy"),
+            SchoolOpensOn = report.Term?.StartDate.ToString("dd MMM yyyy"),
+            SchoolClosesOn = report.Term?.EndDate.ToString("dd MMM yyyy"),
             ReportsPercentages = psms.Domain.Assessment.ReportingScale
                 .ReportsPercentages(report.Class?.Grade?.GradeLevel),
             TermName = report.Term?.TermName,
@@ -153,6 +159,10 @@ public class ReportPdfDataLoader : ITransientDependency
             PrincipalComment = report.PrincipalComment,
             ParentComment = report.ParentComment,
         };
+
+        // RC-21, §25(8)(d): what the learner did last term, so the reader has
+        // something to read this term against.
+        data.PreviousPerformance = await PreviousPerformanceAsync(report, data.ReportsPercentages);
 
         data.Subjects = report.SubjectReports
             .OrderBy(sr => sr.Subject?.SubjectName)
@@ -283,6 +293,52 @@ public class ReportPdfDataLoader : ITransientDependency
     /// then prints the blank line it used to, rather than failing over a name.
     /// </summary>
 
+    /// <summary>
+    /// RC-21. The learner's result from the term before this one, phrased for
+    /// printing, or null when there is nothing earlier to compare with.
+    /// <para>
+    /// §25(8)(d) asks for feedback "in relation to his or her previous
+    /// performance". The card cannot write the teacher's commentary, but it can
+    /// put last term's result next to this one so the comparison is on the page
+    /// rather than in the reader's memory.
+    /// </para>
+    /// <para>
+    /// Foundation Phase cards get the level and its description, not a
+    /// percentage — RC-19 applies to the comparison as much as to the marks.
+    /// </para>
+    /// </summary>
+    private async Task<string> PreviousPerformanceAsync(Report report, bool reportsPercentages)
+    {
+        if (report.TermId == null) return null;
+
+        var previous = await _reportRepository
+            .GetAll()
+            .Include(r => r.Term)
+            .Where(r => r.TenantId == report.TenantId
+                && r.StudentId == report.StudentId
+                && r.AcademicYearId == report.AcademicYearId
+                && r.Id != report.Id
+                && r.Term != null
+                && report.Term != null
+                && r.Term.TermNumber < report.Term.TermNumber)
+            .OrderByDescending(r => r.Term.TermNumber)
+            .FirstOrDefaultAsync();
+
+        if (previous == null) return null;
+
+        return psms.Domain.Assessment.PreviousPerformance.Describe(
+            previous.Term?.TermName,
+            previous.OverallPercentage,
+            previous.OverallAchievementLevel,
+            report.OverallPercentage,
+            reportsPercentages);
+    }
+
+    /// <summary>
+    /// RC-17. The name to print over a signature line. Null when nobody has
+    /// signed, or when the account that did has since been removed — the card
+    /// then prints the blank line it used to, rather than failing over a name.
+    /// </summary>
     private async Task<string> ResolveSignerAsync(long? userId)
     {
         if (!userId.HasValue || userId.Value == 0)

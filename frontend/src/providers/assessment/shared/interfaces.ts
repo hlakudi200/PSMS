@@ -287,6 +287,16 @@ export interface IReport {
    * payloads, which are treated as reporting percentages.
    */
   reportsPercentages?: boolean;
+  /** RC-21, s25(8)(a): the grade, which a class name may not say. */
+  gradeName?: string;
+  /** RC-21, s25(8)(a): the learner's date of birth. */
+  studentDateOfBirth?: string;
+  /** RC-21, s25(8)(b): the dates the school opened and closed for this term. */
+  schoolOpensOn?: string;
+  schoolClosesOn?: string;
+  /** RC-21, s25(8)(d): last term's result, phrased by the server so the print
+   *  view says exactly what the PDF says. */
+  previousPerformance?: string;
   overallPercentage?: number;
   overallAchievementLevel?: number;
   classPosition?: number;
@@ -354,6 +364,16 @@ export interface IReportList {
    * payloads, which are treated as reporting percentages.
    */
   reportsPercentages?: boolean;
+  /** RC-21, s25(8)(a): the grade, which a class name may not say. */
+  gradeName?: string;
+  /** RC-21, s25(8)(a): the learner's date of birth. */
+  studentDateOfBirth?: string;
+  /** RC-21, s25(8)(b): the dates the school opened and closed for this term. */
+  schoolOpensOn?: string;
+  schoolClosesOn?: string;
+  /** RC-21, s25(8)(d): last term's result, phrased by the server so the print
+   *  view says exactly what the PDF says. */
+  previousPerformance?: string;
   overallPercentage?: number;
   overallAchievementLevel?: number;
   classPosition?: number;
