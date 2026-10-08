@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -9,11 +9,16 @@ namespace psms.Domain.Assessment
     /// </summary>
     public readonly struct AssessmentContribution
     {
-        public AssessmentContribution(decimal percentage, decimal weight, bool isExamination)
+        public AssessmentContribution(
+            decimal percentage,
+            decimal weight,
+            bool isExamination,
+            bool isPracticalAssessmentTask = false)
         {
             Percentage = percentage;
             Weight = weight;
             IsExamination = isExamination;
+            IsPracticalAssessmentTask = isPracticalAssessmentTask;
         }
 
         /// <summary>What the learner scored, 0-100.</summary>
@@ -32,6 +37,13 @@ namespace psms.Domain.Assessment
         /// — tests, assignments, projects, orals, practicals — is SBA.
         /// </summary>
         public bool IsExamination { get; }
+
+        /// <summary>
+        /// RC-23. Whether this task is a Practical Assessment Task — a practical
+        /// or, for a language, the oral. It only means anything in a subject
+        /// §7(1) names; elsewhere a practical is ordinary school work.
+        /// </summary>
+        public bool IsPracticalAssessmentTask { get; }
     }
 
     /// <summary>What a subject's marks came to, and how.</summary>
@@ -118,6 +130,12 @@ namespace psms.Domain.Assessment
     public static class SubjectMarkAggregator
     {
         /// <summary>
+        /// RC-23. National Protocol §7(2): "The Practical Assessment Tasks mark
+        /// must count 25% of the end-of-year examination mark."
+        /// </summary>
+        private const decimal PracticalShareOfExamination = 25m;
+
+        /// <summary>
         /// A term's mark: the weighted mean of every task completed in the term,
         /// whatever kind it was.
         /// <para>
@@ -143,11 +161,19 @@ namespace psms.Domain.Assessment
         /// A year mark: the School-Based Assessment and the end-of-year
         /// examination averaged separately and combined at the band's split.
         /// </summary>
+        /// <param name="practicalCountsTowardExamination">
+        /// RC-23. True for a subject National Protocol §7(1) names, where the
+        /// Practical Assessment Task is "a compulsory component of the final
+        /// promotion mark" and §7(2) makes it 25% of the end-of-year examination
+        /// mark. The practical then composes the examination with the written
+        /// paper instead of sitting in the School-Based Assessment total.
+        /// </param>
         public static SubjectMarkResult Aggregate(
             IEnumerable<AssessmentContribution> contributions,
             int sbaPercentage,
             int examPercentage,
-            bool examinationIsExternal)
+            bool examinationIsExternal,
+            bool practicalCountsTowardExamination = false)
         {
             var all = (contributions ?? Enumerable.Empty<AssessmentContribution>()).ToList();
 
@@ -159,16 +185,50 @@ namespace psms.Domain.Assessment
             // without saying so.
             var examinationCounts = examinationIsExternal || examPercentage > 0;
 
-            var schoolBased = Average(all.Where(c => !c.IsExamination || !examinationCounts));
+            // RC-23. §7(2) makes the Practical Assessment Task 25% of the
+            // examination mark, so in a §7(1) subject it is part of the
+            // examination and must leave the School-Based Assessment total —
+            // counting it in both would pay the learner for it twice. It only
+            // moves where there is an examination for it to be a quarter of:
+            // with none, the practical is school work like any other, which is
+            // what happens in Life Orientation and below Grade 10.
+            var practicalIsExamComponent = practicalCountsTowardExamination
+                && examinationCounts
+                && !examinationIsExternal;
+
+            var schoolBased = Average(all.Where(c =>
+                (!c.IsExamination || !examinationCounts)
+                && !(practicalIsExamComponent && c.IsPracticalAssessmentTask)));
 
             // An external examination did not happen at this school, so whatever
             // internal paper was written is not the examination component and is
             // not reported as one. Nor is there an examination component to
             // report when the band does not have one — those marks have already
             // been folded into the school-based total above.
-            var examination = examinationCounts && !examinationIsExternal
-                ? Average(all.Where(c => c.IsExamination))
-                : null;
+            decimal? examination;
+
+            if (practicalIsExamComponent)
+            {
+                var practical = Average(all.Where(c => c.IsPracticalAssessmentTask && !c.IsExamination));
+                var written = Average(all.Where(c => c.IsExamination));
+
+                // A missing half is dropped rather than scored zero, the same
+                // way a missing component is everywhere else here: a learner
+                // with no written paper is marked on the practical they did sit,
+                // and a subject with no practical recorded yet is marked on the
+                // paper.
+                examination =
+                    practical.HasValue && written.HasValue
+                        ? (practical.Value * PracticalShareOfExamination / 100m)
+                          + (written.Value * (100m - PracticalShareOfExamination) / 100m)
+                        : practical ?? written;
+            }
+            else
+            {
+                examination = examinationCounts && !examinationIsExternal
+                    ? Average(all.Where(c => c.IsExamination))
+                    : null;
+            }
 
             if (!schoolBased.HasValue && !examination.HasValue)
                 return SubjectMarkResult.None;
