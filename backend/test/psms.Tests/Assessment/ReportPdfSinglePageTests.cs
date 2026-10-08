@@ -1,4 +1,4 @@
-using psms.Assessment.Reports.Pdf;
+﻿using psms.Assessment.Reports.Pdf;
 using psms.Domain.Shared.Enums;
 using Shouldly;
 using System.Collections.Generic;
@@ -22,6 +22,7 @@ namespace psms.Tests.Assessment;
 /// longest names, every optional block present at once.
 /// </para>
 /// </summary>
+[Collection(PdfRenderCollection.Name)]
 public class ReportPdfSinglePageTests
 {
     /// <summary>

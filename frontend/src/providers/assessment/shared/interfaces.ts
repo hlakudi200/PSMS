@@ -280,6 +280,13 @@ export interface IReport {
   termId?: string;
   academicYearId: string;
   reportType: number;
+  /**
+   * RC-19. Whether this card may show percentages. False for the Foundation
+   * Phase (Grades R-3), which National Protocol s17(4)(a) says reports in
+   * national codes and their achievement descriptions only. Undefined on older
+   * payloads, which are treated as reporting percentages.
+   */
+  reportsPercentages?: boolean;
   overallPercentage?: number;
   overallAchievementLevel?: number;
   classPosition?: number;
@@ -340,6 +347,13 @@ export interface IReportList {
   termId?: string;
   academicYearId: string;
   reportType: number;
+  /**
+   * RC-19. Whether this card may show percentages. False for the Foundation
+   * Phase (Grades R-3), which National Protocol s17(4)(a) says reports in
+   * national codes and their achievement descriptions only. Undefined on older
+   * payloads, which are treated as reporting percentages.
+   */
+  reportsPercentages?: boolean;
   overallPercentage?: number;
   overallAchievementLevel?: number;
   classPosition?: number;

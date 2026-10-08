@@ -321,7 +321,17 @@ public static class ReportPdfGenerator
                         ? $"{data.ClassPosition} of {data.TotalStudentsInClass ?? 0}"
                         : "N/A";
                     InfoRow(c, "Class Position:", posText);
-                    InfoRow(c, "Overall:", data.OverallPercentage.HasValue ? $"{Mark(data.OverallPercentage)}%" : "N/A");
+
+                    // RC-19. No overall for the Foundation Phase. The aggregate
+                    // is a percentage, and an averaged percentage is precisely
+                    // what §17(4)(a) does not provide for — the phase reports a
+                    // code and a description per subject, and the Protocol's
+                    // reporting instrument for it (§18, Table 1) has no overall.
+                    if (data.ReportsPercentages)
+                    {
+                        InfoRow(c, "Overall:",
+                            data.OverallPercentage.HasValue ? $"{Mark(data.OverallPercentage)}%" : "N/A");
+                    }
                 });
             });
 
@@ -348,6 +358,12 @@ public static class ReportPdfGenerator
     // ─── Subject Table with overall footer ───
     private static void ComposeSubjectTable(IContainer container, ReportPdfData data)
     {
+        if (!data.ReportsPercentages)
+        {
+            ComposeFoundationPhaseSubjectTable(container, data);
+            return;
+        }
+
         container.Table(table =>
         {
             table.ColumnsDefinition(columns =>
@@ -444,6 +460,70 @@ public static class ReportPdfGenerator
                 .Padding(4).Text("").FontSize(9);
         });
     }
+
+    /// <summary>
+    /// RC-19. The Foundation Phase table: the national code and its achievement
+    /// description, and no percentage anywhere.
+    /// <para>
+    /// National Protocol §17(4)(a) gives the phase codes and descriptions as the
+    /// reporting instrument. A percentage is provided for from Grade 4 onward,
+    /// so a Grade 1 card printing "68.0%" is reporting on a scale the phase does
+    /// not use. The examination column goes too: the Foundation Phase is wholly
+    /// school-based, so it was always structurally empty here.
+    /// </para>
+    /// </summary>
+    private static void ComposeFoundationPhaseSubjectTable(IContainer container, ReportPdfData data)
+    {
+        container.Table(table =>
+        {
+            table.ColumnsDefinition(columns =>
+            {
+                columns.RelativeColumn(3.0f);  // Subject
+                columns.RelativeColumn(1.0f);  // Code
+                columns.RelativeColumn(0.7f);  // Level
+                columns.RelativeColumn(2.6f);  // Achievement description
+                columns.RelativeColumn(2.0f);  // Teacher
+                columns.RelativeColumn(2.2f);  // Comment
+            });
+
+            table.Header(header =>
+            {
+                var brandBg = data.PrimaryColor;
+                var brandFg = ReadableOn(brandBg);
+                IContainer BrandedHeader(IContainer cell) =>
+                    cell.Border(1).BorderColor(BorderCol).Background(brandBg).Padding(3);
+
+                header.Cell().Element(BrandedHeader).Text("SUBJECT").Bold().FontSize(7.5f).FontColor(brandFg);
+                header.Cell().Element(BrandedHeader).Text("CODE").Bold().FontSize(7.5f).FontColor(brandFg);
+                header.Cell().Element(BrandedHeader).AlignCenter().Text("LEVEL").Bold().FontSize(7.5f).FontColor(brandFg);
+                header.Cell().Element(BrandedHeader).Text("ACHIEVEMENT").Bold().FontSize(7.5f).FontColor(brandFg);
+                header.Cell().Element(BrandedHeader).Text("TEACHER").Bold().FontSize(7.5f).FontColor(brandFg);
+                header.Cell().Element(BrandedHeader).Text("COMMENT").Bold().FontSize(7.5f).FontColor(brandFg);
+            });
+
+            foreach (var s in data.Subjects)
+            {
+                table.Cell().Element(DataCellStyle).Text(s.SubjectName ?? "").SemiBold().FontSize(8.5f);
+                table.Cell().Element(DataCellStyle).Text(s.SubjectCode ?? "-").FontSize(8.5f);
+                table.Cell().Element(DataCellStyle).AlignCenter()
+                    .Text(Level(s.AchievementLevel)).SemiBold().FontSize(8.5f);
+                table.Cell().Element(DataCellStyle)
+                    .Text(AchievementDescription(s.AchievementLevel)).FontSize(8.5f);
+                table.Cell().Element(DataCellStyle).Text(s.TeacherName ?? "-").FontSize(7.5f);
+                table.Cell().Element(DataCellStyle).Text(s.TeacherComment ?? "-").FontSize(7.5f);
+            }
+        });
+    }
+
+    /// <summary>
+    /// The full achievement description for a level — "Substantial achievement".
+    /// The Foundation Phase reports this rather than a mark, so it is spelled out
+    /// here rather than shortened the way the legend shortens it.
+    /// </summary>
+    private static string AchievementDescription(psms.Domain.Shared.Enums.CapsAchievementLevel? level) =>
+        level.HasValue
+            ? psms.Domain.Assessment.CapsAchievementScale.DescriptorFor(level.Value)
+            : "-";
 
     // ─── RC-17: conduct and diligence, two of RE-002's named fields ───
     private static void ComposeConduct(IContainer container, ReportPdfData data)

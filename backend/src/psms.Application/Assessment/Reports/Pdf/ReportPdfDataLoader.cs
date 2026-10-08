@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Abp.Dependency;
@@ -67,7 +67,7 @@ public class ReportPdfDataLoader : ITransientDependency
         var report = await _reportRepository
             .GetAll()
             .Include(r => r.Student)
-            .Include(r => r.Class)
+            .Include(r => r.Class).ThenInclude(c => c.Grade)
             .Include(r => r.Term)
             .Include(r => r.AcademicYear)
             .Include(r => r.PromotedToGrade)
@@ -121,6 +121,8 @@ public class ReportPdfDataLoader : ITransientDependency
             StudentName = report.Student?.GetFullName() ?? "Unknown Student",
             AdmissionNumber = report.Student?.AdmissionNumber,
             ClassName = report.Class?.ClassName ?? "N/A",
+            ReportsPercentages = psms.Domain.Assessment.ReportingScale
+                .ReportsPercentages(report.Class?.Grade?.GradeLevel),
             TermName = report.Term?.TermName,
             AcademicYearName = report.AcademicYear?.YearName ?? "N/A",
             ReportType = GetReportTypeLabel(report.ReportType),
