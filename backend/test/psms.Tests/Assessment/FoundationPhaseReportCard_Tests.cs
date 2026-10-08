@@ -150,6 +150,61 @@ public class FoundationPhaseReportCard_Tests
     }
 
     [Fact]
+    public void A_foundation_phase_card_prints_no_class_position()
+    {
+        // A position is a rank off the overall aggregate — the very number
+        // §17(4)(a) does not provide for and which this card already omits. To
+        // print it is to report that aggregate by another name, and to rank a
+        // five-year-old against their class while doing it.
+        var text = PdfText.Extract(ReportPdfGenerator.Generate(Card(reportsPercentages: false)));
+
+        text.ShouldNotContain("Class Position");
+        text.ShouldNotContain("4 of 30");
+    }
+
+    [Fact]
+    public void Any_other_phase_still_prints_the_position()
+    {
+        var text = PdfText.Extract(ReportPdfGenerator.Generate(Card(reportsPercentages: true)));
+
+        text.ShouldContain("Class Position");
+    }
+
+    [Fact]
+    public void Attendance_nobody_recorded_prints_a_dash_not_a_zero()
+    {
+        // Four zeros state, on a legal document, that the child was present on
+        // none of zero school days.
+        var data = Card(reportsPercentages: false);
+        data.DaysInTerm = null;
+        data.DaysPresent = 0;
+        data.DaysAbsent = 0;
+        data.DaysLate = 0;
+
+        var text = PdfText.Extract(ReportPdfGenerator.Generate(data));
+
+        text.ShouldContain("DAYS PRESENT");
+        text.ShouldContain("—");
+    }
+
+    [Fact]
+    public void Attendance_that_was_recorded_prints_its_figures()
+    {
+        var data = Card(reportsPercentages: false);
+        data.DaysInTerm = 60;
+        data.DaysPresent = 58;
+        data.DaysAbsent = 2;
+        data.DaysLate = 0;
+
+        var text = PdfText.Extract(ReportPdfGenerator.Generate(data));
+
+        text.ShouldContain("58");
+        text.ShouldContain("60");
+        // A real zero stays a zero: the learner was late on no day.
+        text.ShouldNotContain("—");
+    }
+
+    [Fact]
     public void A_foundation_phase_card_fits_on_one_page()
     {
         using var pdf = UglyToad.PdfPig.PdfDocument.Open(

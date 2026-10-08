@@ -713,7 +713,12 @@ function ReportDetailContent() {
         <div className="info-row"><span className="info-label">Date of Birth:</span><span>{report.studentDateOfBirth ? dayjs(report.studentDateOfBirth).format('DD MMM YYYY') : 'N/A'}</span></div>
         <div className="info-row"><span className="info-label">Grade / Class:</span><span>{[report.gradeName, report.className].filter(Boolean).join('  ·  ') || 'N/A'}</span></div>
         <div className="info-row"><span className="info-label">Date Generated:</span><span>{report.generatedDate ? dayjs(report.generatedDate).format('DD MMM YYYY') : 'N/A'}</span></div>
-        <div className="info-row"><span className="info-label">Class Position:</span><span>{report.classPosition ?? '-'}{report.totalStudentsInClass ? ` of ${report.totalStudentsInClass}` : ''}</span></div>
+        {/* RC-19. A class position is a rank off the overall aggregate the
+            Foundation Phase does not report, so printing it would report that
+            aggregate by another name. */}
+        {reportsPercentages && (
+          <div className="info-row"><span className="info-label">Class Position:</span><span>{report.classPosition ?? '-'}{report.totalStudentsInClass ? ` of ${report.totalStudentsInClass}` : ''}</span></div>
+        )}
         {reportsPercentages && (
           <div className="info-row"><span className="info-label">Overall:</span><span>{formatPercentage(report.overallPercentage)}</span></div>
         )}
@@ -816,30 +821,45 @@ function ReportDetailContent() {
 
       {/* Attendance for Print */}
       <div className="print-attendance">
-        <div className="att-cell">
-          <span className="att-label">Days Present</span>
-          <span className="att-value">{report.daysPresent ?? '-'}</span>
-        </div>
-        <div className="att-cell">
-          <span className="att-label">Days Absent</span>
-          <span className="att-value">{report.daysAbsent ?? '-'}</span>
-        </div>
-        <div className="att-cell">
-          <span className="att-label">Days Late</span>
-          <span className="att-value">{report.daysLate ?? '-'}</span>
-        </div>
-        <div className="att-cell">
-          <span className="att-label">School Days</span>
-          {/* RC-17: the school days in the period, which RE-002 reconciles the
-              other two against — not the sum of our own two figures, which would
-              always agree with itself and prove nothing. */}
-          <span className="att-value">
-            {report.daysInTerm
-              ?? (report.daysPresent != null && report.daysAbsent != null
-                ? report.daysPresent + report.daysAbsent
-                : '-')}
-          </span>
-        </div>
+        {/* RC-17: the school days in the period, which RE-002 reconciles the
+            other two against — not the sum of our own two figures, which would
+            always agree with itself and prove nothing.
+
+            Nothing recorded is not the same as a learner who attended nothing:
+            four zeros would state on a legal document that the child was
+            present on none of zero school days. A dash says what is true. */}
+        {(() => {
+          const schoolDays =
+            report.daysInTerm
+            ?? ((report.daysPresent ?? 0) + (report.daysAbsent ?? 0));
+          const recorded =
+            schoolDays > 0
+            || (report.daysPresent ?? 0) > 0
+            || (report.daysAbsent ?? 0) > 0
+            || (report.daysLate ?? 0) > 0;
+          const days = (v?: number) => (recorded ? String(v ?? 0) : '—');
+
+          return (
+            <>
+              <div className="att-cell">
+                <span className="att-label">Days Present</span>
+                <span className="att-value">{days(report.daysPresent)}</span>
+              </div>
+              <div className="att-cell">
+                <span className="att-label">Days Absent</span>
+                <span className="att-value">{days(report.daysAbsent)}</span>
+              </div>
+              <div className="att-cell">
+                <span className="att-label">Days Late</span>
+                <span className="att-value">{days(report.daysLate)}</span>
+              </div>
+              <div className="att-cell">
+                <span className="att-label">School Days</span>
+                <span className="att-value">{days(schoolDays)}</span>
+              </div>
+            </>
+          );
+        })()}
       </div>
 
       {/* Comments for Print */}
@@ -1099,15 +1119,17 @@ function ReportDetailContent() {
             </Card>
           </Col>
         )}
-        <Col xs={12} sm={6}>
-          <Card size="small">
-            <Statistic
-              title="Class Position"
-              value={report.classPosition ?? '-'}
-              suffix={report.totalStudentsInClass ? ` / ${report.totalStudentsInClass}` : ''}
-            />
-          </Card>
-        </Col>
+        {reportsPercentages && (
+          <Col xs={12} sm={6}>
+            <Card size="small">
+              <Statistic
+                title="Class Position"
+                value={report.classPosition ?? '-'}
+                suffix={report.totalStudentsInClass ? ` / ${report.totalStudentsInClass}` : ''}
+              />
+            </Card>
+          </Col>
+        )}
         <Col xs={12} sm={6}>
           <Card size="small">
             <Statistic title="Subjects" value={subjects.length} />
