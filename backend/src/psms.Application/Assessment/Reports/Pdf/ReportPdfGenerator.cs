@@ -673,7 +673,12 @@ public static class ReportPdfGenerator
             || data.DaysAbsent > 0
             || data.DaysLate > 0;
 
-        string Days(int value) => recorded ? value.ToString() : "—";
+        // A plain hyphen, not an em dash. The embedded font's mapping for the
+        // fancier dashes is not read back the same way by every extractor —
+        // one reader gives "—", another a replacement character — and this is
+        // a value on a document people copy from and read with a screen
+        // reader. The same reason ligatures are switched off on this page.
+        string Days(int value) => recorded ? value.ToString() : "-";
 
         container.Row(row =>
         {

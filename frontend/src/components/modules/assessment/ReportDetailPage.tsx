@@ -837,7 +837,7 @@ function ReportDetailContent() {
             || (report.daysPresent ?? 0) > 0
             || (report.daysAbsent ?? 0) > 0
             || (report.daysLate ?? 0) > 0;
-          const days = (v?: number) => (recorded ? String(v ?? 0) : '—');
+          const days = (v?: number) => (recorded ? String(v ?? 0) : '-');
 
           return (
             <>

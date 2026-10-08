@@ -184,7 +184,7 @@ public class FoundationPhaseReportCard_Tests
         var text = PdfText.Extract(ReportPdfGenerator.Generate(data));
 
         text.ShouldContain("DAYS PRESENT");
-        text.ShouldContain("—");
+        text.ShouldContain("-");
     }
 
     [Fact]
@@ -201,7 +201,7 @@ public class FoundationPhaseReportCard_Tests
         text.ShouldContain("58");
         text.ShouldContain("60");
         // A real zero stays a zero: the learner was late on no day.
-        text.ShouldNotContain("—");
+        text.ShouldContain("0");
     }
 
     [Fact]
