@@ -989,6 +989,29 @@ public class ReportAppService : ApplicationService, IReportAppService
     }
 
     /// <summary>
+    /// Asks for a fresh PDF, quietly. A rebuild that cannot be queued must not
+    /// turn a download into an error the reader cannot act on — they are
+    /// already being told the file is out of date.
+    /// </summary>
+    private async Task EnqueuePdfRebuildAsync(Report report)
+    {
+        try
+        {
+            await _backgroundJobManager.EnqueueAsync<GenerateReportPdfJob, GenerateReportPdfJobArgs>(
+                new GenerateReportPdfJobArgs
+                {
+                    ReportId = report.Id,
+                    TenantId = AbpSession.TenantId,
+                    UserId = AbpSession.UserId ?? 0
+                });
+        }
+        catch (Exception ex)
+        {
+            Logger.Warn($"Could not queue a rebuild of the report card PDF for {report.Id}: {ex.Message}");
+        }
+    }
+
+    /// <summary>
     /// RC-26. A retained learner's card is not handed over before the parent has
     /// been seen.
     /// <para>
@@ -1980,7 +2003,10 @@ public class ReportAppService : ApplicationService, IReportAppService
         // report could reach Published with PdfUrl null. Enqueue it here if it
         // has not been produced, and let a failure be a background-job failure
         // rather than a blocked publish.
-        if (!report.HasPdf())
+        // Missing, or older than the card it claims to be. Publishing is the
+        // moment the card reaches the family, so this is the last point at
+        // which an unsigned or out-of-date file can be caught.
+        if (!report.HasPdf() || report.PdfIsStale())
         {
             try
             {
@@ -2473,6 +2499,22 @@ public class ReportAppService : ApplicationService, IReportAppService
         if (!report.HasPdf())
             throw new UserFriendlyException(AssessmentExceptionCodes.PdfNotGenerated,
                 "No PDF has been generated for this report yet.");
+
+        // The stored file is produced once and kept, and nothing rebuilt it
+        // when the card changed. A PDF made before the signatures went on
+        // stayed unsigned on the record, and publishing only built one where
+        // none existed — so that unsigned file is what a parent downloaded.
+        // Checked here because this is the single door to the file: a mutation
+        // added later cannot forget to invalidate it.
+        if (report.PdfIsStale())
+        {
+            await EnqueuePdfRebuildAsync(report);
+
+            throw new UserFriendlyException(AssessmentExceptionCodes.PdfOutOfDate,
+                "This report card has changed since its PDF was made — a signature, a comment "
+                + "or a mark. A fresh one is being produced now; try the download again in a "
+                + "moment.");
+        }
 
         // RC-04: mint a short-lived signed URL rather than handing back a
         // durable link. The file itself is private, so the URL is the only way
