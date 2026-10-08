@@ -363,10 +363,18 @@ public static class ReportPdfGenerator
                 row.RelativeItem().Column(c =>
                 {
                     InfoRow(c, "Date Generated:", data.GeneratedDate ?? "N/A");
-                    var posText = data.ClassPosition.HasValue
-                        ? $"{data.ClassPosition} of {data.TotalStudentsInClass ?? 0}"
-                        : "N/A";
-                    InfoRow(c, "Class Position:", posText);
+                    // RC-19. No class position in the Foundation Phase. It is a
+                    // rank off the overall aggregate — the very number §17(4)(a)
+                    // does not provide for and which this card already omits —
+                    // so printing it reports that aggregate by another name, and
+                    // ranks a five-year-old against their class while doing it.
+                    if (data.ReportsPercentages)
+                    {
+                        var posText = data.ClassPosition.HasValue
+                            ? $"{data.ClassPosition} of {data.TotalStudentsInClass ?? 0}"
+                            : "N/A";
+                        InfoRow(c, "Class Position:", posText);
+                    }
 
                     // RC-19. No overall for the Foundation Phase. The aggregate
                     // is a percentage, and an averaged percentage is precisely
@@ -655,12 +663,24 @@ public static class ReportPdfGenerator
         // always agree with itself and prove nothing.
         var totalDays = data.DaysInTerm ?? (data.DaysPresent + data.DaysAbsent);
 
+        // Nothing recorded is not the same as a learner who attended nothing.
+        // The figures are plain ints, so an attendance nobody captured arrived
+        // here as four zeros and the card stated, on a legal document, that the
+        // child was present on none of zero school days. A dash says what is
+        // true: the school has not recorded it.
+        var recorded = totalDays > 0
+            || data.DaysPresent > 0
+            || data.DaysAbsent > 0
+            || data.DaysLate > 0;
+
+        string Days(int value) => recorded ? value.ToString() : "—";
+
         container.Row(row =>
         {
-            AttendanceCell(row, "DAYS PRESENT", data.DaysPresent.ToString());
-            AttendanceCell(row, "DAYS ABSENT", data.DaysAbsent.ToString());
-            AttendanceCell(row, "DAYS LATE", data.DaysLate.ToString());
-            AttendanceCell(row, "SCHOOL DAYS", totalDays.ToString());
+            AttendanceCell(row, "DAYS PRESENT", Days(data.DaysPresent));
+            AttendanceCell(row, "DAYS ABSENT", Days(data.DaysAbsent));
+            AttendanceCell(row, "DAYS LATE", Days(data.DaysLate));
+            AttendanceCell(row, "SCHOOL DAYS", Days(totalDays));
         });
     }
 
