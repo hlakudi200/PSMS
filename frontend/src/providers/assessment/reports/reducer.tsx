@@ -79,6 +79,18 @@ export const ReportReducer = handleActions<
       ...state,
       ...action.payload,
     }),
+    [ReportActionEnums.withdrawReportPending]: (state, action) => ({
+      ...state,
+      ...action.payload,
+    }),
+    [ReportActionEnums.withdrawReportSuccess]: (state, action) => ({
+      ...state,
+      ...action.payload,
+    }),
+    [ReportActionEnums.withdrawReportError]: (state, action) => ({
+      ...state,
+      ...action.payload,
+    }),
     [ReportActionEnums.addTeacherCommentPending]: (state, action) => ({
       ...state,
       ...action.payload,

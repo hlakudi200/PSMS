@@ -325,6 +325,11 @@ export interface IReport {
   status: number;
   generatedDate?: string;
   publishedDate?: string;
+  /** When this card was taken back, if it ever was — and who did it, and why.
+   *  publishedDate stays set beside these: the card was issued on that day. */
+  withdrawnDate?: string;
+  withdrawnByUserId?: number;
+  withdrawalReason?: string;
   approvedByUserId?: number;
   approvedDate?: string;
   studentName?: string;

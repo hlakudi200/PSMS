@@ -381,7 +381,73 @@ namespace psms.Domain.Assessment.Entities
 
             PublishedDate = DateTime.UtcNow;
             Status = ReportStatus.Published;
+
+            // Issuing it again settles any earlier withdrawal: the card in a
+            // family's hands is this one.
+            WithdrawnDate = null;
+            WithdrawnByUserId = null;
+            WithdrawalReason = null;
         }
+
+        /// <summary>The longest a withdrawal reason is kept.</summary>
+        public const int MaxWithdrawalReasonLength = 1000;
+
+        /// <summary>When this card was taken back, if it ever was.</summary>
+        public DateTime? WithdrawnDate { get; set; }
+
+        /// <summary>Who took it back.</summary>
+        public long? WithdrawnByUserId { get; set; }
+
+        /// <summary>Why. Required — see <see cref="Withdraw"/>.</summary>
+        public string WithdrawalReason { get; set; }
+
+        /// <summary>
+        /// Takes an issued report card back.
+        /// <para>
+        /// A card that has gone to a family cannot be deleted, and that is
+        /// right: it is the school's legal record of the learner's year
+        /// (§25(3)), and an issued record should not simply disappear. But
+        /// having no way at all to withdraw one is a different thing. A school
+        /// that issues a card with the wrong marks on it, or the wrong learner's
+        /// name, had no recourse: the card stayed issued, the verification page
+        /// went on confirming it as genuine, and the only remedy was to issue a
+        /// second card contradicting the first.
+        /// </para>
+        /// <para>
+        /// So the card returns to Approved — off the family's list, no longer
+        /// confirmed by the verification page, correctable, and issuable again
+        /// once it is right. What happened is kept rather than erased:
+        /// <see cref="PublishedDate"/> stays, because the card <i>was</i> issued
+        /// on that day and no later record should pretend otherwise, and the
+        /// withdrawal is stamped beside it.
+        /// </para>
+        /// </summary>
+        public void Withdraw(long withdrawnByUserId, string reason)
+        {
+            if (Status != ReportStatus.Published)
+                throw new InvalidOperationException("Only an issued report card can be withdrawn.");
+
+            if (string.IsNullOrWhiteSpace(reason))
+                throw new ArgumentException(
+                    "A withdrawal has to say why.", nameof(reason));
+
+            var trimmed = reason.Trim();
+
+            WithdrawnDate = DateTime.UtcNow;
+            WithdrawnByUserId = withdrawnByUserId;
+            WithdrawalReason = trimmed.Length > MaxWithdrawalReasonLength
+                ? trimmed.Substring(0, MaxWithdrawalReasonLength)
+                : trimmed;
+
+            Status = ReportStatus.Approved;
+        }
+
+        /// <summary>
+        /// Whether this card was issued and then taken back. Distinct from
+        /// "never issued": a family may have read it, and a card they have seen
+        /// is not the same as one that never left the school.
+        /// </summary>
+        public bool WasWithdrawn() => WithdrawnDate.HasValue;
 
         /// <summary>
         /// Records parent acknowledgement

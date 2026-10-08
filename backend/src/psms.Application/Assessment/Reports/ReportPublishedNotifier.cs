@@ -1,4 +1,4 @@
-using Abp.Dependency;
+﻿using Abp.Dependency;
 using Abp.Domain.Repositories;
 using Castle.Core.Logging;
 using Microsoft.EntityFrameworkCore;
@@ -121,6 +121,90 @@ public class ReportPublishedNotifier : ITransientDependency
         };
 
         await _dispatcher.EnqueueAsync(request);
+    }
+
+    /// <summary>
+    /// COMM-06 template key for a card the school has taken back.
+    /// </summary>
+    public const string WithdrawnTemplateKey = "report.withdrawn";
+
+    /// <summary>
+    /// Tells the same parents that the card has been withdrawn.
+    /// <para>
+    /// Withdrawing removes a card from a family's list. They were told it was
+    /// ready, they may have opened it, and some of them will have printed it.
+    /// Letting it disappear without a word would leave a parent holding a
+    /// document the school no longer stands behind and no way to know that.
+    /// </para>
+    /// <para>
+    /// The reason the school gave is carried, because a parent who is told
+    /// their child's report has been withdrawn will ask why, and the answer is
+    /// already on the record.
+    /// </para>
+    /// </summary>
+    public async Task NotifyWithdrawnAsync(Report report, string studentName, string reportTypeLabel)
+    {
+        if (report == null)
+            return;
+
+        var recipients = await ResolveRecipientsAsync(report.TenantId, report.StudentId);
+        if (recipients.Count == 0)
+            return;
+
+        var name = string.IsNullOrWhiteSpace(studentName) ? "your child" : studentName;
+        var label = string.IsNullOrWhiteSpace(reportTypeLabel) ? "report card" : reportTypeLabel;
+        var reason = string.IsNullOrWhiteSpace(report.WithdrawalReason)
+            ? null
+            : report.WithdrawalReason.Trim();
+
+        var request = new NotificationRequest
+        {
+            TenantId = report.TenantId,
+            RecipientUserIds = recipients,
+            Type = NotificationType.Academic,
+            Priority = NotificationPriority.Normal,
+            Title = $"{label} withdrawn for {name}",
+            Message =
+                $"The school has withdrawn {name}’s {label.ToLower(DisplayCulture)} and is "
+                + "correcting it. A new one will be issued."
+                + (reason == null ? string.Empty : $" Reason given: {reason}"),
+            EntityType = nameof(Report),
+            EntityId = report.Id,
+            TemplateKey = WithdrawnTemplateKey,
+            Variables = new Dictionary<string, string>
+            {
+                ["studentName"] = name,
+                ["reportType"] = label,
+                ["withdrawnDate"] = (report.WithdrawnDate ?? DateTime.UtcNow)
+                    .ToString("dd MMMM yyyy", DisplayCulture),
+                ["reason"] = reason ?? string.Empty,
+            },
+            RequestedChannels = Channels,
+
+            // Keyed on the withdrawal itself, not just the card: a card issued,
+            // withdrawn, corrected, issued and withdrawn again is two separate
+            // things a parent needs to hear about.
+            IdempotencyKey =
+                $"report.withdrawn:{report.Id}:{(report.WithdrawnDate ?? DateTime.UtcNow):O}",
+        };
+
+        await _dispatcher.EnqueueAsync(request);
+    }
+
+    /// <summary>
+    /// As <see cref="NotifyWithdrawnAsync"/>, but never throws: a card that has
+    /// been taken back stays taken back even if nothing could be sent about it.
+    /// </summary>
+    public async Task TryNotifyWithdrawnAsync(Report report, string studentName, string reportTypeLabel)
+    {
+        try
+        {
+            await NotifyWithdrawnAsync(report, studentName, reportTypeLabel);
+        }
+        catch (Exception ex)
+        {
+            Logger.Error($"Could not queue the withdrawal notification for report {report?.Id}.", ex);
+        }
     }
 
     /// <summary>

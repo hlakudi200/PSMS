@@ -1,4 +1,4 @@
-using Abp.Application.Services;
+﻿using Abp.Application.Services;
 using Abp.Application.Services.Dto;
 using psms.Assessment.Reports.Dto;
 using psms.Domain.Shared.Enums;
@@ -20,6 +20,12 @@ public interface IReportAppService : IApplicationService
     Task<BulkGenerateReportsResultDto> BulkGenerateAsync(BulkGenerateReportsInput input);
     Task<ReportDto> SubmitForApprovalAsync(Guid id);
     Task<ReportDto> PublishAsync(Guid id);
+
+    /// <summary>
+    /// Takes an issued report card back: off the family's list, no longer
+    /// confirmed by the verification page, correctable, and issuable again.
+    /// </summary>
+    Task<ReportDto> WithdrawAsync(Guid id, WithdrawReportDto input);
     Task<ReportDto> AddTeacherCommentAsync(Guid id, TeacherCommentDto input);
     Task<ReportDto> AddPrincipalCommentAsync(Guid id, PrincipalCommentDto input);
     Task<ReportDto> AcknowledgeByParentAsync(Guid id, ParentAcknowledgementDto input);

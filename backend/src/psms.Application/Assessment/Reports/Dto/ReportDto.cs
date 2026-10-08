@@ -58,6 +58,15 @@ public class ReportDto : FullAuditedEntityDto<Guid>
     public ReportStatus Status { get; set; }
     public DateTime? GeneratedDate { get; set; }
     public DateTime? PublishedDate { get; set; }
+
+    /// <summary>
+    /// When this card was taken back, if it ever was — and who did it, and
+    /// why. <see cref="PublishedDate"/> stays set beside these: the card was
+    /// issued on that day, and withdrawing it does not unmake that.
+    /// </summary>
+    public DateTime? WithdrawnDate { get; set; }
+    public long? WithdrawnByUserId { get; set; }
+    public string WithdrawalReason { get; set; }
     public long? ApprovedByUserId { get; set; }
     public DateTime? ApprovedDate { get; set; }
 

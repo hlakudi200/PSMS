@@ -132,6 +132,15 @@ public static class AssessmentExceptionCodes
     public const string ReportCardNotSigned = "ASM_REPORT_CARD_NOT_SIGNED";
 
     /// <summary>
+    /// Only a card the school has issued can be taken back. A card still being
+    /// worked on is corrected, not withdrawn.
+    /// </summary>
+    public const string ReportNotIssued = "ASM_REPORT_NOT_ISSUED";
+
+    /// <summary>A withdrawal has to say why.</summary>
+    public const string WithdrawalReasonRequired = "ASM_WITHDRAWAL_REASON_REQUIRED";
+
+    /// <summary>
     /// RC-17. Somebody who is not the class's teacher tried to sign a report
     /// card on the Class Teacher line.
     /// </summary>
