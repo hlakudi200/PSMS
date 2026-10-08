@@ -265,12 +265,22 @@ public class ReportAppService : ApplicationService, IReportAppService
         // Which of these are mine to sign. One query for the page, not one per row.
         var registerClassIds = await MyRegisterClassIdsAsync();
 
+        // RC-19: the scale this learner's phase is reported on. The card and
+        // the PDF already read this; without it on the row, the list printed a
+        // percentage and a class position for a Grade R learner.
+        var scaleByReport = items.ToDictionary(
+            r => r.Id,
+            r => psms.Domain.Assessment.ReportingScale.ReportsPercentages(r.Class?.Grade?.GradeLevel));
+
         foreach (var dto in dtos)
         {
             if (liveWorkflows.TryGetValue(dto.Id, out var instanceId))
                 dto.ActiveWorkflowInstanceId = instanceId;
 
             dto.IsMyRegisterClass = registerClassIds.Contains(dto.ClassId);
+
+            if (scaleByReport.TryGetValue(dto.Id, out var reportsPercentages))
+                dto.ReportsPercentages = reportsPercentages;
         }
 
         return new PagedResultDto<ReportListDto>(totalCount, dtos);

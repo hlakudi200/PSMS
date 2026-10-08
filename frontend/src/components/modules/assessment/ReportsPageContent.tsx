@@ -200,8 +200,25 @@ function ReportsContent() {
       renderType: 'status',
       renderConfig: { statusMap: reportTypeMap },
     },
-    { key: 'overallPercentage', title: 'Overall %', dataIndex: 'overallPercentage', sortable: true, width: 100 },
-    { key: 'classPosition', title: 'Position', dataIndex: 'classPosition', sortable: true, hideOnMobile: true, width: 90 },
+    /* RC-19, §17(4). Foundation Phase is reported on the 1–7 achievement
+       scale, and the Protocol does not rank Foundation Phase learners against
+       one another. The card itself and the printed PDF both leave these out;
+       the list showed every Grade R learner a percentage and a position.
+
+       The columns stay — a list mixing phases needs them for everyone else —
+       and a Foundation Phase row simply has nothing in them. */
+    {
+      key: 'overallPercentage', title: 'Overall %', dataIndex: 'overallPercentage',
+      sortable: true, width: 100,
+      render: (value: number | undefined, row: IReportList) =>
+        row.reportsPercentages === false ? <Typography.Text type="secondary">—</Typography.Text> : (value ?? '-'),
+    },
+    {
+      key: 'classPosition', title: 'Position', dataIndex: 'classPosition',
+      sortable: true, hideOnMobile: true, width: 90,
+      render: (value: number | undefined, row: IReportList) =>
+        row.reportsPercentages === false ? <Typography.Text type="secondary">—</Typography.Text> : (value ?? '-'),
+    },
     { key: 'subjectCount', title: 'Subjects', dataIndex: 'subjectCount', hideOnMobile: true, width: 85 },
     {
       key: 'status', title: 'Status', dataIndex: 'status',
