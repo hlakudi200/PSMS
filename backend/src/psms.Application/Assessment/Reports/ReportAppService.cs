@@ -13,6 +13,7 @@ using psms.Assessment.ReportSubjects.Dto;
 using psms.Assessment.Shared;
 using psms.Authorization;
 using psms.Domain.Academic.Entities;
+using psms.Domain.Academic;
 using psms.Domain.Assessment;
 using psms.Domain.Assessment.Entities;
 using psms.Domain.Assessment.Promotion;
@@ -44,6 +45,9 @@ public class ReportAppService : ApplicationService, IReportAppService
     private readonly IRepository<ReportSubject, Guid> _reportSubjectRepository;
     private readonly IRepository<Student, Guid> _studentRepository;
     private readonly IRepository<Class, Guid> _classRepository;
+    // RC-25: one row per learner per academic year, which is where "how
+    // many years has this learner been in this phase" is answerable from.
+    private readonly IRepository<StudentClass, Guid> _studentClassRepository;
     private readonly IRepository<AcademicYear, Guid> _academicYearRepository;
     private readonly IRepository<Term, Guid> _termRepository;
     private readonly IRepository<Mark, Guid> _markRepository;
@@ -67,6 +71,7 @@ public class ReportAppService : ApplicationService, IReportAppService
         IRepository<ReportSubject, Guid> reportSubjectRepository,
         IRepository<Student, Guid> studentRepository,
         IRepository<Class, Guid> classRepository,
+        IRepository<StudentClass, Guid> studentClassRepository,
         IRepository<AcademicYear, Guid> academicYearRepository,
         IRepository<Term, Guid> termRepository,
         IRepository<Mark, Guid> markRepository,
@@ -89,6 +94,7 @@ public class ReportAppService : ApplicationService, IReportAppService
         _reportSubjectRepository = reportSubjectRepository;
         _studentRepository = studentRepository;
         _classRepository = classRepository;
+        _studentClassRepository = studentClassRepository;
         _academicYearRepository = academicYearRepository;
         _termRepository = termRepository;
         _markRepository = markRepository;
@@ -974,6 +980,92 @@ public class ReportAppService : ApplicationService, IReportAppService
 
         if (selfId.HasValue || childIds != null)
             throw new UserFriendlyException(AssessmentExceptionCodes.ReportNotFound, "Report not found.");
+    }
+
+    /// <summary>
+    /// RC-25. How this learner stands against the retention limits for their
+    /// phase.
+    /// <para>
+    /// NPPPPR §8(4), §21(2) and §29(2): a learner may be retained only once in a
+    /// phase, "in order to prevent the learner being retained in this phase for
+    /// longer than four years".
+    /// </para>
+    /// <para>
+    /// Read from records the system already keeps rather than a parallel
+    /// history: StudentClass is one row per learner per academic year and names
+    /// the class, which names the grade; the year-end reports carry the
+    /// decision. A separate history table would have to be seeded for every
+    /// existing learner and would then be a second thing to keep true.
+    /// </para>
+    /// <para>
+    /// Both figures are what the school's own records show. A learner who
+    /// transferred in carries no history here, and the advice says what it
+    /// knows rather than implying the learner has none.
+    /// </para>
+    /// </summary>
+    private async Task<RetentionStandingDto> RetentionStandingAsync(
+        Guid studentId,
+        SouthAfricanGradeLevel? gradeLevel)
+    {
+        if (!gradeLevel.HasValue) return null;
+
+        var phase = SchoolPhases.PhaseFor(gradeLevel.Value);
+
+        // Every year this learner was enrolled, with the grade they sat in.
+        var enrolments = await _studentClassRepository
+            .GetAll()
+            .Where(sc => sc.TenantId == AbpSession.TenantId && sc.StudentId == studentId)
+            .Select(sc => new { sc.AcademicYearId, sc.Class.Grade.GradeLevel })
+            .ToListAsync();
+
+        var yearsInPhase = enrolments
+            .Where(e => SchoolPhases.PhaseFor(e.GradeLevel) == phase)
+            .Select(e => e.AcademicYearId)
+            .Distinct()
+            .Count();
+
+        // A year-end decision to retain, in a grade in this phase.
+        var retentions = await _reportRepository
+            .GetAll()
+            .Where(r => r.TenantId == AbpSession.TenantId
+                && r.StudentId == studentId
+                && r.PromotionDecision == PromotionDecision.Retained)
+            .Select(r => new { r.AcademicYearId, r.Class.Grade.GradeLevel })
+            .ToListAsync();
+
+        var timesRetained = retentions
+            .Where(r => SchoolPhases.PhaseFor(r.GradeLevel) == phase)
+            .Select(r => r.AcademicYearId)
+            .Distinct()
+            .Count();
+
+        var breaches = timesRetained >= SchoolPhases.MaxRetentionsPerPhase
+            || yearsInPhase >= SchoolPhases.MaxYearsPerPhase;
+
+        var phaseName = SchoolPhases.NameFor(phase);
+
+        string warning = null;
+        if (timesRetained >= SchoolPhases.MaxRetentionsPerPhase)
+        {
+            warning = $"This learner has already been retained once in the {phaseName}. "
+                + "Policy allows one retention per phase, so retaining them again would go "
+                + "beyond it. The decision is the school's, but it should be a considered one.";
+        }
+        else if (yearsInPhase >= SchoolPhases.MaxYearsPerPhase)
+        {
+            warning = $"This learner has been in the {phaseName} for {yearsInPhase} years. "
+                + $"Policy is that no learner spends longer than {SchoolPhases.MaxYearsPerPhase} "
+                + "years in one phase, so retaining them again would go beyond it.";
+        }
+
+        return new RetentionStandingDto
+        {
+            PhaseName = phaseName,
+            YearsInPhase = yearsInPhase,
+            TimesRetainedInPhase = timesRetained,
+            RetainingAgainWouldBreachTheLimit = breaches,
+            Warning = warning,
+        };
     }
 
     /// <summary>
@@ -2128,7 +2220,9 @@ public class ReportAppService : ApplicationService, IReportAppService
             Recorded = report.PromotionDecision,
             PromotedToGradeId = report.PromotedToGradeId,
             PromotedToGradeName = report.PromotedToGrade?.GradeName,
-            GradeOptions = await BuildGradeOptionsAsync(report.ClassId)
+            GradeOptions = await BuildGradeOptionsAsync(report.ClassId),
+            // RC-25: what retaining this learner again would mean.
+            RetentionStanding = await RetentionStandingAsync(report.StudentId, grade?.GradeLevel),
         };
 
         if (grade?.GradeLevel == null)

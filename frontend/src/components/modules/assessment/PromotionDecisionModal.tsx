@@ -243,6 +243,33 @@ export const PromotionDecisionModal: React.FC<Props> = ({
                 }
               />
 
+              {/* RC-25. A learner can only be retained once in a phase, and
+                  nobody deciding this can be expected to remember a child's
+                  whole history. Shown whenever there is something to say, not
+                  only when the decision is already a retention — the point is
+                  to be read before the choice, not after it. */}
+              {advice.retentionStanding?.warning && (
+                <Alert
+                  type="warning"
+                  showIcon
+                  message="Retaining this learner again would go beyond what the phase allows"
+                  description={
+                    <Space direction="vertical" size={2}>
+                      <Text>{advice.retentionStanding.warning}</Text>
+                      <Text type="secondary" style={{ fontSize: 12 }}>
+                        School records show {advice.retentionStanding.yearsInPhase} year
+                        {advice.retentionStanding.yearsInPhase === 1 ? '' : 's'} in the{' '}
+                        {advice.retentionStanding.phaseName}
+                        {(advice.retentionStanding.timesRetainedInPhase ?? 0) > 0
+                          ? `, including ${advice.retentionStanding.timesRetainedInPhase} retention`
+                          : ', with no retention recorded'}
+                        . A learner who transferred in may have more history than this school holds.
+                      </Text>
+                    </Space>
+                  }
+                />
+              )}
+
               <List
                 size="small"
                 bordered
