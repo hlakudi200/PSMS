@@ -527,6 +527,33 @@ export interface IRetentionStanding {
   warning?: string | null;
 }
 
+/**
+ * RC-26. NPPPPR s(2b): a meeting of subject staff, then a meeting with the
+ * parent "before the learner's school report is handed to them", and written
+ * confirmation by the parent of a retention.
+ */
+export interface IRecordRetentionProcedure {
+  staffMeetingDate?: string | null;
+  staffMeetingNote?: string | null;
+  parentMeetingDate?: string | null;
+  parentMeetingNote?: string | null;
+  parentConfirmedInWritingDate?: string | null;
+  parentConfirmationReference?: string | null;
+}
+
+export interface IRetentionProcedure extends IRecordRetentionProcedure {
+  reportId?: string;
+  appealDeadline?: string | null;
+  appealLodgedDate?: string | null;
+  appealDeterminationDeadline?: string | null;
+  appealDeterminedDate?: string | null;
+  appealOutcome?: string | null;
+  appealWasLate?: boolean;
+  determinationIsOverdue?: boolean;
+  /** Whether the card may be handed over yet — the parent meeting is recorded. */
+  reportMayBeIssued?: boolean;
+}
+
 export interface IPromotionGradeOption {
   id: string;
   gradeName?: string;

@@ -32,6 +32,8 @@ import {
 } from 'antd';
 import { CheckCircleTwoTone, CloseCircleTwoTone } from '@ant-design/icons';
 import { z } from 'zod';
+import dayjs, { Dayjs } from 'dayjs';
+import { DatePicker } from 'antd';
 import { useReportActions, useReportState } from '@/providers/assessment/reports';
 import type { IPromotionAdvice } from '@/providers/assessment/shared/interfaces';
 
@@ -64,7 +66,24 @@ const schema = z
     decision: z.number({ error: 'Choose a decision' }).int().min(1).max(4),
     promotedToGradeId: z.string().optional(),
     reason: z.string().max(1000, 'Keep the reason under 1000 characters').optional(),
+    /* RC-26, NPPPPR s(2b). Only asked for when the learner is being retained. */
+    staffMeetingDate: z.any().optional(),
+    staffMeetingNote: z.string().max(1000).optional(),
+    parentMeetingDate: z.any().optional(),
+    parentMeetingNote: z.string().max(1000).optional(),
+    parentConfirmedInWritingDate: z.any().optional(),
+    parentConfirmationReference: z.string().max(1000).optional(),
   })
+  .refine(
+    (d) => d.decision !== PromotionDecisionValue.Retained || !!d.parentMeetingDate,
+    {
+      /* The server refuses to publish a retained learner's card without this,
+         so asking for it here is the difference between a clear form and a
+         card that cannot be handed over with no explanation. */
+      message: 'Record the date the parent was seen — the card cannot be issued without it',
+      path: ['parentMeetingDate'],
+    },
+  )
   .refine((d) => !movesToAnotherGrade(d.decision) || !!d.promotedToGradeId, {
     message: 'Say which grade the learner moves into',
     path: ['promotedToGradeId'],
@@ -88,7 +107,12 @@ export const PromotionDecisionModal: React.FC<Props> = ({
   onRecorded,
 }) => {
   const [form] = Form.useForm<PromotionFormValues>();
-  const { getPromotionAdviceAsync, recordPromotionDecisionAsync } = useReportActions();
+  const {
+    getPromotionAdviceAsync,
+    recordPromotionDecisionAsync,
+    recordRetentionProcedureAsync,
+    getRetentionProcedureAsync,
+  } = useReportActions();
   const { promotionAdvice } = useReportState();
 
   const [decision, setDecision] = useState<number | undefined>();
@@ -104,6 +128,27 @@ export const PromotionDecisionModal: React.FC<Props> = ({
        unhandled rejection and leave the modal spinning with its save button
        permanently disabled. */
     Promise.resolve(getPromotionAdviceAsync(reportId)).catch(() => setLoadFailed(true));
+
+    /* RC-26. Whatever has already been recorded about the retention, so
+       reopening the screen shows it rather than asking again. Absent is the
+       normal case and not a failure. */
+    Promise.resolve(getRetentionProcedureAsync(reportId))
+      .then((p) => {
+        if (!p) return;
+        form.setFieldsValue({
+          staffMeetingDate: p.staffMeetingDate ? dayjs(p.staffMeetingDate) : undefined,
+          staffMeetingNote: p.staffMeetingNote ?? undefined,
+          parentMeetingDate: p.parentMeetingDate ? dayjs(p.parentMeetingDate) : undefined,
+          parentMeetingNote: p.parentMeetingNote ?? undefined,
+          parentConfirmedInWritingDate: p.parentConfirmedInWritingDate
+            ? dayjs(p.parentConfirmedInWritingDate)
+            : undefined,
+          parentConfirmationReference: p.parentConfirmationReference ?? undefined,
+        });
+      })
+      .catch(() => {
+        /* Nothing recorded yet, or not readable. The form simply starts empty. */
+      });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, reportId]);
 
@@ -176,6 +221,22 @@ export const PromotionDecisionModal: React.FC<Props> = ({
           : undefined,
         reason: parsed.data.reason?.trim() || undefined,
       });
+      /* RC-26. The decision has to be a retention before the procedure can be
+         recorded against it, so this follows rather than accompanies it. */
+      if (parsed.data.decision === PromotionDecisionValue.Retained) {
+        const asDate = (d: Dayjs | undefined | null) =>
+          d ? (d as Dayjs).format('YYYY-MM-DD') : undefined;
+
+        await recordRetentionProcedureAsync(reportId, {
+          staffMeetingDate: asDate(values.staffMeetingDate),
+          staffMeetingNote: values.staffMeetingNote?.trim() || undefined,
+          parentMeetingDate: asDate(values.parentMeetingDate),
+          parentMeetingNote: values.parentMeetingNote?.trim() || undefined,
+          parentConfirmedInWritingDate: asDate(values.parentConfirmedInWritingDate),
+          parentConfirmationReference: values.parentConfirmationReference?.trim() || undefined,
+        });
+      }
+
       message.success('Promotion decision recorded');
       onRecorded?.();
       onClose();
@@ -336,6 +397,72 @@ export const PromotionDecisionModal: React.FC<Props> = ({
                 placeholder="What the decision was based on — the staff meeting, the parent meeting, the support plan."
               />
             </Form.Item>
+
+            {/* RC-26, NPPPPR s(2b). Only a retention carries this procedure,
+                and the parent meeting is not paperwork: the server will not
+                let the card be handed over until it is recorded, because the
+                policy puts that meeting before the report reaches the family.
+                Asking for it here is the difference between a clear form and a
+                card that cannot be issued with no explanation why. */}
+            {decision === PromotionDecisionValue.Retained && (
+              <>
+                <Alert
+                  type="info"
+                  showIcon
+                  style={{ marginBottom: 16 }}
+                  message="Retaining a learner has a procedure attached"
+                  description={
+                    <Text type="secondary">
+                      The parent must be seen and the decision explained to them before this
+                      report card is handed over, so the card cannot be issued until the parent
+                      meeting below is recorded. Where the learner has not met the requirements
+                      more than once in Grade 10 or 11, a meeting of subject staff comes first.
+                    </Text>
+                  }
+                />
+
+                <Form.Item label="Staff meeting held on" name="staffMeetingDate">
+                  <DatePicker style={{ width: '100%' }} format="DD MMM YYYY" />
+                </Form.Item>
+
+                <Form.Item label="Who was there, and what they concluded" name="staffMeetingNote">
+                  <Input.TextArea rows={2} maxLength={1000} showCount />
+                </Form.Item>
+
+                <Form.Item
+                  label="Parent meeting held on"
+                  name="parentMeetingDate"
+                  rules={[
+                    {
+                      required: true,
+                      message: 'The card cannot be issued until the parent has been seen',
+                    },
+                  ]}
+                >
+                  <DatePicker style={{ width: '100%' }} format="DD MMM YYYY" />
+                </Form.Item>
+
+                <Form.Item label="What was explained to the parent" name="parentMeetingNote">
+                  <Input.TextArea rows={2} maxLength={1000} showCount />
+                </Form.Item>
+
+                <Form.Item
+                  label="Parent confirmed the retention in writing on"
+                  name="parentConfirmedInWritingDate"
+                  tooltip="Policy asks for the parent's written confirmation. It is recorded here, but the card is not held back waiting for it — a report card may not be withheld for any reason."
+                >
+                  <DatePicker style={{ width: '100%' }} format="DD MMM YYYY" />
+                </Form.Item>
+
+                <Form.Item
+                  label="Where that confirmation is filed"
+                  name="parentConfirmationReference"
+                  tooltip="A reference to the school's own file. Do not retype anything personal here."
+                >
+                  <Input maxLength={1000} placeholder="e.g. Learner file 2026/114, signed form" />
+                </Form.Item>
+              </>
+            )}
           </Form>
 
           {advice.recorded !== undefined && advice.recorded !== null && (

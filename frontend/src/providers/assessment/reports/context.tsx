@@ -10,6 +10,8 @@ import {
   IBulkGenerateReports,
   IBulkGenerateReportsResult,
   IPromotionAdvice,
+  IRecordRetentionProcedure,
+  IRetentionProcedure,
   IRecordPromotion,
   IRecordConduct,
 } from "../shared/interfaces";
@@ -43,6 +45,13 @@ export interface IReportActionContext {
   getPromotionAdviceAsync: (id: string) => void;
   /** RC-16: records the decision, with the destination grade and a reason. */
   recordPromotionDecisionAsync: (input: IRecordPromotion) => void;
+  /** RC-26. The s(2b) meetings around a retention. The parent meeting is what
+   *  the server requires before a retained learner's card may be published. */
+  recordRetentionProcedureAsync: (
+    reportId: string,
+    input: IRecordRetentionProcedure,
+  ) => Promise<IRetentionProcedure>;
+  getRetentionProcedureAsync: (reportId: string) => Promise<IRetentionProcedure | undefined>;
   /** RC-17: records the conduct and diligence ratings (RE-002). */
   recordConductAsync: (input: IRecordConduct) => void;
   /** RC-17: the class teacher signs the card off (RE-003). */
