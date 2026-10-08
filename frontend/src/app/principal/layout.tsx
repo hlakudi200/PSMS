@@ -30,6 +30,7 @@ import {
   FileProtectOutlined,
   HomeOutlined,
   SafetyCertificateOutlined,
+  HighlightOutlined,
   SettingOutlined,
 } from '@ant-design/icons';
 import LayoutShell from '@/components/shared/LayoutShell';
@@ -123,6 +124,13 @@ const buildMenuItems = (isVicePrincipal: boolean) => [
       ...(isVicePrincipal
         ? []
         : [{ key: '/principal/roles', icon: <SafetyCertificateOutlined />, label: 'Roles' }]),
+    ],
+  },
+  {
+    type: 'group' as const,
+    label: 'My Account',
+    children: [
+      { key: '/principal/my-signature', icon: <HighlightOutlined />, label: 'My Signature' },
     ],
   },
 ];

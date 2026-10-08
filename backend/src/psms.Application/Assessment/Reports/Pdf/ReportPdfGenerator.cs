@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Linq;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
@@ -63,8 +63,8 @@ public static class ReportPdfGenerator
         + "Department's statement of results.";
 
     /// <summary>Largest logo we will place in the header, in points.</summary>
-    private const float LogoMaxHeight = 52f;
-    private const float LogoMaxWidth = 150f;
+    private const float LogoMaxHeight = 36f;
+    private const float LogoMaxWidth = 120f;
 
     /// <summary>
     /// The colour if it is one QuestPDF will accept, otherwise the stock PSMS
@@ -191,28 +191,33 @@ public static class ReportPdfGenerator
                 column.Item().AlignCenter()
                     .MaxHeight(LogoMaxHeight).MaxWidth(LogoMaxWidth)
                     .Image(data.LogoBytes).FitArea();
-                column.Item().Height(6);
+                column.Item().Height(3);
             }
 
             // School name — large, uppercase, centred, in the school's colour
             column.Item().AlignCenter()
                 .Text(data.SchoolName?.ToUpperInvariant() ?? "SCHOOL REPORT CARD")
-                .Bold().FontSize(18).LetterSpacing(0.05f).FontColor(InkOnWhite(data.PrimaryColor));
+                .Bold().FontSize(16).LetterSpacing(0.05f).FontColor(InkOnWhite(data.PrimaryColor));
 
-            // Report type
-            column.Item().AlignCenter()
-                .Text(data.ReportType ?? "Student Report Card")
-                .SemiBold().FontSize(13);
+            // Report type, term and year, on one line. These were three
+            // stacked lines that largely repeated each other — "Term 1 Report"
+            // directly above "Term 1 — 2026 Academic Year".
+            var reportType = data.ReportType ?? "Student Report Card";
 
-            // Term — Year
-            if (!string.IsNullOrWhiteSpace(data.TermName) || !string.IsNullOrWhiteSpace(data.AcademicYearName))
-            {
-                var termYear = string.Join(" — ",
-                    new[] { data.TermName, data.AcademicYearName }.Where(s => !string.IsNullOrWhiteSpace(s)));
-                column.Item().AlignCenter().Text(termYear).FontSize(10);
-            }
+            // "Term 1 Report · Term 1 · 2026" says the term twice. The report
+            // type usually names it already, so the term is only added when it
+            // does not.
+            var term = !string.IsNullOrWhiteSpace(data.TermName)
+                && reportType.IndexOf(data.TermName, StringComparison.OrdinalIgnoreCase) < 0
+                    ? data.TermName
+                    : null;
 
-            column.Item().Height(4);
+            var subtitle = string.Join("  ·  ", new[] { reportType, term, data.AcademicYearName }
+                .Where(x => !string.IsNullOrWhiteSpace(x)));
+
+            column.Item().AlignCenter().Text(subtitle).SemiBold().FontSize(10.5f);
+
+            column.Item().Height(3);
 
             // Double rule — the heavy line takes the school's colour, the hairline
             // stays black so the card still reads as a document in mono.
@@ -220,7 +225,7 @@ public static class ReportPdfGenerator
             column.Item().Height(2);
             column.Item().LineHorizontal(0.5f).LineColor(BorderCol);
 
-            column.Item().Height(8);
+            column.Item().Height(5);
         });
     }
 
@@ -231,7 +236,7 @@ public static class ReportPdfGenerator
         {
             // ── Student Info Grid (2 columns) ──
             column.Item().Element(c => ComposeStudentInfo(c, data));
-            column.Item().Height(10);
+            column.Item().Height(6);
 
             // ── Subject Table ──
             column.Item().Element(c => ComposeSubjectTable(c, data));
@@ -239,7 +244,7 @@ public static class ReportPdfGenerator
             // ── RC-15: what the dagger means, when anything carries one ──
             if (data.Subjects.Any(s => s.AwaitsExternalExamination))
             {
-                column.Item().Height(4);
+                column.Item().Height(3);
                 // Deliberately not italic: the italic face's "ti" ligature
                 // carries no usable mapping, so copying the note out of the PDF
                 // — or reading it with a screen reader — turns "National" into
@@ -247,11 +252,11 @@ public static class ReportPdfGenerator
                 column.Item().Text(ExternalExamNote).FontSize(7.5f).FontColor(Colors.Grey.Darken2);
             }
 
-            column.Item().Height(10);
+            column.Item().Height(6);
 
             // ── Attendance ──
             column.Item().Element(c => ComposeAttendance(c, data));
-            column.Item().Height(10);
+            column.Item().Height(6);
 
             // ── RC-17: conduct and diligence (RE-002) ──
             if (!string.IsNullOrWhiteSpace(data.ConductRating)
@@ -259,7 +264,7 @@ public static class ReportPdfGenerator
                 || !string.IsNullOrWhiteSpace(data.BehaviourComments))
             {
                 column.Item().Element(c => ComposeConduct(c, data));
-                column.Item().Height(10);
+                column.Item().Height(6);
             }
 
             // ── RC-16: the promotion decision ──
@@ -270,22 +275,22 @@ public static class ReportPdfGenerator
             if (!string.IsNullOrWhiteSpace(data.PromotionDecision))
             {
                 column.Item().Element(c => ComposePromotion(c, data));
-                column.Item().Height(10);
+                column.Item().Height(6);
             }
 
             // ── Comments ──
             column.Item().Element(c => ComposeComments(c, data));
-            column.Item().Height(16);
+            column.Item().Height(10);
 
             // ── Signature Lines ──
             column.Item().Element(c => ComposeSignatures(c, data));
-            column.Item().Height(12);
+            column.Item().Height(8);
 
             // ── How to check this card is real ──
             if (!string.IsNullOrWhiteSpace(data.VerificationUrl))
             {
                 column.Item().Element(c => ComposeVerification(c, data));
-                column.Item().Height(10);
+                column.Item().Height(6);
             }
 
             // ── CAPS Legend ──
@@ -296,37 +301,47 @@ public static class ReportPdfGenerator
     // ─── Student Info ───
     private static void ComposeStudentInfo(IContainer container, ReportPdfData data)
     {
-        container.Border(1).BorderColor(BorderCol).Padding(8).Row(row =>
+        container.Border(1).BorderColor(BorderCol).Padding(6).Column(grid =>
         {
-            // Left column
-            row.RelativeItem().Column(c =>
+            grid.Item().Row(row =>
             {
-                InfoRow(c, "Student Name:", data.StudentName);
-                InfoRow(c, "Admission No:", data.AdmissionNumber ?? "N/A");
-                InfoRow(c, "Class:", data.ClassName ?? "N/A");
+                // Left column
+                row.RelativeItem().Column(c =>
+                {
+                    InfoRow(c, "Student Name:", data.StudentName);
+                    InfoRow(c, "Admission No:", data.AdmissionNumber ?? "N/A");
+                    InfoRow(c, "Class:", data.ClassName ?? "N/A");
+                });
+
+                // Right column
+                row.RelativeItem().Column(c =>
+                {
+                    InfoRow(c, "Date Generated:", data.GeneratedDate ?? "N/A");
+                    var posText = data.ClassPosition.HasValue
+                        ? $"{data.ClassPosition} of {data.TotalStudentsInClass ?? 0}"
+                        : "N/A";
+                    InfoRow(c, "Class Position:", posText);
+                    InfoRow(c, "Overall:", data.OverallPercentage.HasValue ? $"{Mark(data.OverallPercentage)}%" : "N/A");
+                });
             });
 
-            // Right column
-            row.RelativeItem().Column(c =>
+            // RC-17: RE-002's report card number. Full width, because it is one
+            // long unbroken string — in a half-width cell it wrapped over three
+            // lines and cost the card more room than the whole info grid saved.
+            grid.Item().PaddingTop(1.5f).Row(r =>
             {
-                InfoRow(c, "Date Generated:", data.GeneratedDate ?? "N/A");
-                var posText = data.ClassPosition.HasValue
-                    ? $"{data.ClassPosition} of {data.TotalStudentsInClass ?? 0}"
-                    : "N/A";
-                InfoRow(c, "Class Position:", posText);
-                InfoRow(c, "Overall:", data.OverallPercentage.HasValue ? $"{Mark(data.OverallPercentage)}%" : "N/A");
-            // RC-17: RE-002's report card number.
-            InfoRow(c, "Report card no:", data.ReportCardNumber ?? "N/A");
+                r.ConstantItem(88).Text("Report card no:").Bold().FontSize(8.5f);
+                r.RelativeItem().Text(data.ReportCardNumber ?? "N/A").FontSize(8);
             });
         });
     }
 
     private static void InfoRow(ColumnDescriptor column, string label, string value)
     {
-        column.Item().BorderBottom(0.5f).BorderColor(LightBorder).PaddingVertical(2).Row(r =>
+        column.Item().BorderBottom(0.5f).BorderColor(LightBorder).PaddingVertical(1.5f).Row(r =>
         {
-            r.ConstantItem(100).Text(label).Bold().FontSize(9);
-            r.RelativeItem().Text(value ?? "").FontSize(9);
+            r.ConstantItem(88).Text(label).Bold().FontSize(8.5f);
+            r.RelativeItem().Text(value ?? "").FontSize(8.5f);
         });
     }
 
@@ -337,16 +352,23 @@ public static class ReportPdfGenerator
         {
             table.ColumnsDefinition(columns =>
             {
-                columns.RelativeColumn(2.6f); // Subject
-                columns.RelativeColumn(0.9f); // Code
-                columns.RelativeColumn(1.1f); // Term Mark
-                columns.RelativeColumn(1.1f); // Exam Mark
-                columns.RelativeColumn(1.1f); // Final Mark
-                columns.RelativeColumn(0.6f); // Level
-                columns.RelativeColumn(1.1f); // Class average (RC-06)
-                columns.RelativeColumn(0.8f); // Position in class (RC-06)
-                columns.RelativeColumn(1.6f); // Teacher
-                columns.RelativeColumn(2.3f); // Comment
+                // Widths are what decide the height of this table: a subject
+                // name or a teacher's name that does not fit wraps, and the
+                // whole row grows with it. "Engineering Graphics and Design"
+                // and "Sipho Christopher Nkosi" were both wrapping while the
+                // comment column — a row of dashes on most cards — held the
+                // width they needed. The totals are unchanged; the space is
+                // just where it is read.
+                columns.RelativeColumn(3.1f);  // Subject
+                columns.RelativeColumn(1.05f); // Code
+                columns.RelativeColumn(1.05f); // Term Mark
+                columns.RelativeColumn(1.05f); // Exam Mark
+                columns.RelativeColumn(1.05f); // Final Mark
+                columns.RelativeColumn(0.55f); // Level
+                columns.RelativeColumn(1.05f); // Class average (RC-06)
+                columns.RelativeColumn(0.75f); // Position in class (RC-06)
+                columns.RelativeColumn(2.05f); // Teacher
+                columns.RelativeColumn(1.5f);  // Comment
             });
 
             // Header row
@@ -358,7 +380,7 @@ public static class ReportPdfGenerator
                 var brandBg = data.PrimaryColor;
                 var brandFg = ReadableOn(brandBg);
                 IContainer BrandedHeader(IContainer cell) =>
-                    cell.Border(1).BorderColor(BorderCol).Background(brandBg).Padding(4);
+                    cell.Border(1).BorderColor(BorderCol).Background(brandBg).Padding(3);
 
                 header.Cell().Element(BrandedHeader).Text("SUBJECT").Bold().FontSize(8).FontColor(brandFg);
                 header.Cell().Element(BrandedHeader).Text("CODE").Bold().FontSize(8).FontColor(brandFg);
@@ -376,7 +398,7 @@ public static class ReportPdfGenerator
             foreach (var s in data.Subjects)
             {
                 table.Cell().Element(DataCellStyle).Text(s.SubjectName ?? "").SemiBold().FontSize(9);
-                table.Cell().Element(DataCellStyle).Text(s.SubjectCode ?? "-").FontSize(9);
+                table.Cell().Element(DataCellStyle).Text(s.SubjectCode ?? "-").FontSize(8.5f);
                 table.Cell().Element(DataCellStyle).AlignCenter().Text(Mark(s.TermMark)).FontSize(9);
                 table.Cell().Element(DataCellStyle).AlignCenter().Text(Mark(s.ExamMark)).FontSize(9);
                 table.Cell().Element(DataCellStyle).AlignCenter()
@@ -389,8 +411,8 @@ public static class ReportPdfGenerator
                 // run, rather than a zero that reads as a class average of 0%.
                 table.Cell().Element(DataCellStyle).AlignCenter().Text(Mark(s.ClassAverage)).FontSize(9);
                 table.Cell().Element(DataCellStyle).AlignCenter().Text(s.SubjectPosition?.ToString() ?? "-").FontSize(9);
-                table.Cell().Element(DataCellStyle).Text(s.TeacherName ?? "-").FontSize(8);
-                table.Cell().Element(DataCellStyle).Text(s.TeacherComment ?? "-").FontSize(8);
+                table.Cell().Element(DataCellStyle).Text(s.TeacherName ?? "-").FontSize(7.5f);
+                table.Cell().Element(DataCellStyle).Text(s.TeacherComment ?? "-").FontSize(7.5f);
             }
 
             // Overall footer row. RC-07: this prints the overall stored on the
@@ -428,10 +450,10 @@ public static class ReportPdfGenerator
     {
         container.Border(1).BorderColor(BorderCol).Column(column =>
         {
-            column.Item().Background(HeaderBg).Padding(4)
-                .Text("CONDUCT AND DILIGENCE").Bold().FontSize(8);
+            column.Item().Background(HeaderBg).Padding(3)
+                .Text("CONDUCT AND DILIGENCE").Bold().FontSize(7.5f);
 
-            column.Item().Padding(6).Column(body =>
+            column.Item().Padding(4).Column(body =>
             {
                 body.Item().Row(row =>
                 {
@@ -449,7 +471,7 @@ public static class ReportPdfGenerator
 
                 if (!string.IsNullOrWhiteSpace(data.BehaviourComments))
                 {
-                    body.Item().Height(3);
+                    body.Item().Height(2);
                     body.Item().Text(data.BehaviourComments).FontSize(9);
                 }
             });
@@ -464,10 +486,10 @@ public static class ReportPdfGenerator
 
         container.Border(1).BorderColor(BorderCol).Column(column =>
         {
-            column.Item().Background(brandBg).Padding(4)
-                .Text("PROMOTION DECISION").Bold().FontSize(8).FontColor(brandFg);
+            column.Item().Background(brandBg).Padding(3)
+                .Text("PROMOTION DECISION").Bold().FontSize(7.5f).FontColor(brandFg);
 
-            column.Item().Padding(6).Column(body =>
+            column.Item().Padding(4).Column(body =>
             {
                 var line = string.IsNullOrWhiteSpace(data.PromotedToGradeName)
                     ? data.PromotionDecision
@@ -477,7 +499,7 @@ public static class ReportPdfGenerator
 
                 if (!string.IsNullOrWhiteSpace(data.PromotionReason))
                 {
-                    body.Item().Height(3);
+                    body.Item().Height(2);
                     body.Item().Text(data.PromotionReason).FontSize(9);
                 }
             });
@@ -491,7 +513,7 @@ public static class ReportPdfGenerator
 
     private static IContainer DataCellStyle(IContainer cell)
     {
-        return cell.Border(1).BorderColor(BorderCol).Padding(4);
+        return cell.Border(1).BorderColor(BorderCol).Padding(2.5f);
     }
 
     // ─── Attendance cells ───
@@ -513,10 +535,10 @@ public static class ReportPdfGenerator
 
     private static void AttendanceCell(RowDescriptor row, string label, string value)
     {
-        row.RelativeItem().Border(1).BorderColor(BorderCol).Padding(6).Column(c =>
+        row.RelativeItem().Border(1).BorderColor(BorderCol).Padding(4).Column(c =>
         {
-            c.Item().AlignCenter().Text(label).Bold().FontSize(8);
-            c.Item().AlignCenter().Text(value).Bold().FontSize(16);
+            c.Item().AlignCenter().Text(label).Bold().FontSize(7.5f);
+            c.Item().AlignCenter().Text(value).Bold().FontSize(13);
         });
     }
 
@@ -526,12 +548,12 @@ public static class ReportPdfGenerator
         container.Column(column =>
         {
             CommentBox(column, "CLASS TEACHER'S COMMENT", data.TeacherComment);
-            column.Item().Height(6);
+            column.Item().Height(4);
             CommentBox(column, "PRINCIPAL'S COMMENT", data.PrincipalComment);
 
             if (!string.IsNullOrWhiteSpace(data.ParentComment))
             {
-                column.Item().Height(6);
+                column.Item().Height(4);
                 CommentBox(column, "PARENT'S COMMENT", data.ParentComment);
             }
         });
@@ -542,12 +564,14 @@ public static class ReportPdfGenerator
         column.Item().Border(1).BorderColor(BorderCol).Column(c =>
         {
             // Label bar
-            c.Item().BorderBottom(1).BorderColor(LightBorder).Padding(4)
-                .Text(label).Bold().FontSize(8);
+            c.Item().BorderBottom(1).BorderColor(LightBorder).Padding(3)
+                .Text(label).Bold().FontSize(7.5f);
 
-            // Content area — minimum height so it looks like a form field even when empty
-            c.Item().MinHeight(36).Padding(6)
-                .Text(comment ?? "").FontSize(10);
+            // Content area — minimum height so it looks like a form field even
+            // when empty, and still enough to write a line or two of comment by
+            // hand on the printed card.
+            c.Item().MinHeight(24).Padding(4)
+                .Text(comment ?? "").FontSize(9);
         });
     }
 
@@ -566,26 +590,27 @@ public static class ReportPdfGenerator
         container
             .Background(Colors.Grey.Lighten4)
             .Border(0.5f).BorderColor(BorderCol)
-            .Padding(8)
+            .Padding(5)
             .Row(row =>
             {
                 var qr = TryRenderQr(data.VerificationUrl);
                 if (qr != null)
                 {
-                    row.ConstantItem(58).Height(58).Image(qr).FitArea();
-                    row.ConstantItem(10);
+                    // 42pt is about 15mm printed, which every phone camera reads
+                    // at arm's length and which costs the page a third less than
+                    // the 58pt square did.
+                    row.ConstantItem(42).Height(42).Image(qr).FitArea();
+                    row.ConstantItem(8);
                 }
 
-                row.RelativeItem().Column(c =>
+                row.RelativeItem().AlignMiddle().Column(c =>
                 {
                     c.Item().Text("Check this report card is genuine")
-                        .SemiBold().FontSize(9);
-                    c.Item().Height(2);
-                    c.Item().Text("Scan the code, or visit the address below. The school's records "
-                        + "will confirm whether this card was issued and to whom.")
-                        .FontSize(7.5f).FontColor(Colors.Grey.Darken1);
-                    c.Item().Height(3);
-                    c.Item().Text(data.VerificationUrl).FontSize(7).FontColor(Colors.Grey.Darken2);
+                        .SemiBold().FontSize(8.5f);
+                    c.Item().Text("Scan the code, or visit the address below — the school's records "
+                        + "confirm whether this card was issued, and to whom.")
+                        .FontSize(7).FontColor(Colors.Grey.Darken1);
+                    c.Item().Text(data.VerificationUrl).FontSize(6.5f).FontColor(Colors.Grey.Darken2);
                 });
             });
     }
@@ -644,18 +669,18 @@ public static class ReportPdfGenerator
                 {
                     try
                     {
-                        c.Item().Height(26).AlignCenter().Svg(signatureSvg).FitArea();
+                        c.Item().Height(22).AlignCenter().Svg(signatureSvg).FitArea();
                     }
                     catch (Exception)
                     {
                         // A drawing that will not render must not cost the school
                         // the whole report card; the name and date still print.
-                        c.Item().Height(26);
+                        c.Item().Height(22);
                     }
                 }
                 else
                 {
-                    c.Item().Height(14);
+                    c.Item().Height(12);
                 }
 
                 c.Item().AlignCenter().Text(signedBy).SemiBold().FontSize(9);
@@ -663,7 +688,7 @@ public static class ReportPdfGenerator
             }
             else
             {
-                c.Item().Height(30); // space for a signature by hand
+                c.Item().Height(24); // space for a signature by hand
             }
 
             c.Item().LineHorizontal(1).LineColor(BorderCol);
@@ -675,54 +700,41 @@ public static class ReportPdfGenerator
         });
     }
 
-    // ─── CAPS Legend Table ───
+    // ─── CAPS Legend ───
+    /// <summary>
+    /// The achievement scale, as one strip of running text.
+    /// <para>
+    /// This is a key to the LVL column, not data, and it was costing a second
+    /// sheet of paper: a seven-column bordered table whose cells each wrapped to
+    /// two lines took about 75pt, which is what pushed every card onto a page
+    /// two that carried nothing else. Set as a run of "7 Outstanding 80–100%"
+    /// groups it reads the same way and takes about 20pt.
+    /// </para>
+    /// </summary>
     private static void ComposeLegend(IContainer container)
     {
-        container.Border(1).BorderColor(BorderCol).Padding(6).Column(column =>
+        // RC-07: the levels and their bands come from CapsAchievementScale, so
+        // the printed legend cannot drift from the levels actually awarded above.
+        var levels = psms.Domain.Assessment.CapsAchievementScale.Descending;
+
+        container.Border(0.5f).BorderColor(BorderCol).Padding(5).Text(text =>
         {
-            column.Item().Text("CAPS ACHIEVEMENT LEVEL DESCRIPTORS").Bold().FontSize(8);
-            column.Item().Height(4);
+            text.DefaultTextStyle(x => x.FontSize(7).FontColor(Colors.Grey.Darken3));
 
-            column.Item().Table(table =>
+            text.Span("ACHIEVEMENT LEVELS   ").Bold().FontSize(7).FontColor(Colors.Black);
+
+            var first = true;
+            foreach (var level in levels)
             {
-                table.ColumnsDefinition(cols =>
-                {
-                    cols.RelativeColumn(); // L7
-                    cols.RelativeColumn(); // L6
-                    cols.RelativeColumn(); // L5
-                    cols.RelativeColumn(); // L4
-                    cols.RelativeColumn(); // L3
-                    cols.RelativeColumn(); // L2
-                    cols.RelativeColumn(); // L1
-                });
+                var (low, high) = psms.Domain.Assessment.CapsAchievementScale.RangeFor(level);
+                var descriptor = psms.Domain.Assessment.CapsAchievementScale.ShortDescriptorFor(level);
 
-                // RC-07: the levels and their bands come from CapsAchievementScale,
-                // so the printed legend cannot drift from the levels actually
-                // awarded above it.
-                var levels = psms.Domain.Assessment.CapsAchievementScale.Descending;
+                if (!first) text.Span("   ·   ").FontColor(Colors.Grey.Medium);
+                first = false;
 
-                // Header
-                table.Header(h =>
-                {
-                    foreach (var level in levels)
-                    {
-                        h.Cell().Border(0.5f).BorderColor(LightBorder)
-                            .Background(HeaderBg).Padding(2).AlignCenter()
-                            .Text($"Level {(int)level}").Bold().FontSize(7);
-                    }
-                });
-
-                // Descriptions
-                foreach (var level in levels)
-                {
-                    var (low, high) = psms.Domain.Assessment.CapsAchievementScale.RangeFor(level);
-                    var descriptor = psms.Domain.Assessment.CapsAchievementScale.ShortDescriptorFor(level);
-
-                    table.Cell().Border(0.5f).BorderColor(LightBorder)
-                        .Padding(2).AlignCenter()
-                        .Text($"{descriptor}\n{low}–{high}%").FontSize(7);
-                }
-            });
+                text.Span($"{(int)level} ").Bold().FontColor(Colors.Black);
+                text.Span($"{descriptor} {low}–{high}%");
+            }
         });
     }
 

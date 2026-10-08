@@ -13,6 +13,7 @@ import {
   MessageOutlined,
   CarryOutOutlined,
   SolutionOutlined,
+  HighlightOutlined,
 } from '@ant-design/icons';
 import LayoutShell from '@/components/shared/LayoutShell';
 import { roleColors } from '@/utils/theme-config';
@@ -59,6 +60,13 @@ const menuItems = [
     label: 'Communication',
     children: [
       { key: '/teacher/messages', icon: <MessageOutlined />, label: 'Messages' },
+    ],
+  },
+  {
+    type: 'group' as const,
+    label: 'My Account',
+    children: [
+      { key: '/teacher/my-signature', icon: <HighlightOutlined />, label: 'My Signature' },
     ],
   },
 ];
