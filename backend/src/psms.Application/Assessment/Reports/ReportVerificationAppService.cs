@@ -1,6 +1,7 @@
 using Abp.Application.Services;
 using Abp.Authorization;
 using Abp.Domain.Repositories;
+using Abp.Domain.Uow;
 using Abp.MultiTenancy;
 using Microsoft.EntityFrameworkCore;
 using psms.Domain.Assessment.Entities;
@@ -109,9 +110,18 @@ public class ReportVerificationAppService : ApplicationService, IReportVerificat
         var trimmed = token.Trim();
 
         // The caller is not signed in and belongs to no tenant, so this has to
-        // run host-side across every school's cards. SetTenantId(null) also
-        // means an Abp-TenantId header a caller supplies cannot steer it.
-        using (CurrentUnitOfWork.SetTenantId(null))
+        // look across every school's cards.
+        //
+        // It must be DisableFilter, not SetTenantId(null). Report is
+        // IMayHaveTenant, and setting the tenant to null does not widen the
+        // query — it narrows it to "TenantId IS NULL", which matches no report
+        // card at all, because every card belongs to a school. The effect was
+        // that a perfectly good code came back as "no report card matches this
+        // code", so the QR on every printed card led nowhere. Disabling the
+        // filter removes the tenant predicate instead of changing it, and it
+        // equally means an Abp-TenantId header a caller supplies cannot steer
+        // the lookup. This is how the rest of the codebase reads across tenants.
+        using (CurrentUnitOfWork.DisableFilter(AbpDataFilters.MayHaveTenant))
         {
             var card = await _reportRepository
                 .GetAll()
