@@ -238,7 +238,33 @@ public class ReportPdfBrandingRenderTests
 
         Assert.Contains("Class Teacher", text);
         Assert.Contains("Principal", text);
-        Assert.DoesNotContain("T. Petersen", text.Split("Class Teacher")[^1]);
+
+        // Counted rather than positional. "T. Petersen" is also the Mathematics
+        // teacher in the subject table, so the name is on the card either way;
+        // what an unsigned card must not do is print it a second time, over the
+        // signature line. Asserting on the text after the last "Class Teacher"
+        // read the words in extraction order, and PdfPig does not promise a
+        // stable order for words that sit close together — once the layout
+        // tightened, the table and the signature block were near enough that
+        // the two flipped between runs and the test failed perhaps one run in
+        // three.
+        Assert.Equal(1, Occurrences(text, "T. Petersen"));
+
+        var signed = PdfText.Extract(ReportPdfGenerator.Generate(SampleData("#0066CC", null)));
+        Assert.Equal(2, Occurrences(signed, "T. Petersen"));
+    }
+
+    private static int Occurrences(string haystack, string needle)
+    {
+        var count = 0;
+        for (var i = haystack.IndexOf(needle, System.StringComparison.Ordinal);
+             i >= 0;
+             i = haystack.IndexOf(needle, i + needle.Length, System.StringComparison.Ordinal))
+        {
+            count++;
+        }
+
+        return count;
     }
 
     [Fact]
