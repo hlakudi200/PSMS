@@ -37,6 +37,8 @@ export interface IReportActionContext {
   generateAsync: (input: IGenerateReport) => void;
   submitForApprovalAsync: (id: string) => void;
   publishAsync: (id: string) => void;
+  /** Takes an issued card back. The reason goes on the record. */
+  withdrawAsync: (id: string, reason: string) => Promise<void>;
   addTeacherCommentAsync: (id: string, input: IReportComment) => void;
   addPrincipalCommentAsync: (id: string, input: IReportComment) => void;
   acknowledgeByParentAsync: (id: string, input: IReportComment) => void;

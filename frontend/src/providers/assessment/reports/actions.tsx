@@ -32,6 +32,9 @@ export enum ReportActionEnums {
   publishReportPending = "PUBLISH_REPORT_PENDING",
   publishReportSuccess = "PUBLISH_REPORT_SUCCESS",
   publishReportError = "PUBLISH_REPORT_ERROR",
+  withdrawReportPending = "WITHDRAW_REPORT_PENDING",
+  withdrawReportSuccess = "WITHDRAW_REPORT_SUCCESS",
+  withdrawReportError = "WITHDRAW_REPORT_ERROR",
 
   addTeacherCommentPending = "ADD_TEACHER_COMMENT_PENDING",
   addTeacherCommentSuccess = "ADD_TEACHER_COMMENT_SUCCESS",
@@ -207,6 +210,27 @@ export const publishReportSuccess = createAction<IReportStateContext, IReport>(
 
 export const publishReportError = createAction<IReportStateContext>(
   ReportActionEnums.publishReportError,
+  () => ({ isPending: false, isSuccess: false, isError: true })
+);
+
+// Withdraw Report Actions
+export const withdrawReportPending = createAction<IReportStateContext>(
+  ReportActionEnums.withdrawReportPending,
+  () => ({ isPending: true, isSuccess: false, isError: false })
+);
+
+export const withdrawReportSuccess = createAction<IReportStateContext, IReport>(
+  ReportActionEnums.withdrawReportSuccess,
+  (report: IReport) => ({
+    isPending: false,
+    isSuccess: true,
+    isError: false,
+    report,
+  })
+);
+
+export const withdrawReportError = createAction<IReportStateContext>(
+  ReportActionEnums.withdrawReportError,
   () => ({ isPending: false, isSuccess: false, isError: true })
 );
 

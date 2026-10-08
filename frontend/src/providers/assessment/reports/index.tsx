@@ -34,6 +34,9 @@ import {
   submitForApprovalSuccess,
   submitForApprovalError,
   publishReportPending,
+  withdrawReportPending,
+  withdrawReportSuccess,
+  withdrawReportError,
   publishReportSuccess,
   publishReportError,
   addTeacherCommentPending,
@@ -193,6 +196,26 @@ export const ReportProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(publishReportError());
+        throw error;
+      });
+  };
+
+  /**
+   * Takes an issued card back: off the family's list, no longer confirmed by
+   * the verification page, correctable, and issuable again once it is right.
+   * The reason is required and is kept on the card.
+   */
+  const withdrawAsync = async (id: string, reason: string) => {
+    dispatch(withdrawReportPending());
+    const endpoint = `/api/services/app/Report/Withdraw?id=${id}`;
+    await instance
+      .post(endpoint, { reason })
+      .then((response) => {
+        dispatch(withdrawReportSuccess(response.data.result));
+      })
+      .catch((error) => {
+        console.error(error);
+        dispatch(withdrawReportError());
         throw error;
       });
   };
@@ -464,6 +487,7 @@ export const ReportProvider = ({
           generateAsync,
           submitForApprovalAsync,
           publishAsync,
+          withdrawAsync,
           addTeacherCommentAsync,
           addPrincipalCommentAsync,
           acknowledgeByParentAsync,

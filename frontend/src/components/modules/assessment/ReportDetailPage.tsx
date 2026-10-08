@@ -32,6 +32,7 @@ import {
   LoadingOutlined,
   EyeOutlined,
   FormOutlined,
+  RollbackOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { ReportProvider, useReportState, useReportActions } from '@/providers/assessment/reports';
@@ -42,6 +43,7 @@ import { formatMark, formatPercentage } from '@/utils/marks';
 import { PromotionDecisionModal, promotionDecisionLabels } from './PromotionDecisionModal';
 import { SubjectMarksModal } from './SubjectMarksModal';
 import { ConductAndSignOffCard, conductRatingLabels } from './ConductAndSignOffCard';
+import WithdrawReportModal from '@/components/modals/assessment/WithdrawReportModal';
 import type { IReport, IReportSubject } from '@/providers/assessment/shared/interfaces';
 
 const { Title, Text, Paragraph } = Typography;
@@ -476,6 +478,7 @@ function ReportDetailContent() {
     submitForApprovalAsync,
     publishAsync,
     addPrincipalCommentAsync,
+    withdrawAsync,
     generatePdfAsync,
     getPdfUrlAsync,
   } = useReportActions();
@@ -516,10 +519,28 @@ function ReportDetailContent() {
   const [promotionOpen, setPromotionOpen] = useState(false);
   const [marksOpen, setMarksOpen] = useState(false);
 
+  const [withdrawOpen, setWithdrawOpen] = useState(false);
+  const [withdrawing, setWithdrawing] = useState(false);
+
   const handlePublish = async () => {
     await publishAsync(reportId);
     message.success('Report published');
     refresh();
+  };
+
+  /* An issued card cannot be deleted — it is the school's record of the
+     learner's year — but a card issued by mistake had no way back at all. This
+     returns it to Approved so it can be corrected and issued again. */
+  const handleWithdraw = async (reason: string) => {
+    setWithdrawing(true);
+    try {
+      await withdrawAsync(reportId, reason);
+      message.success('Report card withdrawn. The parents have been told.');
+      setWithdrawOpen(false);
+      refresh();
+    } finally {
+      setWithdrawing(false);
+    }
   };
 
   const handleSaveComment = async () => {
@@ -1014,6 +1035,45 @@ function ReportDetailContent() {
           }
         />
       )}
+      {canManageReport && report.status === 5 && (
+        <Alert
+          className="no-print"
+          type="success"
+          showIcon
+          style={{ marginBottom: 16 }}
+          message="This report card has been issued."
+          description={
+            report.withdrawnDate
+              ? undefined
+              : 'The family can see it and the verification page confirms it as genuine. '
+                + 'If it went out wrong, withdraw it — it returns here for correction and the parents are told.'
+          }
+          action={
+            <Button danger size="small" icon={<RollbackOutlined />} onClick={() => setWithdrawOpen(true)}>
+              Withdraw
+            </Button>
+          }
+        />
+      )}
+
+      {canManageReport && report.status !== 5 && report.withdrawnDate && (
+        <Alert
+          className="no-print"
+          type="warning"
+          showIcon
+          style={{ marginBottom: 16 }}
+          message={`Issued on ${dayjs(report.publishedDate).format('DD MMM YYYY')}, then withdrawn on ${dayjs(report.withdrawnDate).format('DD MMM YYYY')}`}
+          description={
+            <>
+              {report.withdrawalReason && (
+                <div style={{ marginBottom: 4 }}>Reason given: {report.withdrawalReason}</div>
+              )}
+              The parents were told it was withdrawn. Correct it and publish again when it is right.
+            </>
+          }
+        />
+      )}
+
       {canManageReport && report.status === 4 && (
         <Alert
           className="no-print"
@@ -1028,6 +1088,14 @@ function ReportDetailContent() {
           }
         />
       )}
+
+      <WithdrawReportModal
+        open={withdrawOpen}
+        studentName={report.studentName}
+        saving={withdrawing}
+        onCancel={() => setWithdrawOpen(false)}
+        onConfirm={handleWithdraw}
+      />
 
       {/* RC-12: capturing the subject marks and comments. The provider for
           this existed and was mounted nowhere, so a subject mark could only ever

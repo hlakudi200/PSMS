@@ -2072,6 +2072,61 @@ public class ReportAppService : ApplicationService, IReportAppService
         return await GetAsync(id);
     }
 
+    /// <summary>
+    /// Takes an issued report card back.
+    /// <para>
+    /// A published card could not be deleted — right, it is the school's legal
+    /// record (§25(3)) — and nothing else reversed a publish either, so there
+    /// was no way to withdraw one at all. A school that issued a card with the
+    /// wrong marks, or under the wrong learner's name, was left with the card
+    /// issued, the verification page confirming it as genuine, and a second
+    /// card contradicting the first as the only remedy.
+    /// </para>
+    /// <para>
+    /// The card returns to Approved: off the family's list, no longer confirmed
+    /// by the verification page, correctable, and issuable again once it is
+    /// right. The parents are told, because a card they were told about and may
+    /// have read should not quietly vanish from their app.
+    /// </para>
+    /// </summary>
+    [AbpAuthorize(PermissionNames.Assessment_ReportCards_Publish)]
+    public async Task<ReportDto> WithdrawAsync(Guid id, WithdrawReportDto input)
+    {
+        var report = await _reportRepository
+            .FirstOrDefaultAsync(r => r.Id == id && r.TenantId == AbpSession.TenantId);
+
+        if (report == null)
+            throw new UserFriendlyException(AssessmentExceptionCodes.ReportNotFound, "Report not found.");
+
+        if (report.Status != ReportStatus.Published)
+            throw new UserFriendlyException(AssessmentExceptionCodes.ReportNotIssued,
+                "This report card has not been issued, so there is nothing to withdraw. "
+                + "A card the school is still working on is corrected rather than taken back.");
+
+        if (string.IsNullOrWhiteSpace(input?.Reason))
+            throw new UserFriendlyException(AssessmentExceptionCodes.WithdrawalReasonRequired,
+                "Say why the card is being withdrawn. It goes on the record, and a parent who "
+                + "asks is entitled to an answer.");
+
+        report.Withdraw(AbpSession.UserId ?? 0, input.Reason);
+
+        await _reportRepository.UpdateAsync(report);
+        await CurrentUnitOfWork.SaveChangesAsync();
+
+        // Never allowed to fail the withdrawal: a card that has been taken back
+        // stays taken back even if nothing could be sent about it.
+        var studentName = await _studentRepository
+            .GetAll()
+            .Where(s => s.Id == report.StudentId && s.TenantId == AbpSession.TenantId)
+            .Select(s => s.FirstName + " " + s.LastName)
+            .FirstOrDefaultAsync();
+
+        await _publishedNotifier.TryNotifyWithdrawnAsync(
+            report, studentName, ReportTypeLabel(report.ReportType));
+
+        return await GetAsync(id);
+    }
+
     // RC-08: the class teacher writes this comment, and the Teacher role holds
     // no Generate. Gated on the comment permission split out for exactly that.
     [AbpAuthorize(PermissionNames.Assessment_ReportCards_Comment)]
