@@ -1,4 +1,4 @@
-namespace psms.Assessment.Shared;
+﻿namespace psms.Assessment.Shared;
 
 /// <summary>
 /// Exception codes for the Assessment module.
@@ -39,6 +39,9 @@ public static class AssessmentExceptionCodes
     public const string MarksAlreadyReleased = "ASM_MARKS_ALREADY_RELEASED";
     public const string StudentNotInClass = "ASM_STUDENT_NOT_IN_CLASS";
     public const string CannotEditLockedMark = "ASM_CANNOT_EDIT_LOCKED_MARK";
+    // RC-23. National Protocol §8(9) grants an exemption "provided a valid
+    // medical reason is submitted", so one with nothing recorded is not it.
+    public const string ExemptionReasonRequired = "ASM_EXEMPTION_REASON_REQUIRED";
     public const string NoRawMarkToModerate = "ASM_NO_RAW_MARK_TO_MODERATE";
     public const string AssessmentNotPublished = "ASM_ASSESSMENT_NOT_PUBLISHED";
     public const string StudentNotFound = "ASM_STUDENT_NOT_FOUND";

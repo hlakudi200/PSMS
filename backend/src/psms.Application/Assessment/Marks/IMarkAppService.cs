@@ -1,4 +1,4 @@
-using Abp.Application.Services;
+﻿using Abp.Application.Services;
 using Abp.Application.Services.Dto;
 using psms.Assessment.Marks.Dto;
 using System;
@@ -20,6 +20,12 @@ public interface IMarkAppService : IApplicationService
     Task<MarkDto> UpdateMarkAsync(Guid id, RecordMarkDto input);
     Task<MarkDto> UpdateFeedbackAsync(Guid id, UpdateFeedbackDto input);
     Task<MarkDto> MarkAsAbsentAsync(Guid id);
+
+    /// <summary>RC-23. Excuses a learner from a task — National Protocol §8(9).</summary>
+    Task<MarkDto> ExemptAsync(Guid id, ExemptMarkDto input);
+
+    /// <summary>RC-23. Withdraws an exemption.</summary>
+    Task<MarkDto> ClearExemptionAsync(Guid id);
     Task<MarkDto> ApplyModerationAsync(Guid id, decimal adjustment);
     Task<MarkDto> UnlockMarkAsync(Guid id);
     Task DeleteAsync(Guid id);

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Abp.Domain.Entities;
@@ -61,6 +61,27 @@ namespace psms.Domain.Assessment.Entities
         /// Whether the student was absent
         /// </summary>
         public bool WasAbsent { get; set; }
+
+        /// <summary>
+        /// RC-23. Why this task was not required of this learner.
+        /// <para>
+        /// National Protocol §8(9): a learner who cannot offer the Physical
+        /// Education Task "may be exempted … provided a valid medical reason is
+        /// submitted", and their Life Orientation marks are then "recalculated
+        /// in terms of four tasks". An exempted task is left out of the average
+        /// rather than scored zero, which is what makes that recalculation
+        /// happen.
+        /// </para>
+        /// <para>
+        /// This is the school's note that an exemption was granted and on what
+        /// basis — a reference to the documentation it holds. It is <b>not</b> a
+        /// place to transcribe a learner's medical detail: that is special
+        /// personal information under POPIA §26, and the school's own file is
+        /// where it belongs. The field is deliberately kept off learner- and
+        /// parent-facing payloads for the same reason.
+        /// </para>
+        /// </summary>
+        public string ExemptionReason { get; set; }
 
         /// <summary>
         /// Whether this is a re-assessment mark
@@ -161,6 +182,51 @@ namespace psms.Domain.Assessment.Entities
         {
             WasAbsent = true;
             Status = MarkStatus.Absent;
+        }
+
+        /// <summary>
+        /// RC-23. Excuses this learner from this task, on a stated basis.
+        /// <para>
+        /// National Protocol §8(9). An exempted task carries no mark and is left
+        /// out of the subject average — which is how a Life Orientation mark
+        /// comes to be "recalculated in terms of four tasks" rather than five.
+        /// Scoring it zero would punish the learner for an absence the policy
+        /// excuses.
+        /// </para>
+        /// <para>
+        /// <paramref name="reason"/> is required: §8(9) grants the exemption
+        /// "provided a valid medical reason is submitted", so an exemption with
+        /// nothing recorded against it is not one the policy describes.
+        /// </para>
+        /// <para>
+        /// RawMark is left as it was. It is the audit record of what was
+        /// actually recorded, the same way moderation leaves it alone — the
+        /// percentage and the level are what stop counting.
+        /// </para>
+        /// </summary>
+        public void Exempt(string reason)
+        {
+            if (string.IsNullOrWhiteSpace(reason))
+                throw new ArgumentException(
+                    "An exemption has to say what it was granted on.", nameof(reason));
+
+            ExemptionReason = reason.Trim();
+            Status = MarkStatus.Exempted;
+            WasAbsent = false;
+            Percentage = null;
+            AchievementLevel = null;
+        }
+
+        /// <summary>
+        /// RC-23. Withdraws an exemption, putting the task back in the learner's
+        /// programme with no mark yet recorded.
+        /// </summary>
+        public void ClearExemption()
+        {
+            if (Status != MarkStatus.Exempted) return;
+
+            ExemptionReason = null;
+            Status = MarkStatus.Pending;
         }
 
         /// <summary>
