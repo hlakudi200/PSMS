@@ -1301,8 +1301,8 @@ function ReportDetailContent() {
           message="No attendance was recorded for this period"
           description={
             'The register has nothing for this learner over this term, so the card prints a dash '
-            + 'rather than a zero. Capture the register, or correct the attendance on this card, '
-            + 'before it is issued.'
+            + 'rather than a zero — which is true, where three zeros would not be. Capture the '
+            + 'register in Attendance and generate the card again if the figures should be on it.'
           }
         />
       )}
