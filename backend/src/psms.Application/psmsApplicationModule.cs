@@ -76,6 +76,8 @@ public class psmsApplicationModule : AbpModule
         IocManager.IocContainer.Register(
             Classes.FromAssembly(thisAssembly).BasedOn<psms.Workflow.Engine.IWorkflowStepGuard>()
                 .WithService.Base().Configure(c => c.Named("wfext:" + c.Implementation.FullName)).LifestyleTransient(),
+            Classes.FromAssembly(thisAssembly).BasedOn<psms.Workflow.Engine.IWorkflowStepSkipRule>()
+                .WithService.Base().Configure(c => c.Named("wfext:" + c.Implementation.FullName)).LifestyleTransient(),
             Classes.FromAssembly(thisAssembly).BasedOn<psms.Workflow.Engine.IWorkflowStepEffect>()
                 .WithService.Base().Configure(c => c.Named("wfext:" + c.Implementation.FullName)).LifestyleTransient(),
             Classes.FromAssembly(thisAssembly).BasedOn<psms.Workflow.Engine.IWorkflowDecisionSchema>()

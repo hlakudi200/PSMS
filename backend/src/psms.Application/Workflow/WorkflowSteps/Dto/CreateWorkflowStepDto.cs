@@ -36,6 +36,10 @@ public class CreateWorkflowStepDto
     /// <summary>WF-30: exit criterion key (see WorkflowExtension/GetAvailable).</summary>
     [StringLength(100)]
     public string GuardKey { get; set; }
+
+    /// <summary>WF-34: rule deciding whether this step applies to the record at all.</summary>
+    [StringLength(100)]
+    public string SkipWhenKey { get; set; }
     /// <summary>WF-31: effect applied on entering the step.</summary>
     [StringLength(100)]
     public string EntryEffectKey { get; set; }

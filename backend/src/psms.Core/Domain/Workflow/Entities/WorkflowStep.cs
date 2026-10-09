@@ -116,6 +116,16 @@ public class WorkflowStep : FullAuditedEntity<Guid>
     /// </summary>
     public bool IsOptional { get; set; }
 
+    /// <summary>
+    /// WF-34: key of the registered rule (IWorkflowStepSkipRule) that decides
+    /// whether this step applies to the record at all, e.g.
+    /// "application.interview-not-required". Evaluated as the instance enters
+    /// the step; a step that does not apply is stepped over automatically and
+    /// the reason recorded. Null = the step always applies.
+    /// </summary>
+    [StringLength(MaxExtensionKeyLength)]
+    public string SkipWhenKey { get; set; }
+
     [ForeignKey(nameof(WorkflowDefinitionId))]
     public virtual WorkflowDefinition WorkflowDefinition { get; set; }
 }

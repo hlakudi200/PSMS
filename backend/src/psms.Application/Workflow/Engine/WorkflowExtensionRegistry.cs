@@ -24,12 +24,16 @@ public class WorkflowExtensionRegistry : ITransientDependency
     }
 
     public IReadOnlyList<IWorkflowStepGuard> Guards => _iocResolver.ResolveAll<IWorkflowStepGuard>();
+    public IReadOnlyList<IWorkflowStepSkipRule> SkipRules => _iocResolver.ResolveAll<IWorkflowStepSkipRule>();
     public IReadOnlyList<IWorkflowStepEffect> Effects => _iocResolver.ResolveAll<IWorkflowStepEffect>();
     public IReadOnlyList<IWorkflowDecisionSchema> DecisionSchemas => _iocResolver.ResolveAll<IWorkflowDecisionSchema>();
     public IReadOnlyList<IWorkflowEntityHandler> EntityHandlers => _iocResolver.ResolveAll<IWorkflowEntityHandler>();
 
     public IWorkflowStepGuard GetGuard(string key, WorkflowEntityType entityType) =>
         Find(Guards, key, entityType, "guard");
+
+    public IWorkflowStepSkipRule GetSkipRule(string key, WorkflowEntityType entityType) =>
+        Find(SkipRules, key, entityType, "skip rule");
 
     public IWorkflowStepEffect GetEffect(string key, WorkflowEntityType entityType) =>
         Find(Effects, key, entityType, "effect");
@@ -58,6 +62,9 @@ public class WorkflowExtensionRegistry : ITransientDependency
 
     public bool GuardExists(string key, WorkflowEntityType entityType) =>
         Exists(Guards, key, entityType);
+
+    public bool SkipRuleExists(string key, WorkflowEntityType entityType) =>
+        Exists(SkipRules, key, entityType);
 
     public bool EffectExists(string key, WorkflowEntityType entityType) =>
         Exists(Effects, key, entityType);

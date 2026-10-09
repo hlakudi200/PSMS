@@ -780,7 +780,12 @@ public class DefaultRolesCreator
             PermissionNames.Workflow_Instances_Advance,
             PermissionNames.Workflow_Instances_ViewHistory,
 
-            // Admissions - Assessments only
+            // Admissions - the interviews and assessments a teacher conducts.
+            // Kept in step with PsmsRolePermissionSeeder.GetTeacherPermissions.
+            PermissionNames.Admissions_Interviews,
+            PermissionNames.Admissions_Interviews_View,
+            PermissionNames.Admissions_Interviews_Conduct,
+            PermissionNames.Admissions_Interviews_RecordOutcome,
             PermissionNames.Admissions_Assessments,
             PermissionNames.Admissions_Assessments_View,
             PermissionNames.Admissions_Assessments_Conduct,

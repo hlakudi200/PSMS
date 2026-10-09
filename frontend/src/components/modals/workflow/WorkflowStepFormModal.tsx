@@ -28,6 +28,7 @@ const stepSchema = z.object({
   assignedUserId: z.number().optional(),
   slaHours: z.number().min(1).optional(),
   guardKey: optionalKey,
+  skipWhenKey: optionalKey,
   entryEffectKey: optionalKey,
   exitEffectKey: optionalKey,
   decisionSchemaKey: optionalKey,
@@ -59,9 +60,10 @@ const roleOptions = [
   { value: 'AdmissionsOfficer', label: 'Admissions Officer' },
 ];
 
-const EXTENSION_KEYS = ['guardKey', 'entryEffectKey', 'exitEffectKey', 'decisionSchemaKey'] as const;
+const EXTENSION_KEYS = ['guardKey', 'skipWhenKey', 'entryEffectKey', 'exitEffectKey', 'decisionSchemaKey'] as const;
 const EXTENSION_CLEAR: Record<(typeof EXTENSION_KEYS)[number], string> = {
   guardKey: 'clearGuardKey',
+  skipWhenKey: 'clearSkipWhenKey',
   entryEffectKey: 'clearEntryEffectKey',
   exitEffectKey: 'clearExitEffectKey',
   decisionSchemaKey: 'clearDecisionSchemaKey',
@@ -109,6 +111,7 @@ export const WorkflowStepFormModal: React.FC<WorkflowStepFormModalProps> = ({
           slaHours: editRecord.slaHours,
           assignedUserId: editRecord.assignedUserId,
           guardKey: editRecord.guardKey,
+          skipWhenKey: editRecord.skipWhenKey,
           entryEffectKey: editRecord.entryEffectKey,
           exitEffectKey: editRecord.exitEffectKey,
           decisionSchemaKey: editRecord.decisionSchemaKey,
@@ -181,6 +184,7 @@ export const WorkflowStepFormModal: React.FC<WorkflowStepFormModalProps> = ({
     (items ?? []).map((i) => ({ value: i.key, label: `${i.displayName} (${i.key})` }));
 
   const guardOptions = toOptions(catalog?.guards);
+  const skipRuleOptions = toOptions(catalog?.skipRules);
   const effectOptions = toOptions(catalog?.effects);
   const schemaOptions = toOptions(catalog?.decisionSchemas);
   const noCatalog = entityType == null || !catalog;
@@ -267,6 +271,13 @@ export const WorkflowStepFormModal: React.FC<WorkflowStepFormModalProps> = ({
           tooltip="The step cannot be passed until this is true of the record. Management can override with a recorded reason."
         >
           <Select options={guardOptions} placeholder="None" allowClear disabled={noCatalog} showSearch optionFilterProp="label" />
+        </Form.Item>
+        <Form.Item
+          label="Skip this step when"
+          name="skipWhenKey"
+          tooltip="Some records never need this step at all — a grade the school does not interview for, say. When this is true the step is passed over automatically and the reason recorded; nobody is asked to dismiss it."
+        >
+          <Select options={skipRuleOptions} placeholder="Never skip" allowClear disabled={noCatalog} showSearch optionFilterProp="label" />
         </Form.Item>
         <div style={{ display: 'flex', gap: 16 }}>
           <Form.Item label="Effect on entering" name="entryEffectKey" style={{ flex: 1 }}>

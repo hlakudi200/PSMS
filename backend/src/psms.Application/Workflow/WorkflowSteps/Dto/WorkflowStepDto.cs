@@ -19,6 +19,7 @@ public class WorkflowStepDto : EntityDto<Guid>
     public long? AssignedUserId { get; set; }
     public int? SlaHours { get; set; }
     public string GuardKey { get; set; }
+    public string SkipWhenKey { get; set; }
     public string EntryEffectKey { get; set; }
     public string ExitEffectKey { get; set; }
     public string DecisionSchemaKey { get; set; }
