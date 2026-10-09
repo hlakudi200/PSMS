@@ -198,9 +198,23 @@ export default function AdmissionSettingsFormModal({
   }, [open, settings, defaultAcademicYearId, form]);
 
   const submit = async () => {
-    const parsed = schema.safeParse(form.getFieldsValue());
+    /* getFieldsValue() returns only the fields that are rendered, and the year
+       and grade are not when editing — a row's year and grade are what it is.
+       So the schema saw academicYearId as undefined and refused every edit.
+       The `true` asks for the whole store, including what setFieldsValue put
+       there for fields that are deliberately not on screen. */
+    const parsed = schema.safeParse(form.getFieldsValue(true));
+
     if (!parsed.success) {
-      setError(parsed.error.issues[0]?.message);
+      const issue = parsed.error.issues[0];
+      /* Zod describes the shape of the data, not what the person did wrong.
+         "Invalid input: expected string, received undefined" means nothing to
+         a principal, so only our own wording is worth showing. */
+      setError(
+        issue?.message && !/^Invalid input/i.test(issue.message)
+          ? issue.message
+          : 'Something on this form is not right. Check the dates and the fee, and try again.'
+      );
       return;
     }
 
