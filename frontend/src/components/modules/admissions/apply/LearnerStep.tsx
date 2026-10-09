@@ -6,7 +6,7 @@ import dayjs from 'dayjs';
 import type { IOpenIntake } from '@/providers/admissions/admission_settings/context';
 import { ageAgainstIntake, documentsAsList } from './schema';
 
-const { Text, Paragraph } = Typography;
+const { Text } = Typography;
 
 /**
  * Step one: who the learner is, and what they are applying for.
@@ -174,10 +174,6 @@ export default function LearnerStep({
       <Form.Item label="Previous school" name="previousSchool" extra="Leave empty if this is the learner's first school.">
         <Input placeholder="Name of the school they are coming from" />
       </Form.Item>
-
-      <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-        Nothing is sent to the school until you submit. You can close this page and come back to it.
-      </Paragraph>
     </Form>
   );
 }
