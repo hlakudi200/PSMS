@@ -25,7 +25,8 @@ export interface IApplicationActionContext {
   /** The applications this parent started. Always and only their own. */
   getMineAsync: () => Promise<void>;
   getAllAsync: (input?: IGetApplicationsInput) => void;
-  createAsync: (input: ICreateApplication) => void;
+  /** Returns the created application, because its id is needed straight away. */
+  createAsync: (input: ICreateApplication) => Promise<IApplication>;
   updateAsync: (id: string, input: IUpdateApplication) => void;
   deleteAsync: (id: string) => void;
   submitAsync: (id: string) => void;
