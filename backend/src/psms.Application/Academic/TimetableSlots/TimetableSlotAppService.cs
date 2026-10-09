@@ -5,6 +5,7 @@ using Abp.Domain.Repositories;
 using Abp.UI;
 using Microsoft.EntityFrameworkCore;
 using psms.Academic.Shared;
+using psms.Academic.Timetables;
 using psms.Academic.TimetableSlots.Dto;
 using psms.Authorization;
 using psms.Domain.Academic.Entities;
@@ -22,17 +23,20 @@ public class TimetableSlotAppService : ApplicationService, ITimetableSlotAppServ
     private readonly IRepository<Timetable, Guid> _timetableRepository;
     private readonly IRepository<Subject, Guid> _subjectRepository;
     private readonly IRepository<Teacher, Guid> _teacherRepository;
+    private readonly TimetableChangeNotifier _changeNotifier;
 
     public TimetableSlotAppService(
         IRepository<TimetableSlot, Guid> slotRepository,
         IRepository<Timetable, Guid> timetableRepository,
         IRepository<Subject, Guid> subjectRepository,
-        IRepository<Teacher, Guid> teacherRepository)
+        IRepository<Teacher, Guid> teacherRepository,
+        TimetableChangeNotifier changeNotifier)
     {
         _slotRepository = slotRepository;
         _timetableRepository = timetableRepository;
         _subjectRepository = subjectRepository;
         _teacherRepository = teacherRepository;
+        _changeNotifier = changeNotifier;
     }
 
     [AbpAuthorize(PermissionNames.Academic_Timetables_View)]
@@ -127,6 +131,9 @@ public class TimetableSlotAppService : ApplicationService, ITimetableSlotAppServ
         await _slotRepository.InsertAsync(slot);
         await CurrentUnitOfWork.SaveChangesAsync();
 
+        var timetable = await _timetableRepository.GetAsync(slot.TimetableId);
+        await _changeNotifier.SlotAddedAsync(timetable, slot);
+
         return await GetAsync(slot.Id);
     }
 
@@ -157,6 +164,13 @@ public class TimetableSlotAppService : ApplicationService, ITimetableSlotAppServ
             if (teacher == null)
                 throw new UserFriendlyException(AcademicExceptionCodes.TeacherNotFound, "Teacher not found.");
         }
+
+        // Snapshot for the change notice (US-TCH-013) before any field moves.
+        var before = new TimetableSlot(slot.Id, slot.TimetableId, slot.DayOfWeek, slot.PeriodNumber,
+            slot.StartTime, slot.EndTime, slot.SubjectId, slot.TeacherId)
+        {
+            RoomNumber = slot.RoomNumber
+        };
 
         if (input.StartTime.HasValue) slot.StartTime = input.StartTime.Value;
         if (input.EndTime.HasValue) slot.EndTime = input.EndTime.Value;
@@ -206,6 +220,8 @@ public class TimetableSlotAppService : ApplicationService, ITimetableSlotAppServ
         await _slotRepository.UpdateAsync(slot);
         await CurrentUnitOfWork.SaveChangesAsync();
 
+        await _changeNotifier.SlotChangedAsync(slot.Timetable, before, slot);
+
         return await GetAsync(id);
     }
 
@@ -221,6 +237,7 @@ public class TimetableSlotAppService : ApplicationService, ITimetableSlotAppServ
             throw new UserFriendlyException(AcademicExceptionCodes.TimetableSlotNotFound, "Timetable slot not found.");
 
         await _slotRepository.DeleteAsync(slot);
+        await _changeNotifier.SlotRemovedAsync(slot.Timetable, slot);
     }
 
     [AbpAuthorize(PermissionNames.Academic_Timetables_Create)]
@@ -286,6 +303,8 @@ public class TimetableSlotAppService : ApplicationService, ITimetableSlotAppServ
         }
 
         await CurrentUnitOfWork.SaveChangesAsync();
+
+        await _changeNotifier.SlotsAddedAsync(timetable, createdSlots);
 
         // Reload with navigation properties
         var slotIds = createdSlots.Select(s => s.Id).ToList();

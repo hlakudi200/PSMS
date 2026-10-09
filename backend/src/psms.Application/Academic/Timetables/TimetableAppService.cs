@@ -24,17 +24,31 @@ public class TimetableAppService : ApplicationService, ITimetableAppService
     private readonly IRepository<Class, Guid> _classRepository;
     private readonly IRepository<ClassSubject, Guid> _classSubjectRepository;
     private readonly IRepository<TimetableSlot, Guid> _slotRepository;
+    private readonly TimetableChangeNotifier _changeNotifier;
 
     public TimetableAppService(
         IRepository<Timetable, Guid> timetableRepository,
         IRepository<Class, Guid> classRepository,
         IRepository<ClassSubject, Guid> classSubjectRepository,
-        IRepository<TimetableSlot, Guid> slotRepository)
+        IRepository<TimetableSlot, Guid> slotRepository,
+        TimetableChangeNotifier changeNotifier)
     {
         _timetableRepository = timetableRepository;
         _classRepository = classRepository;
         _classSubjectRepository = classSubjectRepository;
         _slotRepository = slotRepository;
+        _changeNotifier = changeNotifier;
+    }
+
+    private async Task<List<Guid>> TeacherIdsOnAsync(IEnumerable<Guid> timetableIds)
+    {
+        var ids = timetableIds.ToList();
+        return await _slotRepository
+            .GetAll()
+            .Where(s => ids.Contains(s.TimetableId))
+            .Select(s => s.TeacherId)
+            .Distinct()
+            .ToListAsync();
     }
 
     [AbpAuthorize(PermissionNames.Academic_Timetables_View)]
@@ -199,6 +213,12 @@ public class TimetableAppService : ApplicationService, ITimetableAppService
         await _timetableRepository.UpdateAsync(timetable);
         await CurrentUnitOfWork.SaveChangesAsync();
 
+        // Everyone teaching on the new timetable or the one it replaced has a
+        // changed schedule (US-TCH-013).
+        var affectedTeachers = await TeacherIdsOnAsync(
+            activeTimetables.Select(t => t.Id).Append(timetable.Id));
+        await _changeNotifier.TimetableSwitchedAsync(timetable, affectedTeachers, activated: true);
+
         return await GetAsync(id);
     }
 
@@ -218,6 +238,9 @@ public class TimetableAppService : ApplicationService, ITimetableAppService
 
         await _timetableRepository.UpdateAsync(timetable);
         await CurrentUnitOfWork.SaveChangesAsync();
+
+        await _changeNotifier.TimetableSwitchedAsync(
+            timetable, await TeacherIdsOnAsync(new[] { timetable.Id }), activated: false);
 
         return await GetAsync(id);
     }
