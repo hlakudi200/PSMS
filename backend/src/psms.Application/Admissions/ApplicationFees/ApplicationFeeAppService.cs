@@ -1,8 +1,9 @@
-using Abp.Application.Services;
+﻿using Abp.Application.Services;
 using Abp.Authorization;
 using Abp.Domain.Repositories;
 using Abp.UI;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using psms.Admissions.ApplicationFees.Dto;
 using psms.Admissions.Shared;
 using psms.Authorization;
@@ -26,17 +27,20 @@ public class ApplicationFeeAppService : ApplicationService, IApplicationFeeAppSe
     private readonly IRepository<Application, Guid> _applicationRepository;
     private readonly IRepository<Domain.Admissions.Entities.AdmissionSettings, Guid> _settingsRepository;
     private readonly WorkflowStarterService _workflowStarter;
+    private readonly IConfiguration _configuration;
 
     public ApplicationFeeAppService(
         IRepository<ApplicationFee, Guid> feeRepository,
         IRepository<Application, Guid> applicationRepository,
         IRepository<Domain.Admissions.Entities.AdmissionSettings, Guid> settingsRepository,
-        WorkflowStarterService workflowStarter)
+        WorkflowStarterService workflowStarter,
+        IConfiguration configuration)
     {
         _feeRepository = feeRepository;
         _applicationRepository = applicationRepository;
         _settingsRepository = settingsRepository;
         _workflowStarter = workflowStarter;
+        _configuration = configuration;
     }
 
     [AbpAuthorize(PermissionNames.Admissions_Applications_View)]
@@ -55,6 +59,78 @@ public class ApplicationFeeAppService : ApplicationService, IApplicationFeeAppSe
         return dto;
     }
 
+    /// <summary>
+    /// Which payment gateway this deployment is wired to. There is no real one
+    /// yet; see <see cref="PaymentGatewayMode"/>.
+    /// </summary>
+    public PaymentGatewayMode GatewayMode =>
+        Enum.TryParse<PaymentGatewayMode>(_configuration["Admissions:PaymentGateway"], ignoreCase: true, out var mode)
+            ? mode
+            : PaymentGatewayMode.Simulated;
+
+    /// <summary>
+    /// What the applicant needs in order to deal with the fee: how much, what
+    /// state it is in, and whether there is anything online to click.
+    /// </summary>
+    [AbpAuthorize(PermissionNames.Admissions_Applications_View)]
+    public async Task<ApplicationFeeCheckoutDto> GetCheckoutAsync(Guid applicationId)
+    {
+        var application = await _applicationRepository.GetAsync(applicationId);
+        var settings = await GetAdmissionSettingsAsync(application.AcademicYearId, application.AppliedGradeId);
+        var fee = await _feeRepository.FirstOrDefaultAsync(f => f.ApplicationId == applicationId);
+
+        return new ApplicationFeeCheckoutDto
+        {
+            ApplicationId = applicationId,
+            ApplicationNumber = application.ApplicationNumber,
+            FeeRequired = settings.RequiresApplicationFee(),
+            Amount = settings.ApplicationFeeAmount,
+            Currency = fee?.Currency ?? "ZAR",
+            Status = fee?.Status ?? PaymentStatus.Pending,
+            PaymentReference = fee?.PaymentReference,
+            ReceiptNumber = fee?.ReceiptNumber,
+            PaymentDate = fee?.PaymentDate,
+            AwaitingPayment = application.Status == ApplicationStatus.PaymentPending,
+            GatewayMode = GatewayMode,
+            IsSimulated = GatewayMode == PaymentGatewayMode.Simulated,
+        };
+    }
+
+    /// <summary>
+    /// Settles the fee through the stand-in gateway, so the admissions journey
+    /// can be walked from end to end before a real one is chosen.
+    /// <para>
+    /// <b>No money moves.</b> It is refused outright unless this deployment is
+    /// configured for the simulated gateway, and everything it writes says so —
+    /// the payment method, the reference and the receipt number all carry
+    /// SIMULATED, so a row in the finance export can never be mistaken for a
+    /// payment the school actually received.
+    /// </para>
+    /// </summary>
+    [AbpAuthorize(PermissionNames.Admissions_Applications_Submit)]
+    public async Task<PaymentResultDto> SimulatePaymentAsync(Guid applicationId)
+    {
+        if (GatewayMode != PaymentGatewayMode.Simulated)
+            throw new UserFriendlyException(AdmissionsExceptionCodes.PaymentGatewayNotAvailable,
+                "Online payment is not available for this school. Pay the application fee by EFT "
+                + "or at the school office, and they will record it against your application.");
+
+        var application = await _applicationRepository.GetAsync(applicationId);
+
+        if (application.Status != ApplicationStatus.PaymentPending)
+            throw new UserFriendlyException(AdmissionsExceptionCodes.FeeAlreadyPaid,
+                "This application is not waiting for payment.");
+
+        var reference = $"SIMULATED-{DateTime.UtcNow:yyyyMMddHHmmss}";
+
+        return await SettleAsync(application, new RecordPaymentDto
+        {
+            PaymentMethod = SouthAfricanPaymentMethod.CreditCard,
+            PaymentReference = reference,
+            ReceiptNumber = $"SIMULATED-{GenerateReceiptNumber()}",
+        });
+    }
+
     [AbpAuthorize(PermissionNames.Financial_Payments_RecordManual)]
     public async Task<PaymentResultDto> RecordPaymentAsync(Guid applicationId, RecordPaymentDto input)
     {
@@ -64,21 +140,32 @@ public class ApplicationFeeAppService : ApplicationService, IApplicationFeeAppSe
             throw new UserFriendlyException(AdmissionsExceptionCodes.FeeAlreadyPaid,
                 "Application is not in payment pending status.");
 
-        var fee = await _feeRepository.FirstOrDefaultAsync(f => f.ApplicationId == applicationId);
+        return await SettleAsync(application, input);
+    }
+
+    /// <summary>
+    /// Marks the fee settled and moves the application into review.
+    /// <para>
+    /// Shared by the office recording a payment it received and by the stand-in
+    /// gateway, because what happens to the application afterwards is the same
+    /// either way and should not be written twice.
+    /// </para>
+    /// </summary>
+    private async Task<PaymentResultDto> SettleAsync(Application application, RecordPaymentDto input)
+    {
+        var fee = await _feeRepository.FirstOrDefaultAsync(f => f.ApplicationId == application.Id);
         var isNewFee = fee == null;
 
         if (isNewFee)
         {
-            // Create fee record
             var settings = await GetAdmissionSettingsAsync(application.AcademicYearId, application.AppliedGradeId);
             fee = new ApplicationFee(
                 Guid.NewGuid(),
-                applicationId,
+                application.Id,
                 settings.ApplicationFeeAmount,
                 "ZAR") { TenantId = AbpSession.TenantId };
         }
 
-        // Record payment
         fee.Status = PaymentStatus.Completed;
         fee.PaymentMethod = input.PaymentMethod;
         fee.PaymentReference = input.PaymentReference;
@@ -90,7 +177,6 @@ public class ApplicationFeeAppService : ApplicationService, IApplicationFeeAppSe
         else
             await _feeRepository.UpdateAsync(fee);
 
-        // Update application status: PaymentPending → UnderReview
         // Backfill TenantId if NULL (pre-fix records)
         if (application.TenantId == null) application.TenantId = AbpSession.TenantId;
         application.MarkPaymentReceived();
@@ -98,26 +184,27 @@ public class ApplicationFeeAppService : ApplicationService, IApplicationFeeAppSe
 
         await CurrentUnitOfWork.SaveChangesAsync();
 
-        // Auto-start admissions workflow (silently skips if no definition configured)
+        // Review is what the admissions workflow is for. Never allowed to fail
+        // the payment: money that was received stays received.
         try
         {
             await _workflowStarter.TryStartWorkflowAsync(
                 AbpSession.TenantId,
                 WorkflowEntityType.Application,
-                applicationId,
-                AbpSession.UserId.Value,
-                AbpSession.UserId.Value.ToString());
+                application.Id,
+                AbpSession.UserId ?? 0,
+                (AbpSession.UserId ?? 0).ToString());
         }
         catch (Exception ex)
         {
-            Logger.Warn($"Could not auto-start workflow for application {applicationId}: {ex.Message}");
+            Logger.Warn($"Could not auto-start workflow for application {application.Id}: {ex.Message}");
         }
 
         return new PaymentResultDto
         {
             Success = true,
             Message = "Payment recorded successfully.",
-            ApplicationId = applicationId,
+            ApplicationId = application.Id,
             FeeId = fee.Id,
             PaymentReference = fee.PaymentReference,
             Status = fee.Status,

@@ -34,6 +34,9 @@ export interface IAdmissionSettings {
   isCapacityFull: boolean;
   applicationFeeAmount: number;
   applicationFeeDisplay: string;
+  /** Whether a fee has to be paid before the school looks at an application.
+   *  The amount is kept when this is off, so turning it back on costs nothing. */
+  isApplicationFeeRequired: boolean;
   isInterviewRequired: boolean;
   isAssessmentRequired: boolean;
   offerExpiryDays: number;
@@ -47,6 +50,7 @@ export interface ICreateAdmissionSettings {
   academicYearId: string;
   gradeId?: string;
   applicationFeeAmount: number;
+  isApplicationFeeRequired?: boolean;
   maxCapacity?: number;
   applicationOpenDate?: string;
   applicationCloseDate?: string;
@@ -62,6 +66,7 @@ export interface ICreateAdmissionSettings {
 
 export interface IUpdateAdmissionSettings {
   applicationFeeAmount?: number;
+  isApplicationFeeRequired?: boolean;
   maxCapacity?: number;
   applicationOpenDate?: string;
   applicationCloseDate?: string;

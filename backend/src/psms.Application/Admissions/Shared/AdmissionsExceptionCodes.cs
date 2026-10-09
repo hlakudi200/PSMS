@@ -1,4 +1,4 @@
-namespace psms.Admissions.Shared;
+﻿namespace psms.Admissions.Shared;
 
 /// <summary>
 /// Exception codes for the Admissions module.
@@ -67,6 +67,12 @@ public static class AdmissionsExceptionCodes
     public const string AdmissionSettingsNotFound = "ADM_SETTINGS_NOT_FOUND";
     public const string ApplicationsNotOpen = "ADM_APPLICATIONS_NOT_OPEN";
     public const string FeeAlreadyPaid = "ADM_FEE_ALREADY_PAID";
+
+    /// <summary>
+    /// This deployment has no online payment to offer. The fee is paid by EFT
+    /// or at the school and recorded by the office.
+    /// </summary>
+    public const string PaymentGatewayNotAvailable = "ADM_PAYMENT_GATEWAY_NOT_AVAILABLE";
     public const string InterviewNotFound = "ADM_INTERVIEW_NOT_FOUND";
     public const string InterviewAlreadyScheduled = "ADM_INTERVIEW_ALREADY_SCHEDULED";
     public const string InsufficientInterviewNotice = "ADM_INSUFFICIENT_INTERVIEW_NOTICE";

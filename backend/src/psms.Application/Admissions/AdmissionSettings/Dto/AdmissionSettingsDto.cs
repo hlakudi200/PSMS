@@ -1,4 +1,4 @@
-using Abp.Application.Services.Dto;
+﻿using Abp.Application.Services.Dto;
 using System;
 
 namespace psms.Admissions.AdmissionSettings.Dto;
@@ -32,6 +32,13 @@ public class AdmissionSettingsDto : FullAuditedEntityDto<Guid>
     // Fees (ADM-006)
     public decimal ApplicationFeeAmount { get; set; }
     public string ApplicationFeeDisplay => $"R {ApplicationFeeAmount:N2}";
+
+    /// <summary>
+    /// Whether a fee has to be paid before the school will look at an
+    /// application. Not every school charges one, and a school that does may
+    /// waive it for a year or a grade.
+    /// </summary>
+    public bool IsApplicationFeeRequired { get; set; } = true;
 
     // Interview Settings (ADM-011)
     public bool IsInterviewRequired { get; set; }
