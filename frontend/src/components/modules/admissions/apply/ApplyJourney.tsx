@@ -4,7 +4,9 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert, Button, Card, Empty, Form, List, Space, Spin, Steps, Tag, Typography, message,
 } from 'antd';
-import { ArrowLeftOutlined, ArrowRightOutlined, LogoutOutlined, PlusOutlined } from '@ant-design/icons';
+import {
+  ArrowLeftOutlined, ArrowRightOutlined, ClockCircleOutlined, LogoutOutlined, PlusOutlined,
+} from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { ProtectedRoute } from '@/components/shared/ProtectedRoute';
 import { useAuthActions } from '@/providers/auth';
@@ -208,13 +210,41 @@ function ApplyContent() {
     }
   };
 
+  const backToList = () => {
+    setWorkingOn(null);
+    setStarting(false);
+    setStep(0);
+    setError(undefined);
+    form.resetFields();
+  };
+
   const next = async () => {
-    if (step === 0) {
+    /* A sent application has nothing to save — the server refuses to edit one,
+       and offering "Save and continue" on it produced an error for pressing the
+       obvious button. */
+    if (step === 0 && !locked) {
       const ok = await saveLearner();
       if (!ok) return;
     }
     setError(undefined);
     setStep((s) => Math.min(s + 1, 3));
+  };
+
+  /**
+   * Leave, and come back to it.
+   *
+   * The learner's details live in the form until something saves them, so
+   * leaving from that step saves first. Parents and documents are written the
+   * moment they are added, so from those steps there is nothing pending and
+   * this is simply the way out.
+   */
+  const finishLater = async () => {
+    if (step === 0 && !locked) {
+      const ok = await saveLearner();
+      if (!ok) return;
+    }
+    message.success('Saved. Carry on whenever you like.');
+    backToList();
   };
 
   /* ---------- the list of what this parent has started ---------- */
@@ -295,15 +325,7 @@ function ApplyContent() {
   return (
     <div style={{ maxWidth: 900, margin: '0 auto', padding: '32px 16px' }}>
       <Space style={{ width: '100%', justifyContent: 'space-between', marginBottom: 16 }}>
-        <Button
-          icon={<ArrowLeftOutlined />}
-          onClick={() => {
-            setWorkingOn(null);
-            setStarting(false);
-            setStep(0);
-            form.resetFields();
-          }}
-        >
+        <Button icon={<ArrowLeftOutlined />} onClick={backToList}>
           My applications
         </Button>
         {current?.applicationNumber && <Text type="secondary">{current.applicationNumber}</Text>}
@@ -320,6 +342,13 @@ function ApplyContent() {
           { title: 'Review' },
         ]}
       />
+
+      {!locked && (
+        <Paragraph type="secondary" style={{ marginTop: -8, marginBottom: 16 }}>
+          Your answers are kept as you go. You can leave this page and carry on later —
+          nothing reaches the school until you submit it.
+        </Paragraph>
+      )}
 
       {error && (
         <Alert type="error" showIcon message={error} closable onClose={() => setError(undefined)} style={{ marginBottom: 16 }} />
@@ -362,11 +391,16 @@ function ApplyContent() {
       </Card>
 
       {step < 3 && (
-        <Space style={{ marginTop: 16 }}>
+        <Space style={{ marginTop: 16 }} wrap>
           {step > 0 && <Button onClick={() => setStep((s) => s - 1)}>Back</Button>}
           <Button type="primary" icon={<ArrowRightOutlined />} loading={saving} onClick={next}>
-            {step === 0 ? 'Save and continue' : 'Continue'}
+            {step === 0 && !locked ? 'Save and continue' : 'Continue'}
           </Button>
+          {!locked && workingOn && (
+            <Button icon={<ClockCircleOutlined />} loading={saving} onClick={finishLater}>
+              {step === 0 ? 'Save and finish later' : 'Finish later'}
+            </Button>
+          )}
         </Space>
       )}
     </div>
