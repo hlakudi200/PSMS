@@ -214,9 +214,11 @@ export default function LoginPage() {
 
           <div className={styles.footer}>
             <div className={styles.help}>
-              <a href="#">Forgot Password?</a>
+              {/* A parent who has never dealt with the school has no account and
+                  no way to ask for one. This is the only place they will look. */}
+              <a href="/auth/register">Applying to the school?</a>
               <span className={styles.separator}>|</span>
-              <a href="#">Need Help?</a>
+              <a href="#">Forgot Password?</a>
             </div>
           </div>
 
