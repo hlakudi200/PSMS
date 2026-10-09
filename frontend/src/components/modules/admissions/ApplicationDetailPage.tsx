@@ -56,16 +56,61 @@ import type {
 const { Title, Text } = Typography;
 
 const statusSteps = ['Draft', 'Submitted', 'UnderReview', 'Approved', 'Enrolled'];
-const statusStepIndex: Record<string, number> = {
-  Draft: 0, Submitted: 1, UnderReview: 2, Approved: 3, Enrolled: 4,
-  Rejected: -1, Waitlisted: -1, Withdrawn: -1,
+/* ApplicationStatus as the API sends it. These were keyed by name — "Draft",
+   "Rejected" — against a field that arrives as a number, so every lookup fell
+   through to its default and every comparison was permanently false: a
+   rejected application never showed its rejection banner, and a waitlisted one
+   never showed its place. */
+const ApplicationStatus = {
+  Draft: 1,
+  Submitted: 2,
+  PaymentPending: 3,
+  UnderReview: 4,
+  InterviewScheduled: 5,
+  AssessmentScheduled: 6,
+  DecisionPending: 7,
+  Approved: 8,
+  Waitlisted: 9,
+  Rejected: 10,
+  OfferAccepted: 11,
+  OfferDeclined: 12,
+  Withdrawn: 13,
+  Enrolled: 14,
+} as const;
+
+const statusStepIndex: Record<number, number> = {
+  [ApplicationStatus.Draft]: 0,
+  [ApplicationStatus.Submitted]: 1,
+  [ApplicationStatus.PaymentPending]: 1,
+  [ApplicationStatus.UnderReview]: 2,
+  [ApplicationStatus.InterviewScheduled]: 2,
+  [ApplicationStatus.AssessmentScheduled]: 2,
+  [ApplicationStatus.DecisionPending]: 2,
+  [ApplicationStatus.Approved]: 3,
+  [ApplicationStatus.OfferAccepted]: 3,
+  [ApplicationStatus.Enrolled]: 4,
+  [ApplicationStatus.Rejected]: -1,
+  [ApplicationStatus.Waitlisted]: -1,
+  [ApplicationStatus.Withdrawn]: -1,
+  [ApplicationStatus.OfferDeclined]: -1,
 };
 
-function getStatusColor(status: string): string {
-  const map: Record<string, string> = {
-    Draft: 'default', Submitted: 'blue', UnderReview: 'orange',
-    Approved: 'green', Rejected: 'red', Waitlisted: 'gold',
-    Enrolled: 'purple', Withdrawn: 'default',
+function getStatusColor(status: number): string {
+  const map: Record<number, string> = {
+    [ApplicationStatus.Draft]: 'default',
+    [ApplicationStatus.Submitted]: 'blue',
+    [ApplicationStatus.PaymentPending]: 'gold',
+    [ApplicationStatus.UnderReview]: 'orange',
+    [ApplicationStatus.InterviewScheduled]: 'orange',
+    [ApplicationStatus.AssessmentScheduled]: 'orange',
+    [ApplicationStatus.DecisionPending]: 'orange',
+    [ApplicationStatus.Approved]: 'green',
+    [ApplicationStatus.Waitlisted]: 'gold',
+    [ApplicationStatus.Rejected]: 'red',
+    [ApplicationStatus.OfferAccepted]: 'green',
+    [ApplicationStatus.OfferDeclined]: 'default',
+    [ApplicationStatus.Withdrawn]: 'default',
+    [ApplicationStatus.Enrolled]: 'purple',
   };
   return map[status] ?? 'default';
 }
@@ -430,7 +475,9 @@ function ApplicationDetailContent() {
 
   const app = application;
   const currentStep = statusStepIndex[app.status] ?? 0;
-  const isTerminal = ['Rejected', 'Withdrawn'].includes(app.status);
+  const isTerminal = [ApplicationStatus.Rejected, ApplicationStatus.Withdrawn].includes(
+    app.status as (typeof ApplicationStatus)['Rejected' | 'Withdrawn']
+  );
 
   const tabItems = [
     {
@@ -504,7 +551,7 @@ function ApplicationDetailContent() {
 
       {isTerminal && (
         <Alert
-          type={app.status === 'Rejected' ? 'error' : 'warning'}
+          type={app.status === ApplicationStatus.Rejected ? 'error' : 'warning'}
           showIcon
           message={`Application ${app.statusDisplayName}`}
           description={app.decisionReason || undefined}
@@ -512,7 +559,7 @@ function ApplicationDetailContent() {
         />
       )}
 
-      {app.status === 'Waitlisted' && (
+      {app.status === ApplicationStatus.Waitlisted && (
         <Alert
           type="info"
           showIcon

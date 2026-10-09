@@ -76,6 +76,20 @@ export const ApplicationFeeProvider = ({
       });
   };
 
+  const getCheckoutAsync = async (applicationId: string) => {
+    const response = await instance.get(
+      `/api/services/app/ApplicationFee/GetCheckout?applicationId=${applicationId}`
+    );
+    return response.data?.result;
+  };
+
+  /** No money moves; the server refuses this unless the stand-in is configured. */
+  const simulatePaymentAsync = async (applicationId: string) => {
+    await instance.post(
+      `/api/services/app/ApplicationFee/SimulatePayment?applicationId=${applicationId}`
+    );
+  };
+
   const getPaymentStatusAsync = async (applicationId: string) => {
     dispatch(getPaymentStatusPending());
     const endpoint = `/api/services/app/ApplicationFee/GetPaymentStatus?applicationId=${applicationId}`;
@@ -97,6 +111,8 @@ export const ApplicationFeeProvider = ({
           getByApplicationAsync,
           recordPaymentAsync,
           processPaymentCallbackAsync,
+          getCheckoutAsync,
+          simulatePaymentAsync,
           getPaymentStatusAsync,
         }}
       >

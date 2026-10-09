@@ -22,6 +22,8 @@ export interface IApplicationStateContext {
 export interface IApplicationActionContext {
   getAsync: (id: string) => void;
   getByApplicationNumberAsync: (applicationNumber: string) => void;
+  /** The applications this parent started. Always and only their own. */
+  getMineAsync: () => Promise<void>;
   getAllAsync: (input?: IGetApplicationsInput) => void;
   createAsync: (input: ICreateApplication) => void;
   updateAsync: (id: string, input: IUpdateApplication) => void;
