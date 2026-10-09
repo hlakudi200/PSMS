@@ -28,6 +28,7 @@ import {
   AudioOutlined,
   FormOutlined,
   DollarOutlined,
+  CalendarOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { ApplicationProvider, useApplicationState, useApplicationActions } from '@/providers/admissions/applications';
@@ -53,9 +54,15 @@ import type {
   IAdmissionAssessment,
 } from '@/providers/admissions/shared/interfaces';
 import {
+  interviewStatusColour,
+  interviewStatusLabel,
+} from '@/providers/admissions/shared/interfaces';
+import {
   ApplicationStatus,
   applicationStepIndex,
 } from '@/providers/admissions/shared/application-status';
+import { useAuthState } from '@/providers/auth';
+import ScheduleInterviewModal from '@/components/modals/admissions/ScheduleInterviewModal';
 
 const { Title, Text } = Typography;
 
@@ -205,33 +212,79 @@ function DocumentsSection({ applicationId }: { applicationId: string }) {
 }
 
 // ─── Interview Tab ─────────────────────────────────────────────
-function InterviewSection({ applicationId }: { applicationId: string }) {
+function InterviewSection({
+  applicationId,
+  applicantName,
+}: {
+  applicationId: string;
+  applicantName?: string;
+}) {
   const { interview: admissionInterview, isPending } = useAdmissionInterviewState();
   const { getByApplicationAsync } = useAdmissionInterviewActions();
+  const { currentRole } = useAuthState();
+  const [scheduling, setScheduling] = useState(false);
 
   useEffect(() => {
     getByApplicationAsync(applicationId);
   }, [applicationId, getByApplicationAsync]);
 
+  /* The roles the school grants Admissions.Interviews.Schedule to. The server
+     is the authority and refuses anyone else; this only decides whether to
+     offer the button. */
+  const maySchedule = ['Admin', 'Principal', 'VicePrincipal', 'AdmissionsOfficer']
+    .includes(currentRole ?? '');
+
+  const scheduleModal = (
+    <ScheduleInterviewModal
+      open={scheduling}
+      applicationId={applicationId}
+      applicantName={applicantName}
+      onClose={() => setScheduling(false)}
+      onScheduled={() => getByApplicationAsync(applicationId)}
+    />
+  );
+
   if (isPending) return <Spin />;
-  if (!admissionInterview) return <Empty description="No interview scheduled" image={Empty.PRESENTED_IMAGE_SIMPLE} />;
+
+  /* Until now this said "No interview scheduled" and stopped there — the
+     Schedule endpoint existed and nothing called it, so an interview could
+     not be arranged from anywhere in the application. */
+  if (!admissionInterview) {
+    return (
+      <>
+        <Empty description="No interview scheduled" image={Empty.PRESENTED_IMAGE_SIMPLE}>
+          {maySchedule && (
+            <Button type="primary" icon={<CalendarOutlined />} onClick={() => setScheduling(true)}>
+              Schedule an interview
+            </Button>
+          )}
+        </Empty>
+        {scheduleModal}
+      </>
+    );
+  }
 
   const iv = admissionInterview as IAdmissionInterview;
   return (
-    <Descriptions bordered size="small" column={{ xs: 1, sm: 2 }}>
-      <Descriptions.Item label="Date">{dayjs(iv.scheduledDate).format('DD MMM YYYY')}</Descriptions.Item>
-      <Descriptions.Item label="Time">{iv.scheduledTime}</Descriptions.Item>
-      <Descriptions.Item label="Interviewer">{iv.interviewerName}</Descriptions.Item>
-      <Descriptions.Item label="Status"><Tag color={iv.statusDisplayName === 'Completed' ? 'green' : 'blue'}>{iv.statusDisplayName}</Tag></Descriptions.Item>
-      <Descriptions.Item label="Location">{iv.location || iv.meetingLink || 'Not specified'}</Descriptions.Item>
-      {iv.rating != null && <Descriptions.Item label="Rating">{iv.rating} / 5</Descriptions.Item>}
-      {iv.recommended != null && (
-        <Descriptions.Item label="Recommended">
-          <Tag color={iv.recommended ? 'green' : 'red'}>{iv.recommended ? 'Yes' : 'No'}</Tag>
+    <>
+      <Descriptions bordered size="small" column={{ xs: 1, sm: 2 }}>
+        <Descriptions.Item label="Date">{dayjs(iv.scheduledDate).format('DD MMM YYYY')}</Descriptions.Item>
+        <Descriptions.Item label="Time">{iv.scheduledTime?.slice(0, 5)}</Descriptions.Item>
+        <Descriptions.Item label="Interviewer">{iv.interviewerName || '—'}</Descriptions.Item>
+        <Descriptions.Item label="Status">
+          <Tag color={interviewStatusColour(iv.status)}>{interviewStatusLabel(iv.status)}</Tag>
         </Descriptions.Item>
-      )}
-      {iv.notes && <Descriptions.Item label="Notes" span={2}>{iv.notes}</Descriptions.Item>}
-    </Descriptions>
+        <Descriptions.Item label="Location">{iv.location || iv.meetingLink || 'Not specified'}</Descriptions.Item>
+        {iv.rating != null && <Descriptions.Item label="Rating">{iv.rating} / 5</Descriptions.Item>}
+        {iv.recommended != null && (
+          <Descriptions.Item label="Recommended">
+            <Tag color={iv.recommended ? 'green' : 'red'}>{iv.recommended ? 'Yes' : 'No'}</Tag>
+          </Descriptions.Item>
+        )}
+        {iv.notes && <Descriptions.Item label="Notes" span={2}>{iv.notes}</Descriptions.Item>}
+      </Descriptions>
+      {scheduleModal}
+    </>
   );
 }
 
@@ -467,7 +520,7 @@ function ApplicationDetailContent() {
     {
       key: 'interview',
       label: <span><AudioOutlined /> Interview</span>,
-      children: <InterviewSection applicationId={applicationId} />,
+      children: <InterviewSection applicationId={applicationId} applicantName={app.fullName} />,
     },
     {
       key: 'assessment',

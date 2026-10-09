@@ -470,7 +470,8 @@ export interface IAdmissionInterview {
   meetingLink?: string;
   interviewerUserId: number;
   interviewerName: string;
-  status: string;
+  /** InterviewStatus, which arrives as a number — see InterviewStatus below. */
+  status: number;
   statusDisplayName: string;
   completedDate?: string;
   rating?: number;
@@ -483,12 +484,49 @@ export interface IAdmissionInterview {
   canCancel: boolean;
 }
 
+/** psms.Domain.Shared.Enums.InterviewStatus, as the API sends it. */
+export const InterviewStatus = {
+  Scheduled: 1,
+  Rescheduled: 2,
+  Completed: 3,
+  Cancelled: 4,
+  NoShow: 5,
+} as const;
+
+export const interviewStatusLabel = (status: number): string =>
+  ({
+    [InterviewStatus.Scheduled]: 'Scheduled',
+    [InterviewStatus.Rescheduled]: 'Rescheduled',
+    [InterviewStatus.Completed]: 'Completed',
+    [InterviewStatus.Cancelled]: 'Cancelled',
+    [InterviewStatus.NoShow]: 'Did not attend',
+  })[status] ?? 'Scheduled';
+
+export const interviewStatusColour = (status: number): string =>
+  ({
+    [InterviewStatus.Scheduled]: 'blue',
+    [InterviewStatus.Rescheduled]: 'gold',
+    [InterviewStatus.Completed]: 'green',
+    [InterviewStatus.Cancelled]: 'default',
+    [InterviewStatus.NoShow]: 'red',
+  })[status] ?? 'default';
+
+/** Somebody the school may put down to conduct an interview. */
+export interface IInterviewer {
+  userId: number;
+  name: string;
+  emailAddress?: string;
+  roles: string[];
+  upcomingInterviews: number;
+}
+
 export interface IScheduleInterview {
   applicationId: string;
   scheduledDate: string;
   scheduledTime: string;
   interviewerUserId: number;
-  interviewerName: string;
+  /** Ignored by the server, which uses the school's own record of this person. */
+  interviewerName?: string;
   location?: string;
   meetingLink?: string;
   notes?: string;

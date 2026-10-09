@@ -147,7 +147,12 @@ public class AdmissionsMapper : Profile
             .ForMember(dest => dest.GradeName, opt => opt.MapFrom(src => src.Application != null && src.Application.AppliedGrade != null
                 ? src.Application.AppliedGrade.GradeName
                 : null))
-            .ForMember(dest => dest.InterviewerName, opt => opt.Ignore()); // Set in service
+            /* InterviewerName was ignored here with a note saying the service
+               would set it. No service ever did, so every interview came back
+               with no interviewer — including the one shown on the application
+               page, which printed an empty cell. The entity has carried the
+               name since the interview was booked; map it. */
+            .ForMember(dest => dest.InterviewerName, opt => opt.MapFrom(src => src.InterviewerName));
 
         CreateMap<ScheduleInterviewDto, AdmissionInterview>()
             .ForMember(dest => dest.Id, opt => opt.Ignore())
