@@ -29,6 +29,12 @@ public interface IApplicationAppService : IApplicationService
     Task<ListResultDto<ApplicationListDto>> GetMineAsync();
 
     /// <summary>
+    /// What a prospective parent may apply for at this school, and on what
+    /// terms. Only intakes that are open and not full.
+    /// </summary>
+    Task<ListResultDto<psms.Admissions.AdmissionSettings.Dto.OpenIntakeDto>> GetOpenIntakesAsync();
+
+    /// <summary>
     /// Gets paginated list of applications with filters.
     /// </summary>
     Task<PagedResultDto<ApplicationListDto>> GetAllAsync(GetApplicationsInput input);

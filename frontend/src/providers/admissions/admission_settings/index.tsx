@@ -88,11 +88,16 @@ export const AdmissionSettingsProvider = ({
    * the same list read a different way.
    */
   /**
-   * What a prospective parent may apply for. Returned rather than dispatched:
-   * the apply screen is the only caller and wants it inline.
+   * What a prospective parent may apply for. Lives on the Application service,
+   * not this one: ABP checks the class-level permission as well as the
+   * method's, and AdmissionSettingsAppService is guarded by a permission no
+   * applicant holds.
+   *
+   * Returned rather than dispatched: the apply screen is the only caller and
+   * wants it inline.
    */
   const getOpenIntakesAsync = async () => {
-    const response = await instance.get('/api/services/app/AdmissionSettings/GetOpenIntakes');
+    const response = await instance.get('/api/services/app/Application/GetOpenIntakes');
     return response.data?.result?.items ?? [];
   };
 

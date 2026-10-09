@@ -32,12 +32,6 @@ public interface IAdmissionSettingsAppService : IApplicationService
     /// </summary>
     Task<ListResultDto<AdmissionSettingsDto>> GetAllAsync(Guid? academicYearId = null, Guid? gradeId = null);
 
-    /// <summary>
-    /// What a prospective parent may apply for at this school, and on what
-    /// terms. Only intakes that are open and not full.
-    /// </summary>
-    Task<ListResultDto<OpenIntakeDto>> GetOpenIntakesAsync();
-
     Task<ListResultDto<AdmissionSettingsDto>> GetAllByAcademicYearAsync(Guid academicYearId);
 
     /// <summary>

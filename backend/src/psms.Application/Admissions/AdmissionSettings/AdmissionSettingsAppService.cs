@@ -97,58 +97,6 @@ public class AdmissionSettingsAppService : ApplicationService, IAdmissionSetting
     /// at all.
     /// </para>
     /// </summary>
-    /// <summary>
-    /// What a prospective parent may apply for at this school, and on what
-    /// terms.
-    /// <para>
-    /// The application form needs an academic year and a grade. An applicant
-    /// holds neither <c>Academic.Calendar.View</c> nor
-    /// <c>Academic.Grades.View</c>, and should not: a parent applying has no
-    /// business reading the school's whole timetable of years and grades. So
-    /// the question is answered in admissions terms instead, and only for
-    /// intakes that are actually open.
-    /// </para>
-    /// <para>
-    /// Guarded by the permission to create an application rather than the one
-    /// to manage settings: this is for the person applying, not the person
-    /// configuring.
-    /// </para>
-    /// </summary>
-    [AbpAuthorize(PermissionNames.Admissions_Applications_Create)]
-    public async Task<ListResultDto<OpenIntakeDto>> GetOpenIntakesAsync()
-    {
-        var settings = await _settingsRepository
-            .GetAll()
-            .Include(s => s.AcademicYear)
-            .Include(s => s.Grade)
-            .ToListAsync();
-
-        var open = settings
-            .Where(x => x.AreApplicationsOpen() && !x.IsAtCapacity())
-            .OrderBy(x => x.AcademicYear.Year)
-            .ThenBy(x => x.GradeId == null ? 0 : 1)
-            .ThenBy(x => x.Grade == null ? 0 : (int)x.Grade.GradeLevel)
-            .Select(x => new OpenIntakeDto
-            {
-                AcademicYearId = x.AcademicYearId,
-                AcademicYearName = x.AcademicYear?.YearName,
-                GradeId = x.GradeId,
-                GradeName = x.Grade?.GradeName,
-                ApplicationCloseDate = x.ApplicationCloseDate,
-                FeeRequired = x.RequiresApplicationFee(),
-                FeeAmount = x.ApplicationFeeAmount,
-                IsInterviewRequired = x.IsInterviewRequired,
-                IsAssessmentRequired = x.IsAssessmentRequired,
-                MinimumAge = x.MinimumAge,
-                MaximumAge = x.MaximumAge,
-                RequiredDocuments = x.RequiredDocuments,
-                AvailableSpots = x.MaxCapacity.HasValue ? x.GetAvailableSpots() : (int?)null,
-            })
-            .ToList();
-
-        return new ListResultDto<OpenIntakeDto>(open);
-    }
-
     [AbpAuthorize(PermissionNames.Admissions_Settings_View)]
     public async Task<ListResultDto<AdmissionSettingsDto>> GetAllAsync(
         Guid? academicYearId = null, Guid? gradeId = null)
