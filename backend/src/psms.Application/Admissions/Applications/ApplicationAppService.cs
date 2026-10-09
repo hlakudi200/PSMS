@@ -10,6 +10,7 @@ using psms.Admissions.AdmissionSettings.Dto;
 using psms.Admissions.Applications.Dto;
 using psms.Admissions.Shared;
 using psms.Authorization;
+using psms.Shared;
 using psms.Domain.Admissions.Entities;
 using psms.Domain.Shared.Enums;
 using psms.Domain.Shared.Validators;
@@ -63,7 +64,7 @@ public class ApplicationAppService : ApplicationService, IApplicationAppService
 
         await AssertMineIfApplicantAsync(application);
 
-        return ObjectMapper.Map<ApplicationDto>(application);
+        return await MapForCallerAsync(application);
     }
 
     [AbpAuthorize(PermissionNames.Admissions_Applications_View)]
@@ -86,7 +87,7 @@ public class ApplicationAppService : ApplicationService, IApplicationAppService
 
         await AssertMineIfApplicantAsync(application);
 
-        return ObjectMapper.Map<ApplicationDto>(application);
+        return await MapForCallerAsync(application);
     }
 
     /// <summary>
@@ -324,10 +325,14 @@ public class ApplicationAppService : ApplicationService, IApplicationAppService
         if (input.Gender.HasValue)
             application.Gender = input.Gender.Value;
 
-        if (!string.IsNullOrWhiteSpace(input.IdNumber))
+        /* A mask that came from a read is not an edit. Whatever a client sends,
+           asterisks never replace a real identifier — a passport is not length
+           or checksum validated anywhere, so without this a screen that loaded
+           a record and saved it back would quietly write "****" over it. */
+        if (!string.IsNullOrWhiteSpace(input.IdNumber) && !PiiMasking.LooksMasked(input.IdNumber))
             application.IdNumber = input.IdNumber;
 
-        if (!string.IsNullOrWhiteSpace(input.PassportNumber))
+        if (!string.IsNullOrWhiteSpace(input.PassportNumber) && !PiiMasking.LooksMasked(input.PassportNumber))
             application.PassportNumber = input.PassportNumber;
 
         if (input.IsSACitizen.HasValue)
@@ -409,7 +414,7 @@ public class ApplicationAppService : ApplicationService, IApplicationAppService
         if (!feeRequired)
             await TryStartAdmissionsWorkflowAsync(application.Id);
 
-        return ObjectMapper.Map<ApplicationDto>(application);
+        return await MapForCallerAsync(application);
     }
 
     /// <summary>
@@ -516,6 +521,35 @@ public class ApplicationAppService : ApplicationService, IApplicationAppService
     /// which application numbers exist.
     /// </para>
     /// </summary>
+    /// <summary>
+    /// The application, with the identifiers shown to whoever may see them.
+    /// <para>
+    /// ID and passport numbers are masked on the way out — <c>*********5081</c>
+    /// — which is right for the school's lists and wrong for the one person who
+    /// typed them. A parent coming back to their own draft was shown the mask
+    /// in the ID field, and Save and continue then failed the thirteen-digit
+    /// check on a number they had entered correctly. They could not get past
+    /// it: the field refilled itself with the mask on every visit.
+    /// </para>
+    /// <para>
+    /// So the parent who created the application gets their own numbers back
+    /// in full. Everybody else still gets the mask.
+    /// </para>
+    /// </summary>
+    private async Task<ApplicationDto> MapForCallerAsync(Application application)
+    {
+        var dto = ObjectMapper.Map<ApplicationDto>(application);
+
+        var ownerOnly = await _currentApplicant.GetOwnApplicationsOnlyForAsync();
+        if (ownerOnly.HasValue && application.CreatorUserId == ownerOnly.Value)
+        {
+            dto.IdNumber = application.IdNumber;
+            dto.PassportNumber = application.PassportNumber;
+        }
+
+        return dto;
+    }
+
     private async Task AssertMineIfApplicantAsync(Application application)
     {
         var ownerOnly = await _currentApplicant.GetOwnApplicationsOnlyForAsync();

@@ -9,6 +9,7 @@ using psms.Admissions.Shared;
 using psms.Authorization;
 using psms.Domain.Admissions.Entities;
 using psms.Domain.Shared.Enums;
+using psms.Shared;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -25,27 +26,33 @@ public class ApplicantParentAppService : ApplicationService, IApplicantParentApp
 {
     private readonly IRepository<ApplicantParent, Guid> _parentRepository;
     private readonly IRepository<Application, Guid> _applicationRepository;
+    private readonly ICurrentApplicantResolver _currentApplicant;
 
     private const int MaxParentsPerApplication = 4;
 
     public ApplicantParentAppService(
         IRepository<ApplicantParent, Guid> parentRepository,
-        IRepository<Application, Guid> applicationRepository)
+        IRepository<Application, Guid> applicationRepository,
+        ICurrentApplicantResolver currentApplicant)
     {
         _parentRepository = parentRepository;
         _applicationRepository = applicationRepository;
+        _currentApplicant = currentApplicant;
     }
 
     [AbpAuthorize(PermissionNames.Admissions_Applications_View)]
     public async Task<ApplicantParentDto> GetAsync(Guid id)
     {
         var parent = await _parentRepository.GetAsync(id);
-        return ObjectMapper.Map<ApplicantParentDto>(parent);
+        var mine = await IsMineAsync(parent.ApplicationId);
+        return MapForCaller(parent, mine);
     }
 
     [AbpAuthorize(PermissionNames.Admissions_Applications_View)]
     public async Task<ListResultDto<ApplicantParentDto>> GetAllByApplicationAsync(Guid applicationId)
     {
+        var mine = await IsMineAsync(applicationId);
+
         var parents = await _parentRepository
             .GetAll()
             .Where(p => p.ApplicationId == applicationId)
@@ -54,7 +61,47 @@ public class ApplicantParentAppService : ApplicationService, IApplicantParentApp
             .ToListAsync();
 
         return new ListResultDto<ApplicantParentDto>(
-            ObjectMapper.Map<List<ApplicantParentDto>>(parents));
+            parents.Select(p => MapForCaller(p, mine)).ToList());
+    }
+
+    /// <summary>
+    /// Whether this application belongs to the caller, refusing outright if it
+    /// belongs to another family.
+    /// <para>
+    /// The application service learned to check this; its parents did not. An
+    /// applicant holds Applications.View so they can read their own, and these
+    /// calls took an id and answered — so a parent with any application id but
+    /// their own could read the other family's contact details, addresses,
+    /// employers and ID numbers.
+    /// </para>
+    /// </summary>
+    private async Task<bool> IsMineAsync(Guid applicationId)
+    {
+        var ownerOnly = await _currentApplicant.GetOwnApplicationsOnlyForAsync();
+        if (!ownerOnly.HasValue)
+            return false; // Staff: they may see it, but not unmasked.
+
+        var application = await _applicationRepository.FirstOrDefaultAsync(applicationId);
+        if (application == null || application.CreatorUserId != ownerOnly.Value)
+            throw new UserFriendlyException(AdmissionsExceptionCodes.ApplicationNotFound,
+                "Application not found.");
+
+        return true;
+    }
+
+    /// <summary>
+    /// ID numbers are masked on the way out, which leaves the parent who typed
+    /// one looking at <c>*****1234</c> in the field they are meant to edit —
+    /// and saving that form writes the asterisks over the real number. The
+    /// family who entered these gets them back in full; the school still sees
+    /// the mask.
+    /// </summary>
+    private ApplicantParentDto MapForCaller(ApplicantParent parent, bool mine)
+    {
+        var dto = ObjectMapper.Map<ApplicantParentDto>(parent);
+        if (mine)
+            dto.IdNumber = parent.IdNumber;
+        return dto;
     }
 
     [AbpAuthorize(PermissionNames.Admissions_Applications_Edit)]
@@ -111,7 +158,8 @@ public class ApplicantParentAppService : ApplicationService, IApplicantParentApp
         if (!string.IsNullOrWhiteSpace(input.LastName))
             parent.LastName = input.LastName;
 
-        if (input.IdNumber != null)
+        // Asterisks are a read artefact, never an edit. See PiiMasking.LooksMasked.
+        if (input.IdNumber != null && !PiiMasking.LooksMasked(input.IdNumber))
             parent.IdNumber = input.IdNumber;
 
         if (!string.IsNullOrWhiteSpace(input.Email))
