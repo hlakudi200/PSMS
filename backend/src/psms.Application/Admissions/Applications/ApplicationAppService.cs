@@ -444,7 +444,23 @@ public class ApplicationAppService : ApplicationService, IApplicationAppService
         if (application == null)
             throw new UserFriendlyException(AdmissionsExceptionCodes.ApplicationNotFound, "Application not found.");
 
-        application.Withdraw(reason);
+        /* The entity guards this itself and says no with an InvalidOperationException,
+           which would reach the parent as "An internal error occurred during your
+           request!". They are entitled to know which of the two it is: a learner
+           already enrolled, or an application already closed. */
+        try
+        {
+            application.Withdraw(reason);
+        }
+        catch (InvalidOperationException ex)
+        {
+            throw new UserFriendlyException(
+                AdmissionsExceptionCodes.ApplicationCannotBeWithdrawn,
+                application.Status == ApplicationStatus.Enrolled
+                    ? "This learner has already been enrolled, so the application can no longer be withdrawn. Speak to the school."
+                    : "This application has already been closed, so there is nothing to withdraw.",
+                ex);
+        }
 
         await _applicationRepository.UpdateAsync(application);
         await CurrentUnitOfWork.SaveChangesAsync();
