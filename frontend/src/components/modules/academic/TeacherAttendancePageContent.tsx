@@ -49,6 +49,7 @@ import {
   useAttendanceState,
 } from '@/providers/academic/attendances';
 import type { IStudentAttendanceEntry, IAttendanceList } from '@/providers/academic/shared/interfaces';
+import { useReplaceQuery } from '@/utils/use-replace-query';
 
 const { Title, Text } = Typography;
 
@@ -102,17 +103,33 @@ interface AttendanceRow {
   dirty?: boolean;
 }
 
+/**
+ * `?date=YYYY-MM-DD` from the URL, or today. A malformed or future date falls
+ * back to today rather than erroring — the picker can't select one either.
+ */
+function parseDateParam(value: string | null): Dayjs {
+  const today = dayjs().startOf('day');
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return today;
+  const parsed = dayjs(value);
+  if (!parsed.isValid() || parsed.format('YYYY-MM-DD') !== value || parsed.isAfter(today)) {
+    return today;
+  }
+  return parsed.startOf('day');
+}
+
 function TeacherAttendanceContent() {
   const { currentUser } = useAuthState();
   const searchParams = useSearchParams();
+  const replaceQuery = useReplaceQuery();
 
-  // Preselect the class when arriving from My Classes' "Attendance" quick
-  // link (`?classId=...`) — previously ignored, so that button silently
-  // dropped you on an empty class picker instead of the intended register.
-  const [classId, setClassId] = useState<string | undefined>(
+  // T-T18: My Classes' "Attendance" quick link arrives with `?classId=...`
+  // (and a shared link may carry `?date=`). The requested class only takes
+  // effect once it is confirmed as one of the teacher's own classes — see
+  // `classId` below.
+  const [selectedClassId, setSelectedClassId] = useState<string | undefined>(
     () => searchParams.get('classId') ?? undefined
   );
-  const [date, setDate] = useState<Dayjs>(dayjs().startOf('day'));
+  const [date, setDate] = useState<Dayjs>(() => parseDateParam(searchParams.get('date')));
   const [rows, setRows] = useState<Record<string, AttendanceRow>>({});
   const [saving, setSaving] = useState(false);
 
@@ -159,6 +176,23 @@ function TeacherAttendanceContent() {
     });
     return Array.from(map.entries()).map(([value, label]) => ({ value, label }));
   }, [classSubjects, teacherClasses]);
+
+  // An unrecognised or unauthorised id (stale link, someone else's class) is
+  // ignored: the page behaves as if no class was picked instead of loading a
+  // register the teacher doesn't own.
+  const classId = classOptions.some((o) => o.value === selectedClassId) ? selectedClassId : undefined;
+
+  const handleClassChange = (value: string) => {
+    setSelectedClassId(value);
+    replaceQuery({ classId: value });
+  };
+
+  const handleDateChange = (value: Dayjs | null) => {
+    if (!value) return;
+    const day = value.startOf('day');
+    setDate(day);
+    replaceQuery({ date: day.format('YYYY-MM-DD') });
+  };
 
   const dateKey = date.format('YYYY-MM-DD');
 
@@ -474,7 +508,7 @@ function TeacherAttendanceContent() {
               showSearch
               optionFilterProp="label"
               value={classId}
-              onChange={setClassId}
+              onChange={handleClassChange}
               options={classOptions}
               style={{ width: '100%' }}
             />
@@ -482,7 +516,7 @@ function TeacherAttendanceContent() {
           <Col xs={24} md={8}>
             <DatePicker
               value={date}
-              onChange={(d) => d && setDate(d.startOf('day'))}
+              onChange={handleDateChange}
               allowClear={false}
               format="YYYY-MM-DD"
               // AT: no future dates.
@@ -569,8 +603,8 @@ export default function TeacherAttendancePageContent() {
         <TeacherClassProvider>
           <StudentClassProvider>
             <AttendanceProvider>
-              {/* useSearchParams (for the ?classId= deep link) requires a
-                  Suspense boundary in the App Router. */}
+              {/* useSearchParams (for the ?classId= / ?date= deep link)
+                  requires a Suspense boundary in the App Router. */}
               <Suspense fallback={null}>
                 <TeacherAttendanceContent />
               </Suspense>
