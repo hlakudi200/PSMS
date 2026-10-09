@@ -113,14 +113,17 @@ export interface IApplication {
   fullName: string;
   dateOfBirth: string;
   age: number;
-  gender: string;
+  /* ABP serialises these enums as numbers. They were typed as strings, so
+     every `status === 'Rejected'` comparison in the staff screens was
+     permanently false. */
+  gender: number;
   genderDisplayName: string;
   idNumber?: string;
   passportNumber?: string;
   isSACitizen: boolean;
   previousSchool?: string;
   creatorEmailAddress: string;
-  status: string;
+  status: number;
   statusDisplayName: string;
   applicationDate: string;
   submittedDate?: string;
@@ -155,7 +158,7 @@ export interface IApplicationList {
   dateOfBirth: string;
   gradeName: string;
   academicYearName: string;
-  status: string;
+  status: number;
   statusDisplayName: string;
   submittedDate?: string;
   creationTime: string;
@@ -176,7 +179,7 @@ export interface ICreateApplication {
   middleName?: string;
   lastName: string;
   dateOfBirth: string;
-  gender: string;
+  gender: number;
   idNumber?: string;
   passportNumber?: string;
   isSACitizen: boolean;
@@ -190,7 +193,7 @@ export interface IUpdateApplication {
   middleName?: string;
   lastName?: string;
   dateOfBirth?: string;
-  gender?: string;
+  gender?: number;
   idNumber?: string;
   passportNumber?: string;
   isSACitizen?: boolean;
@@ -260,7 +263,7 @@ export interface IDailyApplicationCount {
 export interface IApplicantParent {
   id: string;
   applicationId: string;
-  relationship: string;
+  relationship: number;
   relationshipDisplayName: string;
   firstName: string;
   lastName: string;
@@ -282,7 +285,7 @@ export interface IApplicantParent {
 
 export interface ICreateApplicantParent {
   applicationId: string;
-  relationship: string;
+  relationship: number;
   firstName: string;
   lastName: string;
   idNumber?: string;
@@ -301,7 +304,7 @@ export interface ICreateApplicantParent {
 }
 
 export interface IUpdateApplicantParent {
-  relationship?: string;
+  relationship?: number;
   firstName?: string;
   lastName?: string;
   idNumber?: string;
@@ -326,7 +329,7 @@ export interface IApplicationDocument {
   id: string;
   applicationId: string;
   applicationNumber: string;
-  category: string;
+  category: number;
   categoryDisplayName: string;
   documentName: string;
   fileName: string;
@@ -355,14 +358,14 @@ export interface IFileUploadTicket {
 
 export interface IRequestDocumentUploadUrl {
   applicationId: string;
-  category: string;
+  category: number;
   fileName: string;
 }
 
 // Posted after the document's bytes have been uploaded directly to storage.
 export interface IUploadDocument {
   applicationId: string;
-  category: string;
+  category: number;
   objectKey: string;
   fileName: string;
   description?: string;
@@ -386,7 +389,7 @@ export interface IRequiredDocumentsStatus {
 }
 
 export interface IRequiredDocumentItem {
-  category: string;
+  category: number;
   categoryDisplayName: string;
   description: string;
   isRequired: boolean;
@@ -601,7 +604,7 @@ export interface IEnrollment {
   firstName: string;
   lastName: string;
   dateOfBirth: string;
-  gender: string;
+  gender: number;
   gradeId: string;
   gradeName: string;
   assignedClassId?: string;

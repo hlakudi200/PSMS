@@ -80,6 +80,27 @@ export const ApplicationProvider = ({
       });
   };
 
+  /**
+   * The applications this parent started. Listing needs ViewAll, which an
+   * applicant does not hold, so this is the only route back to a draft.
+   */
+  const getMineAsync = async () => {
+    dispatch(getApplicationsPending());
+    await instance
+      .get('/api/services/app/Application/GetMine')
+      .then((response) => {
+        dispatch(getApplicationsSuccess({
+          items: response.data.result.items,
+          totalCount: response.data.result.items.length,
+        }));
+      })
+      .catch((error) => {
+        console.error(error);
+        dispatch(getApplicationsError());
+        throw error;
+      });
+  };
+
   const getAllAsync = async (input?: IGetApplicationsInput) => {
     dispatch(getApplicationsPending());
 
@@ -213,6 +234,7 @@ export const ApplicationProvider = ({
           getAsync,
           getByApplicationNumberAsync,
           getAllAsync,
+          getMineAsync,
           createAsync,
           updateAsync,
           deleteAsync,

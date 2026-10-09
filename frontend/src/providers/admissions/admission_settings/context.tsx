@@ -21,6 +21,8 @@ export interface IAdmissionSettingsActionContext {
   getByGradeAsync: (academicYearId: string, gradeId: string) => void;
   /** Every row, narrowed by year and grade when given. */
   getAllAsync: (academicYearId?: string, gradeId?: string) => void;
+  /** What a prospective parent may apply for, and on what terms. */
+  getOpenIntakesAsync: () => Promise<IOpenIntake[]>;
   getAllByAcademicYearAsync: (academicYearId: string) => void;
   createAsync: (input: ICreateAdmissionSettings) => void;
   updateAsync: (id: string, input: IUpdateAdmissionSettings) => void;
@@ -43,3 +45,24 @@ export const AdmissionSettingsStateContext =
 export const AdmissionSettingsActionContext = createContext<
   IAdmissionSettingsActionContext | undefined
 >(undefined);
+
+
+/**
+ * A year and grade a prospective parent may apply for, with the terms attached.
+ * Mirrors OpenIntakeDto.
+ */
+export interface IOpenIntake {
+  academicYearId: string;
+  academicYearName: string;
+  gradeId?: string;
+  gradeName?: string;
+  applicationCloseDate?: string;
+  feeRequired: boolean;
+  feeAmount: number;
+  isInterviewRequired: boolean;
+  isAssessmentRequired: boolean;
+  minimumAge?: number;
+  maximumAge?: number;
+  requiredDocuments?: string;
+  availableSpots?: number;
+}

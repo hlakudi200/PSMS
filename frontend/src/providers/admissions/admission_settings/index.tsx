@@ -87,6 +87,15 @@ export const AdmissionSettingsProvider = ({
    * screen's filters are set. Reuses the by-year slot in state, since it is
    * the same list read a different way.
    */
+  /**
+   * What a prospective parent may apply for. Returned rather than dispatched:
+   * the apply screen is the only caller and wants it inline.
+   */
+  const getOpenIntakesAsync = async () => {
+    const response = await instance.get('/api/services/app/AdmissionSettings/GetOpenIntakes');
+    return response.data?.result?.items ?? [];
+  };
+
   const getAllAsync = async (academicYearId?: string, gradeId?: string) => {
     dispatch(getAllByAcademicYearPending());
     const params = new URLSearchParams();
@@ -241,6 +250,7 @@ export const AdmissionSettingsProvider = ({
           getAsync,
           getByGradeAsync,
           getAllAsync,
+          getOpenIntakesAsync,
           getAllByAcademicYearAsync,
           createAsync,
           updateAsync,
