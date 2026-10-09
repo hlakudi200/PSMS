@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Button,
@@ -18,7 +18,7 @@ import {
 } from 'antd';
 import { EditOutlined, ReloadOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuthState } from '@/providers/auth';
 import {
   TeacherProvider,
@@ -37,16 +37,27 @@ import {
 } from '@/providers/assessment/assessments';
 import type { IClassSubjectList } from '@/providers/academic/shared/interfaces';
 import type { IAssessmentList } from '@/providers/assessment/shared/interfaces';
+import { useReplaceQuery } from '@/utils/use-replace-query';
 
 const { Title, Text } = Typography;
 
 function TeacherMarkSheetsContent() {
   const router = useRouter();
   const { currentUser } = useAuthState();
+  const searchParams = useSearchParams();
+  const replaceQuery = useReplaceQuery();
 
   const [searchKeyword, setSearchKeyword] = useState('');
   const [debouncedKeyword, setDebouncedKeyword] = useState('');
-  const [filterClassSubjectId, setFilterClassSubjectId] = useState<string | undefined>(undefined);
+  // T-T18: My Classes' "Mark Sheets" quick link arrives with `?classId=...`;
+  // a shared link may also carry `?classSubjectId=`. Both are requests only —
+  // see the validated `filterClassId` / `filterClassSubjectId` below.
+  const [selectedClassId, setSelectedClassId] = useState<string | undefined>(
+    () => searchParams.get('classId') ?? undefined
+  );
+  const [selectedClassSubjectId, setSelectedClassSubjectId] = useState<string | undefined>(
+    () => searchParams.get('classSubjectId') ?? undefined
+  );
 
   useEffect(() => {
     const handle = setTimeout(() => setDebouncedKeyword(searchKeyword), 300);
@@ -82,6 +93,18 @@ function TeacherMarkSheetsContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [teacherId]);
 
+  // An id that isn't one of the teacher's own classes / class-subjects (stale
+  // link, someone else's class) is ignored rather than erroring; a
+  // class-subject outside the chosen class is ignored too.
+  const filterClassId = (classSubjects ?? []).some((cs) => cs.classId === selectedClassId)
+    ? selectedClassId
+    : undefined;
+  const filterClassSubjectId = (classSubjects ?? []).some(
+    (cs) => cs.id === selectedClassSubjectId && (!filterClassId || cs.classId === filterClassId)
+  )
+    ? selectedClassSubjectId
+    : undefined;
+
   const refresh = useCallback(() => {
     if ((classSubjects?.length ?? 0) === 0) return;
     getAllAssessments({
@@ -108,9 +131,16 @@ function TeacherMarkSheetsContent() {
     return map;
   }, [classSubjects]);
 
+  // The API filters by class-subject only, so a class-level filter is applied
+  // here.
   const myAssessments = useMemo(
-    () => (assessments ?? []).filter((a) => myClassSubjectIds.has(a.classSubjectId)),
-    [assessments, myClassSubjectIds]
+    () =>
+      (assessments ?? []).filter(
+        (a) =>
+          myClassSubjectIds.has(a.classSubjectId) &&
+          (!filterClassId || classSubjectsById.get(a.classSubjectId)?.classId === filterClassId)
+      ),
+    [assessments, myClassSubjectIds, classSubjectsById, filterClassId]
   );
 
   const loading = teacherPending || classSubjectsPending || assessmentsPending;
@@ -120,14 +150,42 @@ function TeacherMarkSheetsContent() {
   const noTeacherProfile =
     !teacherPending && !teacherError && currentUser != null && teacher === undefined;
 
+  const classOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    (classSubjects ?? []).forEach((cs) => {
+      if (!map.has(cs.classId)) map.set(cs.classId, cs.className ?? 'Class');
+    });
+    return Array.from(map.entries()).map(([value, label]) => ({ value, label }));
+  }, [classSubjects]);
+
+  // Narrowed to the chosen class, where the class name would be redundant.
   const classSubjectOptions = useMemo(
     () =>
-      (classSubjects ?? []).map((cs) => ({
-        value: cs.id,
-        label: `${cs.className ?? 'Class'} — ${cs.subjectName ?? 'Subject'}`,
-      })),
-    [classSubjects]
+      (classSubjects ?? [])
+        .filter((cs) => !filterClassId || cs.classId === filterClassId)
+        .map((cs) => ({
+          value: cs.id,
+          label: filterClassId
+            ? cs.subjectName ?? 'Subject'
+            : `${cs.className ?? 'Class'} — ${cs.subjectName ?? 'Subject'}`,
+        })),
+    [classSubjects, filterClassId]
   );
+
+  const handleClassChange = (value?: string) => {
+    // Keep the subject only if it belongs to the newly chosen class.
+    const keepSubject =
+      !!value && classSubjectsById.get(filterClassSubjectId ?? '')?.classId === value;
+    const classSubjectId = keepSubject ? filterClassSubjectId : undefined;
+    setSelectedClassId(value);
+    setSelectedClassSubjectId(classSubjectId);
+    replaceQuery({ classId: value, classSubjectId });
+  };
+
+  const handleClassSubjectChange = (value?: string) => {
+    setSelectedClassSubjectId(value);
+    replaceQuery({ classSubjectId: value });
+  };
 
   const columns: ColumnsType<IAssessmentList> = [
     {
@@ -235,7 +293,7 @@ function TeacherMarkSheetsContent() {
 
       <Card variant="borderless" size="small" style={{ marginBottom: 16 }}>
         <Row gutter={[12, 12]} align="middle">
-          <Col xs={24} md={12}>
+          <Col xs={24} md={8}>
             <Input.Search
               placeholder="Search by assessment name…"
               allowClear
@@ -244,14 +302,26 @@ function TeacherMarkSheetsContent() {
               onSearch={(v) => setSearchKeyword(v)}
             />
           </Col>
-          <Col xs={24} md={12}>
+          <Col xs={24} md={8}>
             <Select
-              placeholder="Class & subject"
+              placeholder="Class"
+              allowClear
+              showSearch
+              optionFilterProp="label"
+              value={filterClassId}
+              onChange={handleClassChange}
+              options={classOptions}
+              style={{ width: '100%' }}
+            />
+          </Col>
+          <Col xs={24} md={8}>
+            <Select
+              placeholder={filterClassId ? 'Subject' : 'Class & subject'}
               allowClear
               showSearch
               optionFilterProp="label"
               value={filterClassSubjectId}
-              onChange={setFilterClassSubjectId}
+              onChange={handleClassSubjectChange}
               options={classSubjectOptions}
               style={{ width: '100%' }}
             />
@@ -286,7 +356,11 @@ export default function TeacherMarkSheetsPageContent() {
     <TeacherProvider>
       <ClassSubjectProvider>
         <AssessmentProvider>
-          <TeacherMarkSheetsContent />
+          {/* useSearchParams (for the ?classId= deep link) requires a
+              Suspense boundary in the App Router. */}
+          <Suspense fallback={null}>
+            <TeacherMarkSheetsContent />
+          </Suspense>
         </AssessmentProvider>
       </ClassSubjectProvider>
     </TeacherProvider>
