@@ -57,7 +57,7 @@ function AdmissionsContent() {
   const { applications, totalCount, statistics, isPending, isError } = useApplicationState();
   const { getAllAsync, getStatisticsAsync } = useApplicationActions();
   const { admissionSettingsList, isPending: settingsPending } = useAdmissionSettingsState();
-  const { getAllByAcademicYearAsync } = useAdmissionSettingsActions();
+  const { getAllAsync: getAllSettings } = useAdmissionSettingsActions();
   const [addingSettings, setAddingSettings] = useState(false);
 
   /* These settings were shown and never editable, so the only way to change
@@ -107,12 +107,17 @@ function AdmissionsContent() {
     getActiveGradesAsync();
   }, []);
 
-  // Load settings & statistics when academic year changes
+  /* The settings list used to load only when a year was chosen, and the year
+     filter defaults to "All Years" — so it asked for nothing and a school with
+     a configured intake was told it had none. It loads either way now, and the
+     filters narrow it rather than deciding whether anything appears. */
   useEffect(() => {
-    if (selectedAcademicYearId) {
-      getAllByAcademicYearAsync(selectedAcademicYearId);
-      getStatisticsAsync(selectedAcademicYearId, selectedGradeId);
-    }
+    getAllSettings(selectedAcademicYearId, selectedGradeId);
+  }, [selectedAcademicYearId, selectedGradeId]);
+
+  // Statistics are genuinely per-year; there is nothing to show without one.
+  useEffect(() => {
+    if (selectedAcademicYearId) getStatisticsAsync(selectedAcademicYearId, selectedGradeId);
   }, [selectedAcademicYearId, selectedGradeId]);
 
   const handleAppQueryChange = useCallback((query: TableQuery) => {
@@ -412,7 +417,7 @@ function AdmissionsContent() {
           setAddingSettings(false);
         }}
         onSaved={() => {
-          if (selectedAcademicYearId) getAllByAcademicYearAsync(selectedAcademicYearId);
+          getAllSettings(selectedAcademicYearId, selectedGradeId);
         }}
       />
     </div>

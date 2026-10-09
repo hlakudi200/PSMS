@@ -19,6 +19,8 @@ export interface IAdmissionSettingsStateContext {
 export interface IAdmissionSettingsActionContext {
   getAsync: (id: string) => void;
   getByGradeAsync: (academicYearId: string, gradeId: string) => void;
+  /** Every row, narrowed by year and grade when given. */
+  getAllAsync: (academicYearId?: string, gradeId?: string) => void;
   getAllByAcademicYearAsync: (academicYearId: string) => void;
   createAsync: (input: ICreateAdmissionSettings) => void;
   updateAsync: (id: string, input: IUpdateAdmissionSettings) => void;
