@@ -35,15 +35,18 @@ public class ApplicationAppService : ApplicationService, IApplicationAppService
     private readonly IRepository<ApplicantParent, Guid> _parentRepository;
     private readonly WorkflowStarterService _workflowStarter;
     private readonly ICurrentApplicantResolver _currentApplicant;
+    private readonly IRepository<psms.Authorization.Users.User, long> _userRepository;
 
     public ApplicationAppService(
         IRepository<Application, Guid> applicationRepository,
         IRepository<Domain.Admissions.Entities.AdmissionSettings, Guid> settingsRepository,
         IRepository<ApplicantParent, Guid> parentRepository,
         WorkflowStarterService workflowStarter,
-        ICurrentApplicantResolver currentApplicant)
+        ICurrentApplicantResolver currentApplicant,
+        IRepository<psms.Authorization.Users.User, long> userRepository)
     {
         _currentApplicant = currentApplicant;
+        _userRepository = userRepository;
         _applicationRepository = applicationRepository;
         _settingsRepository = settingsRepository;
         _parentRepository = parentRepository;
@@ -250,6 +253,23 @@ public class ApplicationAppService : ApplicationService, IApplicationAppService
             throw new UserFriendlyException(AdmissionsExceptionCodes.InvalidProspectiveStudentInfo,
                 "Passport number is required for non-South African citizens.");
 
+        // Where the school writes about this. A parent applying for their own
+        // child is signed in, so their account's address is the answer and the
+        // form does not have to ask for something it already knows.
+        var contactEmail = input.CreatorEmailAddress;
+        if (string.IsNullOrWhiteSpace(contactEmail))
+        {
+            contactEmail = await _userRepository
+                .GetAll()
+                .Where(u => u.Id == (AbpSession.UserId ?? 0))
+                .Select(u => u.EmailAddress)
+                .FirstOrDefaultAsync();
+        }
+
+        if (string.IsNullOrWhiteSpace(contactEmail))
+            throw new UserFriendlyException(AdmissionsExceptionCodes.InvalidProspectiveStudentInfo,
+                "An email address is needed so the school can write to you about this application.");
+
         // Generate application number (ADM-001)
         var applicationNumber = await GenerateApplicationNumberAsync(input.AcademicYearId);
 
@@ -263,7 +283,7 @@ public class ApplicationAppService : ApplicationService, IApplicationAppService
             input.Gender,
             input.ApplyingForGradeId,
             input.AcademicYearId,
-            input.CreatorEmailAddress)
+            contactEmail)
         {
             ProspectiveStudentMiddleName = input.MiddleName,
             IdNumber = input.IdNumber,

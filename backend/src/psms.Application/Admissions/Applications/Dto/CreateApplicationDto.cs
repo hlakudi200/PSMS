@@ -1,4 +1,4 @@
-using psms.Domain.Shared.Enums;
+﻿using psms.Domain.Shared.Enums;
 using System;
 using System.ComponentModel.DataAnnotations;
 
@@ -55,8 +55,21 @@ public class CreateApplicationDto
     [StringLength(200)]
     public string PreviousSchool { get; set; }
 
-    // Creator's Email (required for notifications)
-    [Required]
+    /// <summary>
+    /// Where the school writes about this application.
+    /// <para>
+    /// Optional, and left out by the person it usually belongs to: a parent
+    /// applying for their own child is signed in, and their account's address
+    /// is the answer. Requiring it meant the apply form had to ask a parent
+    /// for an email address it already knew — and gave them a field in which
+    /// to put somebody else's.
+    /// </para>
+    /// <para>
+    /// It stays on the DTO for the other case: an admissions officer capturing
+    /// an application for a walk-in, where the address is the family's and not
+    /// the person typing.
+    /// </para>
+    /// </summary>
     [EmailAddress]
     [StringLength(256)]
     public string CreatorEmailAddress { get; set; }
