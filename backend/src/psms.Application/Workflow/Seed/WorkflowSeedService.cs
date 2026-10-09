@@ -62,14 +62,21 @@ public class WorkflowSeedService : ApplicationService
         await CurrentUnitOfWork.SaveChangesAsync();
     }
 
+    private const string InterviewNotRequiredSkipKey = "application.interview-not-required";
+
     private async Task SeedAdmissionsWorkflow()
     {
-        var exists = await _definitionRepository
+        var existing = await _definitionRepository
             .GetAll()
-            .AnyAsync(d => d.TenantId == AbpSession.TenantId
+            .Include(d => d.Steps)
+            .FirstOrDefaultAsync(d => d.TenantId == AbpSession.TenantId
                 && d.EntityType == WorkflowEntityType.Application);
 
-        if (exists) return;
+        if (existing != null)
+        {
+            await UpgradeAdmissionsWorkflow(existing);
+            return;
+        }
 
         var definition = new WorkflowDefinition
         {
@@ -112,8 +119,13 @@ public class WorkflowSeedService : ApplicationService
                 StepOrder = 3,
                 Name = "Interview",
                 Description = "Schedule and conduct parent/student interview.",
-                AssignedRole = "Admin",
-                ActionType = WorkflowActionType.Review
+                // The teacher does the interview, so the step belongs to them.
+                AssignedRole = "Teacher",
+                ActionType = WorkflowActionType.Review,
+                // A school that does not interview for this grade never sees it.
+                SkipWhenKey = InterviewNotRequiredSkipKey,
+                // And one that normally does can still waive it for a case.
+                IsOptional = true
             },
             new WorkflowStep
             {
@@ -143,6 +155,42 @@ public class WorkflowSeedService : ApplicationService
         {
             await _stepRepository.InsertAsync(step);
         }
+    }
+
+    /// <summary>
+    /// WF-34: brings a tenant seeded before this onto the current Interview step.
+    /// <para>
+    /// Two changes, both in place so instances already running keep their step
+    /// order: the step moves from Admin to the Teacher who actually conducts
+    /// the interview, and it gains the rule that steps over it for a grade the
+    /// school does not interview for. Only touched where it still holds the old
+    /// values — a school that has since configured its own is left alone.
+    /// </para>
+    /// </summary>
+    private async Task UpgradeAdmissionsWorkflow(WorkflowDefinition definition)
+    {
+        var interview = definition.Steps?
+            .FirstOrDefault(s => s.Name == "Interview" && s.StepOrder == 3);
+
+        if (interview == null) return;
+
+        var changed = false;
+
+        if (string.IsNullOrWhiteSpace(interview.SkipWhenKey))
+        {
+            interview.SkipWhenKey = InterviewNotRequiredSkipKey;
+            interview.IsOptional = true;
+            changed = true;
+        }
+
+        if (interview.AssignedRole == "Admin")
+        {
+            interview.AssignedRole = "Teacher";
+            changed = true;
+        }
+
+        if (changed)
+            await _stepRepository.UpdateAsync(interview);
     }
 
     /// <summary>

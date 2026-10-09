@@ -148,6 +148,8 @@ export interface IWorkflowStep {
   slaHours?: number;
   /** WF-30: exit-criterion key (see IWorkflowExtensionCatalog.guards). */
   guardKey?: string;
+  /** WF-34: rule deciding whether this step applies to the record at all. */
+  skipWhenKey?: string;
   /** WF-31: effect applied when an instance enters this step. */
   entryEffectKey?: string;
   /** WF-31: effect applied when a forward action leaves this step. */
@@ -172,6 +174,7 @@ export interface ICreateWorkflowStep {
   assignedUserId?: number;
   slaHours?: number;
   guardKey?: string;
+  skipWhenKey?: string;
   entryEffectKey?: string;
   exitEffectKey?: string;
   decisionSchemaKey?: string;
@@ -195,6 +198,8 @@ export interface IUpdateWorkflowStep {
   clearSlaHours?: boolean;
   guardKey?: string;
   clearGuardKey?: boolean;
+  skipWhenKey?: string;
+  clearSkipWhenKey?: boolean;
   entryEffectKey?: string;
   clearEntryEffectKey?: boolean;
   exitEffectKey?: string;
@@ -245,6 +250,7 @@ export interface IWorkflowExtensionItem {
 export interface IWorkflowExtensionCatalog {
   entityType: number;
   guards: IWorkflowExtensionItem[];
+  skipRules: IWorkflowExtensionItem[];
   effects: IWorkflowExtensionItem[];
   decisionSchemas: IWorkflowDecisionSchema[];
   hasEntityHandler: boolean;

@@ -21,6 +21,8 @@ public class WorkflowExtensionCatalogDto
 {
     public WorkflowEntityType EntityType { get; set; }
     public List<WorkflowExtensionItemDto> Guards { get; set; } = new();
+    /// <summary>WF-34: rules that decide whether a step applies to a record at all.</summary>
+    public List<WorkflowExtensionItemDto> SkipRules { get; set; } = new();
     public List<WorkflowExtensionItemDto> Effects { get; set; } = new();
     public List<WorkflowDecisionSchemaDto> DecisionSchemas { get; set; } = new();
     /// <summary>Whether the entity type has a terminal write-back handler at all.</summary>
@@ -51,6 +53,9 @@ public class WorkflowExtensionAppService : ApplicationService, IWorkflowExtensio
             Guards = _registry.Guards.Where(g => g.EntityType == entityType)
                 .OrderBy(g => g.DisplayName)
                 .Select(g => new WorkflowExtensionItemDto { Key = g.Key, DisplayName = g.DisplayName }).ToList(),
+            SkipRules = _registry.SkipRules.Where(r => r.EntityType == entityType)
+                .OrderBy(r => r.DisplayName)
+                .Select(r => new WorkflowExtensionItemDto { Key = r.Key, DisplayName = r.DisplayName }).ToList(),
             Effects = _registry.Effects.Where(e => e.EntityType == entityType)
                 .OrderBy(e => e.DisplayName)
                 .Select(e => new WorkflowExtensionItemDto { Key = e.Key, DisplayName = e.DisplayName }).ToList(),

@@ -48,6 +48,39 @@ public sealed class WorkflowGuardResult
 }
 
 /// <summary>
+/// WF-34: whether this step applies to this particular record at all.
+/// <para>
+/// Evaluated as an instance ENTERS the step. A step that does not apply is
+/// stepped straight over, with the reason written into the history — nobody is
+/// asked to dismiss a step for work the school has already said it does not do.
+/// An interview is the case this was built for: the grade's admission settings
+/// say whether one is required, and for a grade that does not interview the
+/// step should never have appeared.
+/// </para>
+/// <para>
+/// This is not <see cref="IWorkflowStepGuard"/>, which asks "has the work of
+/// this step been done" and blocks until it has, nor the manual Waive, which is
+/// a person deciding to skip a step that did apply. This asks "is this step
+/// relevant to this record", and only configuration answers.
+/// </para>
+/// </summary>
+public interface IWorkflowStepSkipRule : IWorkflowExtension
+{
+    Task<WorkflowSkipResult> EvaluateAsync(Guid entityId);
+}
+
+public sealed class WorkflowSkipResult
+{
+    public bool ShouldSkip { get; init; }
+
+    /// <summary>Why, in words that belong in the history a person will read.</summary>
+    public string Reason { get; init; }
+
+    public static WorkflowSkipResult Applies() => new() { ShouldSkip = false };
+    public static WorkflowSkipResult Skip(string reason) => new() { ShouldSkip = true, Reason = reason };
+}
+
+/// <summary>
 /// WF-31: a side effect on the linked record when an instance enters or leaves a
 /// step. Runs inside the advance transaction; throw <c>UserFriendlyException</c>
 /// (or let <c>InvalidOperationException</c> propagate — the engine translates it)

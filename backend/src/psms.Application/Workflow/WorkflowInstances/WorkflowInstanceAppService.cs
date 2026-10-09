@@ -241,8 +241,17 @@ public class WorkflowInstanceAppService : ApplicationService, IWorkflowInstanceA
             TransitionDate = DateTime.UtcNow
         };
 
+        // WF-34: the first step may be one this record does not need either.
+        var skipped = await StepOverInapplicableAsync(
+            instance,
+            firstStep,
+            definition.Steps.OrderBy(s => s.StepOrder).ToList(),
+            "Workflow started.");
+
         await _instanceRepository.InsertAsync(instance);
         await _transitionRepository.InsertAsync(transition);
+        foreach (var skippedTransition in skipped.Transitions)
+            await _transitionRepository.InsertAsync(skippedTransition);
         await CurrentUnitOfWork.SaveChangesAsync();
 
         return await GetAsync(instance.Id);
@@ -423,6 +432,16 @@ public class WorkflowInstanceAppService : ApplicationService, IWorkflowInstanceA
                 "Invalid action. Use Submit, Review, Approve, Reject, Waive, or Send for Revision.");
         }
 
+        /* WF-34: a step the record does not need is stepped over on entry,
+           before its entry effect runs — the school already answered this when
+           it set up the intake, and nobody should have to dismiss a step for
+           work their school does not do. Each one skipped leaves its own line
+           in the history saying why. */
+        var skipped = await StepOverInapplicableAsync(instance, enteredStep, allSteps, input.Comment);
+        enteredStep = skipped.LandedOn;
+        if (skipped.Transitions.Count > 0)
+            toStepId = enteredStep?.Id;
+
         // WF-31: entry effect of the step being entered.
         if (enteredStep != null && !string.IsNullOrWhiteSpace(enteredStep.EntryEffectKey))
             await _extensions.GetEffect(enteredStep.EntryEffectKey, instance.EntityType).ApplyAsync(effectContext);
@@ -456,10 +475,99 @@ public class WorkflowInstanceAppService : ApplicationService, IWorkflowInstanceA
 
         await _instanceRepository.UpdateAsync(instance);
         await _transitionRepository.InsertAsync(transition);
+        foreach (var skippedTransition in skipped.Transitions)
+            await _transitionRepository.InsertAsync(skippedTransition);
         await CurrentUnitOfWork.SaveChangesAsync();
 
         return await GetAsync(instanceId);
     }
+
+    private sealed class SkipOutcome
+    {
+        public WorkflowStep LandedOn { get; init; }
+        public List<WorkflowTransition> Transitions { get; init; } = new();
+    }
+
+    /// <summary>
+    /// WF-34: walks forward past every step the record does not need, and
+    /// returns the one it actually lands on.
+    /// <para>
+    /// A terminal step is never skipped — the decision at the end of a workflow
+    /// is the workflow, and no configuration may remove it. Nor is a step
+    /// without a skip rule. If skipping runs off the end of the definition the
+    /// instance completes, the same as approving the last step would.
+    /// </para>
+    /// </summary>
+    private async Task<SkipOutcome> StepOverInapplicableAsync(
+        WorkflowInstance instance,
+        WorkflowStep enteredStep,
+        List<WorkflowStep> allSteps,
+        string actorComment)
+    {
+        var outcome = new SkipOutcome { LandedOn = enteredStep };
+        if (enteredStep == null)
+            return outcome;
+
+        var actorUserId = AbpSession.UserId.Value;
+        var actorUserName = await GetCurrentUserName();
+        var current = enteredStep;
+
+        // Bounded by the number of steps: a definition that routed in a circle
+        // would otherwise spin here rather than surfacing as a bad definition.
+        for (var hops = 0; hops < allSteps.Count; hops++)
+        {
+            if (current == null || current.IsTerminal || string.IsNullOrWhiteSpace(current.SkipWhenKey))
+                break;
+
+            var rule = _extensions.GetSkipRule(current.SkipWhenKey, instance.EntityType);
+            var verdict = await rule.EvaluateAsync(instance.EntityId);
+            if (!verdict.ShouldSkip)
+                break;
+
+            var nextOrder = current.NextStepOnApprove ?? (current.StepOrder + 1);
+            var next = allSteps.FirstOrDefault(s => s.StepOrder == nextOrder);
+
+            if (next == null)
+            {
+                instance.Complete(actorUserId, actorComment);
+                outcome.Transitions.Add(SkipTransition(instance, current, null, actorUserId, actorUserName, verdict.Reason));
+                return new SkipOutcome { LandedOn = null, Transitions = outcome.Transitions };
+            }
+
+            instance.AdvanceTo(next.StepOrder, next.Id, next.SlaHours);
+            outcome.Transitions.Add(SkipTransition(instance, current, next, actorUserId, actorUserName, verdict.Reason));
+            current = next;
+        }
+
+        return new SkipOutcome { LandedOn = current, Transitions = outcome.Transitions };
+    }
+
+    /// <summary>
+    /// The history line for a step that was stepped over. Recorded as a waive,
+    /// because that is what it is — the step was passed without its work being
+    /// done — and the reason says the school's rule rather than a person's.
+    /// </summary>
+    private WorkflowTransition SkipTransition(
+        WorkflowInstance instance,
+        WorkflowStep from,
+        WorkflowStep to,
+        long actorUserId,
+        string actorUserName,
+        string reason) =>
+        new()
+        {
+            Id = Guid.NewGuid(),
+            TenantId = AbpSession.TenantId,
+            WorkflowInstanceId = instance.Id,
+            FromStepId = from.Id,
+            ToStepId = to?.Id,
+            Action = WorkflowActionType.Waive,
+            ActorUserId = actorUserId,
+            ActorUserName = actorUserName,
+            Comment = $"Skipped automatically — {reason}",
+            TransitionDate = DateTime.UtcNow,
+            IsWaived = true,
+        };
 
     [AbpAuthorize(PermissionNames.Workflow_Instances_Cancel)]
     public async Task<WorkflowInstanceDto> CancelAsync(Guid instanceId, string comment)

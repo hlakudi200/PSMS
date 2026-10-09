@@ -923,7 +923,16 @@ public class PsmsRolePermissionSeeder : ITransientDependency
             PermissionNames.Workflow_Instances_Advance,
             PermissionNames.Workflow_Instances_ViewHistory,
 
-            // Admissions - Assessments only
+            // Admissions - the interviews and assessments a teacher conducts.
+            // WF-34: the Interview step of the admissions workflow belongs to
+            // the teacher who sits in the room. A teacher held nothing at all
+            // for interviews — not even View — so the step was assigned to
+            // Admin, and the person who actually did the interview had no way
+            // to see it or record what came of it.
+            PermissionNames.Admissions_Interviews,
+            PermissionNames.Admissions_Interviews_View,
+            PermissionNames.Admissions_Interviews_Conduct,
+            PermissionNames.Admissions_Interviews_RecordOutcome,
             PermissionNames.Admissions_Assessments,
             PermissionNames.Admissions_Assessments_View,
             PermissionNames.Admissions_Assessments_Conduct,
@@ -1145,6 +1154,8 @@ public class PsmsRolePermissionSeeder : ITransientDependency
     /// 403 in a browser.
     /// </summary>
     public static IReadOnlyList<string> ApplicantPermissions() => GetApplicantPermissions();
+
+    public static IReadOnlyList<string> TeacherPermissions() => GetTeacherPermissions();
 
     private static List<string> GetApplicantPermissions()
     {

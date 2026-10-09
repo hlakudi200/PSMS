@@ -64,10 +64,12 @@ public class WorkflowStepAppService : ApplicationService, IWorkflowStepAppServic
     /// registered for the definition's entity type — a typo would otherwise block
     /// every instance at run time.
     /// </summary>
-    private void EnsureExtensionKeysExist(WorkflowEntityType entityType, string guardKey, string entryEffectKey, string exitEffectKey, string decisionSchemaKey)
+    private void EnsureExtensionKeysExist(WorkflowEntityType entityType, string guardKey, string skipWhenKey, string entryEffectKey, string exitEffectKey, string decisionSchemaKey)
     {
         if (!_extensions.GuardExists(guardKey, entityType))
             throw new UserFriendlyException(WorkflowExceptionCodes.ExtensionNotFound, $"Unknown guard '{guardKey}' for {entityType}.");
+        if (!_extensions.SkipRuleExists(skipWhenKey, entityType))
+            throw new UserFriendlyException(WorkflowExceptionCodes.ExtensionNotFound, $"Unknown skip rule '{skipWhenKey}' for {entityType}.");
         if (!_extensions.EffectExists(entryEffectKey, entityType))
             throw new UserFriendlyException(WorkflowExceptionCodes.ExtensionNotFound, $"Unknown entry effect '{entryEffectKey}' for {entityType}.");
         if (!_extensions.EffectExists(exitEffectKey, entityType))
@@ -139,7 +141,7 @@ public class WorkflowStepAppService : ApplicationService, IWorkflowStepAppServic
         if (input.AssignedUserId.HasValue)
             await EnsureAssignedUserHoldsRoleAsync(input.AssignedUserId.Value, input.AssignedRole.Trim());
 
-        EnsureExtensionKeysExist(definition.EntityType, input.GuardKey, input.EntryEffectKey, input.ExitEffectKey, input.DecisionSchemaKey);
+        EnsureExtensionKeysExist(definition.EntityType, input.GuardKey, input.SkipWhenKey, input.EntryEffectKey, input.ExitEffectKey, input.DecisionSchemaKey);
 
         var step = new WorkflowStep
         {
@@ -157,6 +159,7 @@ public class WorkflowStepAppService : ApplicationService, IWorkflowStepAppServic
             AssignedUserId = input.AssignedUserId,
             SlaHours = input.SlaHours,
             GuardKey = Key(input.GuardKey),
+            SkipWhenKey = Key(input.SkipWhenKey),
             EntryEffectKey = Key(input.EntryEffectKey),
             ExitEffectKey = Key(input.ExitEffectKey),
             DecisionSchemaKey = Key(input.DecisionSchemaKey),
@@ -204,6 +207,8 @@ public class WorkflowStepAppService : ApplicationService, IWorkflowStepAppServic
         if (input.ClearSlaHours) step.SlaHours = null;
         else if (input.SlaHours.HasValue) step.SlaHours = input.SlaHours;
 
+        if (input.ClearSkipWhenKey) step.SkipWhenKey = null;
+        else if (input.SkipWhenKey != null) step.SkipWhenKey = Key(input.SkipWhenKey);
         if (input.ClearGuardKey) step.GuardKey = null;
         else if (input.GuardKey != null) step.GuardKey = Key(input.GuardKey);
         if (input.ClearEntryEffectKey) step.EntryEffectKey = null;
@@ -213,7 +218,7 @@ public class WorkflowStepAppService : ApplicationService, IWorkflowStepAppServic
         if (input.ClearDecisionSchemaKey) step.DecisionSchemaKey = null;
         else if (input.DecisionSchemaKey != null) step.DecisionSchemaKey = Key(input.DecisionSchemaKey);
         if (input.IsOptional.HasValue) step.IsOptional = input.IsOptional.Value;
-        EnsureExtensionKeysExist(step.WorkflowDefinition.EntityType, step.GuardKey, step.EntryEffectKey, step.ExitEffectKey, step.DecisionSchemaKey);
+        EnsureExtensionKeysExist(step.WorkflowDefinition.EntityType, step.GuardKey, step.SkipWhenKey, step.EntryEffectKey, step.ExitEffectKey, step.DecisionSchemaKey);
 
         // WF-05: validate the FINAL state — a user-pinned step (after applying any
         // role/user change above) requires that user to hold the step's role.

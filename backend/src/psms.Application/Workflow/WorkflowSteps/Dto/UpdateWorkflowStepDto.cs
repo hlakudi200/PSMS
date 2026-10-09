@@ -30,6 +30,9 @@ public class UpdateWorkflowStepDto
     public string GuardKey { get; set; }
     public bool ClearGuardKey { get; set; }
     [StringLength(100)]
+    public string SkipWhenKey { get; set; }
+    public bool ClearSkipWhenKey { get; set; }
+    [StringLength(100)]
     public string EntryEffectKey { get; set; }
     public bool ClearEntryEffectKey { get; set; }
     [StringLength(100)]
