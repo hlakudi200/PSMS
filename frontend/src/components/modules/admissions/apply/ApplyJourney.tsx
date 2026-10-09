@@ -66,6 +66,11 @@ function ApplyContent() {
   const [intakes, setIntakes] = useState<IOpenIntake[]>([]);
   const [loadingIntakes, setLoadingIntakes] = useState(true);
   const [workingOn, setWorkingOn] = useState<string | null>(null);
+  /* Whether the form is open on a brand new application. Explicit, because
+     there is nothing else to infer it from: a new one has no id yet, and
+     "has the form been touched" is false until the parent types — so Start
+     an application appeared to do nothing at all. */
+  const [starting, setStarting] = useState(false);
   const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -91,6 +96,7 @@ function ApplyContent() {
 
   const startNew = () => {
     setWorkingOn(null);
+    setStarting(true);
     setStep(0);
     setError(undefined);
     form.resetFields();
@@ -99,6 +105,7 @@ function ApplyContent() {
 
   const openExisting = async (id: string) => {
     setWorkingOn(id);
+    setStarting(false);
     setError(undefined);
     await getAsync(id);
     setStep(0);
@@ -166,7 +173,12 @@ function ApplyContent() {
         await getAsync(workingOn);
       } else {
         // The account's own address is what the school writes to.
-        await createAsync({ ...payload, creatorEmailAddress: '' });
+        const created = await createAsync({ ...payload, creatorEmailAddress: '' });
+        if (created?.id) {
+          setWorkingOn(created.id);
+          setStarting(false);
+          await getAsync(created.id);
+        }
         await getMineAsync();
       }
       return true;
@@ -198,19 +210,13 @@ function ApplyContent() {
     if (step === 0) {
       const ok = await saveLearner();
       if (!ok) return;
-      // Creating one leaves us without its id until the list comes back.
-      if (!workingOn) {
-        const mine = (applications ?? []).filter((a) => a.status === DRAFT);
-        const newest = mine[0];
-        if (newest) setWorkingOn(newest.id);
-      }
     }
     setError(undefined);
     setStep((s) => Math.min(s + 1, 3));
   };
 
   /* ---------- the list of what this parent has started ---------- */
-  if (!workingOn && step === 0 && !form.isFieldsTouched()) {
+  if (!workingOn && !starting) {
     const mine = applications ?? [];
 
     return (
@@ -287,7 +293,15 @@ function ApplyContent() {
   return (
     <div style={{ maxWidth: 900, margin: '0 auto', padding: '32px 16px' }}>
       <Space style={{ width: '100%', justifyContent: 'space-between', marginBottom: 16 }}>
-        <Button icon={<ArrowLeftOutlined />} onClick={() => { setWorkingOn(null); setStep(0); form.resetFields(); }}>
+        <Button
+          icon={<ArrowLeftOutlined />}
+          onClick={() => {
+            setWorkingOn(null);
+            setStarting(false);
+            setStep(0);
+            form.resetFields();
+          }}
+        >
           My applications
         </Button>
         {current?.applicationNumber && <Text type="secondary">{current.applicationNumber}</Text>}

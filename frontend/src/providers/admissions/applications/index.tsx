@@ -1,4 +1,5 @@
 "use client";
+import type { IApplication } from '@/providers/admissions/shared/interfaces';
 import { getAxiosInstance } from "@/utils/axios-instance";
 import {
   INITIAL_STATE,
@@ -135,19 +136,23 @@ export const ApplicationProvider = ({
       });
   };
 
+  /**
+   * Returns what it created. A caller that has just made an application needs
+   * its id immediately, and reading it back out of state does not work: that
+   * value belongs to the render the caller is already inside.
+   */
   const createAsync = async (input: ICreateApplication) => {
     dispatch(createApplicationPending());
     const endpoint = `/api/services/app/Application/Create`;
-    await instance
-      .post(endpoint, input)
-      .then((response) => {
-        dispatch(createApplicationSuccess(response.data.result));
-      })
-      .catch((error) => {
-        console.error(error);
-        dispatch(createApplicationError());
-        throw error;
-      });
+    try {
+      const response = await instance.post(endpoint, input);
+      dispatch(createApplicationSuccess(response.data.result));
+      return response.data.result as IApplication;
+    } catch (error) {
+      console.error(error);
+      dispatch(createApplicationError());
+      throw error;
+    }
   };
 
   const updateAsync = async (id: string, input: IUpdateApplication) => {
