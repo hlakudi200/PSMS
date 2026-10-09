@@ -48,6 +48,55 @@ function collectMenuKeys(items: ItemType[]): string[] {
   return keys;
 }
 
+/**
+ * A section's key. Prefixed so it can never collide with a route key, and so
+ * `pickSelectedKey` — which matches keys against the pathname — cannot pick one.
+ */
+const sectionKey = (label: string) => `section:${label}`;
+
+/**
+ * Turns the flat `type: 'group'` headings into sections that open and close.
+ *
+ * AntD renders a group as a label with its items always beneath it, so a portal
+ * with nine headings was nine headings' worth of scrolling with no way to put
+ * any of it away. A submenu is the same shape of data and collapses.
+ *
+ * Items that are not groups — the Dashboard at the top, dividers — pass
+ * through untouched.
+ */
+function asCollapsibleSections(items: ItemType[]): ItemType[] {
+  return items.map((item) => {
+    if (!item || typeof item !== 'object') return item;
+    if ((item as MenuItemGroupType).type !== 'group') return item;
+
+    const group = item as MenuItemGroupType;
+    const label = typeof group.label === 'string' ? group.label : '';
+
+    return {
+      key: sectionKey(label),
+      label: group.label,
+      children: group.children,
+    } as ItemType;
+  });
+}
+
+/** The section a route key sits in, so the right one is open on arrival. */
+function sectionContaining(items: ItemType[], key: string): string | undefined {
+  for (const item of items) {
+    if (!item || typeof item !== 'object') continue;
+    if ((item as MenuItemGroupType).type !== 'group') continue;
+
+    const group = item as MenuItemGroupType;
+    const children = group.children ?? [];
+    const has = children.some(
+      (child) => child && typeof child === 'object' && (child as MenuItemType).key === key
+    );
+
+    if (has) return sectionKey(typeof group.label === 'string' ? group.label : '');
+  }
+  return undefined;
+}
+
 // Pick the longest menu key that is a prefix of the current pathname.
 // Avoids mis-highlighting overlapping routes (e.g. /students vs /students-archive).
 function pickSelectedKey(allKeys: string[], basePath: string, pathname: string): string {
@@ -87,6 +136,7 @@ function ShellLayout({
   } = config;
 
   const collapseStorageKey = `layoutShell:collapsed:${basePath}`;
+  const openSectionsStorageKey = `layoutShell:openSections:${basePath}`;
 
   const [collapsed, setCollapsed] = useState(false);
   const pathname = usePathname();
@@ -130,6 +180,47 @@ function ShellLayout({
     () => pickSelectedKey(allKeys, basePath, pathname ?? basePath),
     [allKeys, basePath, pathname]
   );
+
+  const sectionedItems = useMemo(() => asCollapsibleSections(menuItems), [menuItems]);
+  const currentSection = useMemo(
+    () => sectionContaining(menuItems, selectedKey),
+    [menuItems, selectedKey]
+  );
+
+  /* Which sections are open. Remembered per portal, because a principal who
+     works in Assessments all day should not have to reopen it every morning.
+     Null means "not restored yet" — until then the section holding the current
+     page is the one open, so arriving anywhere shows you where you are. */
+  const [openSections, setOpenSections] = useState<string[] | null>(null);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const stored = window.localStorage.getItem(openSectionsStorageKey);
+    if (stored === null) return;
+    try {
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed)) setOpenSections(parsed.filter((k) => typeof k === 'string'));
+    } catch {
+      /* A corrupt entry is not worth failing the page over. */
+    }
+  }, [openSectionsStorageKey]);
+
+  /* Navigating into a closed section opens it, so the page you are on is never
+     hidden behind a heading. */
+  useEffect(() => {
+    if (!currentSection) return;
+    setOpenSections((previous) => {
+      const base = previous ?? [];
+      return base.includes(currentSection) ? previous : [...base, currentSection];
+    });
+  }, [currentSection]);
+
+  const onOpenChange = (keys: string[]) => {
+    setOpenSections(keys);
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(openSectionsStorageKey, JSON.stringify(keys));
+    }
+  };
 
   const handleMenuClick = ({ key }: { key: string }) => {
     if (key.startsWith(basePath)) {
@@ -207,7 +298,13 @@ function ShellLayout({
           <Menu
             mode="inline"
             selectedKeys={[selectedKey]}
-            items={menuItems}
+            /* Narrowed to icons there is no room for a section title, and a
+               submenu with no icon would be an empty square. The original
+               groups still read correctly in that state, so they are what is
+               shown. */
+            items={collapsed ? menuItems : sectionedItems}
+            openKeys={collapsed ? undefined : openSections ?? (currentSection ? [currentSection] : [])}
+            onOpenChange={onOpenChange}
             onClick={handleMenuClick}
             style={{ background: 'transparent', borderRight: 0 }}
           />
