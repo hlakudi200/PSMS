@@ -4,6 +4,8 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Abp.Application.Services;
+using Abp.Application.Services.Dto;
+using Abp.Domain.Uow;
 using Abp.Authorization;
 using Abp.Domain.Repositories;
 using Abp.UI;
@@ -30,6 +32,7 @@ public class SchoolBrandingAppService : ApplicationService, ISchoolBrandingAppSe
 {
     private readonly IRepository<SchoolBranding, Guid> _brandingRepository;
     private readonly IRepository<Tenant> _tenantRepository;
+    private readonly IRepository<Domain.Admissions.Entities.AdmissionSettings, Guid> _admissionSettingsRepository;
     private readonly IFileStorageService _fileStorage;
 
     /// <summary>Supabase bucket for branding images (public-read).</summary>
@@ -56,8 +59,10 @@ public class SchoolBrandingAppService : ApplicationService, ISchoolBrandingAppSe
     public SchoolBrandingAppService(
         IRepository<SchoolBranding, Guid> brandingRepository,
         IRepository<Tenant> tenantRepository,
+        IRepository<Domain.Admissions.Entities.AdmissionSettings, Guid> admissionSettingsRepository,
         IFileStorageService fileStorage)
     {
+        _admissionSettingsRepository = admissionSettingsRepository;
         _brandingRepository = brandingRepository;
         _tenantRepository = tenantRepository;
         _fileStorage = fileStorage;
@@ -98,6 +103,88 @@ public class SchoolBrandingAppService : ApplicationService, ISchoolBrandingAppSe
     /// than a 404: the login page must still render, and a differing response
     /// would turn this into a tenant-enumeration oracle.
     /// </summary>
+    /// <summary>
+    /// The schools a prospective parent may apply to, for them to pick from.
+    /// <para>
+    /// Asking a parent to type the school's name exactly is a trap: "School
+    /// ABC" and "SchoolABC" are the same school to them and different strings
+    /// to us, and the only feedback was a flat refusal that looked like the
+    /// school was not on the system at all.
+    /// </para>
+    /// <para>
+    /// <b>Only schools that are open to applications are listed.</b> That is
+    /// the useful filter — a parent cannot apply to a closed school anyway —
+    /// and it is the careful one: a school that never opens admissions online
+    /// never appears here, so this is not a directory of everyone who uses the
+    /// product.
+    /// </para>
+    /// <para>
+    /// Host-side and anonymous, like <see cref="GetPublicAsync"/>: there is no
+    /// session yet, and nothing here is steerable by an <c>Abp-TenantId</c>
+    /// header the caller supplies.
+    /// </para>
+    /// </summary>
+    [AbpAllowAnonymous]
+    public async Task<ListResultDto<OpenSchoolDto>> GetSchoolsAcceptingApplicationsAsync()
+    {
+        // The settings live in each tenant, so the filter has to come off to
+        // see across them. DisableFilter, not SetTenantId(null): the latter
+        // narrows to rows whose TenantId IS NULL, which is none of them.
+        List<Domain.Admissions.Entities.AdmissionSettings> settings;
+        using (CurrentUnitOfWork.DisableFilter(AbpDataFilters.MayHaveTenant))
+        {
+            settings = await _admissionSettingsRepository.GetAllListAsync();
+        }
+
+        // AreApplicationsOpen() weighs the switch against the dates, and it is
+        // the entity that knows how. One open grade is enough to list a school.
+        var openTenantIds = settings
+            .Where(x => x.TenantId.HasValue && x.AreApplicationsOpen())
+            .Select(x => x.TenantId.Value)
+            .Distinct()
+            .ToList();
+
+        if (openTenantIds.Count == 0)
+            return new ListResultDto<OpenSchoolDto>(new List<OpenSchoolDto>());
+
+        List<Tenant> tenants;
+        using (CurrentUnitOfWork.SetTenantId(null))
+        {
+            tenants = await _tenantRepository
+                .GetAll()
+                .Where(t => t.IsActive && openTenantIds.Contains(t.Id))
+                .ToListAsync();
+        }
+
+        List<SchoolBranding> branding;
+        using (CurrentUnitOfWork.DisableFilter(AbpDataFilters.MayHaveTenant))
+        {
+            branding = await _brandingRepository.GetAllListAsync();
+        }
+
+        var byTenant = branding
+            .GroupBy(b => b.TenantId)
+            .ToDictionary(g => g.Key, g => g.First());
+
+        var schools = tenants
+            .Select(t =>
+            {
+                byTenant.TryGetValue(t.Id, out var b);
+                return new OpenSchoolDto
+                {
+                    TenancyName = t.TenancyName,
+                    // The tenancy name is a login handle, not a school's name.
+                    // It is the fallback only because something has to be shown.
+                    SchoolName = string.IsNullOrWhiteSpace(b?.SchoolName) ? t.Name : b.SchoolName,
+                    LogoUrl = b?.LogoUrl,
+                };
+            })
+            .OrderBy(x => x.SchoolName, StringComparer.CurrentCultureIgnoreCase)
+            .ToList();
+
+        return new ListResultDto<OpenSchoolDto>(schools);
+    }
+
     [AbpAllowAnonymous]
     public async Task<PublicSchoolBrandingDto> GetPublicAsync(string tenancyName)
     {
