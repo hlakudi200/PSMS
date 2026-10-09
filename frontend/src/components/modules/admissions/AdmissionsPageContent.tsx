@@ -28,15 +28,23 @@ import type { IAdmissionSettings } from '@/providers/admissions/shared/interface
 import AdmissionSettingsFormModal from '@/components/modals/admissions/AdmissionSettingsFormModal';
 import type { IWaitlist } from '@/providers/admissions/shared/interfaces';
 
+/* Keyed by the status name the server sends in statusDisplayName, and it has
+   to be every one of them: this map colours the column and fills the status
+   filter, so a name missing from it is a status nobody can filter by, and a
+   name that is not in the enum — OfferAccepted was one — is a filter option
+   that never matches anything. */
 const applicationStatusMap: Record<string, { label: string; color: string }> = {
   Draft: { label: 'Draft', color: 'default' },
   Submitted: { label: 'Submitted', color: 'blue' },
+  PaymentPending: { label: 'Awaiting Fee', color: 'gold' },
   UnderReview: { label: 'Under Review', color: 'orange' },
+  DocumentsRequired: { label: 'Docs Required', color: 'gold' },
+  InterviewScheduled: { label: 'Interview Set', color: 'orange' },
+  AssessmentScheduled: { label: 'Assessment Set', color: 'orange' },
   UnderConsideration: { label: 'Considering', color: 'purple' },
   Approved: { label: 'Approved', color: 'green' },
   Rejected: { label: 'Rejected', color: 'red' },
   Waitlisted: { label: 'Waitlisted', color: 'gold' },
-  OfferAccepted: { label: 'Offer Accepted', color: 'cyan' },
   Enrolled: { label: 'Enrolled', color: 'green' },
   Withdrawn: { label: 'Withdrawn', color: 'default' },
   Expired: { label: 'Expired', color: 'default' },

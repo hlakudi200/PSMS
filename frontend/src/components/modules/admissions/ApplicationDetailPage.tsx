@@ -52,68 +52,39 @@ import type {
   IAdmissionInterview,
   IAdmissionAssessment,
 } from '@/providers/admissions/shared/interfaces';
+import {
+  ApplicationStatus,
+  applicationStepIndex,
+} from '@/providers/admissions/shared/application-status';
 
 const { Title, Text } = Typography;
 
 const statusSteps = ['Draft', 'Submitted', 'UnderReview', 'Approved', 'Enrolled'];
-/* ApplicationStatus as the API sends it. These were keyed by name — "Draft",
-   "Rejected" — against a field that arrives as a number, so every lookup fell
-   through to its default and every comparison was permanently false: a
-   rejected application never showed its rejection banner, and a waitlisted one
-   never showed its place. */
-const ApplicationStatus = {
-  Draft: 1,
-  Submitted: 2,
-  PaymentPending: 3,
-  UnderReview: 4,
-  InterviewScheduled: 5,
-  AssessmentScheduled: 6,
-  DecisionPending: 7,
-  Approved: 8,
-  Waitlisted: 9,
-  Rejected: 10,
-  OfferAccepted: 11,
-  OfferDeclined: 12,
-  Withdrawn: 13,
-  Enrolled: 14,
-} as const;
 
-const statusStepIndex: Record<number, number> = {
-  [ApplicationStatus.Draft]: 0,
-  [ApplicationStatus.Submitted]: 1,
-  [ApplicationStatus.PaymentPending]: 1,
-  [ApplicationStatus.UnderReview]: 2,
-  [ApplicationStatus.InterviewScheduled]: 2,
-  [ApplicationStatus.AssessmentScheduled]: 2,
-  [ApplicationStatus.DecisionPending]: 2,
-  [ApplicationStatus.Approved]: 3,
-  [ApplicationStatus.OfferAccepted]: 3,
-  [ApplicationStatus.Enrolled]: 4,
-  [ApplicationStatus.Rejected]: -1,
-  [ApplicationStatus.Waitlisted]: -1,
-  [ApplicationStatus.Withdrawn]: -1,
-  [ApplicationStatus.OfferDeclined]: -1,
-};
-
-function getStatusColor(status: number): string {
+/* The status numbers, the step a status sits at and the colour it wears all
+   come from one place now. This file used to carry its own copy, and the copy
+   had drifted from the enum: 9 was written down as Waitlisted when the server
+   means Approved by it, so an approved application announced "Waitlisted —
+   Position #N/A" and parked its timeline back at Draft. */
+const getStatusColor = (status: number): string => {
   const map: Record<number, string> = {
     [ApplicationStatus.Draft]: 'default',
     [ApplicationStatus.Submitted]: 'blue',
     [ApplicationStatus.PaymentPending]: 'gold',
     [ApplicationStatus.UnderReview]: 'orange',
+    [ApplicationStatus.DocumentsRequired]: 'gold',
     [ApplicationStatus.InterviewScheduled]: 'orange',
     [ApplicationStatus.AssessmentScheduled]: 'orange',
-    [ApplicationStatus.DecisionPending]: 'orange',
+    [ApplicationStatus.UnderConsideration]: 'orange',
     [ApplicationStatus.Approved]: 'green',
     [ApplicationStatus.Waitlisted]: 'gold',
     [ApplicationStatus.Rejected]: 'red',
-    [ApplicationStatus.OfferAccepted]: 'green',
-    [ApplicationStatus.OfferDeclined]: 'default',
-    [ApplicationStatus.Withdrawn]: 'default',
     [ApplicationStatus.Enrolled]: 'purple',
+    [ApplicationStatus.Withdrawn]: 'default',
+    [ApplicationStatus.Expired]: 'default',
   };
   return map[status] ?? 'default';
-}
+};
 
 // ─── Parents Tab ───────────────────────────────────────────────
 function ParentsSection({ applicationId }: { applicationId: string }) {
@@ -474,10 +445,13 @@ function ApplicationDetailContent() {
   if (!application) return null;
 
   const app = application;
-  const currentStep = statusStepIndex[app.status] ?? 0;
-  const isTerminal = [ApplicationStatus.Rejected, ApplicationStatus.Withdrawn].includes(
-    app.status as (typeof ApplicationStatus)['Rejected' | 'Withdrawn']
-  );
+  const currentStep = applicationStepIndex(app.status);
+  /* Ended without a place. Enrolled is an ending too, but it is the last step
+     of the timeline rather than a reason to hide it. */
+  const isTerminal =
+    app.status === ApplicationStatus.Rejected
+    || app.status === ApplicationStatus.Withdrawn
+    || app.status === ApplicationStatus.Expired;
 
   const tabItems = [
     {

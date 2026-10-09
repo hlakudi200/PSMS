@@ -1,18 +1,23 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Alert, Button, Card, Descriptions, Result, Space, Tag, Typography, message } from 'antd';
-import { CreditCardOutlined, SendOutlined } from '@ant-design/icons';
+import {
+  Alert, Button, Card, Descriptions, Input, Modal, Result, Space, Tag, Typography, message,
+} from 'antd';
+import { CreditCardOutlined, SendOutlined, StopOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { useApplicationFeeActions } from '@/providers/admissions/application_fees';
 import type { IFeeCheckout } from '@/providers/admissions/application_fees/context';
 import type { IApplicantParent, IApplication } from '@/providers/admissions/shared/interfaces';
+import {
+  ApplicationStatus, applicationStatusLabel, canWithdraw,
+} from '@/providers/admissions/shared/application-status';
 
 const { Paragraph, Text } = Typography;
 
 /** Draft is 1; anything beyond it is in the school's hands. */
-const DRAFT = 1;
-const PAYMENT_PENDING = 3;
+const DRAFT = ApplicationStatus.Draft;
+const PAYMENT_PENDING = ApplicationStatus.PaymentPending;
 
 /**
  * Step four: what the school is about to receive, then handing it over.
@@ -26,6 +31,8 @@ export default function ReviewStep({
   documentCount,
   onSubmit,
   submitting,
+  onWithdraw,
+  withdrawing,
   onRefresh,
 }: {
   application: IApplication;
@@ -35,13 +42,81 @@ export default function ReviewStep({
   documentCount: number;
   onSubmit: () => void;
   submitting: boolean;
+  onWithdraw: (reason?: string) => Promise<void>;
+  withdrawing: boolean;
   onRefresh: () => void;
 }) {
   const { getCheckoutAsync, simulatePaymentAsync } = useApplicationFeeActions();
   const [checkout, setCheckout] = useState<IFeeCheckout | undefined>();
   const [paying, setPaying] = useState(false);
+  const [askingToWithdraw, setAskingToWithdraw] = useState(false);
+  const [reason, setReason] = useState('');
 
   const isDraft = application.status === DRAFT;
+  const withdrawn = application.status === ApplicationStatus.Withdrawn;
+  const learnerName = `${application.firstName ?? ''} ${application.lastName ?? ''}`.trim();
+  const grade = application.applyingForGradeName ?? 'this grade';
+
+  const confirmWithdrawal = async () => {
+    await onWithdraw(reason.trim() || undefined);
+    setAskingToWithdraw(false);
+    setReason('');
+  };
+
+  /**
+   * The way out, wherever the application has got to.
+   *
+   * Deliberately quiet — a text button, not a red one beside Submit — because
+   * withdrawing is rare and cannot be undone, and nobody should land on it
+   * while aiming at something else. The confirmation says so plainly.
+   */
+  const withdrawAffordance = !canWithdraw(application.status) ? null : (
+    <>
+      <Button
+        type="text"
+        danger
+        icon={<StopOutlined />}
+        onClick={() => setAskingToWithdraw(true)}
+        style={{ paddingLeft: 0 }}
+      >
+        {isDraft ? 'I no longer want to apply' : 'Withdraw this application'}
+      </Button>
+
+      <Modal
+        open={askingToWithdraw}
+        title="Withdraw this application?"
+        okText="Yes, withdraw it"
+        okButtonProps={{ danger: true, loading: withdrawing }}
+        cancelText="Keep it"
+        onOk={confirmWithdrawal}
+        onCancel={() => setAskingToWithdraw(false)}
+        destroyOnHidden
+      >
+        <Paragraph>
+          {isDraft
+            ? `${learnerName || 'This learner'} will not be put forward for ${grade}, and this application will be closed.`
+            : `The school will stop considering ${learnerName || 'this learner'} for ${grade}.`}
+        </Paragraph>
+        <Paragraph type="secondary">
+          This cannot be undone. If you change your mind you would have to apply again, and only
+          while applications are still open.
+          {checkout?.feeRequired && !checkout.awaitingPayment
+            ? ' A fee you have already paid is not refunded automatically — ask the school about it.'
+            : ''}
+        </Paragraph>
+        <Paragraph style={{ marginBottom: 4 }}>Why are you withdrawing? (optional)</Paragraph>
+        <Input.TextArea
+          id="withdraw-reason"
+          rows={3}
+          maxLength={500}
+          showCount
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          placeholder="The school will see this."
+        />
+      </Modal>
+    </>
+  );
 
   useEffect(() => {
     if (isDraft) return;
@@ -65,6 +140,26 @@ export default function ReviewStep({
     }
   };
 
+  if (withdrawn) {
+    return (
+      <Result
+        status="warning"
+        title="You have withdrawn this application"
+        subTitle={
+          <Space direction="vertical" size={2}>
+            <Text>{learnerName} is no longer being considered for {grade}.</Text>
+            {application.decisionReason && (
+              <Text type="secondary">You told the school: {application.decisionReason}</Text>
+            )}
+            <Text type="secondary">
+              Reference {application.applicationNumber}, should you need to refer to it.
+            </Text>
+          </Space>
+        }
+      />
+    );
+  }
+
   if (!isDraft) {
     const awaitingPayment = application.status === PAYMENT_PENDING && checkout?.awaitingPayment;
 
@@ -79,6 +174,9 @@ export default function ReviewStep({
                 Reference <Text strong copyable>{application.applicationNumber}</Text>
               </Text>
               <Text type="secondary">Keep that number — the school will ask for it.</Text>
+              <Text type="secondary">
+                Where it stands: {applicationStatusLabel(application.status)}.
+              </Text>
             </Space>
           }
         />
@@ -132,6 +230,13 @@ export default function ReviewStep({
             description="The school is reviewing your application."
           />
         )}
+
+        <div style={{ marginTop: 24 }}>
+          <Paragraph type="secondary" style={{ marginBottom: 4 }}>
+            Changed your mind, or taken a place somewhere else?
+          </Paragraph>
+          {withdrawAffordance}
+        </div>
       </>
     );
   }
@@ -185,9 +290,12 @@ export default function ReviewStep({
         </Descriptions.Item>
       </Descriptions>
 
-      <Button type="primary" size="large" icon={<SendOutlined />} loading={submitting} onClick={onSubmit}>
-        Submit this application
-      </Button>
+      <Space direction="vertical" size={4}>
+        <Button type="primary" size="large" icon={<SendOutlined />} loading={submitting} onClick={onSubmit}>
+          Submit this application
+        </Button>
+        {withdrawAffordance}
+      </Space>
     </>
   );
 }

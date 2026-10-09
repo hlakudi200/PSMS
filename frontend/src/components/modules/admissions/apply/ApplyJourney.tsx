@@ -22,6 +22,9 @@ import {
 } from '@/providers/admissions/admission_settings';
 import type { IOpenIntake } from '@/providers/admissions/admission_settings/context';
 import type { ICreateApplication } from '@/providers/admissions/shared/interfaces';
+import {
+  ApplicationStatus, applicationStatusColor, applicationStatusLabel,
+} from '@/providers/admissions/shared/application-status';
 import LearnerStep from './LearnerStep';
 import ParentsStep from './ParentsStep';
 import DocumentsStep from './DocumentsStep';
@@ -30,24 +33,7 @@ import { learnerSchema } from './schema';
 
 const { Title, Paragraph, Text } = Typography;
 
-const DRAFT = 1;
-
-const statusLabels: Record<number, { label: string; color: string }> = {
-  1: { label: 'Not sent yet', color: 'default' },
-  2: { label: 'Submitted', color: 'processing' },
-  3: { label: 'Waiting for the fee', color: 'warning' },
-  4: { label: 'Being reviewed', color: 'processing' },
-  5: { label: 'Interview arranged', color: 'processing' },
-  6: { label: 'Assessment arranged', color: 'processing' },
-  7: { label: 'Decision pending', color: 'processing' },
-  8: { label: 'Offered a place', color: 'success' },
-  9: { label: 'Waitlisted', color: 'warning' },
-  10: { label: 'Not successful', color: 'error' },
-  11: { label: 'Offer accepted', color: 'success' },
-  12: { label: 'Offer declined', color: 'default' },
-  13: { label: 'Withdrawn', color: 'default' },
-  14: { label: 'Enrolled', color: 'success' },
-};
+const DRAFT = ApplicationStatus.Draft;
 
 /**
  * Where a prospective parent fills in an application.
@@ -62,7 +48,8 @@ function ApplyContent() {
   const { signOut } = useAuthActions();
 
   const { applications, application, isPending } = useApplicationState();
-  const { getMineAsync, getAsync, createAsync, updateAsync, submitAsync } = useApplicationActions();
+  const { getMineAsync, getAsync, createAsync, updateAsync, submitAsync, withdrawAsync } =
+    useApplicationActions();
   const { getOpenIntakesAsync } = useAdmissionSettingsActions();
 
   const [form] = Form.useForm();
@@ -77,6 +64,7 @@ function ApplyContent() {
   const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [withdrawing, setWithdrawing] = useState(false);
   const [error, setError] = useState<string | undefined>();
 
   useEffect(() => {
@@ -107,11 +95,15 @@ function ApplyContent() {
   };
 
   const openExisting = async (id: string) => {
+    const known = (applications ?? []).find((a) => a.id === id);
     setWorkingOn(id);
     setStarting(false);
     setError(undefined);
+    /* A sent application has nothing left to fill in. What the parent opened it
+       for is where it stands — and that is the last step, not a read-only copy
+       of the first one. */
+    setStep(known && known.status !== DRAFT ? 3 : 0);
     await getAsync(id);
-    setStep(0);
   };
 
   /* Fill the learner form from whatever is already saved, so coming back to a
@@ -210,6 +202,30 @@ function ApplyContent() {
     }
   };
 
+  /**
+   * Taking it back.
+   *
+   * A parent who has changed their mind — moved town, took a place elsewhere,
+   * or simply started this one by mistake — has to be able to say so. The
+   * server allows it right up until the learner is enrolled, and it is final:
+   * there is no un-withdrawing, only applying again.
+   */
+  const withdraw = async (reason?: string) => {
+    if (!workingOn) return;
+    setWithdrawing(true);
+    setError(undefined);
+    try {
+      await withdrawAsync(workingOn, reason);
+      message.success('Withdrawn. The school has been told.');
+      await getAsync(workingOn);
+      await getMineAsync();
+    } catch (e) {
+      sayWhatTheServerSaid(e, 'Could not withdraw this application.');
+    } finally {
+      setWithdrawing(false);
+    }
+  };
+
   const backToList = () => {
     setWorkingOn(null);
     setStarting(false);
@@ -292,8 +308,8 @@ function ApplyContent() {
                     title={
                       <Space wrap>
                         <Text strong>{a.fullName}</Text>
-                        <Tag color={statusLabels[a.status]?.color}>
-                          {statusLabels[a.status]?.label ?? 'In progress'}
+                        <Tag color={applicationStatusColor(a.status)}>
+                          {applicationStatusLabel(a.status)}
                         </Tag>
                       </Space>
                     }
@@ -384,6 +400,8 @@ function ApplyContent() {
             documentCount={current.documentCount ?? 0}
             onSubmit={submit}
             submitting={submitting}
+            onWithdraw={withdraw}
+            withdrawing={withdrawing}
             onRefresh={refresh}
           />
         )}
