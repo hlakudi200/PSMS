@@ -3,6 +3,17 @@
 import { createContext } from "react";
 
 /**
+ * A school a prospective parent can choose to apply to. Only schools currently
+ * open to applications are listed, which is both the useful filter and the
+ * careful one.
+ */
+export interface IOpenSchool {
+  tenancyName: string;
+  schoolName: string;
+  logoUrl?: string;
+}
+
+/**
  * A tenant's visual identity (issue #56). Mirrors the backend
  * SchoolBrandingDto / PublicSchoolBrandingDto.
  */

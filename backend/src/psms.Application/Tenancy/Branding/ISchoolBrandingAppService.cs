@@ -1,4 +1,4 @@
-using System.Threading.Tasks;
+﻿using System.Threading.Tasks;
 using Abp.Application.Services;
 using psms.Domain.Shared.Storage;
 using psms.Tenancy.Branding.Dto;
@@ -21,6 +21,12 @@ public interface ISchoolBrandingAppService : IApplicationService
     /// callers (the login page). Returns the PSMS defaults for an unknown or
     /// inactive tenancy name.
     /// </summary>
+    /// <summary>
+    /// The schools a prospective parent may apply to, for them to pick from
+    /// rather than type. Only schools currently open to applications.
+    /// </summary>
+    Task<Abp.Application.Services.Dto.ListResultDto<Dto.OpenSchoolDto>> GetSchoolsAcceptingApplicationsAsync();
+
     Task<PublicSchoolBrandingDto> GetPublicAsync(string tenancyName);
 
     /// <summary>Sets colours and display name, creating the row if needed.</summary>

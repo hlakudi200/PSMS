@@ -1,13 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Alert, Button, Form, Input, Typography, message } from "antd";
+import { Alert, Avatar, Button, Form, Input, Select, Spin, Typography, message } from "antd";
 import { BankOutlined, LockOutlined, MailOutlined, UserOutlined } from "@ant-design/icons";
 import { useRouter } from "next/navigation";
 import { z } from "zod";
 import { getAxiosInstance } from "@/utils/axios-instance";
 import { useAuthActions, useAuthState } from "@/providers/auth";
 import { useBrandingActions, useBrandingState } from "@/providers/branding";
+import type { IOpenSchool } from "@/providers/branding/context";
 import styles from "../login/login.module.css";
 
 const { Paragraph, Text } = Typography;
@@ -29,7 +30,7 @@ const BRANDING_LOOKUP_DEBOUNCE_MS = 500;
  */
 const schema = z
   .object({
-    tenancyName: z.string().trim().min(1, "Enter the name of the school you are applying to."),
+    tenancyName: z.string().trim().min(1, "Choose the school you are applying to."),
     name: z.string().trim().min(2, "Enter your first name."),
     surname: z.string().trim().min(2, "Enter your surname."),
     emailAddress: z.string().trim().email("Enter a valid email address."),
@@ -57,39 +58,47 @@ export default function RegisterPage() {
   const { loadPublicBranding, resetBranding } = useBrandingActions();
 
   const instanceRef = useRef(getAxiosInstance());
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [lookedUpTenancy, setLookedUpTenancy] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [refusal, setRefusal] = useState<string | undefined>();
 
-  const scheduleBrandingLookup = useCallback(
+  /* Typing the school's name exactly is a trap — "School ABC" and "SchoolABC"
+     are the same school to a parent and different strings to us, and the only
+     feedback was a refusal that read as "your school is not on this system".
+     The schools currently open to applications are loaded instead. */
+  const [schools, setSchools] = useState<IOpenSchool[]>([]);
+  const [loadingSchools, setLoadingSchools] = useState(true);
+  const [schoolsFailed, setSchoolsFailed] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    instanceRef.current
+      .get("/api/services/app/SchoolBranding/GetSchoolsAcceptingApplications", {
+        suppressErrorModal: true,
+      })
+      .then((response) => {
+        if (!cancelled) setSchools(response.data?.result?.items ?? []);
+      })
+      .catch(() => {
+        if (!cancelled) setSchoolsFailed(true);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingSchools(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  /* Brand the page for whichever school they pick, the way the login page
+     brands itself for whichever school they type. */
+  const onSchoolChosen = useCallback(
     (tenancyName: string) => {
-      const trimmed = tenancyName.trim();
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-
-      if (!trimmed) {
-        if (lookedUpTenancy !== null) {
-          setLookedUpTenancy(null);
-          resetBranding();
-        }
-        return;
-      }
-
-      if (trimmed === lookedUpTenancy) return;
-
-      debounceRef.current = setTimeout(() => {
-        setLookedUpTenancy(trimmed);
-        loadPublicBranding(trimmed);
-      }, BRANDING_LOOKUP_DEBOUNCE_MS);
+      if (tenancyName) loadPublicBranding(tenancyName);
+      else resetBranding();
     },
-    [loadPublicBranding, resetBranding, lookedUpTenancy]
-  );
-
-  useEffect(
-    () => () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    },
-    []
+    [loadPublicBranding, resetBranding]
   );
 
   // Signing up signs you in, and an applicant's place is the application.
@@ -180,6 +189,16 @@ export default function RegisterPage() {
             learner&apos;s details on the next screen, and you can come back to finish later.
           </Paragraph>
 
+          {schoolsFailed && (
+            <Alert
+              type="warning"
+              showIcon
+              style={{ marginBottom: 16 }}
+              message="Could not load the list of schools"
+              description="Check your connection and reload the page. If it keeps happening, contact the school and they will help you apply."
+            />
+          )}
+
           {refusal && (
             <Alert
               type="error"
@@ -195,12 +214,41 @@ export default function RegisterPage() {
             <Form.Item
               name="tenancyName"
               label="School you are applying to"
-              rules={[{ required: true, message: "Enter the name of the school." }]}
+              rules={[{ required: true, message: "Choose the school you are applying to." }]}
+              extra={
+                !loadingSchools && !schoolsFailed && schools.length === 0
+                  ? "No schools are taking applications online at the moment. Contact the school directly."
+                  : undefined
+              }
             >
-              <Input
-                suffix={<BankOutlined style={{ color: "#8C8C8C" }} />}
-                placeholder="School name"
-                onChange={(e) => scheduleBrandingLookup(e.target.value)}
+              <Select
+                showSearch
+                allowClear
+                placeholder={loadingSchools ? "Loading schools..." : "Choose your school"}
+                loading={loadingSchools}
+                disabled={loadingSchools || schools.length === 0}
+                onChange={onSchoolChosen}
+                notFoundContent={loadingSchools ? <Spin size="small" /> : "No match"}
+                filterOption={(input, option) =>
+                  String(option?.label ?? "").toLowerCase().includes(input.toLowerCase())
+                }
+                options={schools.map((school) => ({
+                  value: school.tenancyName,
+                  label: school.schoolName,
+                }))}
+                optionRender={(option) => {
+                  const school = schools.find((s) => s.tenancyName === option.value);
+                  return (
+                    <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <Avatar
+                        size={22}
+                        src={school?.logoUrl || undefined}
+                        icon={!school?.logoUrl ? <BankOutlined /> : undefined}
+                      />
+                      {option.label}
+                    </span>
+                  );
+                }}
               />
             </Form.Item>
 
