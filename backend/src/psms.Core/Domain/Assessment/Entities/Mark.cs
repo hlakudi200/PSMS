@@ -15,6 +15,7 @@ namespace psms.Domain.Assessment.Entities
     public class Mark : FullAuditedEntity<Guid>, IMayHaveTenant
     {
         public const int MaxCommentLength = 1000;
+        public const int MinFeedbackLength = 20;
         public const int MaxFeedbackLength = 2000;
 
         /// <summary>

@@ -193,7 +193,9 @@ export const MarkProvider = ({
     dispatch(updateMarkPending());
     const endpoint = `/api/services/app/Mark/UpdateFeedback?id=${id}`;
     await instance
-      .put(endpoint, input)
+      // The feedback modal shows refusals inline (language, window, length),
+      // so no generic error dialog on top of it.
+      .put(endpoint, input, { suppressErrorModal: true })
       .then((response) => {
         dispatch(updateMarkSuccess(response.data.result));
       })

@@ -379,16 +379,27 @@ function MarkCaptureContent() {
       },
     },
     {
-      title: 'Notes',
+      // T-T20/T-T24: this is the short comment printed beside the mark on the
+      // report card — not the detailed student feedback (20–2000 chars),
+      // which is written per mark via the Feedback action.
+      title: (
+        <Tooltip title="Short comment printed on the report card. Detailed feedback for the student is added with the Feedback button once the mark is saved.">
+          Report comment
+        </Tooltip>
+      ),
       key: 'teacherComment',
       render: (_: unknown, row) => {
-        if (row.existingMark) return <Text type="secondary">—</Text>;
+        if (row.existingMark) {
+          return row.existingMark.teacherComment
+            ? <Text type="secondary">{row.existingMark.teacherComment}</Text>
+            : <Text type="secondary">—</Text>;
+        }
         return (
           <Input
             value={row.teacherComment}
             disabled={locked}
             maxLength={1000}
-            placeholder="Optional"
+            placeholder="Optional, for the report card"
             onChange={(e) => updateRow(row.studentId, { teacherComment: e.target.value })}
           />
         );

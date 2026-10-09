@@ -181,12 +181,15 @@ export const EditMarkModal: React.FC<EditMarkModalProps> = ({
           </div>
 
           <div>
-            <Text strong>Teacher Comment</Text>
+            <Text strong>Report comment</Text>
+            <Text type="secondary" style={{ display: 'block', fontSize: 12 }}>
+              Short comment printed on the report card. Detailed student feedback is edited separately.
+            </Text>
             <Input
               value={teacherComment}
               disabled={locked}
               maxLength={1000}
-              placeholder="Optional"
+              placeholder="Optional, for the report card"
               onChange={(e) => setTeacherComment(e.target.value)}
               style={{ marginTop: 4 }}
             />

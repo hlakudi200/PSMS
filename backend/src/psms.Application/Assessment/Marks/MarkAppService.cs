@@ -399,6 +399,11 @@ public class MarkAppService : ApplicationService, IMarkAppService
             throw new UserFriendlyException(AssessmentExceptionCodes.MarkNotFound, "Mark not found.");
 
         var feedback = (input.Feedback ?? string.Empty).Trim();
+        // US-TCH-010: 20–2000 characters. Empty is allowed and clears the
+        // feedback; anything shorter than the minimum isn't useful feedback.
+        if (feedback.Length > 0 && feedback.Length < Mark.MinFeedbackLength)
+            throw new UserFriendlyException(AssessmentExceptionCodes.FeedbackTooShort,
+                $"Feedback must be at least {Mark.MinFeedbackLength} characters.");
         if (feedback.Length > Mark.MaxFeedbackLength)
             throw new UserFriendlyException(AssessmentExceptionCodes.FeedbackTooLong,
                 $"Feedback must be {Mark.MaxFeedbackLength} characters or fewer.");
@@ -420,10 +425,13 @@ public class MarkAppService : ApplicationService, IMarkAppService
                         : "The feedback edit window has closed for this assessment.");
         }
 
-        // TF-002: reject inappropriate language.
-        if (ContainsInappropriateLanguage(feedback))
+        // TF-002: reject inappropriate language, naming the words so the
+        // teacher knows exactly what to rephrase.
+        var flagged = FindInappropriateTerms(feedback);
+        if (flagged.Count > 0)
             throw new UserFriendlyException(AssessmentExceptionCodes.FeedbackInappropriateLanguage,
-                "Feedback contains language that isn't allowed. Please revise it.");
+                $"Feedback can't include: {string.Join(", ", flagged.Select(t => $"\"{t}\""))}. " +
+                "Please describe the behaviour or work instead.");
 
         // TF-005: record the previous feedback in the edit history (only when
         // it actually changes and there was prior text to preserve).
@@ -451,11 +459,12 @@ public class MarkAppService : ApplicationService, IMarkAppService
         return await GetAsync(id);
     }
 
-    private static bool ContainsInappropriateLanguage(string text)
+    private static List<string> FindInappropriateTerms(string text)
     {
-        if (string.IsNullOrWhiteSpace(text)) return false;
-        return InappropriateTerms.Any(term =>
-            Regex.IsMatch(text, $@"\b{Regex.Escape(term)}\b", RegexOptions.IgnoreCase));
+        if (string.IsNullOrWhiteSpace(text)) return new List<string>();
+        return InappropriateTerms
+            .Where(term => Regex.IsMatch(text, $@"\b{Regex.Escape(term)}\b", RegexOptions.IgnoreCase))
+            .ToList();
     }
 
     [AbpAuthorize(PermissionNames.Assessment_Marks_Edit)]
