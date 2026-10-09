@@ -203,6 +203,12 @@ public class ApplicationAppService : ApplicationService, IApplicationAppService
             .ToListAsync();
 
         var open = settings
+            /* A year-wide row is not something anyone can apply to: creating an
+               application requires a grade, so "Any grade · 2027" was the only
+               thing on offer and the form then refused it. Settings are written
+               per grade now; any year-wide row left over from before is a
+               template for the school, not an intake for a parent. */
+            .Where(x => x.GradeId.HasValue)
             .Where(x => x.AreApplicationsOpen() && !x.IsAtCapacity())
             .OrderBy(x => x.AcademicYear.Year)
             .ThenBy(x => x.GradeId == null ? 0 : 1)

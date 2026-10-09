@@ -224,7 +224,7 @@ export default function AdmissionSettingsFormModal({
 
     try {
       if (isNew) {
-        await createAsync({
+        const created = await createAsync({
           academicYearId: v.academicYearId,
           gradeId: v.gradeId || undefined,
           isAcceptingApplications: v.isAcceptingApplications,
@@ -241,7 +241,15 @@ export default function AdmissionSettingsFormModal({
           requiredDocuments: v.requiredDocuments || undefined,
           notes: v.notes || undefined,
         });
-        message.success('Admission settings added');
+        /* Leaving the grade empty writes one intake per grade, so say how many
+           rather than "added" — the school is about to see a table that grew by
+           twelve, and should know that was the point. */
+        const howMany = created?.length ?? 1;
+        message.success(
+          howMany === 1
+            ? 'Admission settings added'
+            : `Admission settings added for ${howMany} grades. Open any one of them to set its places, assessment or documents apart.`
+        );
         onSaved();
         onClose();
         return;
@@ -316,12 +324,16 @@ export default function AdmissionSettingsFormModal({
               <Form.Item
                 label="Grade"
                 name="gradeId"
-                extra="Leave empty for the default that covers every grade."
+                extra={
+                  chosenGradeId
+                    ? 'One intake, for this grade.'
+                    : 'Leave empty and these settings are written once for every grade, so you can then set each one apart — Grade 1 takes a different number of learners to Grade 8, and sits a different assessment.'
+                }
               >
                 <Select
                   allowClear
                   showSearch
-                  placeholder="Every grade"
+                  placeholder="Set up every grade"
                   optionFilterProp="label"
                   options={gradeOptions.map((g) => ({ value: g.id, label: g.gradeName }))}
                 />

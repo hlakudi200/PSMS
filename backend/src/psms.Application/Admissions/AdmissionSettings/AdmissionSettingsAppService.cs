@@ -28,17 +28,20 @@ public class AdmissionSettingsAppService : ApplicationService, IAdmissionSetting
     private readonly IRepository<Application, Guid> _applicationRepository;
     private readonly IRepository<Waitlist, Guid> _waitlistRepository;
     private readonly IRepository<psms.Domain.Academic.Entities.AcademicYear, Guid> _academicYearRepository;
+    private readonly IRepository<psms.Domain.Academic.Entities.Grade, Guid> _gradeRepository;
 
     public AdmissionSettingsAppService(
         IRepository<Domain.Admissions.Entities.AdmissionSettings, Guid> settingsRepository,
         IRepository<Application, Guid> applicationRepository,
         IRepository<Waitlist, Guid> waitlistRepository,
-        IRepository<psms.Domain.Academic.Entities.AcademicYear, Guid> academicYearRepository)
+        IRepository<psms.Domain.Academic.Entities.AcademicYear, Guid> academicYearRepository,
+        IRepository<psms.Domain.Academic.Entities.Grade, Guid> gradeRepository)
     {
         _settingsRepository = settingsRepository;
         _applicationRepository = applicationRepository;
         _waitlistRepository = waitlistRepository;
         _academicYearRepository = academicYearRepository;
+        _gradeRepository = gradeRepository;
     }
 
     [AbpAuthorize(PermissionNames.Admissions_Settings_View)]
@@ -134,31 +137,148 @@ public class AdmissionSettingsAppService : ApplicationService, IAdmissionSetting
             ObjectMapper.Map<List<AdmissionSettingsDto>>(settingsList));
     }
 
+    /// <summary>
+    /// Sets up an intake.
+    /// <para>
+    /// Choosing no grade used to store a single "any grade" row, and almost
+    /// nothing on these settings is true of a whole school at once. The
+    /// capacity is not — a hundred places for 2027 says nothing about how many
+    /// Grade 1s the school can take. The age bounds are not. The documents are
+    /// not: a Grade 1 needs a birth certificate, a Grade 11 needs reports from
+    /// the school they are leaving. And the assessment certainly is not — a
+    /// six-year-old and a sixteen-year-old cannot sit the same paper, so an
+    /// intake that spans every grade cannot say which assessment it means.
+    /// </para>
+    /// <para>
+    /// Worse, nobody could apply through one. The server insists on a grade,
+    /// so the one row the school had published put every parent into a dead
+    /// end: they picked the only thing on offer and the form refused it.
+    /// </para>
+    /// <para>
+    /// So "every grade" now means what it says — one set of settings per
+    /// grade, identical to start with and each editable afterwards, which is
+    /// where a school sets Grade 1's capacity apart from Grade 8's.
+    /// </para>
+    /// </summary>
     [AbpAuthorize(PermissionNames.Admissions_Settings_Manage)]
-    public async Task<AdmissionSettingsDto> CreateAsync(CreateAdmissionSettingsDto input)
+    public async Task<ListResultDto<AdmissionSettingsDto>> CreateAsync(CreateAdmissionSettingsDto input)
     {
-        // Check if settings already exist for this academic year and grade
-        var existingSettings = await _settingsRepository
-            .FirstOrDefaultAsync(s => s.AcademicYearId == input.AcademicYearId && s.GradeId == input.GradeId);
-
-        if (existingSettings != null)
+        if (input.GradeId.HasValue)
         {
-            throw new UserFriendlyException(AdmissionsExceptionCodes.DuplicateAdmissionSettings,
-                input.GradeId.HasValue
-                    ? "Admission settings already exist for this grade and academic year."
-                    : "Default admission settings already exist for this academic year.");
+            var created = await CreateOneAsync(input, input.GradeId.Value);
+            await CurrentUnitOfWork.SaveChangesAsync();
+            return new ListResultDto<AdmissionSettingsDto>(
+                new List<AdmissionSettingsDto> { await GetAsync(created.Id) });
         }
+
+        return await WriteOnePerGradeAsync(input);
+    }
+
+    /// <summary>
+    /// Takes a year-wide row the school set up before, writes the per-grade
+    /// settings it was standing in for, and removes it — so the intake parents
+    /// could not apply to becomes the intakes they can.
+    /// </summary>
+    [AbpAuthorize(PermissionNames.Admissions_Settings_Manage)]
+    public async Task<ListResultDto<AdmissionSettingsDto>> ExpandToEveryGradeAsync(Guid id)
+    {
+        var template = await _settingsRepository.FirstOrDefaultAsync(id);
+
+        if (template == null)
+            throw new UserFriendlyException(AdmissionsExceptionCodes.AdmissionSettingsNotFound,
+                "Those admission settings no longer exist.");
+
+        if (template.GradeId.HasValue)
+            throw new UserFriendlyException(AdmissionsExceptionCodes.InvalidAdmissionSettings,
+                "These settings already belong to one grade, so there is nothing to expand.");
+
+        var written = await WriteOnePerGradeAsync(new CreateAdmissionSettingsDto
+        {
+            AcademicYearId = template.AcademicYearId,
+            ApplicationFeeAmount = template.ApplicationFeeAmount,
+            IsApplicationFeeRequired = template.IsApplicationFeeRequired,
+            MaxCapacity = template.MaxCapacity,
+            ApplicationOpenDate = template.ApplicationOpenDate,
+            ApplicationCloseDate = template.ApplicationCloseDate,
+            IsAcceptingApplications = template.IsAcceptingApplications,
+            RequiredDocuments = template.RequiredDocuments,
+            IsInterviewRequired = template.IsInterviewRequired,
+            IsAssessmentRequired = template.IsAssessmentRequired,
+            MinimumAge = template.MinimumAge,
+            MaximumAge = template.MaximumAge,
+            OfferExpiryDays = template.OfferExpiryDays,
+            Notes = template.Notes,
+        });
+
+        await _settingsRepository.DeleteAsync(template);
+        await CurrentUnitOfWork.SaveChangesAsync();
+
+        return written;
+    }
+
+    /// <summary>
+    /// One row per grade that does not already have one for this year, all
+    /// carrying the same values. Grades the school has already configured are
+    /// left exactly as they are — this never overwrites a decision somebody
+    /// has made about a particular grade.
+    /// </summary>
+    private async Task<ListResultDto<AdmissionSettingsDto>> WriteOnePerGradeAsync(CreateAdmissionSettingsDto input)
+    {
+        var grades = await _gradeRepository
+            .GetAll()
+            .Where(g => g.IsActive)
+            .OrderBy(g => g.GradeLevel)
+            .ToListAsync();
+
+        if (grades.Count == 0)
+            throw new UserFriendlyException(AdmissionsExceptionCodes.InvalidAdmissionSettings,
+                "This school has no grades set up yet, so there is nothing to open applications for.");
+
+        var alreadyConfigured = await _settingsRepository
+            .GetAll()
+            .Where(s => s.AcademicYearId == input.AcademicYearId && s.GradeId != null)
+            .Select(s => s.GradeId.Value)
+            .ToListAsync();
+
+        var toWrite = grades.Where(g => !alreadyConfigured.Contains(g.Id)).ToList();
+
+        if (toWrite.Count == 0)
+            throw new UserFriendlyException(AdmissionsExceptionCodes.DuplicateAdmissionSettings,
+                "Every grade already has admission settings for this year. Edit the ones you want to change.");
+
+        var written = new List<Guid>();
+        foreach (var grade in toWrite)
+            written.Add((await CreateOneAsync(input, grade.Id)).Id);
+
+        await CurrentUnitOfWork.SaveChangesAsync();
+
+        var result = new List<AdmissionSettingsDto>();
+        foreach (var id in written)
+            result.Add(await GetAsync(id));
+
+        return new ListResultDto<AdmissionSettingsDto>(result);
+    }
+
+    private async Task<Domain.Admissions.Entities.AdmissionSettings> CreateOneAsync(
+        CreateAdmissionSettingsDto input,
+        Guid gradeId)
+    {
+        var existing = await _settingsRepository
+            .FirstOrDefaultAsync(s => s.AcademicYearId == input.AcademicYearId && s.GradeId == gradeId);
+
+        if (existing != null)
+            throw new UserFriendlyException(AdmissionsExceptionCodes.DuplicateAdmissionSettings,
+                "Admission settings already exist for this grade and academic year.");
 
         var settings = ObjectMapper.Map<Domain.Admissions.Entities.AdmissionSettings>(input);
         settings.Id = Guid.NewGuid();
         settings.TenantId = AbpSession.TenantId;
+        settings.GradeId = gradeId;
 
         await AssertTheWindowMakesSenseAsync(settings);
 
         await _settingsRepository.InsertAsync(settings);
-        await CurrentUnitOfWork.SaveChangesAsync();
-
-        return await GetAsync(settings.Id);
+        return settings;
     }
 
     [AbpAuthorize(PermissionNames.Admissions_Settings_Manage)]
