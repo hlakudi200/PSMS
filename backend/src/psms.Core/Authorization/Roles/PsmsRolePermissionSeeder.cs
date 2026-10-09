@@ -1,4 +1,4 @@
-using Abp.Authorization;
+﻿using Abp.Authorization;
 using Abp.Dependency;
 using Abp.Domain.Uow;
 using Abp.IdentityFramework;
@@ -1137,6 +1137,14 @@ public class PsmsRolePermissionSeeder : ITransientDependency
             PermissionNames.Learning_Recordings_View,
         };
     }
+
+    /// <summary>
+    /// What a prospective parent is granted. Readable from outside so a test
+    /// can check that the calls the apply screens make are ones this role can
+    /// actually reach — the kind of mismatch that otherwise only shows up as a
+    /// 403 in a browser.
+    /// </summary>
+    public static IReadOnlyList<string> ApplicantPermissions() => GetApplicantPermissions();
 
     private static List<string> GetApplicantPermissions()
     {
