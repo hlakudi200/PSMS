@@ -6,6 +6,7 @@ import {
   AdmissionSettingsStateContext,
 } from "./context";
 import {
+  IAdmissionSettings,
   ICreateAdmissionSettings,
   IUpdateAdmissionSettings,
 } from "../shared/interfaces";
@@ -137,17 +138,36 @@ export const AdmissionSettingsProvider = ({
       });
   };
 
-  const createAsync = async (input: ICreateAdmissionSettings) => {
+  /**
+   * Returns every row written, which is one per grade when no grade was
+   * chosen — "every grade" writes real settings for each rather than one row
+   * nobody can apply to.
+   */
+  const createAsync = async (input: ICreateAdmissionSettings): Promise<IAdmissionSettings[]> => {
     dispatch(createAdmissionSettingsPending());
     const endpoint = `/api/services/app/AdmissionSettings/Create`;
-    await instance
+    return instance
       .post(endpoint, input)
       .then((response) => {
-        dispatch(createAdmissionSettingsSuccess(response.data.result));
+        const items: IAdmissionSettings[] = response.data.result.items ?? [];
+        dispatch(createAdmissionSettingsSuccess(items[0]));
+        return items;
       })
       .catch((error) => {
         console.error(error);
         dispatch(createAdmissionSettingsError());
+        throw error;
+      });
+  };
+
+  /** Turns a leftover year-wide row into the per-grade settings it stood for. */
+  const expandToEveryGradeAsync = async (id: string): Promise<IAdmissionSettings[]> => {
+    const endpoint = `/api/services/app/AdmissionSettings/ExpandToEveryGrade?id=${id}`;
+    return instance
+      .post(endpoint)
+      .then((response) => response.data.result.items ?? [])
+      .catch((error) => {
+        console.error(error);
         throw error;
       });
   };
@@ -258,6 +278,7 @@ export const AdmissionSettingsProvider = ({
           getOpenIntakesAsync,
           getAllByAcademicYearAsync,
           createAsync,
+          expandToEveryGradeAsync,
           updateAsync,
           deleteAsync,
           getCapacityStatusAsync,

@@ -28,6 +28,7 @@ public class ApplicationWindow_Tests : psmsTestBase
 {
     private readonly IAdmissionSettingsAppService _settings;
     private Guid _yearId;
+    private Guid _gradeId;
     private DateTime _yearEnds;
 
     public ApplicationWindow_Tests()
@@ -38,10 +39,16 @@ public class ApplicationWindow_Tests : psmsTestBase
         _yearId = Guid.NewGuid();
         _yearEnds = new DateTime(2027, 12, 15);
 
+        _gradeId = Guid.NewGuid();
+
         UsingDbContext(1, context =>
         {
             context.AcademicYears.Add(new AcademicYear(_yearId, 1, 2027,
                 new DateTime(2027, 2, 3), _yearEnds) { YearName = "2027 Academic Year" });
+            // Settings belong to a grade; one is enough to exercise the window.
+            context.Grades.Add(new Grade(_gradeId, 1,
+                psms.Domain.Shared.Enums.SouthAfricanGradeLevel.Grade1, "Grade 1",
+                psms.Domain.Shared.Enums.SouthAfricanSchoolPhase.Foundation));
             context.SaveChanges();
         });
     }
@@ -51,7 +58,7 @@ public class ApplicationWindow_Tests : psmsTestBase
         new CreateAdmissionSettingsDto
         {
             AcademicYearId = _yearId,
-            GradeId = gradeId,
+            GradeId = gradeId ?? _gradeId,
             ApplicationFeeAmount = 500m,
             IsAcceptingApplications = accepting,
             ApplicationOpenDate = opens,
@@ -109,7 +116,7 @@ public class ApplicationWindow_Tests : psmsTestBase
             closes: DateTime.UtcNow.Date.AddDays(-1),
             accepting: false));
 
-        saved.ShouldNotBeNull();
+        saved.Items.ShouldNotBeEmpty();
     }
 
     [Fact]
@@ -121,7 +128,7 @@ public class ApplicationWindow_Tests : psmsTestBase
             opens: DateTime.UtcNow.Date.AddDays(-30),
             closes: new DateTime(2027, 1, 31)));
 
-        saved.ShouldNotBeNull();
+        saved.Items.ShouldNotBeEmpty();
     }
 
     [Fact]
@@ -129,8 +136,9 @@ public class ApplicationWindow_Tests : psmsTestBase
     {
         // Then the switch is the whole answer, which is what most schools do.
         var saved = await _settings.CreateAsync(Window(opens: null, closes: null));
+        var row = saved.Items[0];
 
-        saved.ShouldNotBeNull();
+        row.ShouldNotBeNull();
     }
 
     [Fact]
@@ -139,9 +147,10 @@ public class ApplicationWindow_Tests : psmsTestBase
         // The defect reached the database through an editor, so the check has
         // to sit on the way back in as well as on the way in.
         var saved = await _settings.CreateAsync(Window(opens: null, closes: null));
+        var row = saved.Items[0];
 
         var refusal = await Should.ThrowAsync<UserFriendlyException>(
-            () => _settings.UpdateAsync(saved.Id, new UpdateAdmissionSettingsDto
+            () => _settings.UpdateAsync(row.Id, new UpdateAdmissionSettingsDto
             {
                 IsAcceptingApplications = true,
                 ApplicationCloseDate = DateTime.UtcNow.Date.AddDays(-1),

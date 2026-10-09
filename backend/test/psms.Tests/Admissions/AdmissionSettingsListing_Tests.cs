@@ -54,7 +54,8 @@ public class AdmissionSettingsListing_Tests : psmsTestBase
         });
     }
 
-    private async Task SeedAsync(Guid yearId, Guid? gradeId) =>
+    private async Task<Abp.Application.Services.Dto.ListResultDto<AdmissionSettingsDto>> SeedAsync(
+        Guid yearId, Guid? gradeId) =>
         await _settings.CreateAsync(new CreateAdmissionSettingsDto
         {
             AcademicYearId = yearId,
@@ -73,7 +74,46 @@ public class AdmissionSettingsListing_Tests : psmsTestBase
 
         var all = await _settings.GetAllAsync();
 
-        all.Items.Count.ShouldBe(2);
+        all.Items.Select(x => x.AcademicYearId).Distinct()
+            .ShouldBe(new[] { _year2027, _year2026 }, ignoreOrder: true);
+    }
+
+    [Fact]
+    public async Task No_grade_means_every_grade_gets_its_own_settings()
+    {
+        /* It used to mean one "any grade" row, and almost nothing on these
+           settings is true of a whole school at once — the capacity least of
+           all, and a six-year-old and a sixteen-year-old cannot sit the same
+           admission assessment. Nobody could apply through one either: creating
+           an application needs a grade, so the row was a dead end. */
+        var written = await SeedAsync(_year2027, null);
+
+        written.Items.Count.ShouldBe(2);
+        written.Items.Select(x => x.GradeId)
+            .ShouldBe(new Guid?[] { _grade8, _grade11 }, ignoreOrder: true);
+        written.Items.ShouldAllBe(x => x.GradeId != null);
+    }
+
+    [Fact]
+    public async Task And_leaves_a_grade_the_school_has_already_set_up_alone()
+    {
+        // Somebody decided Grade 11 takes 20 learners. Filling in the rest of
+        // the school must not quietly reset that.
+        await _settings.CreateAsync(new CreateAdmissionSettingsDto
+        {
+            AcademicYearId = _year2027,
+            GradeId = _grade11,
+            ApplicationFeeAmount = 500m,
+            MaxCapacity = 20,
+            OfferExpiryDays = 14,
+        });
+
+        var written = await SeedAsync(_year2027, null);
+
+        written.Items.Single().GradeId.ShouldBe(_grade8);
+
+        var all = await _settings.GetAllAsync(_year2027, _grade11);
+        all.Items.Single().MaxCapacity.ShouldBe(20);
     }
 
     [Fact]
@@ -111,14 +151,57 @@ public class AdmissionSettingsListing_Tests : psmsTestBase
     }
 
     [Fact]
-    public async Task The_default_sits_above_the_grades_it_is_the_default_for()
+    public async Task A_leftover_year_wide_row_sits_above_the_grades()
     {
+        /* New settings are always written per grade, but schools configured
+           before that have an "any grade" row in the database. It still sorts
+           to the top, where the action that turns it into real per-grade
+           settings is waiting. */
+        var legacy = Guid.NewGuid();
+        UsingDbContext(1, context =>
+        {
+            context.AdmissionSettings.Add(
+                new psms.Domain.Admissions.Entities.AdmissionSettings(legacy, 1, _year2027, 500m)
+                {
+                    GradeId = null,
+                    OfferExpiryDays = 14,
+                });
+            context.SaveChanges();
+        });
+
         await SeedAsync(_year2027, _grade11);
-        await SeedAsync(_year2027, null);
 
         var all = await _settings.GetAllAsync(_year2027);
 
         all.Items.First().GradeId.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task And_can_be_turned_into_the_per_grade_settings_it_stood_for()
+    {
+        var legacy = Guid.NewGuid();
+        UsingDbContext(1, context =>
+        {
+            context.AdmissionSettings.Add(
+                new psms.Domain.Admissions.Entities.AdmissionSettings(legacy, 1, _year2027, 750m)
+                {
+                    GradeId = null,
+                    MaxCapacity = 100,
+                    IsAcceptingApplications = true,
+                    OfferExpiryDays = 21,
+                });
+            context.SaveChanges();
+        });
+
+        var written = await _settings.ExpandToEveryGradeAsync(legacy);
+
+        written.Items.Count.ShouldBe(2);
+        written.Items.ShouldAllBe(x => x.ApplicationFeeAmount == 750m);
+        written.Items.ShouldAllBe(x => x.OfferExpiryDays == 21);
+
+        // And the row nobody could apply through is gone.
+        var all = await _settings.GetAllAsync(_year2027);
+        all.Items.ShouldAllBe(x => x.GradeId != null);
     }
 
     [Fact]

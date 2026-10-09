@@ -93,6 +93,9 @@ public static class AdmissionsExceptionCodes
     public const string DocumentNotFound = "ADM_DOCUMENT_NOT_FOUND";
     public const string DuplicateAdmissionSettings = "ADM_DUPLICATE_ADMISSION_SETTINGS";
 
+    /// <summary>The settings as asked for do not describe an intake anyone could apply to.</summary>
+    public const string InvalidAdmissionSettings = "ADM_INVALID_ADMISSION_SETTINGS";
+
     /// <summary>
     /// The application window does not describe a period a parent could apply
     /// in: it closes before it opens, closes after the school year is over, or

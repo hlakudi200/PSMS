@@ -13,6 +13,7 @@ import {
   ClockCircleOutlined,
   UserAddOutlined,
   EditOutlined,
+  PartitionOutlined,
   PlusOutlined,
 } from '@ant-design/icons';
 import { EnterpriseTable } from '@/components/shared/enterprise-table';
@@ -65,7 +66,7 @@ function AdmissionsContent() {
   const { applications, totalCount, statistics, isPending, isError } = useApplicationState();
   const { getAllAsync, getStatisticsAsync } = useApplicationActions();
   const { admissionSettingsList, isPending: settingsPending } = useAdmissionSettingsState();
-  const { getAllAsync: getAllSettings } = useAdmissionSettingsActions();
+  const { getAllAsync: getAllSettings, expandToEveryGradeAsync } = useAdmissionSettingsActions();
   const [addingSettings, setAddingSettings] = useState(false);
 
   /* These settings were shown and never editable, so the only way to change
@@ -92,6 +93,34 @@ function AdmissionsContent() {
       label: 'Edit settings',
       icon: <EditOutlined />,
       onClick: (record) => setEditingSettings(record),
+    },
+    /* A row with no grade is one nobody can apply through — an application
+       needs a grade, so parents were shown "Any grade · 2027" and the form
+       then refused it. This writes the per-grade settings it was standing in
+       for and removes it. */
+    {
+      key: 'expand',
+      label: 'Set up each grade',
+      icon: <PartitionOutlined />,
+      visible: (record) => !record.gradeId,
+      confirm: {
+        title: 'Set these up for every grade?',
+        description:
+          'Each grade gets its own copy of these settings, and this row goes away. Grades you have already configured are left alone.',
+      },
+      onClick: async (record) => {
+        try {
+          const written = await expandToEveryGradeAsync(record.id);
+          message.success(
+            `Written for ${written.length} grades. Open any one to set its places, assessment or documents apart.`
+          );
+          getAllSettings(selectedAcademicYearId, selectedGradeId);
+        } catch (e) {
+          const abp = (e as { response?: { data?: { error?: { message?: string; details?: string } } } })
+            ?.response?.data?.error;
+          message.error(abp?.message || abp?.details || 'Could not set up the grades.');
+        }
+      },
     },
   ];
   const { waitlistEntries, totalCount: waitlistTotal, isPending: waitlistPending, isError: waitlistError } = useWaitlistState();

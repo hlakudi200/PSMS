@@ -37,7 +37,16 @@ public interface IAdmissionSettingsAppService : IApplicationService
     /// <summary>
     /// Creates new admission settings.
     /// </summary>
-    Task<AdmissionSettingsDto> CreateAsync(CreateAdmissionSettingsDto input);
+    /// <summary>
+    /// Sets up an intake. With no grade chosen this writes one set of settings
+    /// per grade rather than a single "any grade" row — see the service.
+    /// </summary>
+    Task<ListResultDto<AdmissionSettingsDto>> CreateAsync(CreateAdmissionSettingsDto input);
+
+    /// <summary>
+    /// Turns an existing year-wide row into real per-grade settings.
+    /// </summary>
+    Task<ListResultDto<AdmissionSettingsDto>> ExpandToEveryGradeAsync(Guid id);
 
     /// <summary>
     /// Updates existing admission settings.

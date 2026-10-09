@@ -24,7 +24,8 @@ export interface IAdmissionSettingsActionContext {
   /** What a prospective parent may apply for, and on what terms. */
   getOpenIntakesAsync: () => Promise<IOpenIntake[]>;
   getAllByAcademicYearAsync: (academicYearId: string) => void;
-  createAsync: (input: ICreateAdmissionSettings) => void;
+  createAsync: (input: ICreateAdmissionSettings) => Promise<IAdmissionSettings[]>;
+  expandToEveryGradeAsync: (id: string) => Promise<IAdmissionSettings[]>;
   updateAsync: (id: string, input: IUpdateAdmissionSettings) => void;
   deleteAsync: (id: string) => void;
   getCapacityStatusAsync: (academicYearId: string, gradeId: string) => void;
