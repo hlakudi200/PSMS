@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.ComponentModel.DataAnnotations;
 
 namespace psms.Admissions.AdmissionSettings.Dto;
@@ -21,6 +21,12 @@ public class CreateAdmissionSettingsDto
     [Required]
     [Range(0, 100000)]
     public decimal ApplicationFeeAmount { get; set; }
+
+    /// <summary>
+    /// Whether a fee has to be paid before the school will look at an
+    /// application. Defaults to charging one where an amount is given.
+    /// </summary>
+    public bool IsApplicationFeeRequired { get; set; } = true;
 
     // Capacity
     [Range(1, 1000)]

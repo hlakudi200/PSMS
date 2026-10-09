@@ -1,4 +1,4 @@
-using Abp.Application.Services;
+﻿using Abp.Application.Services;
 using Abp.Application.Services.Dto;
 using Abp.Authorization;
 using Abp.Domain.Repositories;
@@ -12,6 +12,8 @@ using psms.Authorization;
 using psms.Domain.Admissions.Entities;
 using psms.Domain.Shared.Enums;
 using psms.Domain.Shared.Validators;
+using psms.Domain.Workflow.Enums;
+using psms.Workflow.Shared;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -30,15 +32,18 @@ public class ApplicationAppService : ApplicationService, IApplicationAppService
     private readonly IRepository<Application, Guid> _applicationRepository;
     private readonly IRepository<Domain.Admissions.Entities.AdmissionSettings, Guid> _settingsRepository;
     private readonly IRepository<ApplicantParent, Guid> _parentRepository;
+    private readonly WorkflowStarterService _workflowStarter;
 
     public ApplicationAppService(
         IRepository<Application, Guid> applicationRepository,
         IRepository<Domain.Admissions.Entities.AdmissionSettings, Guid> settingsRepository,
-        IRepository<ApplicantParent, Guid> parentRepository)
+        IRepository<ApplicantParent, Guid> parentRepository,
+        WorkflowStarterService workflowStarter)
     {
         _applicationRepository = applicationRepository;
         _settingsRepository = settingsRepository;
         _parentRepository = parentRepository;
+        _workflowStarter = workflowStarter;
     }
 
     [AbpAuthorize(PermissionNames.Admissions_Applications_View)]
@@ -262,13 +267,50 @@ public class ApplicationAppService : ApplicationService, IApplicationAppService
             throw new UserFriendlyException(AdmissionsExceptionCodes.ParentInformationRequired,
                 "At least one parent must be marked as financially responsible.");
 
-        // Perform the status transition
-        application.Submit();
+        // Whether the school charges for this grade and year decides where a
+        // submitted application lands: waiting for money, or straight in front
+        // of the admissions officer.
+        var settings = await GetAdmissionSettingsAsync(
+            application.AcademicYearId, application.AppliedGradeId);
+
+        var feeRequired = settings.RequiresApplicationFee();
+
+        application.Submit(feeRequired);
 
         await _applicationRepository.UpdateAsync(application);
         await CurrentUnitOfWork.SaveChangesAsync();
 
+        // Review is what the admissions workflow is for, and until now only
+        // paying for the application ever started it. A school that charges
+        // nothing would have had every application reach review with no
+        // workflow behind it.
+        if (!feeRequired)
+            await TryStartAdmissionsWorkflowAsync(application.Id);
+
         return ObjectMapper.Map<ApplicationDto>(application);
+    }
+
+    /// <summary>
+    /// Puts the application in front of the admissions workflow, if the school
+    /// has one configured. Never allowed to fail the thing that triggered it:
+    /// an application that was legitimately submitted or paid for stays that
+    /// way even if the workflow could not be started.
+    /// </summary>
+    private async Task TryStartAdmissionsWorkflowAsync(Guid applicationId)
+    {
+        try
+        {
+            await _workflowStarter.TryStartWorkflowAsync(
+                AbpSession.TenantId,
+                WorkflowEntityType.Application,
+                applicationId,
+                AbpSession.UserId ?? 0,
+                (AbpSession.UserId ?? 0).ToString());
+        }
+        catch (Exception ex)
+        {
+            Logger.Warn($"Could not start the admissions workflow for application {applicationId}: {ex.Message}");
+        }
     }
 
     [AbpAuthorize(PermissionNames.Admissions_Applications_Withdraw)]

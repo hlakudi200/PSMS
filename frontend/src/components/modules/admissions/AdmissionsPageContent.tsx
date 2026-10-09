@@ -12,6 +12,7 @@ import {
   CloseCircleOutlined,
   ClockCircleOutlined,
   UserAddOutlined,
+  EditOutlined,
 } from '@ant-design/icons';
 import { EnterpriseTable } from '@/components/shared/enterprise-table';
 import type { ColumnConfig, TableQuery, RowAction } from '@/components/shared/enterprise-table';
@@ -23,6 +24,7 @@ import { GradeProvider, useGradeState, useGradeActions } from '@/providers/acade
 import { useAuthState } from '@/providers/auth';
 import type { IApplicationList } from '@/providers/admissions/shared/interfaces';
 import type { IAdmissionSettings } from '@/providers/admissions/shared/interfaces';
+import AdmissionSettingsFormModal from '@/components/modals/admissions/AdmissionSettingsFormModal';
 import type { IWaitlist } from '@/providers/admissions/shared/interfaces';
 
 const applicationStatusMap: Record<string, { label: string; color: string }> = {
@@ -55,6 +57,20 @@ function AdmissionsContent() {
   const { getAllAsync, getStatisticsAsync } = useApplicationActions();
   const { admissionSettingsList, isPending: settingsPending } = useAdmissionSettingsState();
   const { getAllByAcademicYearAsync } = useAdmissionSettingsActions();
+
+  /* These settings were shown and never editable, so the only way to change
+     when applications open, what they cost, or whether they cost anything was
+     an API client. */
+  const [editingSettings, setEditingSettings] = useState<IAdmissionSettings | undefined>();
+
+  const settingsRowActions: RowAction<IAdmissionSettings>[] = [
+    {
+      key: 'edit',
+      label: 'Edit settings',
+      icon: <EditOutlined />,
+      onClick: (record) => setEditingSettings(record),
+    },
+  ];
   const { waitlistEntries, totalCount: waitlistTotal, isPending: waitlistPending, isError: waitlistError } = useWaitlistState();
   const { getAllAsync: getAllWaitlist } = useWaitlistActions();
   const { academicYears } = useAcademicYearState();
@@ -165,7 +181,16 @@ function AdmissionsContent() {
     { key: 'maxCapacity', title: 'Capacity', dataIndex: 'maxCapacity', width: 90 },
     { key: 'currentEnrolledCount', title: 'Enrolled', dataIndex: 'currentEnrolledCount', width: 90 },
     { key: 'availableSpots', title: 'Available', dataIndex: 'availableSpots', width: 90 },
-    { key: 'applicationFeeDisplay', title: 'App Fee', dataIndex: 'applicationFeeDisplay', hideOnMobile: true, width: 100 },
+    {
+      key: 'applicationFeeDisplay', title: 'App Fee', dataIndex: 'applicationFeeDisplay',
+      hideOnMobile: true, width: 110,
+      /* A school that charges nothing should read as free, not as "R 500.00"
+         sitting next to a switch that says the fee is off. */
+      render: (value: string, row: IAdmissionSettings) =>
+        row.isApplicationFeeRequired === false || row.applicationFeeAmount <= 0
+          ? <Tag color="green">No fee</Tag>
+          : value,
+    },
     {
       key: 'isAcceptingApplications', title: 'Accepting', dataIndex: 'isAcceptingApplications',
       filterable: true, filterType: 'enum',
@@ -245,6 +270,7 @@ function AdmissionsContent() {
           onQueryChange={() => {}}
           rowKey="id"
           currentUserRole={currentRole}
+          rowActions={settingsRowActions}
         />
       ),
     },
@@ -354,6 +380,15 @@ function AdmissionsContent() {
           style={{ padding: '0 16px' }}
         />
       </Card>
+
+      <AdmissionSettingsFormModal
+        open={!!editingSettings}
+        settings={editingSettings}
+        onClose={() => setEditingSettings(undefined)}
+        onSaved={() => {
+          if (selectedAcademicYearId) getAllByAcademicYearAsync(selectedAcademicYearId);
+        }}
+      />
     </div>
   );
 }

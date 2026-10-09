@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
@@ -246,12 +246,25 @@ namespace psms.Domain.Admissions.Entities
         /// <summary>
         /// Submits the application - moves to PaymentPending (ADM-005)
         /// </summary>
-        public void Submit()
+        /// <summary>
+        /// The parent has finished filling it in and hands it to the school.
+        /// <para>
+        /// Where the school charges an application fee, it waits for the money.
+        /// Where it does not, it goes straight to review: an application should
+        /// never sit in PaymentPending waiting for a payment nobody asked for,
+        /// which is where every application landed while submitting had only
+        /// one destination.
+        /// </para>
+        /// </summary>
+        public void Submit(bool feeRequired)
         {
             if (Status != ApplicationStatus.Draft)
                 throw new InvalidOperationException("Only draft applications can be submitted.");
 
-            Status = ApplicationStatus.PaymentPending;
+            Status = feeRequired
+                ? ApplicationStatus.PaymentPending
+                : ApplicationStatus.UnderReview;
+
             SubmissionDate = DateTime.UtcNow;
         }
 

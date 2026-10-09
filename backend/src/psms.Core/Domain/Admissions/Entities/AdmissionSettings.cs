@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Abp.Domain.Entities;
@@ -37,6 +37,30 @@ namespace psms.Domain.Admissions.Entities
         /// </summary>
         [Required]
         public decimal ApplicationFeeAmount { get; set; }
+
+        /// <summary>
+        /// Whether a fee has to be paid before the school will look at an
+        /// application.
+        /// <para>
+        /// Not every school charges one, and a school that does may waive it
+        /// for a year, for a grade, or while a bursary drive is running. The
+        /// amount is kept either way: turning the fee off should not make the
+        /// school retype what it costs when they turn it back on.
+        /// </para>
+        /// <para>
+        /// Where no fee is required, a submitted application goes straight to
+        /// review. It must not sit in PaymentPending waiting for money nobody
+        /// asked for.
+        /// </para>
+        /// </summary>
+        public bool IsApplicationFeeRequired { get; set; } = true;
+
+        /// <summary>
+        /// Whether this application has to be paid for before it is reviewed.
+        /// A fee of nothing is not a fee, whatever the flag says.
+        /// </summary>
+        public bool RequiresApplicationFee() =>
+            IsApplicationFeeRequired && ApplicationFeeAmount > 0m;
 
         /// <summary>
         /// Maximum capacity for the grade (for waitlist logic)
@@ -127,6 +151,7 @@ namespace psms.Domain.Admissions.Entities
             TenantId = tenantId;
             AcademicYearId = academicYearId;
             ApplicationFeeAmount = applicationFeeAmount;
+            IsApplicationFeeRequired = applicationFeeAmount > 0m;
             IsAcceptingApplications = false;
             CurrentEnrolledCount = 0;
             OfferExpiryDays = 14;

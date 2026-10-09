@@ -1,4 +1,4 @@
-using Abp.Application.Services;
+﻿using Abp.Application.Services;
 using psms.Admissions.ApplicationFees.Dto;
 using System;
 using System.Threading.Tasks;
@@ -30,4 +30,16 @@ public interface IApplicationFeeAppService : IApplicationService
     /// Gets payment status for an application.
     /// </summary>
     Task<PaymentResultDto> GetPaymentStatusAsync(Guid applicationId);
+
+    /// <summary>
+    /// What the applicant needs in order to deal with the fee: how much, what
+    /// state it is in, and whether there is anything online to click.
+    /// </summary>
+    Task<ApplicationFeeCheckoutDto> GetCheckoutAsync(Guid applicationId);
+
+    /// <summary>
+    /// Settles the fee through the stand-in gateway. No money moves; refused
+    /// unless this deployment is configured for the simulated gateway.
+    /// </summary>
+    Task<PaymentResultDto> SimulatePaymentAsync(Guid applicationId);
 }
