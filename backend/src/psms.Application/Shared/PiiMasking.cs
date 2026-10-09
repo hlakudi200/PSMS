@@ -20,4 +20,19 @@ public static class PiiMasking
 
         return new string('*', value.Length - 4) + value[^4..];
     }
+
+    /// <summary>
+    /// Whether a value is one of these masks rather than a real identifier.
+    /// <para>
+    /// A mask makes a round trip whenever a screen loads a record, shows it in
+    /// a field and saves it again — and on the way back it is indistinguishable
+    /// from a deliberate edit, so it overwrites the real number with asterisks.
+    /// No ID number or passport contains one, so a value that does was never
+    /// typed by a person and must never be stored.
+    /// </para>
+    /// </summary>
+    public static bool LooksMasked(string value)
+    {
+        return !string.IsNullOrEmpty(value) && value.Contains('*');
+    }
 }
