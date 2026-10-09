@@ -42,6 +42,18 @@ const schema = z
     (v) => !v.applicationOpenDate || !v.applicationCloseDate || !v.applicationCloseDate.isBefore(v.applicationOpenDate),
     { path: ['applicationCloseDate'], message: 'Applications cannot close before they open.' }
   )
+  /* The contradiction that makes a school invisible to every applicant: open
+     for business, with a window that already shut. Turning the switch off is
+     how a closed window is recorded. */
+  .refine(
+    (v) => !v.isAcceptingApplications || !v.applicationCloseDate || !v.applicationCloseDate.isBefore(dayjs(), 'day'),
+    {
+      path: ['applicationCloseDate'],
+      message:
+        'Applications are switched on but this window has already closed, so no parent would see the school. '
+        + 'Move the closing date, or switch applications off.',
+    }
+  )
   .refine((v) => v.minimumAge == null || v.maximumAge == null || v.maximumAge >= v.minimumAge, {
     path: ['maximumAge'],
     message: 'The oldest cannot be younger than the youngest.',
@@ -83,6 +95,59 @@ export default function AdmissionSettingsFormModal({
 
   const isNew = !settings;
   const feeRequired = Form.useWatch('isApplicationFeeRequired', form);
+  const accepting = Form.useWatch('isAcceptingApplications', form);
+  const opensOn = Form.useWatch('applicationOpenDate', form);
+  const closesOn = Form.useWatch('applicationCloseDate', form);
+
+  /* The switch is only half the answer. Whether a school is visible to a
+     prospective parent is the switch weighed against these dates, and a
+     principal reading "Open" on a window that has not started — or has already
+     finished — would have no way to know the school is invisible. */
+  const chosenGradeId = Form.useWatch('gradeId', form);
+  const youngest = Form.useWatch('minimumAge', form);
+  const oldest = Form.useWatch('maximumAge', form);
+
+  /* A South African learner is typically the grade number plus six: Grade R at
+     five or six, Grade 1 at six or seven, Grade 11 at sixteen or seventeen.
+     Schools do admit the odd learner out of band, so this warns rather than
+     refuses — but a range of 8 to 19 on a Grade 11 intake is a typo, and it
+     quietly disables the age check that exists to catch exactly that kind of
+     mistake on an application. */
+  const ageWarning = (() => {
+    const grade = gradeOptions.find((g) => g.id === chosenGradeId);
+    if (!grade) return undefined;
+
+    const typical = grade.gradeLevel + 6;
+    const tooYoung = youngest != null && youngest < typical - 2;
+    const tooOld = oldest != null && oldest > typical + 3;
+    if (!tooYoung && !tooOld) return undefined;
+
+    return `A learner in ${grade.gradeName} is usually ${typical} or ${typical + 1}. `
+      + `Accepting ${youngest ?? 'any'} to ${oldest ?? 'any'} will let through applications `
+      + 'the age check would otherwise have queried.';
+  })();
+
+  const windowWarning = (() => {
+    if (!accepting) return undefined;
+
+    if (closesOn && dayjs(closesOn).isBefore(dayjs(), 'day')) {
+      return {
+        message: `Switched on, but this window closed on ${dayjs(closesOn).format('DD MMM YYYY')}`,
+        description:
+          'No parent can see this school while that is the case. Move the closing date, or switch applications off.',
+      };
+    }
+
+    if (opensOn && dayjs(opensOn).isAfter(dayjs(), 'day')) {
+      return {
+        message: `Switched on, but this window does not open until ${dayjs(opensOn).format('DD MMM YYYY')}`,
+        description: 'Nothing is wrong with that — just know the school is not visible to applicants until then.',
+      };
+    }
+
+    return undefined;
+  })();
+
 
   useEffect(() => {
     if (!open) return;
@@ -293,6 +358,26 @@ export default function AdmissionSettingsFormModal({
             </Form.Item>
           </Col>
         </Row>
+
+        {ageWarning && (
+          <Alert
+            type="warning"
+            showIcon
+            style={{ marginBottom: 16 }}
+            message="That age range looks wide for this grade"
+            description={ageWarning}
+          />
+        )}
+
+        {windowWarning && (
+          <Alert
+            type="warning"
+            showIcon
+            style={{ marginBottom: 16 }}
+            message={windowWarning.message}
+            description={windowWarning.description}
+          />
+        )}
 
         {!feeRequired && (
           <Alert
