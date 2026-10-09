@@ -8,6 +8,8 @@ using Microsoft.EntityFrameworkCore;
 using psms.Admissions.AdmissionInterviews.Dto;
 using psms.Admissions.Shared;
 using psms.Authorization;
+using psms.Authorization.Roles;
+using psms.Authorization.Users;
 using psms.Domain.Admissions.Entities;
 using psms.Domain.Shared.Enums;
 using System;
@@ -27,16 +29,155 @@ public class AdmissionInterviewAppService : ApplicationService, IAdmissionInterv
 {
     private readonly IRepository<AdmissionInterview, Guid> _interviewRepository;
     private readonly IRepository<Application, Guid> _applicationRepository;
+    private readonly UserManager _userManager;
+    private readonly RoleManager _roleManager;
 
     private const int MinNoticeDaysRequired = 2; // ADM-012: 48 hours minimum
     private const int MaxReschedules = 2; // ADM-012: Maximum 2 reschedules
 
     public AdmissionInterviewAppService(
         IRepository<AdmissionInterview, Guid> interviewRepository,
-        IRepository<Application, Guid> applicationRepository)
+        IRepository<Application, Guid> applicationRepository,
+        UserManager userManager,
+        RoleManager roleManager)
     {
         _interviewRepository = interviewRepository;
         _applicationRepository = applicationRepository;
+        _userManager = userManager;
+        _roleManager = roleManager;
+    }
+
+    /// <summary>
+    /// The interviews this person is down to conduct.
+    /// <para>
+    /// A teacher now owns the Interview step of the admissions workflow, and
+    /// had no way to find out they were down for one: the interview could be
+    /// read through the application, and a teacher cannot read applications.
+    /// This is deliberately only ever the caller's own — it asks nothing about
+    /// permissions beyond being able to see an interview at all, because being
+    /// named as the interviewer is the authority.
+    /// </para>
+    /// </summary>
+    [AbpAuthorize(PermissionNames.Admissions_Interviews_View)]
+    public async Task<ListResultDto<AdmissionInterviewDto>> GetMineAsync(bool includePast = false)
+    {
+        var userId = AbpSession.UserId;
+        if (!userId.HasValue)
+            return new ListResultDto<AdmissionInterviewDto>(new List<AdmissionInterviewDto>());
+
+        var today = DateTime.UtcNow.Date;
+
+        var mine = await _interviewRepository
+            .GetAll()
+            .Include(i => i.Application).ThenInclude(a => a.AppliedGrade)
+            .Where(i => i.InterviewerUserId == userId.Value)
+            /* Past interviews are hidden unless asked for, but one that has
+               come and gone without an outcome is not "past" — it is the thing
+               most needing attention, so it stays on the list. */
+            .WhereIf(!includePast,
+                i => i.ScheduledDate >= today
+                     || i.Status == InterviewStatus.Scheduled
+                     || i.Status == InterviewStatus.Rescheduled)
+            .OrderBy(i => i.ScheduledDate)
+            .ThenBy(i => i.ScheduledTime)
+            .ToListAsync();
+
+        return new ListResultDto<AdmissionInterviewDto>(
+            ObjectMapper.Map<List<AdmissionInterviewDto>>(mine));
+    }
+
+    /// <summary>
+    /// Who may be put down to conduct an interview: everybody holding a role
+    /// the school has granted <c>Admissions.Interviews.Conduct</c>, with how
+    /// busy they already are, so whoever schedules can spread the load.
+    /// </summary>
+    [AbpAuthorize(PermissionNames.Admissions_Interviews_Schedule)]
+    public async Task<ListResultDto<InterviewerDto>> GetInterviewersAsync()
+    {
+        var found = new Dictionary<long, InterviewerDto>();
+
+        foreach (var role in await _roleManager.Roles.ToListAsync())
+        {
+            if (!await _roleManager.IsGrantedAsync(role.Id, PermissionNames.Admissions_Interviews_Conduct))
+                continue;
+
+            foreach (var user in await _userManager.GetUsersInRoleAsync(role.NormalizedName))
+            {
+                if (!user.IsActive)
+                    continue;
+
+                if (found.TryGetValue(user.Id, out var already))
+                {
+                    already.Roles.Add(role.DisplayName ?? role.Name);
+                    continue;
+                }
+
+                found[user.Id] = new InterviewerDto
+                {
+                    UserId = user.Id,
+                    Name = user.FullName,
+                    EmailAddress = user.EmailAddress,
+                    Roles = new List<string> { role.DisplayName ?? role.Name },
+                };
+            }
+        }
+
+        var ids = found.Keys.ToList();
+        var loads = await _interviewRepository
+            .GetAll()
+            .Where(i => ids.Contains(i.InterviewerUserId)
+                        && (i.Status == InterviewStatus.Scheduled || i.Status == InterviewStatus.Rescheduled))
+            .GroupBy(i => i.InterviewerUserId)
+            .Select(g => new { UserId = g.Key, Count = g.Count() })
+            .ToListAsync();
+
+        foreach (var load in loads)
+            found[load.UserId].UpcomingInterviews = load.Count;
+
+        return new ListResultDto<InterviewerDto>(
+            found.Values.OrderBy(i => i.Name).ToList());
+    }
+
+    /// <summary>
+    /// Resolves the person an interview is being booked against, and refuses
+    /// anyone who could not conduct it.
+    /// <para>
+    /// The id and the name both used to come from the request, unchecked and
+    /// unrelated. Scheduling an interview with a colleague who holds no
+    /// interview permission produced a booking that looked fine and could
+    /// never be completed, and the failure surfaced on the day.
+    /// </para>
+    /// </summary>
+    private async Task<User> ResolveInterviewerAsync(long interviewerUserId)
+    {
+        var user = await _userManager.FindByIdAsync(interviewerUserId.ToString());
+
+        if (user == null || !user.IsActive)
+            throw new UserFriendlyException(AdmissionsExceptionCodes.InvalidInterviewSchedule,
+                "That interviewer is not someone at this school.");
+
+        if (!await _userManager.IsGrantedAsync(user.Id, PermissionNames.Admissions_Interviews_Conduct))
+            throw new UserFriendlyException(AdmissionsExceptionCodes.InvalidInterviewSchedule,
+                $"{user.FullName} is not able to conduct admission interviews. Choose somebody else, or ask an administrator to give them the role.");
+
+        return user;
+    }
+
+    /// <summary>
+    /// Recording what came of an interview belongs to the person who conducted
+    /// it, or to the admissions staff who arrange them. Anyone else holding the
+    /// permission is writing somebody else's judgement under their name.
+    /// </summary>
+    private async Task AssertMayRecordOutcomeAsync(AdmissionInterview interview)
+    {
+        if (AbpSession.UserId.HasValue && interview.InterviewerUserId == AbpSession.UserId.Value)
+            return;
+
+        if (await PermissionChecker.IsGrantedAsync(PermissionNames.Admissions_Interviews_Schedule))
+            return;
+
+        throw new UserFriendlyException(AdmissionsExceptionCodes.InvalidInterviewSchedule,
+            $"This interview is {interview.InterviewerName}'s to record.");
     }
 
     [AbpAuthorize(PermissionNames.Admissions_Interviews_View)]
@@ -114,13 +255,17 @@ public class AdmissionInterviewAppService : ApplicationService, IAdmissionInterv
             throw new UserFriendlyException(AdmissionsExceptionCodes.InsufficientInterviewNotice,
                 $"Interview must be scheduled at least {MinNoticeDaysRequired} days in advance.");
 
+        // The name is the school's record of this person, not whatever the
+        // caller typed — the two used to be able to disagree.
+        var interviewer = await ResolveInterviewerAsync(input.InterviewerUserId);
+
         var interview = new AdmissionInterview(
             Guid.NewGuid(),
             input.ApplicationId,
             input.ScheduledDate,
             input.ScheduledTime,
-            input.InterviewerUserId,
-            input.InterviewerName)
+            interviewer.Id,
+            interviewer.FullName)
         {
             TenantId = AbpSession.TenantId,
             Location = input.Location,
@@ -202,6 +347,8 @@ public class AdmissionInterviewAppService : ApplicationService, IAdmissionInterv
     {
         var interview = await _interviewRepository.GetAsync(id);
 
+        await AssertMayRecordOutcomeAsync(interview);
+
         if (interview.Status != InterviewStatus.Scheduled && interview.Status != InterviewStatus.Rescheduled)
             throw new UserFriendlyException(AdmissionsExceptionCodes.InterviewNotScheduled,
                 "Interview is not in a schedulable state.");
@@ -228,6 +375,8 @@ public class AdmissionInterviewAppService : ApplicationService, IAdmissionInterv
     public async Task<AdmissionInterviewDto> MarkNoShowAsync(Guid id)
     {
         var interview = await _interviewRepository.GetAsync(id);
+
+        await AssertMayRecordOutcomeAsync(interview);
 
         if (interview.Status != InterviewStatus.Scheduled && interview.Status != InterviewStatus.Rescheduled)
             throw new UserFriendlyException(AdmissionsExceptionCodes.InterviewNotScheduled,

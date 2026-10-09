@@ -6,6 +6,8 @@ import {
   AdmissionInterviewStateContext,
 } from "./context";
 import {
+  IAdmissionInterview,
+  IInterviewer,
   IScheduleInterview,
   IRescheduleInterview,
   ICompleteInterview,
@@ -100,17 +102,51 @@ export const AdmissionInterviewProvider = ({
       });
   };
 
+  /** The interviews the signed-in person is down to conduct. */
+  const getMineAsync = async (includePast = false) => {
+    dispatch(getAllInterviewsPending());
+    const endpoint = `/api/services/app/AdmissionInterview/GetMine?includePast=${includePast}`;
+    return instance
+      .get(endpoint)
+      .then((response) => {
+        const items: IAdmissionInterview[] = response.data.result.items ?? [];
+        dispatch(getAllInterviewsSuccess({ items, totalCount: items.length }));
+        return items;
+      })
+      .catch((error) => {
+        console.error(error);
+        dispatch(getAllInterviewsError());
+        throw error;
+      });
+  };
+
+  /** Who the school may put down to conduct one. */
+  const getInterviewersAsync = async (): Promise<IInterviewer[]> => {
+    const endpoint = `/api/services/app/AdmissionInterview/GetInterviewers`;
+    return instance
+      .get(endpoint)
+      .then((response) => response.data.result.items ?? [])
+      .catch((error) => {
+        console.error(error);
+        throw error;
+      });
+  };
+
   const scheduleAsync = async (input: IScheduleInterview) => {
     dispatch(scheduleInterviewPending());
     const endpoint = `/api/services/app/AdmissionInterview/Schedule`;
-    await instance
+    return instance
       .post(endpoint, input)
       .then((response) => {
         dispatch(scheduleInterviewSuccess(response.data.result));
+        return response.data.result as IAdmissionInterview;
       })
       .catch((error) => {
         console.error(error);
         dispatch(scheduleInterviewError());
+        // The server's refusal is the useful part — the minimum-notice rule,
+        // an interviewer who cannot conduct one. Let the screen show it.
+        throw error;
       });
   };
 
@@ -145,7 +181,7 @@ export const AdmissionInterviewProvider = ({
   const completeAsync = async (id: string, input: ICompleteInterview) => {
     dispatch(completeInterviewPending());
     const endpoint = `/api/services/app/AdmissionInterview/Complete?id=${id}`;
-    await instance
+    return instance
       .post(endpoint, input)
       .then((response) => {
         dispatch(completeInterviewSuccess(response.data.result));
@@ -153,13 +189,14 @@ export const AdmissionInterviewProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(completeInterviewError());
+        throw error;
       });
   };
 
   const markNoShowAsync = async (id: string) => {
     dispatch(markNoShowPending());
     const endpoint = `/api/services/app/AdmissionInterview/MarkNoShow?id=${id}`;
-    await instance
+    return instance
       .post(endpoint)
       .then((response) => {
         dispatch(markNoShowSuccess(response.data.result));
@@ -167,6 +204,7 @@ export const AdmissionInterviewProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(markNoShowError());
+        throw error;
       });
   };
 
@@ -191,6 +229,8 @@ export const AdmissionInterviewProvider = ({
           getAsync,
           getByApplicationAsync,
           getAllAsync,
+          getMineAsync,
+          getInterviewersAsync,
           scheduleAsync,
           rescheduleAsync,
           cancelAsync,

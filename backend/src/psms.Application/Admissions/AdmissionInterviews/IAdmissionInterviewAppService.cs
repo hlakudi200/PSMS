@@ -57,4 +57,14 @@ public interface IAdmissionInterviewAppService : IApplicationService
     /// Gets available time slots for scheduling.
     /// </summary>
     Task<List<TimeSlotDto>> GetAvailableTimeSlotsAsync(DateTime date, long interviewerUserId);
+
+    /// <summary>
+    /// The interviews this person is down to conduct.
+    /// </summary>
+    Task<ListResultDto<AdmissionInterviewDto>> GetMineAsync(bool includePast = false);
+
+    /// <summary>
+    /// Who may be put down to conduct an interview.
+    /// </summary>
+    Task<ListResultDto<InterviewerDto>> GetInterviewersAsync();
 }

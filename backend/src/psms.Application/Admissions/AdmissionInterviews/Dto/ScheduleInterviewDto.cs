@@ -34,9 +34,11 @@ public class ScheduleInterviewDto
     public long InterviewerUserId { get; set; }
 
     /// <summary>
-    /// Interviewer's name.
+    /// Ignored. The name stored against the interview is the school's own
+    /// record of the chosen user — this used to be taken from the request
+    /// alongside the id, with nothing checking that the two described the same
+    /// person. Kept on the contract so existing callers do not break.
     /// </summary>
-    [Required]
     [StringLength(100)]
     public string InterviewerName { get; set; }
 

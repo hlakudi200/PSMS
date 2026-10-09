@@ -14,6 +14,7 @@ import {
   CarryOutOutlined,
   SolutionOutlined,
   HighlightOutlined,
+  AudioOutlined,
 } from '@ant-design/icons';
 import LayoutShell from '@/components/shared/LayoutShell';
 import { roleColors } from '@/utils/theme-config';
@@ -53,6 +54,7 @@ const menuItems = [
       { key: '/teacher/attendance', icon: <CheckSquareOutlined />, label: 'Attendance' },
       { key: '/teacher/mark-sheets', icon: <FileTextOutlined />, label: 'Mark Sheets' },
       { key: '/teacher/reports', icon: <SolutionOutlined />, label: 'Report Cards' },
+      { key: '/teacher/interviews', icon: <AudioOutlined />, label: 'Admission Interviews' },
     ],
   },
   {
