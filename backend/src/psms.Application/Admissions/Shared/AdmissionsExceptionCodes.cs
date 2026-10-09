@@ -92,6 +92,13 @@ public static class AdmissionsExceptionCodes
     public const string CannotWithdrawFromWaitlist = "ADM_CANNOT_WITHDRAW_FROM_WAITLIST";
     public const string DocumentNotFound = "ADM_DOCUMENT_NOT_FOUND";
     public const string DuplicateAdmissionSettings = "ADM_DUPLICATE_ADMISSION_SETTINGS";
+
+    /// <summary>
+    /// The application window does not describe a period a parent could apply
+    /// in: it closes before it opens, closes after the school year is over, or
+    /// has already closed while applications are switched on.
+    /// </summary>
+    public const string InvalidApplicationWindow = "ADM_INVALID_APPLICATION_WINDOW";
     public const string CannotDeleteSettingsWithApplications = "ADM_CANNOT_DELETE_SETTINGS_WITH_APPLICATIONS";
     public const string ParentNotFound = "ADM_PARENT_NOT_FOUND";
     public const string InvalidGradeForAge = "ADM_INVALID_GRADE_FOR_AGE";

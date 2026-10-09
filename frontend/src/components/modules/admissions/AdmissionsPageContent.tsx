@@ -3,7 +3,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { usePortalBase } from '@/utils/portal-base';
-import { Card, Col, Row, Select, Statistic, Tabs, Tag, message } from 'antd';
+import { Card, Col, Row, Select, Statistic, Tabs, Tag, Tooltip, message } from 'antd';
 import {
   EyeOutlined,
   FileTextOutlined,
@@ -213,12 +213,18 @@ function AdmissionsContent() {
         { label: 'Open', value: 'true' },
         { label: 'Closed', value: 'false' },
       ],
-      renderType: 'status',
-      renderConfig: {
-        statusMap: {
-          true: { label: 'Open', color: 'green' },
-          false: { label: 'Closed', color: 'red' },
-        },
+      /* The switch is only half the answer: whether a school is visible to a
+         prospective parent is the switch weighed against the window. A row
+         reading "Open" on a window that closed last year told the principal
+         the opposite of the truth. */
+      render: (accepting: boolean, row: IAdmissionSettings) => {
+        if (!accepting) return <Tag color="red">Closed</Tag>;
+        if (row.isApplicationPeriodOpen) return <Tag color="green">Open</Tag>;
+        return (
+          <Tooltip title="Applications are switched on, but the window says otherwise — no parent can see this school. Open the row to fix the dates.">
+            <Tag color="orange">On, but shut</Tag>
+          </Tooltip>
+        );
       },
     },
   ];

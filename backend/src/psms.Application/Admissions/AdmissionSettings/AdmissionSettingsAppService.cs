@@ -1,4 +1,4 @@
-using Abp.Application.Services;
+﻿using Abp.Application.Services;
 using Abp.Application.Services.Dto;
 using Abp.Authorization;
 using Abp.Domain.Repositories;
@@ -26,15 +26,18 @@ public class AdmissionSettingsAppService : ApplicationService, IAdmissionSetting
     private readonly IRepository<Domain.Admissions.Entities.AdmissionSettings, Guid> _settingsRepository;
     private readonly IRepository<Application, Guid> _applicationRepository;
     private readonly IRepository<Waitlist, Guid> _waitlistRepository;
+    private readonly IRepository<psms.Domain.Academic.Entities.AcademicYear, Guid> _academicYearRepository;
 
     public AdmissionSettingsAppService(
         IRepository<Domain.Admissions.Entities.AdmissionSettings, Guid> settingsRepository,
         IRepository<Application, Guid> applicationRepository,
-        IRepository<Waitlist, Guid> waitlistRepository)
+        IRepository<Waitlist, Guid> waitlistRepository,
+        IRepository<psms.Domain.Academic.Entities.AcademicYear, Guid> academicYearRepository)
     {
         _settingsRepository = settingsRepository;
         _applicationRepository = applicationRepository;
         _waitlistRepository = waitlistRepository;
+        _academicYearRepository = academicYearRepository;
     }
 
     [AbpAuthorize(PermissionNames.Admissions_Settings_View)]
@@ -114,6 +117,8 @@ public class AdmissionSettingsAppService : ApplicationService, IAdmissionSetting
         settings.Id = Guid.NewGuid();
         settings.TenantId = AbpSession.TenantId;
 
+        await AssertTheWindowMakesSenseAsync(settings);
+
         await _settingsRepository.InsertAsync(settings);
         await CurrentUnitOfWork.SaveChangesAsync();
 
@@ -127,10 +132,65 @@ public class AdmissionSettingsAppService : ApplicationService, IAdmissionSetting
 
         ObjectMapper.Map(input, settings);
 
+        await AssertTheWindowMakesSenseAsync(settings);
+
         await _settingsRepository.UpdateAsync(settings);
         await CurrentUnitOfWork.SaveChangesAsync();
 
         return await GetAsync(id);
+    }
+
+    /// <summary>
+    /// The application window has to describe a period a parent could actually
+    /// apply in.
+    /// <para>
+    /// Nothing checked it. A window could close before it opened, could run
+    /// past the end of the school year it was for, and could have closed years
+    /// ago while the switch still said the school was accepting applications —
+    /// which is exactly what one of these rows said: a 2027 intake whose
+    /// window opened and closed in 2025.
+    /// </para>
+    /// <para>
+    /// That last one is not cosmetic. Whether a school appears to a prospective
+    /// parent at all is <c>AreApplicationsOpen()</c>, which weighs the switch
+    /// against these dates. A principal could set this up, read "Open" on their
+    /// own screen, and be invisible to every applicant with nothing anywhere
+    /// saying why.
+    /// </para>
+    /// <para>
+    /// Deliberately not checked: that the window falls inside the academic year.
+    /// Applications for a year open during the year before it — that is the
+    /// normal case, not an error.
+    /// </para>
+    /// </summary>
+    private async Task AssertTheWindowMakesSenseAsync(Domain.Admissions.Entities.AdmissionSettings settings)
+    {
+        var opens = settings.ApplicationOpenDate;
+        var closes = settings.ApplicationCloseDate;
+
+        if (opens.HasValue && closes.HasValue && closes.Value.Date < opens.Value.Date)
+            throw new UserFriendlyException(AdmissionsExceptionCodes.InvalidApplicationWindow,
+                "Applications cannot close before they open.");
+
+        if (closes.HasValue)
+        {
+            var year = await _academicYearRepository
+                .FirstOrDefaultAsync(y => y.Id == settings.AcademicYearId);
+
+            if (year != null && closes.Value.Date > year.EndDate.Date)
+                throw new UserFriendlyException(AdmissionsExceptionCodes.InvalidApplicationWindow,
+                    $"Applications would close on {closes.Value:dd MMM yyyy}, after the "
+                    + $"{year.YearName} school year has already ended on {year.EndDate:dd MMM yyyy}. "
+                    + "Nobody can apply for a year that is over.");
+        }
+
+        // The contradiction that makes a school invisible: open for business,
+        // with a window that shut. Turning the switch off is how a closed
+        // window is recorded.
+        if (settings.IsAcceptingApplications && closes.HasValue && closes.Value.Date < DateTime.UtcNow.Date)
+            throw new UserFriendlyException(AdmissionsExceptionCodes.InvalidApplicationWindow,
+                $"Applications are switched on, but the window closed on {closes.Value:dd MMM yyyy}, "
+                + "so no parent can see this school. Move the closing date, or switch applications off.");
     }
 
     [AbpAuthorize(PermissionNames.Admissions_Settings_Manage)]
