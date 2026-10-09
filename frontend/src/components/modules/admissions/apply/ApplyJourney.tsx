@@ -19,6 +19,7 @@ import {
   AdmissionSettingsProvider, useAdmissionSettingsActions,
 } from '@/providers/admissions/admission_settings';
 import type { IOpenIntake } from '@/providers/admissions/admission_settings/context';
+import type { ICreateApplication } from '@/providers/admissions/shared/interfaces';
 import LearnerStep from './LearnerStep';
 import ParentsStep from './ParentsStep';
 import DocumentsStep from './DocumentsStep';
@@ -172,8 +173,9 @@ function ApplyContent() {
         await updateAsync(workingOn, payload);
         await getAsync(workingOn);
       } else {
-        // The account's own address is what the school writes to.
-        const created = await createAsync({ ...payload, creatorEmailAddress: '' });
+        /* No address: the server takes it from the signed-in account, which is
+           this parent's own and the only right answer here. */
+        const created = await createAsync(payload as ICreateApplication);
         if (created?.id) {
           setWorkingOn(created.id);
           setStarting(false);

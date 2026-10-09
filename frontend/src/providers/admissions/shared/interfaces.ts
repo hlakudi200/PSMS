@@ -184,7 +184,8 @@ export interface ICreateApplication {
   passportNumber?: string;
   isSACitizen: boolean;
   previousSchool?: string;
-  creatorEmailAddress: string;
+  /** Optional: the server uses the signed-in account's address when absent. */
+  creatorEmailAddress?: string;
 }
 
 export interface IUpdateApplication {
