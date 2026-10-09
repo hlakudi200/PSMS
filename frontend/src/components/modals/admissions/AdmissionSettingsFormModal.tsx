@@ -1,10 +1,12 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Alert, Col, DatePicker, Form, Input, InputNumber, Modal, Row, Switch, Typography, message } from 'antd';
+import { Alert, Col, DatePicker, Form, Input, InputNumber, Modal, Row, Select, Switch, Typography, message } from 'antd';
 import dayjs from 'dayjs';
 import { z } from 'zod';
 import { useAdmissionSettingsActions } from '@/providers/admissions/admission_settings';
+import { useGradeState } from '@/providers/academic/grades';
+import { useAcademicYearState } from '@/providers/academic/academic_years';
 import type { IAdmissionSettings } from '@/providers/admissions/shared/interfaces';
 
 const { Text } = Typography;
@@ -18,6 +20,10 @@ const { Text } = Typography;
  */
 const schema = z
   .object({
+    /* Only asked when creating. An existing row's year and grade are what it
+       is — moving one would silently become a different school's rules. */
+    academicYearId: z.string().min(1, 'Choose the academic year these apply to.'),
+    gradeId: z.string().nullish(),
     isAcceptingApplications: z.boolean(),
     applicationOpenDate: z.any().nullish(),
     applicationCloseDate: z.any().nullish(),
@@ -49,22 +55,66 @@ type FormValues = z.infer<typeof schema>;
 
 interface Props {
   open: boolean;
+  /** The row being edited. Absent means a new one is being added. */
   settings?: IAdmissionSettings;
+  /** Preselected when adding, so the year the page is showing is the one offered. */
+  defaultAcademicYearId?: string;
   onClose: () => void;
   onSaved: () => void;
 }
 
-export default function AdmissionSettingsFormModal({ open, settings, onClose, onSaved }: Props) {
+export default function AdmissionSettingsFormModal({
+  open,
+  settings,
+  defaultAcademicYearId,
+  onClose,
+  onSaved,
+}: Props) {
   const [form] = Form.useForm<FormValues>();
-  const { updateAsync } = useAdmissionSettingsActions();
+  const { createAsync, updateAsync } = useAdmissionSettingsActions();
+  /* The admissions page loads the active grades, which land in their own slot
+     rather than the general one. Read both, so this works wherever it is
+     mounted instead of silently offering an empty list. */
+  const { grades, activeGrades } = useGradeState();
+  const gradeOptions = (activeGrades?.length ? activeGrades : grades) ?? [];
+  const { academicYears } = useAcademicYearState();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | undefined>();
 
+  const isNew = !settings;
   const feeRequired = Form.useWatch('isApplicationFeeRequired', form);
 
   useEffect(() => {
-    if (!open || !settings) return;
+    if (!open) return;
+
+    if (!settings) {
+      /* A new row starts closed and free. A school sets these up before it has
+         decided to open, and advertising it as taking applications the moment
+         the row exists would be the system making that decision for them. */
+      form.setFieldsValue({
+        academicYearId: defaultAcademicYearId ?? '',
+        gradeId: null,
+        isAcceptingApplications: false,
+        applicationOpenDate: null,
+        applicationCloseDate: null,
+        maxCapacity: null,
+        isApplicationFeeRequired: false,
+        applicationFeeAmount: 0,
+        minimumAge: null,
+        maximumAge: null,
+        offerExpiryDays: 14,
+        isInterviewRequired: false,
+        isAssessmentRequired: false,
+        requiredDocuments: '',
+        notes: '',
+      } as FormValues);
+      setError(undefined);
+      return;
+    }
+
     form.setFieldsValue({
+      academicYearId: settings.academicYearId,
+      gradeId: settings.gradeId ?? null,
       isAcceptingApplications: settings.isAcceptingApplications,
       applicationOpenDate: settings.applicationOpenDate ? dayjs(settings.applicationOpenDate) : null,
       applicationCloseDate: settings.applicationCloseDate ? dayjs(settings.applicationCloseDate) : null,
@@ -80,11 +130,9 @@ export default function AdmissionSettingsFormModal({ open, settings, onClose, on
       notes: settings.notes ?? '',
     });
     setError(undefined);
-  }, [open, settings, form]);
+  }, [open, settings, defaultAcademicYearId, form]);
 
   const submit = async () => {
-    if (!settings) return;
-
     const parsed = schema.safeParse(form.getFieldsValue());
     if (!parsed.success) {
       setError(parsed.error.issues[0]?.message);
@@ -96,7 +144,31 @@ export default function AdmissionSettingsFormModal({ open, settings, onClose, on
     setError(undefined);
 
     try {
-      await updateAsync(settings.id, {
+      if (isNew) {
+        await createAsync({
+          academicYearId: v.academicYearId,
+          gradeId: v.gradeId || undefined,
+          isAcceptingApplications: v.isAcceptingApplications,
+          applicationOpenDate: v.applicationOpenDate ? v.applicationOpenDate.toISOString() : undefined,
+          applicationCloseDate: v.applicationCloseDate ? v.applicationCloseDate.toISOString() : undefined,
+          maxCapacity: v.maxCapacity ?? undefined,
+          isApplicationFeeRequired: v.isApplicationFeeRequired,
+          applicationFeeAmount: v.applicationFeeAmount,
+          minimumAge: v.minimumAge ?? undefined,
+          maximumAge: v.maximumAge ?? undefined,
+          offerExpiryDays: v.offerExpiryDays,
+          isInterviewRequired: v.isInterviewRequired,
+          isAssessmentRequired: v.isAssessmentRequired,
+          requiredDocuments: v.requiredDocuments || undefined,
+          notes: v.notes || undefined,
+        });
+        message.success('Admission settings added');
+        onSaved();
+        onClose();
+        return;
+      }
+
+      await updateAsync(settings!.id, {
         isAcceptingApplications: v.isAcceptingApplications,
         applicationOpenDate: v.applicationOpenDate ? v.applicationOpenDate.toISOString() : undefined,
         applicationCloseDate: v.applicationCloseDate ? v.applicationCloseDate.toISOString() : undefined,
@@ -129,9 +201,9 @@ export default function AdmissionSettingsFormModal({ open, settings, onClose, on
       title={
         settings
           ? `Admissions for ${settings.gradeName ?? 'every grade'} · ${settings.academicYearName}`
-          : 'Admission settings'
+          : 'Add admission settings'
       }
-      okText="Save settings"
+      okText={isNew ? 'Add settings' : 'Save settings'}
       okButtonProps={{ loading: saving }}
       onOk={submit}
       onCancel={onClose}
@@ -141,6 +213,44 @@ export default function AdmissionSettingsFormModal({ open, settings, onClose, on
       {error && <Alert type="error" showIcon message={error} style={{ marginBottom: 16 }} closable onClose={() => setError(undefined)} />}
 
       <Form form={form} layout="vertical">
+        {/* Which intake these rules govern. Asked only when adding: an existing
+            row's year and grade are what it is, and moving one would silently
+            become a different intake's rules. */}
+        {isNew && (
+          <Row gutter={16}>
+            <Col xs={24} md={12}>
+              <Form.Item
+                label="Academic year"
+                name="academicYearId"
+                rules={[{ required: true, message: 'Choose the academic year.' }]}
+              >
+                <Select
+                  placeholder="Choose a year"
+                  options={(academicYears ?? []).map((y) => ({
+                    value: y.id,
+                    label: y.yearName ?? String(y.year),
+                  }))}
+                />
+              </Form.Item>
+            </Col>
+            <Col xs={24} md={12}>
+              <Form.Item
+                label="Grade"
+                name="gradeId"
+                extra="Leave empty for the default that covers every grade."
+              >
+                <Select
+                  allowClear
+                  showSearch
+                  placeholder="Every grade"
+                  optionFilterProp="label"
+                  options={gradeOptions.map((g) => ({ value: g.id, label: g.gradeName }))}
+                />
+              </Form.Item>
+            </Col>
+          </Row>
+        )}
+
         <Row gutter={16}>
           <Col xs={24} md={12}>
             <Form.Item label="Accepting applications" name="isAcceptingApplications" valuePropName="checked">
