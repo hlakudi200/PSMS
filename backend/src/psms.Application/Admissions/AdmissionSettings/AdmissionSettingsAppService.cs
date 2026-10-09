@@ -2,6 +2,7 @@
 using Abp.Application.Services.Dto;
 using Abp.Authorization;
 using Abp.Domain.Repositories;
+using Abp.Linq.Extensions;
 using Abp.UI;
 using Microsoft.EntityFrameworkCore;
 using psms.Admissions.AdmissionSettings.Dto;
@@ -80,6 +81,41 @@ public class AdmissionSettingsAppService : ApplicationService, IAdmissionSetting
                 "Admission settings not found for this academic year. Please configure admission settings first.");
 
         return ObjectMapper.Map<AdmissionSettingsDto>(settings);
+    }
+
+    /// <summary>
+    /// Every admission settings row the school has, newest year first.
+    /// <para>
+    /// The only way to read these was one academic year at a time, and the
+    /// screen that lists them defaults its year filter to "All Years" — so the
+    /// list asked for nothing and showed nothing, and a school that had
+    /// configured an intake was told it had none.
+    /// </para>
+    /// <para>
+    /// The year and grade narrow the result when given, so the filters on that
+    /// screen mean what they say rather than deciding whether anything loads
+    /// at all.
+    /// </para>
+    /// </summary>
+    [AbpAuthorize(PermissionNames.Admissions_Settings_View)]
+    public async Task<ListResultDto<AdmissionSettingsDto>> GetAllAsync(
+        Guid? academicYearId = null, Guid? gradeId = null)
+    {
+        var settings = await _settingsRepository
+            .GetAll()
+            .Include(s => s.AcademicYear)
+            .Include(s => s.Grade)
+            .WhereIf(academicYearId.HasValue, s => s.AcademicYearId == academicYearId.Value)
+            .WhereIf(gradeId.HasValue, s => s.GradeId == gradeId.Value)
+            .OrderByDescending(s => s.AcademicYear.Year)
+            // The default that covers every grade belongs above the grades it
+            // is the default for.
+            .ThenBy(s => s.GradeId == null ? 0 : 1)
+            .ThenBy(s => s.Grade.GradeLevel)
+            .ToListAsync();
+
+        return new ListResultDto<AdmissionSettingsDto>(
+            ObjectMapper.Map<List<AdmissionSettingsDto>>(settings));
     }
 
     [AbpAuthorize(PermissionNames.Admissions_Settings_View)]

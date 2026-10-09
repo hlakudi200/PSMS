@@ -1,4 +1,4 @@
-using Abp.Application.Services;
+﻿using Abp.Application.Services;
 using Abp.Application.Services.Dto;
 using psms.Admissions.AdmissionSettings.Dto;
 using System;
@@ -26,6 +26,12 @@ public interface IAdmissionSettingsAppService : IApplicationService
     /// <summary>
     /// Gets all admission settings for an academic year.
     /// </summary>
+    /// <summary>
+    /// Every admission settings row the school has, optionally narrowed by
+    /// year and grade.
+    /// </summary>
+    Task<ListResultDto<AdmissionSettingsDto>> GetAllAsync(Guid? academicYearId = null, Guid? gradeId = null);
+
     Task<ListResultDto<AdmissionSettingsDto>> GetAllByAcademicYearAsync(Guid academicYearId);
 
     /// <summary>

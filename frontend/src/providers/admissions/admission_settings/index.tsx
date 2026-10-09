@@ -82,6 +82,30 @@ export const AdmissionSettingsProvider = ({
       });
   };
 
+  /**
+   * Every settings row the school has, narrowed by year and grade when the
+   * screen's filters are set. Reuses the by-year slot in state, since it is
+   * the same list read a different way.
+   */
+  const getAllAsync = async (academicYearId?: string, gradeId?: string) => {
+    dispatch(getAllByAcademicYearPending());
+    const params = new URLSearchParams();
+    if (academicYearId) params.set('academicYearId', academicYearId);
+    if (gradeId) params.set('gradeId', gradeId);
+    const query = params.toString();
+    const endpoint = `/api/services/app/AdmissionSettings/GetAll${query ? `?${query}` : ''}`;
+    await instance
+      .get(endpoint)
+      .then((response) => {
+        dispatch(getAllByAcademicYearSuccess({ items: response.data.result.items }));
+      })
+      .catch((error) => {
+        console.error(error);
+        dispatch(getAllByAcademicYearError());
+        throw error;
+      });
+  };
+
   const getAllByAcademicYearAsync = async (academicYearId: string) => {
     dispatch(getAllByAcademicYearPending());
     const endpoint = `/api/services/app/AdmissionSettings/GetAllByAcademicYear?academicYearId=${academicYearId}`;
@@ -216,6 +240,7 @@ export const AdmissionSettingsProvider = ({
         value={{
           getAsync,
           getByGradeAsync,
+          getAllAsync,
           getAllByAcademicYearAsync,
           createAsync,
           updateAsync,
