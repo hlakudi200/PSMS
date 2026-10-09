@@ -3,8 +3,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
+  Button,
   Card,
   Col,
+  DatePicker,
   Empty,
   Row,
   Skeleton,
@@ -13,13 +15,18 @@ import {
   Table,
   Tabs,
   Tag,
+  Tooltip,
   Typography,
+  message,
 } from 'antd';
 import {
+  CalendarOutlined,
   ClockCircleOutlined,
+  PrinterOutlined,
   TeamOutlined,
   WarningOutlined,
 } from '@ant-design/icons';
+import dayjs, { Dayjs } from 'dayjs';
 import type { ColumnsType } from 'antd/es/table';
 import { CoffeeOutlined } from '@ant-design/icons';
 import { useAuthState } from '@/providers/auth';
@@ -33,10 +40,46 @@ import {
   useTimetableSlotActions,
   useTimetableSlotState,
 } from '@/providers/academic/timetable_slots';
+import {
+  TermProvider,
+  useTermActions,
+  useTermState,
+} from '@/providers/academic/terms';
+import {
+  TermEventProvider,
+  useTermEventActions,
+  useTermEventState,
+} from '@/providers/academic/term_events';
 import { detectBreaks } from '@/utils/timetable-grid';
+import {
+  MAX_RANGE_DAYS,
+  buildScheduleIcs,
+  downloadTextFile,
+  expandSchedule,
+  holidaysByDate,
+  type ScheduleDay,
+} from '@/utils/teacher-schedule';
 import type { ITimetableSlotList } from '@/providers/academic/shared/interfaces';
 
 const { Title, Text } = Typography;
+const { RangePicker } = DatePicker;
+
+type ScheduleTab = 'today' | 'week' | 'term';
+type DateRange = [Dayjs, Dayjs];
+
+/* Print stylesheet — same technique as the class timetable PDF (#188):
+ * hide everything except the print area, drop on-screen controls. */
+const printStyles = `
+@media print {
+  @page { size: A4 landscape; margin: 12mm 10mm; }
+  body * { visibility: hidden; }
+  .schedule-print-area, .schedule-print-area * { visibility: visible; }
+  .schedule-print-area { position: absolute; left: 0; top: 0; width: 100%; }
+  .schedule-print-area .ant-tabs-nav, .no-print { display: none !important; }
+  .print-only { display: block !important; }
+}
+.print-only { display: none; }
+`;
 
 // SA labor-law cap from business rule TT-005 (Supplementary). The dashboard's
 // "workload" stat compares the teacher's weekly period count to this number.
@@ -79,7 +122,10 @@ interface ScheduleRow {
 
 function TeacherScheduleContent() {
   const { currentUser } = useAuthState();
-  const [activeTab, setActiveTab] = useState<'today' | 'week'>('today');
+  const [activeTab, setActiveTab] = useState<ScheduleTab>('today');
+  // Term view / date-range filter. Starts on the current term once it loads;
+  // null until then (or if the school has no current term set).
+  const [range, setRange] = useState<DateRange | null>(null);
   // `new Date().getDay()` at render time would differ between the SSR
   // shell (UTC) and the SA client (UTC+2), tripping React's hydration
   // check after 22:00 UTC. Resolve the day once on mount instead.
@@ -94,6 +140,11 @@ function TeacherScheduleContent() {
     isPending: teacherPending,
     isError: teacherError,
   } = useTeacherState();
+
+  const { getCurrentAsync: getCurrentTerm } = useTermActions();
+  const { term: currentTerm, isPending: termPending } = useTermState();
+  const { getByDateRangeAsync: getTermEvents } = useTermEventActions();
+  const { termEvents } = useTermEventState();
 
   const { getByTeacherAsync: getMySlots } = useTimetableSlotActions();
   const {
@@ -119,7 +170,48 @@ function TeacherScheduleContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [teacherId]);
 
+  useEffect(() => {
+    // No current term is a valid school state, not a page error: the term
+    // view then falls back to the next four weeks.
+    getCurrentTerm().catch(() =>
+      setRange((r) => r ?? [dayjs().startOf('day'), dayjs().add(4, 'week')])
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const termRange = useMemo<DateRange | null>(
+    () =>
+      currentTerm
+        ? [dayjs(currentTerm.startDate).startOf('day'), dayjs(currentTerm.endDate).startOf('day')]
+        : null,
+    [currentTerm]
+  );
+
+  useEffect(() => {
+    if (termRange) setRange((r) => r ?? termRange);
+  }, [termRange]);
+
+  // Holidays for the selected range. The server compares UTC-shifted dates,
+  // so pad a day each side and match by local date on the client.
+  useEffect(() => {
+    if (!range) return;
+    getTermEvents(
+      range[0].subtract(1, 'day').format('YYYY-MM-DD'),
+      range[1].add(1, 'day').format('YYYY-MM-DD')
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [range?.[0]?.valueOf(), range?.[1]?.valueOf()]);
+
   const slots = useMemo(() => timetableSlots ?? [], [timetableSlots]);
+
+  const scheduleDays = useMemo<ScheduleDay[]>(
+    () => (range ? expandSchedule(slots, range[0], range[1], holidaysByDate(termEvents)) : []),
+    [slots, range, termEvents]
+  );
+  const teachingDays = scheduleDays.filter((d) => !d.holiday).length;
+  const rangeLabel = range
+    ? `${range[0].format('D MMM YYYY')} – ${range[1].format('D MMM YYYY')}`
+    : '';
 
   const todaysSlots = useMemo(
     () =>
@@ -355,17 +447,120 @@ function TeacherScheduleContent() {
     );
   };
 
+  const handleRangeChange = (value: [Dayjs | null, Dayjs | null] | null) => {
+    if (!value || !value[0] || !value[1]) {
+      setRange(termRange ?? [dayjs().startOf('day'), dayjs().add(4, 'week')]);
+      return;
+    }
+    if (value[1].diff(value[0], 'day') >= MAX_RANGE_DAYS) {
+      message.warning(`Pick a range of at most ${MAX_RANGE_DAYS} days.`);
+      return;
+    }
+    setRange([value[0].startOf('day'), value[1].startOf('day')]);
+  };
+
+  const handleExportIcs = () => {
+    if (!range || scheduleDays.every((d) => d.slots.length === 0)) {
+      message.info('There are no periods in the selected dates to export.');
+      return;
+    }
+    const name = currentTerm ? `My schedule — ${currentTerm.termName}` : 'My schedule';
+    downloadTextFile(
+      buildScheduleIcs(scheduleDays, name),
+      `my-schedule-${range[0].format('YYYYMMDD')}-${range[1].format('YYYYMMDD')}.ics`,
+      'text/calendar;charset=utf-8'
+    );
+  };
+
+  const renderTerm = () => {
+    return (
+      <div>
+        <Space wrap className="no-print" style={{ marginBottom: 12 }}>
+          <RangePicker
+            value={range}
+            onChange={handleRangeChange}
+            format="D MMM YYYY"
+            allowClear={false}
+            presets={[
+              ...(termRange ? [{ label: currentTerm?.termName ?? 'This term', value: termRange }] : []),
+              { label: 'This week', value: [dayjs().startOf('week'), dayjs().endOf('week')] },
+              { label: 'Next 4 weeks', value: [dayjs().startOf('day'), dayjs().add(4, 'week')] },
+            ]}
+          />
+          <Text type="secondary">
+            {teachingDays} teaching day{teachingDays === 1 ? '' : 's'}
+          </Text>
+        </Space>
+        {scheduleDays.length === 0 ? (
+          <Empty description="No periods in the selected dates." />
+        ) : (
+          <Table<ScheduleDay>
+            dataSource={scheduleDays}
+            rowKey="date"
+            size="small"
+            pagination={false}
+            scroll={{ x: 640 }}
+            columns={[
+              {
+                title: 'Date',
+                dataIndex: 'date',
+                key: 'date',
+                width: 150,
+                render: (d: string) => <Text strong>{dayjs(d).format('ddd D MMM')}</Text>,
+              },
+              {
+                title: 'Periods',
+                key: 'periods',
+                render: (_: unknown, day: ScheduleDay) =>
+                  day.holiday ? (
+                    <Tag color="orange">{day.holiday} — no classes</Tag>
+                  ) : (
+                    <Space size={[4, 4]} wrap>
+                      {day.slots.map((s) => (
+                        <Tag key={s.id}>
+                          P{s.periodNumber} {formatTimeShort(s.startTime)} ·{' '}
+                          {s.subjectName ?? 'Lesson'}
+                          {s.roomNumber ? ` · Room ${s.roomNumber}` : ''}
+                        </Tag>
+                      ))}
+                    </Space>
+                  ),
+              },
+            ]}
+          />
+        )}
+      </div>
+    );
+  };
+
   return (
     <div>
-      <div style={{ marginBottom: 16 }}>
-        <Title level={4} style={{ margin: 0 }}>
-          My Schedule
-        </Title>
-        <Text type="secondary">
-          Your weekly teaching periods. The workload count below is governed
-          by SA business rule TT-005 (max {MAX_PERIODS_PER_WEEK} periods per
-          week).
-        </Text>
+      <style>{printStyles}</style>
+      <div
+        style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}
+      >
+        <div>
+          <Title level={4} style={{ margin: 0 }}>
+            My Schedule
+          </Title>
+          <Text type="secondary">
+            Your weekly teaching periods. The workload count below is governed
+            by SA business rule TT-005 (max {MAX_PERIODS_PER_WEEK} periods per
+            week).
+          </Text>
+        </div>
+        <Space className="no-print">
+          <Tooltip title="Print or save the view you're on as a PDF">
+            <Button icon={<PrinterOutlined />} onClick={() => window.print()} disabled={loading}>
+              Download PDF
+            </Button>
+          </Tooltip>
+          <Tooltip title={`Add the periods for ${rangeLabel || 'the selected dates'} to your own calendar (Google, Outlook, Apple)`}>
+            <Button icon={<CalendarOutlined />} onClick={handleExportIcs} disabled={loading || !range}>
+              Add to calendar
+            </Button>
+          </Tooltip>
+        </Space>
       </div>
 
       {noTeacherProfile && (
@@ -423,10 +618,16 @@ function TeacherScheduleContent() {
         </Col>
       </Row>
 
-      <Card variant="borderless" styles={{ body: { padding: 0 } }}>
+      <Card variant="borderless" styles={{ body: { padding: 0 } }} className="schedule-print-area">
+        <div className="print-only" style={{ padding: '0 16px 8px' }}>
+          <Title level={4} style={{ margin: 0 }}>
+            My Schedule
+            {activeTab === 'term' && rangeLabel ? ` — ${rangeLabel}` : ''}
+          </Title>
+        </div>
         <Tabs
           activeKey={activeTab}
-          onChange={(k) => setActiveTab(k as 'today' | 'week')}
+          onChange={(k) => setActiveTab(k as ScheduleTab)}
           style={{ padding: '0 16px' }}
           items={[
             {
@@ -450,6 +651,16 @@ function TeacherScheduleContent() {
                 renderWeek()
               ),
             },
+            {
+              key: 'term',
+              label: currentTerm ? `Term view (${currentTerm.termName})` : 'Term view',
+              children:
+                loading || (termPending && !range) ? (
+                  <Skeleton active paragraph={{ rows: 6 }} />
+                ) : (
+                  renderTerm()
+                ),
+            },
           ]}
         />
       </Card>
@@ -461,7 +672,11 @@ export default function TeacherSchedulePageContent() {
   return (
     <TeacherProvider>
       <TimetableSlotProvider>
-        <TeacherScheduleContent />
+        <TermProvider>
+          <TermEventProvider>
+            <TeacherScheduleContent />
+          </TermEventProvider>
+        </TermProvider>
       </TimetableSlotProvider>
     </TeacherProvider>
   );

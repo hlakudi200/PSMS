@@ -20,7 +20,7 @@ export interface ITermActionContext {
   getAsync: (id: string) => void;
   getAllAsync: (input?: IPagedAndSortedResultRequest) => void;
   getByAcademicYearAsync: (academicYearId: string) => void;
-  getCurrentAsync: () => void;
+  getCurrentAsync: () => Promise<void>;
   createAsync: (input: ICreateTerm) => void;
   updateAsync: (id: string, input: IUpdateTerm) => void;
   deleteAsync: (id: string) => void;
