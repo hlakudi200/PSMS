@@ -33,13 +33,16 @@ public class ApplicationAppService : ApplicationService, IApplicationAppService
     private readonly IRepository<Domain.Admissions.Entities.AdmissionSettings, Guid> _settingsRepository;
     private readonly IRepository<ApplicantParent, Guid> _parentRepository;
     private readonly WorkflowStarterService _workflowStarter;
+    private readonly ICurrentApplicantResolver _currentApplicant;
 
     public ApplicationAppService(
         IRepository<Application, Guid> applicationRepository,
         IRepository<Domain.Admissions.Entities.AdmissionSettings, Guid> settingsRepository,
         IRepository<ApplicantParent, Guid> parentRepository,
-        WorkflowStarterService workflowStarter)
+        WorkflowStarterService workflowStarter,
+        ICurrentApplicantResolver currentApplicant)
     {
+        _currentApplicant = currentApplicant;
         _applicationRepository = applicationRepository;
         _settingsRepository = settingsRepository;
         _parentRepository = parentRepository;
@@ -53,6 +56,8 @@ public class ApplicationAppService : ApplicationService, IApplicationAppService
 
         if (application == null)
             throw new UserFriendlyException(AdmissionsExceptionCodes.ApplicationNotFound, "Application not found.");
+
+        await AssertMineIfApplicantAsync(application);
 
         return ObjectMapper.Map<ApplicationDto>(application);
     }
@@ -75,7 +80,45 @@ public class ApplicationAppService : ApplicationService, IApplicationAppService
         if (application == null)
             throw new UserFriendlyException(AdmissionsExceptionCodes.InvalidApplicationNumber, "Application not found with this number.");
 
+        await AssertMineIfApplicantAsync(application);
+
         return ObjectMapper.Map<ApplicationDto>(application);
+    }
+
+    /// <summary>
+    /// The applications this parent has started, so the apply screen can find
+    /// them again.
+    /// <para>
+    /// There was no way to. Listing applications needs
+    /// Applications.ViewAll — "every application at this school" — which an
+    /// applicant does not and should not hold, so a parent who signed back in
+    /// had no route to the draft they had already begun.
+    /// </para>
+    /// <para>
+    /// Staff get the same answer from GetAll, which is scoped to the school
+    /// and filterable; this is deliberately only ever the caller's own.
+    /// </para>
+    /// </summary>
+    [AbpAuthorize(PermissionNames.Admissions_Applications_View)]
+    public async Task<ListResultDto<ApplicationListDto>> GetMineAsync()
+    {
+        // The resolver already knows who this applicant is; for staff asking
+        // the same question, "mine" is simply what they created.
+        var ownerId = await _currentApplicant.GetOwnApplicationsOnlyForAsync() ?? AbpSession.UserId;
+
+        if (!ownerId.HasValue)
+            return new ListResultDto<ApplicationListDto>(new List<ApplicationListDto>());
+
+        var mine = await _applicationRepository
+            .GetAll()
+            .Include(a => a.AppliedGrade)
+            .Include(a => a.AcademicYear)
+            .Where(a => a.CreatorUserId == ownerId.Value)
+            .OrderByDescending(a => a.CreationTime)
+            .ToListAsync();
+
+        return new ListResultDto<ApplicationListDto>(
+            ObjectMapper.Map<List<ApplicationListDto>>(mine));
     }
 
     [AbpAuthorize(PermissionNames.Admissions_Applications_ViewAll)]
@@ -184,6 +227,7 @@ public class ApplicationAppService : ApplicationService, IApplicationAppService
     public async Task<ApplicationDto> UpdateAsync(Guid id, UpdateApplicationDto input)
     {
         var application = await _applicationRepository.GetAsync(id);
+        await AssertMineIfApplicantAsync(application);
 
         if (application.Status != ApplicationStatus.Draft)
             throw new UserFriendlyException(AdmissionsExceptionCodes.InvalidStatusTransition,
@@ -236,6 +280,7 @@ public class ApplicationAppService : ApplicationService, IApplicationAppService
     public async Task DeleteAsync(Guid id)
     {
         var application = await _applicationRepository.GetAsync(id);
+        await AssertMineIfApplicantAsync(application);
 
         if (application.Status != ApplicationStatus.Draft)
             throw new UserFriendlyException(AdmissionsExceptionCodes.InvalidStatusTransition,
@@ -251,6 +296,8 @@ public class ApplicationAppService : ApplicationService, IApplicationAppService
 
         if (application == null)
             throw new UserFriendlyException(AdmissionsExceptionCodes.ApplicationNotFound, "Application not found.");
+
+        await AssertMineIfApplicantAsync(application);
 
         // Validate at least one parent exists (ADM-003)
         if (application.ApplicantParents == null || !application.ApplicantParents.Any())
@@ -317,6 +364,7 @@ public class ApplicationAppService : ApplicationService, IApplicationAppService
     public async Task<ApplicationDto> WithdrawAsync(Guid id, string reason = null)
     {
         var application = await _applicationRepository.GetAsync(id);
+        await AssertMineIfApplicantAsync(application);
 
         if (application == null)
             throw new UserFriendlyException(AdmissionsExceptionCodes.ApplicationNotFound, "Application not found.");
@@ -362,6 +410,29 @@ public class ApplicationAppService : ApplicationService, IApplicationAppService
     }
 
     #region Private Helper Methods
+
+    /// <summary>
+    /// A prospective parent reads their own application and nobody else's.
+    /// <para>
+    /// They hold Applications.View so they can see theirs, and nothing checked
+    /// that it was theirs. Application numbers run in sequence —
+    /// APP-003-2026-00011 — so another family's application was reachable by
+    /// counting: a child's name, date of birth, ID number, and both parents'
+    /// contact details.
+    /// </para>
+    /// <para>
+    /// Not-found rather than forbidden, so this cannot be used to discover
+    /// which application numbers exist.
+    /// </para>
+    /// </summary>
+    private async Task AssertMineIfApplicantAsync(Application application)
+    {
+        var ownerOnly = await _currentApplicant.GetOwnApplicationsOnlyForAsync();
+
+        if (ownerOnly.HasValue && application.CreatorUserId != ownerOnly.Value)
+            throw new UserFriendlyException(AdmissionsExceptionCodes.ApplicationNotFound,
+                "Application not found.");
+    }
 
     private async Task<Application> GetApplicationWithDetailsAsync(Guid id)
     {

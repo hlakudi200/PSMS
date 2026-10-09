@@ -1,4 +1,4 @@
-using Abp.Application.Services;
+﻿using Abp.Application.Services;
 using Abp.Application.Services.Dto;
 using psms.Admissions.Applications.Dto;
 using System;
@@ -21,6 +21,12 @@ public interface IApplicationAppService : IApplicationService
     /// Gets an application by application number.
     /// </summary>
     Task<ApplicationDto> GetByApplicationNumberAsync(string applicationNumber);
+
+    /// <summary>
+    /// The applications the signed-in parent has started, so the apply screen
+    /// can find them again. Always and only their own.
+    /// </summary>
+    Task<ListResultDto<ApplicationListDto>> GetMineAsync();
 
     /// <summary>
     /// Gets paginated list of applications with filters.
