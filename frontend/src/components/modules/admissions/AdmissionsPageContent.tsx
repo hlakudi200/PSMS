@@ -13,9 +13,10 @@ import {
   ClockCircleOutlined,
   UserAddOutlined,
   EditOutlined,
+  PlusOutlined,
 } from '@ant-design/icons';
 import { EnterpriseTable } from '@/components/shared/enterprise-table';
-import type { ColumnConfig, TableQuery, RowAction } from '@/components/shared/enterprise-table';
+import type { ColumnConfig, TableQuery, RowAction, ToolbarAction } from '@/components/shared/enterprise-table';
 import { ApplicationProvider, useApplicationState, useApplicationActions } from '@/providers/admissions/applications';
 import { AdmissionSettingsProvider, useAdmissionSettingsState, useAdmissionSettingsActions } from '@/providers/admissions/admission_settings';
 import { WaitlistProvider, useWaitlistState, useWaitlistActions } from '@/providers/admissions/waitlists';
@@ -57,11 +58,25 @@ function AdmissionsContent() {
   const { getAllAsync, getStatisticsAsync } = useApplicationActions();
   const { admissionSettingsList, isPending: settingsPending } = useAdmissionSettingsState();
   const { getAllByAcademicYearAsync } = useAdmissionSettingsActions();
+  const [addingSettings, setAddingSettings] = useState(false);
 
   /* These settings were shown and never editable, so the only way to change
      when applications open, what they cost, or whether they cost anything was
      an API client. */
   const [editingSettings, setEditingSettings] = useState<IAdmissionSettings | undefined>();
+
+  /* The create endpoint and its provider call both existed and nothing
+     mounted them, so a school could only ever edit the settings rows it was
+     seeded with — and could not add per-grade rules at all. */
+  const settingsToolbarActions: ToolbarAction[] = [
+    {
+      key: 'add',
+      label: 'Add settings',
+      icon: <PlusOutlined />,
+      type: 'primary',
+      onClick: () => setAddingSettings(true),
+    },
+  ];
 
   const settingsRowActions: RowAction<IAdmissionSettings>[] = [
     {
@@ -271,6 +286,7 @@ function AdmissionsContent() {
           rowKey="id"
           currentUserRole={currentRole}
           rowActions={settingsRowActions}
+          toolbarActions={settingsToolbarActions}
         />
       ),
     },
@@ -382,9 +398,13 @@ function AdmissionsContent() {
       </Card>
 
       <AdmissionSettingsFormModal
-        open={!!editingSettings}
+        open={!!editingSettings || addingSettings}
         settings={editingSettings}
-        onClose={() => setEditingSettings(undefined)}
+        defaultAcademicYearId={selectedAcademicYearId}
+        onClose={() => {
+          setEditingSettings(undefined);
+          setAddingSettings(false);
+        }}
         onSaved={() => {
           if (selectedAcademicYearId) getAllByAcademicYearAsync(selectedAcademicYearId);
         }}
