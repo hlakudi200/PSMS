@@ -315,25 +315,13 @@ public class PaymentAllocationAppService : ApplicationService, IPaymentAllocatio
             throw new UserFriendlyException(FinancialExceptionCodes.PaymentAllocationNotFound,
                 "Payment allocation not found.");
 
-        // Reverse allocation from student fee
-        var originalStatus = allocation.StudentFee.Status;
-        allocation.StudentFee.AmountPaid -= allocation.Amount;
-        if (allocation.StudentFee.AmountPaid < 0)
-            allocation.StudentFee.AmountPaid = 0;
+        // A refund already took this money back off the fee; removing the
+        // allocation afterwards would take it back a second time.
+        if (allocation.Payment.Status != PaymentStatus.Completed)
+            throw new UserFriendlyException(FinancialExceptionCodes.PaymentNotCompleted,
+                "Cannot remove an allocation from a payment that is not completed.");
 
-        // Preserve Waived/Cancelled status — don't recompute settled fees
-        if (originalStatus != FeeStatus.Waived && originalStatus != FeeStatus.Cancelled)
-        {
-            var outstanding = allocation.StudentFee.GetOutstandingBalance();
-            if (outstanding <= 0)
-                allocation.StudentFee.Status = FeeStatus.Paid;
-            else if (allocation.StudentFee.AmountPaid > 0)
-                allocation.StudentFee.Status = FeeStatus.PartiallyPaid;
-            else if (DateTime.UtcNow > allocation.StudentFee.DueDate)
-                allocation.StudentFee.Status = FeeStatus.Overdue;
-            else
-                allocation.StudentFee.Status = FeeStatus.Pending;
-        }
+        allocation.StudentFee.ReversePayment(allocation.Amount);
 
         await _studentFeeRepository.UpdateAsync(allocation.StudentFee);
         await _paymentAllocationRepository.DeleteAsync(allocation);

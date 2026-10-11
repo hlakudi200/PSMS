@@ -140,6 +140,22 @@ namespace psms.Domain.Financial.Entities
         }
 
         /// <summary>
+        /// Takes back money that no longer counts towards this fee — a payment
+        /// refunded, or an allocation removed. A waived or cancelled fee keeps its
+        /// status: it is settled whatever was paid on it.
+        /// </summary>
+        public void ReversePayment(decimal amount)
+        {
+            if (amount <= 0)
+                throw new ArgumentException("Reversal amount must be positive.", nameof(amount));
+
+            AmountPaid = Math.Max(0, AmountPaid - amount);
+
+            if (Status != FeeStatus.Waived && Status != FeeStatus.Cancelled)
+                UpdateStatus();
+        }
+
+        /// <summary>
         /// Applies a discount to this fee
         /// </summary>
         public void ApplyDiscount(decimal discount)

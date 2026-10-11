@@ -251,6 +251,8 @@ public class PaymentAppService : ApplicationService, IPaymentAppService
     public async Task<PaymentDto> RefundAsync(Guid id)
     {
         var payment = await _paymentRepository
+            .GetAll()
+            .Include(p => p.PaymentAllocations).ThenInclude(pa => pa.StudentFee)
             .FirstOrDefaultAsync(p => p.Id == id && p.TenantId == AbpSession.TenantId);
 
         if (payment == null)
@@ -265,6 +267,13 @@ public class PaymentAppService : ApplicationService, IPaymentAppService
         {
             throw new UserFriendlyException(FinancialExceptionCodes.InvalidPaymentStatusTransition, ex.Message);
         }
+
+        // The family has the money back, so it no longer pays the fees it was
+        // put against. Refunding only flipped the payment's status, which left
+        // each fee showing as paid. The allocations stay as the record of what
+        // the payment had covered.
+        foreach (var allocation in payment.PaymentAllocations)
+            allocation.StudentFee?.ReversePayment(allocation.Amount);
 
         await _paymentRepository.UpdateAsync(payment);
         await CurrentUnitOfWork.SaveChangesAsync();
