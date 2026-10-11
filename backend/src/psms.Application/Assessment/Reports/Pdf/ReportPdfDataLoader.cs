@@ -8,11 +8,7 @@ using Abp.Domain.Uow;
 using Microsoft.EntityFrameworkCore;
 using psms.Domain.Assessment.Entities;
 using psms.Domain.Shared.Enums;
-using psms.Domain.Tenancy;
-using psms.Domain.Tenancy.Entities;
-using psms.MultiTenancy;
-using System.Net.Http;
-using System.Threading;
+using psms.Shared.Pdf;
 
 namespace psms.Assessment.Reports.Pdf;
 
@@ -21,40 +17,23 @@ namespace psms.Assessment.Reports.Pdf;
 /// </summary>
 public class ReportPdfDataLoader : ITransientDependency
 {
-    /// <summary>
-    /// How long to wait for the school logo before printing without it. A report
-    /// card must not fail, or hang a background job, over a decoration.
-    /// </summary>
-    private static readonly TimeSpan LogoFetchTimeout = TimeSpan.FromSeconds(5);
-
-    /// <summary>Beyond this a "logo" is not a logo, and we skip it.</summary>
-    private const int MaxLogoBytes = 2 * 1024 * 1024;
-
-    private static readonly HttpClient LogoClient = new HttpClient
-    {
-        Timeout = LogoFetchTimeout
-    };
-
     private readonly IRepository<Report, Guid> _reportRepository;
-    private readonly IRepository<SchoolBranding, Guid> _brandingRepository;
     private readonly IRepository<psms.Authorization.Users.User, long> _userRepository;
-    private readonly TenantManager _tenantManager;
+    private readonly SchoolLetterheadLoader _letterheadLoader;
     private readonly IUnitOfWorkManager _unitOfWorkManager;
     private readonly Microsoft.Extensions.Configuration.IConfiguration _configuration;
     public Castle.Core.Logging.ILogger Logger { get; set; } = Castle.Core.Logging.NullLogger.Instance;
 
     public ReportPdfDataLoader(
         IRepository<Report, Guid> reportRepository,
-        IRepository<SchoolBranding, Guid> brandingRepository,
         IRepository<psms.Authorization.Users.User, long> userRepository,
-        TenantManager tenantManager,
+        SchoolLetterheadLoader letterheadLoader,
         IUnitOfWorkManager unitOfWorkManager,
         Microsoft.Extensions.Configuration.IConfiguration configuration)
     {
         _reportRepository = reportRepository;
-        _brandingRepository = brandingRepository;
         _userRepository = userRepository;
-        _tenantManager = tenantManager;
+        _letterheadLoader = letterheadLoader;
         _unitOfWorkManager = unitOfWorkManager;
         _configuration = configuration;
     }
@@ -79,49 +58,17 @@ public class ReportPdfDataLoader : ITransientDependency
             return null;
 
         // The school's own identity, so a printed card looks like it came from
-        // the school rather than from PSMS (issue #56). The branding row carries
-        // the display name; the tenancy name is only a fallback for a tenant that
-        // has never been branded.
-        string schoolName = null;
-        var primaryColor = BrandingDefaults.PrimaryColor;
-        var secondaryColor = BrandingDefaults.SecondaryColor;
-        string logoUrl = null;
-        string stampUrl = null;
-
-        if (tenantId.HasValue)
-        {
-            var branding = await _brandingRepository
-                .GetAll()
-                .FirstOrDefaultAsync(b => b.TenantId == tenantId.Value);
-
-            if (branding != null)
-            {
-                if (!string.IsNullOrWhiteSpace(branding.SchoolName))
-                    schoolName = branding.SchoolName;
-                if (SchoolBranding.IsValidHexColor(branding.PrimaryColor))
-                    primaryColor = branding.PrimaryColor;
-                if (SchoolBranding.IsValidHexColor(branding.SecondaryColor))
-                    secondaryColor = branding.SecondaryColor;
-                logoUrl = branding.LogoUrl;
-                stampUrl = branding.StampUrl;
-            }
-
-            if (string.IsNullOrWhiteSpace(schoolName))
-            {
-                var tenant = await _tenantManager.FindByIdAsync(tenantId.Value);
-                if (tenant != null)
-                    schoolName = tenant.TenancyName;
-            }
-        }
+        // the school rather than from PSMS (issue #56).
+        var letterhead = await _letterheadLoader.LoadAsync(tenantId);
 
         var data = new ReportPdfData
         {
-            SchoolName = string.IsNullOrWhiteSpace(schoolName) ? "School" : schoolName,
-            PrimaryColor = primaryColor,
-            SecondaryColor = secondaryColor,
-            LogoBytes = await TryFetchImageAsync(logoUrl, "logo"),
+            SchoolName = letterhead.SchoolName,
+            PrimaryColor = letterhead.PrimaryColor,
+            SecondaryColor = letterhead.SecondaryColor,
+            LogoBytes = letterhead.LogoBytes,
             // §25(8)(b): the school stamp.
-            StampBytes = await TryFetchImageAsync(stampUrl, "stamp"),
+            StampBytes = letterhead.StampBytes,
             StudentName = report.Student?.GetFullName() ?? "Unknown Student",
             AdmissionNumber = report.Student?.AdmissionNumber,
             ClassName = report.Class?.ClassName ?? "N/A",
@@ -194,50 +141,6 @@ public class ReportPdfDataLoader : ITransientDependency
 
         return data;
         } // end DisableFilter
-    }
-
-    /// <summary>
-    /// Reads the logo bytes so QuestPDF can embed them. Returns null on anything
-    /// going wrong — a slow host, a 404, a file that is not an image — because a
-    /// report card has to print with or without the badge on it.
-    /// </summary>
-    private async Task<byte[]> TryFetchImageAsync(string url, string what)
-    {
-        if (string.IsNullOrWhiteSpace(url))
-            return null;
-
-        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri)
-            || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
-        {
-            Logger.Warn($"School {what} URL is not a usable http(s) address, skipping it: {url}");
-            return null;
-        }
-
-        try
-        {
-            using var cts = new CancellationTokenSource(LogoFetchTimeout);
-            using var response = await LogoClient.GetAsync(uri, cts.Token);
-
-            if (!response.IsSuccessStatusCode)
-            {
-                Logger.Warn($"School {what} fetch returned {(int)response.StatusCode}, printing without it.");
-                return null;
-            }
-
-            if (response.Content.Headers.ContentLength > MaxLogoBytes)
-            {
-                Logger.Warn($"School {what} is larger than the embed limit, printing without it.");
-                return null;
-            }
-
-            var bytes = await response.Content.ReadAsByteArrayAsync();
-            return bytes.Length == 0 || bytes.Length > MaxLogoBytes ? null : bytes;
-        }
-        catch (Exception ex)
-        {
-            Logger.Warn($"Could not read the school {what} for the report card: {ex.Message}");
-            return null;
-        }
     }
 
     /// <summary>
