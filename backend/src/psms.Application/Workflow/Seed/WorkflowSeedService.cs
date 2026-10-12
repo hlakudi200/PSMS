@@ -69,6 +69,13 @@ public class WorkflowSeedService : ApplicationService
     private const string InterviewNotRequiredSkipKey = "application.interview-not-required";
     private const string AssessmentNotRequiredSkipKey = "application.assessment-not-required";
     private const string AssessmentStepName = "Placement Assessment";
+    private const string PrincipalDecisionStepName = "Principal Decision";
+
+    /// <summary>
+    /// The form the principal fills in to decide an application: accept, accept
+    /// with conditions, waitlist, or reject. Matches ApplicationDecisionSchema.Key.
+    /// </summary>
+    private const string ApplicationDecisionKey = "application.decision";
 
     private async Task SeedAdmissionsWorkflow()
     {
@@ -162,12 +169,15 @@ public class WorkflowSeedService : ApplicationService
                 Id = Guid.NewGuid(),
                 WorkflowDefinitionId = definition.Id,
                 StepOrder = 6,
-                Name = "Principal Decision",
+                Name = PrincipalDecisionStepName,
                 Description = "Principal makes the final admission decision.",
                 AssignedRole = "Principal",
                 ActionType = WorkflowActionType.Approve,
                 IsTerminal = true,
-                NextStepOnReject = 5 // Send back to committee for reconsideration
+                NextStepOnReject = 5, // Send back to committee for reconsideration
+                // Without this the step has no decision to make: every completion
+                // fell through to Accepted, so nobody could waitlist or reject.
+                DecisionSchemaKey = ApplicationDecisionKey
             }
         };
 
@@ -213,6 +223,42 @@ public class WorkflowSeedService : ApplicationService
             await _stepRepository.UpdateAsync(interview);
 
         await AddAssessmentStepAsync(definition);
+        await GiveThePrincipalADecisionToMakeAsync(definition);
+    }
+
+    /// <summary>
+    /// Attaches the admission decision form to the principal's step.
+    /// <para>
+    /// The form was written — accept, accept with conditions, place on
+    /// waitlist, reject, with the reason and offer-validity rules ADM-020 and
+    /// ADM-018 are about — registered with the engine, and attached to nothing.
+    /// So the step had no decision on it, and completing it read:
+    /// </para>
+    /// <code>
+    /// var decision = ctx.Decision.GetEnum&lt;AdmissionDecision&gt;("decision")
+    ///               ?? AdmissionDecision.Accepted;
+    /// </code>
+    /// <para>
+    /// Every application the principal passed was therefore accepted, whatever
+    /// they meant. Nobody could be waitlisted — which is why the waiting list
+    /// was always empty — nobody could be rejected with the reason the rule
+    /// demands, and an offer could not be given a life of its own.
+    /// </para>
+    /// <para>
+    /// Only attached where the step still carries none, so a school that has
+    /// configured its own form keeps it.
+    /// </para>
+    /// </summary>
+    private async Task GiveThePrincipalADecisionToMakeAsync(WorkflowDefinition definition)
+    {
+        var decision = definition.Steps?
+            .FirstOrDefault(s => s.IsTerminal && s.Name == PrincipalDecisionStepName);
+
+        if (decision == null || !string.IsNullOrWhiteSpace(decision.DecisionSchemaKey))
+            return;
+
+        decision.DecisionSchemaKey = ApplicationDecisionKey;
+        await _stepRepository.UpdateAsync(decision);
     }
 
     /// <summary>

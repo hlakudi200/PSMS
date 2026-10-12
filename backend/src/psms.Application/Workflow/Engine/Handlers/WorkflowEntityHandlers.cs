@@ -89,7 +89,23 @@ public class ApplicationWorkflowHandler : EntityHandlerBase<Application>, ITrans
     protected override void Completed(Application a, WorkflowEffectContext ctx)
     {
         EnsureUnderConsideration(a);
-        var decision = ctx.Decision.GetEnum<AdmissionDecision>("decision") ?? AdmissionDecision.Accepted;
+
+        /* Silence used to mean "Accepted". The decision form was never attached
+           to the principal's step, so every application that reached the end of
+           the workflow was accepted whatever the principal intended — and of
+           the four possible outcomes, offering a child a place by accident is
+           the worst one to guess at.
+
+           With the form attached the engine validates a decision before this
+           runs, so reaching here empty now means a step configured without it.
+           That is a misconfiguration, and it says so rather than admitting
+           somebody nobody chose to admit. */
+        var decision = ctx.Decision.GetEnum<AdmissionDecision>("decision");
+        if (decision == null)
+            throw new UserFriendlyException(WorkflowExceptionCodes.DecisionInvalid,
+                "This step has no admission decision on it, so there is nothing to act on. "
+                + "Attach the admission decision form to the step and try again.");
+
         var reason = ctx.Decision.GetString("reason") ?? ctx.Comment;
         var days = ctx.Decision.GetInt("offerExpiryDays") ?? 14;
 
