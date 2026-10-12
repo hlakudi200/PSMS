@@ -29,6 +29,29 @@ public class AdmissionSettingsDto : FullAuditedEntityDto<Guid>
     public int AvailableSpots => MaxCapacity.HasValue ? Math.Max(0, MaxCapacity.Value - CurrentEnrolledCount) : int.MaxValue;
     public bool IsCapacityFull => MaxCapacity.HasValue && CurrentEnrolledCount >= MaxCapacity.Value;
 
+    /// <summary>
+    /// Applications still in the running for this intake — submitted, being
+    /// reviewed, interviewed, assessed, or approved and not yet enrolled.
+    /// <para>
+    /// Capacity counts learners who have enrolled, so a grade with two places
+    /// and three applicants reads "2 available" and is quite right. What the
+    /// school could not see was the three: nothing on the screen said more
+    /// people were competing for the places than there were places, which is
+    /// the moment the waiting list is for.
+    /// </para>
+    /// </summary>
+    public int LiveApplications { get; set; }
+
+    /// <summary>Approved and waiting to enrol — these already have a claim on a place.</summary>
+    public int ApprovedAwaitingEnrolment { get; set; }
+
+    /// <summary>
+    /// More applicants in the running than places left for them. Not a problem
+    /// in itself — schools want to be able to choose — but the school should
+    /// know before it starts making offers it cannot honour.
+    /// </summary>
+    public bool IsOversubscribed => MaxCapacity.HasValue && LiveApplications > AvailableSpots;
+
     // Fees (ADM-006)
     public decimal ApplicationFeeAmount { get; set; }
     public string ApplicationFeeDisplay => $"R {ApplicationFeeAmount:N2}";

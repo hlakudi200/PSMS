@@ -3,7 +3,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { usePortalBase } from '@/utils/portal-base';
-import { Card, Col, Row, Select, Statistic, Tabs, Tag, Tooltip, message } from 'antd';
+import { Card, Col, Row, Select, Space, Statistic, Tabs, Tag, Tooltip, message } from 'antd';
 import {
   EyeOutlined,
   FileTextOutlined,
@@ -238,6 +238,30 @@ function AdmissionsContent() {
     { key: 'maxCapacity', title: 'Capacity', dataIndex: 'maxCapacity', width: 90 },
     { key: 'currentEnrolledCount', title: 'Enrolled', dataIndex: 'currentEnrolledCount', width: 90 },
     { key: 'availableSpots', title: 'Available', dataIndex: 'availableSpots', width: 90 },
+    /* Capacity counts learners who have enrolled, so two places with three
+       applicants reads "2 available" and is right. The three were nowhere on
+       this screen — and three people competing for two places is the moment a
+       waiting list earns its keep. */
+    {
+      key: 'liveApplications',
+      title: 'Applicants',
+      dataIndex: 'liveApplications',
+      width: 150,
+      render: (_: unknown, r: IAdmissionSettings) => (
+        <Space size={4}>
+          <span>{r.liveApplications}</span>
+          {r.isOversubscribed && (
+            <Tooltip
+              title={`${r.liveApplications} applicants still in the running for ${r.availableSpots} ${
+                r.availableSpots === 1 ? 'place' : 'places'
+              }. Offer the places, and put the rest on the waiting list.`}
+            >
+              <Tag color="gold" style={{ marginInlineEnd: 0 }}>More than places</Tag>
+            </Tooltip>
+          )}
+        </Space>
+      ),
+    },
     {
       key: 'applicationFeeDisplay', title: 'App Fee', dataIndex: 'applicationFeeDisplay',
       hideOnMobile: true, width: 110,

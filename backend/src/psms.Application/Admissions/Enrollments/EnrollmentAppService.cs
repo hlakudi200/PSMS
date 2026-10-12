@@ -224,6 +224,26 @@ public class EnrollmentAppService : ApplicationService, IEnrollmentAppService
             throw new UserFriendlyException(AdmissionsExceptionCodes.GradeCapacityFull,
                 "The selected class has reached maximum capacity.");
 
+        /* ADM-028, and a different thing from the class above: that is how many
+           desks are in a room, this is how many new learners the school said it
+           would take into this grade this year.
+
+           The count was incremented on every enrolment and never checked, so a
+           grade with two places could take a third and a fourth. The available
+           figure floors at zero, so the overshoot never even showed. Approving
+           more applicants than there are seats is normal and expected; seating
+           more children than there is room for is not. Checked here, before a
+           student record and a portal login are created for them. */
+        var settings = await _settingsRepository
+            .FirstOrDefaultAsync(s => s.AcademicYearId == application.AcademicYearId
+                && s.GradeId == application.AppliedGradeId);
+
+        if (settings != null && settings.IsAtCapacity())
+            throw new UserFriendlyException(AdmissionsExceptionCodes.GradeCapacityFull,
+                $"{application.AppliedGrade?.GradeName ?? "This grade"} is full — all "
+                + $"{settings.MaxCapacity} places for the year are taken. Raise the intake first, "
+                + "or offer this applicant a place on the waiting list.");
+
         // Generate admission number if not provided
         var admissionNumber = input.AdmissionNumber ?? await GenerateAdmissionNumberAsync();
 
@@ -265,13 +285,11 @@ public class EnrollmentAppService : ApplicationService, IEnrollmentAppService
         application.MarkAsEnrolled(student.Id);
         await _applicationRepository.UpdateAsync(application);
 
-        // Increment admission settings enrollment count (ADM-028)
-        var settings = await _settingsRepository
-            .FirstOrDefaultAsync(s => s.AcademicYearId == application.AcademicYearId
-                && s.GradeId == application.AppliedGradeId);
+        // One more place taken. The capacity that allowed it was checked above,
+        // before any record was created for this learner.
         if (settings != null)
         {
-            settings.CurrentEnrolledCount++;
+            settings.IncrementEnrolledCount();
             await _settingsRepository.UpdateAsync(settings);
         }
 

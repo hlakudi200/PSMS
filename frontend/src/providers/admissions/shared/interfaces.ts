@@ -32,6 +32,11 @@ export interface IAdmissionSettings {
   currentEnrolledCount: number;
   availableSpots: number;
   isCapacityFull: boolean;
+  /** Applications still in the running — submitted through approved, not yet enrolled. */
+  liveApplications: number;
+  approvedAwaitingEnrolment: number;
+  /** More applicants in the running than places left for them. */
+  isOversubscribed: boolean;
   applicationFeeAmount: number;
   applicationFeeDisplay: string;
   /** Whether a fee has to be paid before the school looks at an application.

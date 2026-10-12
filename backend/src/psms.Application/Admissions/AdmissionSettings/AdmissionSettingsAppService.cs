@@ -118,7 +118,58 @@ public class AdmissionSettingsAppService : ApplicationService, IAdmissionSetting
             .ToListAsync();
 
         return new ListResultDto<AdmissionSettingsDto>(
-            ObjectMapper.Map<List<AdmissionSettingsDto>>(settings));
+            await WithApplicationCountsAsync(settings));
+    }
+
+    /// <summary>
+    /// How many applicants are still in the running for each intake.
+    /// <para>
+    /// Capacity counts learners who have enrolled, so a grade with two places
+    /// and three applicants reads "2 available" and is right. The school simply
+    /// could not see the three — and three people competing for two places is
+    /// exactly when a waiting list earns its keep.
+    /// </para>
+    /// <para>
+    /// Counted in one query across every row rather than per row, so a school
+    /// with a dozen grades does not pay a dozen round trips to find out.
+    /// </para>
+    /// </summary>
+    private async Task<List<AdmissionSettingsDto>> WithApplicationCountsAsync(
+        List<Domain.Admissions.Entities.AdmissionSettings> settings)
+    {
+        var dtos = ObjectMapper.Map<List<AdmissionSettingsDto>>(settings);
+        if (dtos.Count == 0) return dtos;
+
+        var years = settings.Select(s => s.AcademicYearId).Distinct().ToList();
+
+        var counts = await _applicationRepository
+            .GetAll()
+            .Where(a => years.Contains(a.AcademicYearId)
+                        && a.Status != ApplicationStatus.Draft
+                        && a.Status != ApplicationStatus.Rejected
+                        && a.Status != ApplicationStatus.Withdrawn
+                        && a.Status != ApplicationStatus.Expired
+                        && a.Status != ApplicationStatus.Enrolled)
+            .GroupBy(a => new { a.AcademicYearId, a.AppliedGradeId })
+            .Select(g => new
+            {
+                g.Key.AcademicYearId,
+                g.Key.AppliedGradeId,
+                Live = g.Count(),
+                Approved = g.Count(a => a.Status == ApplicationStatus.Approved),
+            })
+            .ToListAsync();
+
+        foreach (var dto in dtos)
+        {
+            var match = counts.FirstOrDefault(c =>
+                c.AcademicYearId == dto.AcademicYearId && c.AppliedGradeId == dto.GradeId);
+
+            dto.LiveApplications = match?.Live ?? 0;
+            dto.ApprovedAwaitingEnrolment = match?.Approved ?? 0;
+        }
+
+        return dtos;
     }
 
     [AbpAuthorize(PermissionNames.Admissions_Settings_View)]
