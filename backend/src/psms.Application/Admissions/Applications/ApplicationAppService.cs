@@ -553,6 +553,27 @@ public class ApplicationAppService : ApplicationService, IApplicationAppService
             dto.PassportNumber = application.PassportNumber;
         }
 
+        /* What this grade actually asks of an applicant. The workflow already
+           steps over an interview or assessment a grade does not require; the
+           screens showing those stages did not know, so a Grade 11 that
+           interviews nobody still offered an Interview tab and a button to
+           arrange one — against the school's own settings.
+
+           Read here rather than by the screen, because reading admission
+           settings needs a permission that somebody looking at an application
+           may not hold. */
+        var settings = await _settingsRepository
+            .GetAll()
+            .Where(s => s.AcademicYearId == application.AcademicYearId
+                        && (s.GradeId == application.AppliedGradeId || s.GradeId == null))
+            // Grade-specific wins over the year's leftover default.
+            .OrderBy(s => s.GradeId == null ? 1 : 0)
+            .Select(s => new { s.IsInterviewRequired, s.IsAssessmentRequired })
+            .FirstOrDefaultAsync();
+
+        dto.RequiresInterview = settings?.IsInterviewRequired;
+        dto.RequiresAssessment = settings?.IsAssessmentRequired;
+
         return dto;
     }
 

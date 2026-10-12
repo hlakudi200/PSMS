@@ -580,6 +580,18 @@ function ApplicationDetailContent() {
     || app.status === ApplicationStatus.Withdrawn
     || app.status === ApplicationStatus.Expired;
 
+  /* A grade that interviews nobody should not be offered an Interview tab, let
+     alone a button to arrange one — the workflow already steps that stage over,
+     and the screen was contradicting the school's own settings.
+
+     Two deliberate exceptions. A stage with something already on record stays
+     visible however the settings read now, because hiding it would hide real
+     work somebody did. And a grade the school has not configured at all
+     (requires == null) keeps both, since a missing row is not a decision to
+     skip anything. */
+  const showInterview = app.requiresInterview !== false || app.hasInterview;
+  const showAssessment = app.requiresAssessment !== false || app.hasAssessment;
+
   const tabItems = [
     {
       key: 'parents',
@@ -591,23 +603,27 @@ function ApplicationDetailContent() {
       label: <span><FileOutlined /> Documents ({app.documentCount})</span>,
       children: <DocumentsSection applicationId={applicationId} />,
     },
-    {
-      key: 'interview',
-      label: <span><AudioOutlined /> Interview</span>,
-      children: <InterviewSection applicationId={applicationId} applicantName={app.fullName} />,
-    },
-    {
-      key: 'assessment',
-      label: <span><FormOutlined /> Assessment</span>,
-      children: (
-        <AssessmentSection
-          applicationId={applicationId}
-          applicantName={app.fullName}
-          gradeId={app.applyingForGradeId}
-          gradeName={app.applyingForGradeName}
-        />
-      ),
-    },
+    ...(showInterview
+      ? [{
+          key: 'interview',
+          label: <span><AudioOutlined /> Interview</span>,
+          children: <InterviewSection applicationId={applicationId} applicantName={app.fullName} />,
+        }]
+      : []),
+    ...(showAssessment
+      ? [{
+          key: 'assessment',
+          label: <span><FormOutlined /> Assessment</span>,
+          children: (
+            <AssessmentSection
+              applicationId={applicationId}
+              applicantName={app.fullName}
+              gradeId={app.applyingForGradeId}
+              gradeName={app.applyingForGradeName}
+            />
+          ),
+        }]
+      : []),
     {
       key: 'fee',
       label: <span><DollarOutlined /> Fee</span>,

@@ -65,6 +65,20 @@ public class ApplicationDto : FullAuditedEntityDto<Guid>
     public int DocumentCount { get; set; }
     public bool HasInterview { get; set; }
     public bool HasAssessment { get; set; }
+
+    /// <summary>
+    /// Whether the grade applied to asks for an interview, per its admission
+    /// settings. Null when the school has not configured that grade, which is
+    /// not the same as "no" — a screen should not hide a stage of admissions
+    /// on the strength of a missing row.
+    /// </summary>
+    public bool? RequiresInterview { get; set; }
+
+    /// <summary>
+    /// Whether the grade applied to sets a placement assessment. Null when the
+    /// school has not configured that grade.
+    /// </summary>
+    public bool? RequiresAssessment { get; set; }
     public int? WaitlistPosition { get; set; }
 
     // Fee Status (from ApplicationFee navigation)
