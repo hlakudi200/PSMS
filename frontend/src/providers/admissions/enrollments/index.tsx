@@ -8,7 +8,9 @@ import {
 import {
   IAcceptOffer,
   IAssignClass,
+  IClassAvailability,
   ICompleteEnrollment,
+  IEnrollment,
   IPagedAndSortedResultRequest,
 } from "../shared/interfaces";
 import { EnrollmentReducer } from "./reducer";
@@ -74,17 +76,20 @@ export const EnrollmentProvider = ({
       });
   };
 
-  const getAvailableClassesAsync = async (gradeId: string) => {
+  const getAvailableClassesAsync = async (gradeId: string): Promise<IClassAvailability[]> => {
     dispatch(getAvailableClassesPending());
     const endpoint = `/api/services/app/Enrollment/GetAvailableClasses?gradeId=${gradeId}`;
-    await instance
+    return instance
       .get(endpoint)
       .then((response) => {
-        dispatch(getAvailableClassesSuccess(response.data.result));
+        const classes: IClassAvailability[] = response.data.result ?? [];
+        dispatch(getAvailableClassesSuccess(classes));
+        return classes;
       })
       .catch((error) => {
         console.error(error);
         dispatch(getAvailableClassesError());
+        throw error;
       });
   };
 
@@ -116,17 +121,26 @@ export const EnrollmentProvider = ({
       });
   };
 
-  const completeEnrollmentAsync = async (input: ICompleteEnrollment) => {
+  /**
+   * Returns the finished enrolment, which carries the learner's new sign-in
+   * once and once only — the server withholds it on every later read, so
+   * whatever calls this has to show it there and then.
+   */
+  const completeEnrollmentAsync = async (input: ICompleteEnrollment): Promise<IEnrollment> => {
     dispatch(completeEnrollmentPending());
     const endpoint = `/api/services/app/Enrollment/CompleteEnrollment`;
-    await instance
+    return instance
       .post(endpoint, input)
       .then((response) => {
         dispatch(completeEnrollmentSuccess(response.data.result));
+        return response.data.result as IEnrollment;
       })
       .catch((error) => {
         console.error(error);
         dispatch(completeEnrollmentError());
+        // The refusals matter here: a full class, a full intake, an offer that
+        // was never accepted. The screen has to be able to say which.
+        throw error;
       });
   };
 

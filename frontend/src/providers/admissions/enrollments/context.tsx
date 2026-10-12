@@ -22,10 +22,10 @@ export interface IEnrollmentStateContext {
 export interface IEnrollmentActionContext {
   getByApplicationAsync: (applicationId: string) => void;
   getPendingEnrollmentsAsync: (input: IPagedAndSortedResultRequest) => void;
-  getAvailableClassesAsync: (gradeId: string) => void;
+  getAvailableClassesAsync: (gradeId: string) => Promise<IClassAvailability[]>;
   acceptOfferAsync: (input: IAcceptOffer) => void;
   assignClassAsync: (input: IAssignClass) => void;
-  completeEnrollmentAsync: (input: ICompleteEnrollment) => void;
+  completeEnrollmentAsync: (input: ICompleteEnrollment) => Promise<IEnrollment>;
 }
 
 export const INITIAL_STATE: IEnrollmentStateContext = {

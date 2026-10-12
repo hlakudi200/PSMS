@@ -29,6 +29,7 @@ import {
   FormOutlined,
   DollarOutlined,
   CalendarOutlined,
+  SolutionOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { ApplicationProvider, useApplicationState, useApplicationActions } from '@/providers/admissions/applications';
@@ -37,6 +38,7 @@ import { ApplicationDocumentProvider, useApplicationDocumentState, useApplicatio
 import { AdmissionInterviewProvider, useAdmissionInterviewState, useAdmissionInterviewActions } from '@/providers/admissions/admission_interviews';
 import { AdmissionAssessmentProvider, useAdmissionAssessmentState, useAdmissionAssessmentActions } from '@/providers/admissions/admission_assessments';
 import { ApplicationFeeProvider, useApplicationFeeState, useApplicationFeeActions } from '@/providers/admissions/application_fees';
+import { EnrollmentProvider } from '@/providers/admissions/enrollments';
 import {
   WorkflowInstanceProvider,
   useWorkflowInstanceState,
@@ -65,6 +67,7 @@ import {
 import { useAuthState } from '@/providers/auth';
 import ScheduleInterviewModal from '@/components/modals/admissions/ScheduleInterviewModal';
 import ScheduleAssessmentModal from '@/components/modals/admissions/ScheduleAssessmentModal';
+import EnrolLearnerModal from '@/components/modals/admissions/EnrolLearnerModal';
 
 const { Title, Text } = Typography;
 
@@ -538,6 +541,8 @@ function ApplicationDetailContent() {
 
   const { application, isPending, isError } = useApplicationState();
   const { getAsync } = useApplicationActions();
+  const { currentRole } = useAuthState();
+  const [enrolling, setEnrolling] = useState(false);
 
   useEffect(() => {
     if (applicationId) getAsync(applicationId);
@@ -573,6 +578,11 @@ function ApplicationDetailContent() {
 
   const app = application;
   const currentStep = applicationStepIndex(app.status);
+
+  /* The roles the school grants Admissions.Enrollment.Complete to. The server
+     refuses anyone else; this only decides whether to offer the button. */
+  const mayEnrol = ['Admin', 'Principal', 'VicePrincipal', 'AdmissionsOfficer']
+    .includes(currentRole ?? '');
   /* Ended without a place. Enrolled is an ending too, but it is the last step
      of the timeline rather than a reason to hide it. */
   const isTerminal =
@@ -659,8 +669,32 @@ function ApplicationDetailContent() {
               </Space>
             </div>
           </Col>
+          {/* The end of admissions: an approved applicant becomes a learner.
+              Until this existed the funnel simply stopped at Approved. */}
+          {app.status === ApplicationStatus.Approved && mayEnrol && (
+            <Col>
+              <Button type="primary" icon={<SolutionOutlined />} onClick={() => setEnrolling(true)}>
+                Enrol this learner
+              </Button>
+            </Col>
+          )}
+          {app.status === ApplicationStatus.Enrolled && (
+            <Col>
+              <Tag color="purple" style={{ fontSize: 14, padding: '4px 10px' }}>On the roll</Tag>
+            </Col>
+          )}
         </Row>
       </Card>
+
+      <EnrolLearnerModal
+        open={enrolling}
+        applicationId={applicationId}
+        applicantName={app.fullName}
+        gradeId={app.applyingForGradeId}
+        gradeName={app.applyingForGradeName}
+        onClose={() => setEnrolling(false)}
+        onEnrolled={() => getAsync(applicationId)}
+      />
 
       {/* Status Timeline */}
       {!isTerminal && (
@@ -731,7 +765,9 @@ export default function ApplicationDetailPage() {
           <AdmissionInterviewProvider>
             <AdmissionAssessmentProvider>
               <ApplicationFeeProvider>
-                <ApplicationDetailContent />
+                <EnrollmentProvider>
+                  <ApplicationDetailContent />
+                </EnrollmentProvider>
               </ApplicationFeeProvider>
             </AdmissionAssessmentProvider>
           </AdmissionInterviewProvider>

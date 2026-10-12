@@ -14,6 +14,7 @@ import {
   UserAddOutlined,
   EditOutlined,
   PartitionOutlined,
+  SolutionOutlined,
   PlusOutlined,
 } from '@ant-design/icons';
 import { EnterpriseTable } from '@/components/shared/enterprise-table';
@@ -21,12 +22,14 @@ import type { ColumnConfig, TableQuery, RowAction, ToolbarAction } from '@/compo
 import { ApplicationProvider, useApplicationState, useApplicationActions } from '@/providers/admissions/applications';
 import { AdmissionSettingsProvider, useAdmissionSettingsState, useAdmissionSettingsActions } from '@/providers/admissions/admission_settings';
 import { WaitlistProvider, useWaitlistState, useWaitlistActions } from '@/providers/admissions/waitlists';
+import { EnrollmentProvider } from '@/providers/admissions/enrollments';
 import { AcademicYearProvider, useAcademicYearState, useAcademicYearActions } from '@/providers/academic/academic_years';
 import { GradeProvider, useGradeState, useGradeActions } from '@/providers/academic/grades';
 import { useAuthState } from '@/providers/auth';
 import type { IApplicationList } from '@/providers/admissions/shared/interfaces';
 import type { IAdmissionSettings } from '@/providers/admissions/shared/interfaces';
 import AdmissionSettingsFormModal from '@/components/modals/admissions/AdmissionSettingsFormModal';
+import PendingEnrolmentsTab from '@/components/modules/admissions/PendingEnrolmentsTab';
 import type { IWaitlist } from '@/providers/admissions/shared/interfaces';
 
 /* Keyed by the status name the server sends in statusDisplayName, and it has
@@ -130,6 +133,11 @@ function AdmissionsContent() {
   const { activeGrades } = useGradeState();
   const { getActiveGradesAsync } = useGradeActions();
   const { currentRole } = useAuthState();
+
+  /* Who the school grants Admissions.Enrollment.Complete to. The server is the
+     authority; this only decides whether to offer the button. */
+  const mayEnrol = ['Admin', 'Principal', 'VicePrincipal', 'AdmissionsOfficer']
+    .includes(currentRole ?? '');
 
   const [selectedAcademicYearId, setSelectedAcademicYearId] = useState<string | undefined>(undefined);
   const [selectedGradeId, setSelectedGradeId] = useState<string | undefined>(undefined);
@@ -362,6 +370,15 @@ function AdmissionsContent() {
         />
       ),
     },
+    /* The end of the funnel, and until now it had nowhere to live: an approved
+       applicant could not be put on the roll from anywhere in the app. */
+    {
+      key: 'enrolment',
+      label: (
+        <span><SolutionOutlined style={{ marginRight: 6 }} />Enrolment</span>
+      ),
+      children: <PendingEnrolmentsTab mayEnrol={mayEnrol} />,
+    },
     {
       key: 'waitlist',
       label: (
@@ -492,7 +509,9 @@ export default function AdmissionsPageContent() {
         <ApplicationProvider>
           <AdmissionSettingsProvider>
             <WaitlistProvider>
-              <AdmissionsContent />
+              <EnrollmentProvider>
+                <AdmissionsContent />
+              </EnrollmentProvider>
             </WaitlistProvider>
           </AdmissionSettingsProvider>
         </ApplicationProvider>
