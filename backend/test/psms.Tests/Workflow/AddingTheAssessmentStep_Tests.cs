@@ -109,7 +109,7 @@ public class AddingTheAssessmentStep_Tests : psmsTestBase
 
     private List<WorkflowStep> StepsOf(Guid definitionId) =>
         UsingDbContext(1, context => context.WorkflowSteps
-            .Where(s => s.WorkflowDefinitionId == definitionId)
+            .Where(s => s.WorkflowDefinitionId == definitionId && !s.IsDeleted)
             .OrderBy(s => s.StepOrder)
             .ToList());
 
@@ -120,19 +120,20 @@ public class AddingTheAssessmentStep_Tests : psmsTestBase
 
         await RunTheSeederAsync();
 
+        /* The same seeding pass also retires Document Verification and
+           Committee Review, so a school that predates the assessment ends up
+           with the four steps that decide something. */
         StepsOf(definitionId).Select(s => s.Name).ShouldBe(new[]
         {
             "Admin Review",
-            "Document Verification",
             "Interview",
             Assessment,
-            "Committee Review",
             "Principal Decision",
         });
     }
 
     [Fact]
-    public async Task It_sits_after_the_interview_and_before_the_committee()
+    public async Task It_sits_after_the_interview_and_before_the_decision()
     {
         var definitionId = SeedTheOldShape();
         await RunTheSeederAsync();
@@ -141,30 +142,33 @@ public class AddingTheAssessmentStep_Tests : psmsTestBase
 
         steps.Single(s => s.Name == Assessment).StepOrder
             .ShouldBe(steps.Single(s => s.Name == "Interview").StepOrder + 1);
-        steps.Single(s => s.Name == "Committee Review").StepOrder
+        steps.Single(s => s.Name == "Principal Decision").StepOrder
             .ShouldBe(steps.Single(s => s.Name == Assessment).StepOrder + 1);
     }
 
     [Fact]
-    public async Task The_decision_still_sends_rejections_back_to_the_committee()
+    public async Task The_decision_sends_rejections_to_a_step_that_still_exists()
     {
-        // It pointed at step 4, which is now the assessment. Left alone, a
-        // principal sending an application back for reconsideration would have
-        // sent it to be re-assessed instead.
+        /* It pointed at step 4, which the insert turned into the assessment and
+           the removal turned into nothing. Left alone, a principal sending an
+           application back would have aimed it at whatever happened to be
+           fourth — or at a number with no step behind it at all. */
         var definitionId = SeedTheOldShape();
         await RunTheSeederAsync();
 
         var steps = StepsOf(definitionId);
+        var target = steps.Single(s => s.Name == "Principal Decision").NextStepOnReject;
 
-        steps.Single(s => s.Name == "Principal Decision").NextStepOnReject
-            .ShouldBe(steps.Single(s => s.Name == "Committee Review").StepOrder);
+        target.ShouldNotBeNull();
+        steps.Select(s => s.StepOrder).ShouldContain(target.Value);
+        steps.Single(s => s.StepOrder == target.Value).IsTerminal.ShouldBeFalse();
     }
 
     [Fact]
     public async Task An_application_part_way_through_stays_on_the_step_it_was_on()
     {
         var definitionId = SeedTheOldShape();
-        var committeeId = StepsOf(definitionId).Single(s => s.Name == "Committee Review").Id;
+        var interviewId = StepsOf(definitionId).Single(s => s.Name == "Interview").Id;
         var instanceId = Guid.NewGuid();
 
         UsingDbContext(1, context =>
@@ -177,8 +181,8 @@ public class AddingTheAssessmentStep_Tests : psmsTestBase
                 EntityType = WorkflowEntityType.Application,
                 EntityId = Guid.NewGuid(),
                 Status = WorkflowStatus.InProgress,
-                CurrentStepId = committeeId,
-                CurrentStepOrder = 4,
+                CurrentStepId = interviewId,
+                CurrentStepOrder = 3,
             });
             context.SaveChanges();
         });
@@ -186,18 +190,20 @@ public class AddingTheAssessmentStep_Tests : psmsTestBase
         await RunTheSeederAsync();
 
         var after = UsingDbContext(1, context => context.WorkflowInstances.Single(i => i.Id == instanceId));
-        var committeeNow = StepsOf(definitionId).Single(s => s.Name == "Committee Review");
+        var interviewNow = StepsOf(definitionId).Single(s => s.Name == "Interview");
 
         // Same step, and the number it records still describes where that is.
-        after.CurrentStepId.ShouldBe(committeeId);
-        after.CurrentStepOrder.ShouldBe(committeeNow.StepOrder);
+        after.CurrentStepId.ShouldBe(interviewId);
+        after.CurrentStepOrder.ShouldBe(interviewNow.StepOrder);
     }
 
     [Fact]
     public async Task An_application_before_the_insertion_point_is_untouched()
     {
+        // The first step is before everything the seeding pass touches, so an
+        // application waiting there should not move at all.
         var definitionId = SeedTheOldShape();
-        var documentsId = StepsOf(definitionId).Single(s => s.Name == "Document Verification").Id;
+        var reviewId = StepsOf(definitionId).Single(s => s.Name == "Admin Review").Id;
         var instanceId = Guid.NewGuid();
 
         UsingDbContext(1, context =>
@@ -210,16 +216,17 @@ public class AddingTheAssessmentStep_Tests : psmsTestBase
                 EntityType = WorkflowEntityType.Application,
                 EntityId = Guid.NewGuid(),
                 Status = WorkflowStatus.InProgress,
-                CurrentStepId = documentsId,
-                CurrentStepOrder = 2,
+                CurrentStepId = reviewId,
+                CurrentStepOrder = 1,
             });
             context.SaveChanges();
         });
 
         await RunTheSeederAsync();
 
-        UsingDbContext(1, context => context.WorkflowInstances.Single(i => i.Id == instanceId))
-            .CurrentStepOrder.ShouldBe(2);
+        var after = UsingDbContext(1, context => context.WorkflowInstances.Single(i => i.Id == instanceId));
+        after.CurrentStepId.ShouldBe(reviewId);
+        after.CurrentStepOrder.ShouldBe(1);
     }
 
     [Fact]
