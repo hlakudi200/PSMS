@@ -352,8 +352,8 @@ function ApplyContent() {
         onChange={(s) => { if (s < step || locked) setStep(s); }}
         style={{ marginBottom: 24 }}
         items={[
-          { title: 'Learner' },
-          { title: 'Parents', disabled: !workingOn },
+          { title: 'The learner' },
+          { title: 'Parents and guardians', disabled: !workingOn },
           { title: 'Documents', disabled: !workingOn },
           { title: 'Review' },
         ]}

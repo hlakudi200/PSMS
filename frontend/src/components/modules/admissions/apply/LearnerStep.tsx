@@ -1,12 +1,12 @@
 'use client';
 
 import React, { useMemo } from 'react';
-import { Alert, Col, DatePicker, Form, Input, Radio, Row, Select, Typography } from 'antd';
+import { Alert, Col, DatePicker, Divider, Form, Input, Radio, Row, Select, Typography } from 'antd';
 import dayjs from 'dayjs';
 import type { IOpenIntake } from '@/providers/admissions/admission_settings/context';
 import { ageAgainstIntake, documentsAsList } from './schema';
 
-const { Text } = Typography;
+const { Text, Paragraph } = Typography;
 
 /**
  * Step one: who the learner is, and what they are applying for.
@@ -94,20 +94,37 @@ export default function LearnerStep({
         />
       )}
 
+      {/* A parent has just signed up under their own name and is about to be
+          asked for their own details on the next step. Without saying so, the
+          empty name field here reads as "yours" — so this says whose it is,
+          and every label below repeats it rather than relying on being read
+          in order. */}
+      <Divider titlePlacement="start" style={{ marginTop: 8 }}>
+        <Text strong>About the child you are applying for</Text>
+      </Divider>
+      <Paragraph type="secondary" style={{ marginTop: -8 }}>
+        These are the learner&rsquo;s details, exactly as they appear on their
+        birth certificate or ID. Your own details come next.
+      </Paragraph>
+
       <Row gutter={16}>
         <Col xs={24} md={8}>
-          <Form.Item label="First name" name="firstName" rules={[{ required: true, message: "Enter the learner's first name." }]}>
-            <Input placeholder="First name" />
+          <Form.Item
+            label="Learner's first name"
+            name="firstName"
+            rules={[{ required: true, message: "Enter the learner's first name." }]}
+          >
+            <Input placeholder="The child's first name" />
           </Form.Item>
         </Col>
         <Col xs={24} md={8}>
-          <Form.Item label="Middle name" name="middleName">
+          <Form.Item label="Learner's middle name" name="middleName">
             <Input placeholder="Optional" />
           </Form.Item>
         </Col>
         <Col xs={24} md={8}>
-          <Form.Item label="Surname" name="lastName" rules={[{ required: true, message: "Enter the learner's surname." }]}>
-            <Input placeholder="Surname" />
+          <Form.Item label="Learner's surname" name="lastName" rules={[{ required: true, message: "Enter the learner's surname." }]}>
+            <Input placeholder="The child's surname" />
           </Form.Item>
         </Col>
       </Row>
@@ -115,7 +132,7 @@ export default function LearnerStep({
       <Row gutter={16}>
         <Col xs={24} md={12}>
           <Form.Item
-            label="Date of birth"
+            label="Learner's date of birth"
             name="dateOfBirth"
             rules={[{ required: true, message: 'Enter the date of birth.' }]}
             validateStatus={ageNote ? 'warning' : undefined}
@@ -132,7 +149,7 @@ export default function LearnerStep({
           </Form.Item>
         </Col>
         <Col xs={24} md={12}>
-          <Form.Item label="Gender" name="gender" rules={[{ required: true, message: 'Choose one.' }]}>
+          <Form.Item label="Learner's gender" name="gender" rules={[{ required: true, message: 'Choose one.' }]}>
             <Select
               placeholder="As it appears on the birth certificate"
               options={[
@@ -154,15 +171,15 @@ export default function LearnerStep({
 
       {isSACitizen === false ? (
         <Form.Item
-          label="Passport number"
+          label="Learner's passport number"
           name="passportNumber"
           rules={[{ required: true, message: 'A passport number is required.' }]}
         >
-          <Input placeholder="Passport number" />
+          <Input placeholder="The child's passport number" />
         </Form.Item>
       ) : (
         <Form.Item
-          label="ID number"
+          label="Learner's ID number"
           name="idNumber"
           extra="Thirteen digits, as on the birth certificate or ID."
           rules={[{ required: true, message: 'An ID number is required.' }]}
@@ -171,7 +188,7 @@ export default function LearnerStep({
         </Form.Item>
       )}
 
-      <Form.Item label="Previous school" name="previousSchool" extra="Leave empty if this is the learner's first school.">
+      <Form.Item label="Learner's previous school" name="previousSchool" extra="Leave empty if this is their first school.">
         <Input placeholder="Name of the school they are coming from" />
       </Form.Item>
     </Form>
