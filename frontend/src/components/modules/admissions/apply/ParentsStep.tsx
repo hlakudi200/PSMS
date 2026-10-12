@@ -140,8 +140,9 @@ export default function ParentsStep({
   return (
     <>
       <Paragraph type="secondary">
-        The school needs to know who to contact about this application, and who is responsible for the
-        fees. Add both parents, or a guardian, or whoever that is.
+        This is where your own details go. The school needs to know who to contact about this
+        application, and who is responsible for the fees — add yourself, the other parent, or
+        whoever the guardian is.
       </Paragraph>
 
       {missing.length > 0 && (
