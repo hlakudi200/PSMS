@@ -1,5 +1,6 @@
 using psms.Admissions.AdmissionSettings;
 using psms.Admissions.AdmissionSettings.Dto;
+using psms.Admissions.Shared;
 using psms.Domain.Academic.Entities;
 using psms.Domain.Shared.Enums;
 using Shouldly;
@@ -69,7 +70,7 @@ public class AdmissionSettingsListing_Tests : psmsTestBase
     {
         // The case the screen was in: no year chosen, and a school with rows
         // was shown an empty table.
-        await SeedAsync(_year2026, null);
+        await SeedAsync(_year2026, _grade8);
         await SeedAsync(_year2027, _grade11);
 
         var all = await _settings.GetAllAsync();
@@ -79,26 +80,25 @@ public class AdmissionSettingsListing_Tests : psmsTestBase
     }
 
     [Fact]
-    public async Task No_grade_means_every_grade_gets_its_own_settings()
+    public async Task Settings_have_to_say_which_grade_they_are_for()
     {
-        /* It used to mean one "any grade" row, and almost nothing on these
-           settings is true of a whole school at once — the capacity least of
-           all, and a six-year-old and a sixteen-year-old cannot sit the same
-           admission assessment. Nobody could apply through one either: creating
-           an application needs a grade, so the row was a dead end. */
-        var written = await SeedAsync(_year2027, null);
+        /* A school opens its admissions grade by grade. Almost nothing here is
+           true of a whole school at once — the capacity least of all, and a
+           six-year-old and a sixteen-year-old cannot sit the same admission
+           assessment. Nor could anybody apply through a row without a grade:
+           creating an application needs one, so it was a dead end. */
+        var refusal = await Should.ThrowAsync<Abp.UI.UserFriendlyException>(
+            () => SeedAsync(_year2027, null));
 
-        written.Items.Count.ShouldBe(2);
-        written.Items.Select(x => x.GradeId)
-            .ShouldBe(new Guid?[] { _grade8, _grade11 }, ignoreOrder: true);
-        written.Items.ShouldAllBe(x => x.GradeId != null);
+        refusal.Message.ShouldBe(AdmissionsExceptionCodes.InvalidAdmissionSettings);
+        refusal.Details.ShouldContain("grade by grade");
     }
 
     [Fact]
-    public async Task And_leaves_a_grade_the_school_has_already_set_up_alone()
+    public async Task Each_grade_is_set_up_on_its_own_terms()
     {
-        // Somebody decided Grade 11 takes 20 learners. Filling in the rest of
-        // the school must not quietly reset that.
+        // Grade 11 takes 20; Grade 8 takes 80. That difference is the point of
+        // doing this per grade.
         await _settings.CreateAsync(new CreateAdmissionSettingsDto
         {
             AcademicYearId = _year2027,
@@ -107,19 +107,28 @@ public class AdmissionSettingsListing_Tests : psmsTestBase
             MaxCapacity = 20,
             OfferExpiryDays = 14,
         });
+        await _settings.CreateAsync(new CreateAdmissionSettingsDto
+        {
+            AcademicYearId = _year2027,
+            GradeId = _grade8,
+            ApplicationFeeAmount = 500m,
+            MaxCapacity = 80,
+            IsAssessmentRequired = true,
+            OfferExpiryDays = 14,
+        });
 
-        var written = await SeedAsync(_year2027, null);
+        var all = await _settings.GetAllAsync(_year2027);
 
-        written.Items.Single().GradeId.ShouldBe(_grade8);
-
-        var all = await _settings.GetAllAsync(_year2027, _grade11);
-        all.Items.Single().MaxCapacity.ShouldBe(20);
+        all.Items.Single(x => x.GradeId == _grade11).MaxCapacity.ShouldBe(20);
+        all.Items.Single(x => x.GradeId == _grade8).MaxCapacity.ShouldBe(80);
+        all.Items.Single(x => x.GradeId == _grade8).IsAssessmentRequired.ShouldBeTrue();
+        all.Items.Single(x => x.GradeId == _grade11).IsAssessmentRequired.ShouldBeFalse();
     }
 
     [Fact]
     public async Task A_year_narrows_it()
     {
-        await SeedAsync(_year2026, null);
+        await SeedAsync(_year2026, _grade8);
         await SeedAsync(_year2027, _grade11);
 
         var only2027 = await _settings.GetAllAsync(_year2027);
@@ -142,8 +151,8 @@ public class AdmissionSettingsListing_Tests : psmsTestBase
     [Fact]
     public async Task The_newest_year_comes_first()
     {
-        await SeedAsync(_year2026, null);
-        await SeedAsync(_year2027, null);
+        await SeedAsync(_year2026, _grade8);
+        await SeedAsync(_year2027, _grade8);
 
         var all = await _settings.GetAllAsync();
 

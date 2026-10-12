@@ -10,6 +10,7 @@ using psms.Workflow.Shared;
 using psms.Workflow.WorkflowDefinitions;
 using psms.Workflow.WorkflowDefinitions.Dto;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -36,13 +37,16 @@ public class WorkflowSeedService : ApplicationService
 
     private readonly IRepository<WorkflowDefinition, Guid> _definitionRepository;
     private readonly IRepository<WorkflowStep, Guid> _stepRepository;
+    private readonly IRepository<WorkflowInstance, Guid> _instanceRepository;
 
     public WorkflowSeedService(
         IRepository<WorkflowDefinition, Guid> definitionRepository,
-        IRepository<WorkflowStep, Guid> stepRepository)
+        IRepository<WorkflowStep, Guid> stepRepository,
+        IRepository<WorkflowInstance, Guid> instanceRepository)
     {
         _definitionRepository = definitionRepository;
         _stepRepository = stepRepository;
+        _instanceRepository = instanceRepository;
     }
 
     /// <summary>
@@ -63,6 +67,8 @@ public class WorkflowSeedService : ApplicationService
     }
 
     private const string InterviewNotRequiredSkipKey = "application.interview-not-required";
+    private const string AssessmentNotRequiredSkipKey = "application.assessment-not-required";
+    private const string AssessmentStepName = "Placement Assessment";
 
     private async Task SeedAdmissionsWorkflow()
     {
@@ -132,6 +138,20 @@ public class WorkflowSeedService : ApplicationService
                 Id = Guid.NewGuid(),
                 WorkflowDefinitionId = definition.Id,
                 StepOrder = 4,
+                Name = AssessmentStepName,
+                Description = "Set and mark the placement assessment for the grade applied for.",
+                // Whoever sets the paper marks it; it is a different paper for
+                // every grade, which is why this is a per-grade decision.
+                AssignedRole = "Teacher",
+                ActionType = WorkflowActionType.Review,
+                SkipWhenKey = AssessmentNotRequiredSkipKey,
+                IsOptional = true
+            },
+            new WorkflowStep
+            {
+                Id = Guid.NewGuid(),
+                WorkflowDefinitionId = definition.Id,
+                StepOrder = 5,
                 Name = "Committee Review",
                 Description = "Admissions committee reviews the complete application.",
                 AssignedRole = "Admin",
@@ -141,13 +161,13 @@ public class WorkflowSeedService : ApplicationService
             {
                 Id = Guid.NewGuid(),
                 WorkflowDefinitionId = definition.Id,
-                StepOrder = 5,
+                StepOrder = 6,
                 Name = "Principal Decision",
                 Description = "Principal makes the final admission decision.",
                 AssignedRole = "Principal",
                 ActionType = WorkflowActionType.Approve,
                 IsTerminal = true,
-                NextStepOnReject = 4 // Send back to committee for reconsideration
+                NextStepOnReject = 5 // Send back to committee for reconsideration
             }
         };
 
@@ -191,6 +211,87 @@ public class WorkflowSeedService : ApplicationService
 
         if (changed)
             await _stepRepository.UpdateAsync(interview);
+
+        await AddAssessmentStepAsync(definition);
+    }
+
+    /// <summary>
+    /// Adds the placement assessment to a workflow seeded before it existed.
+    /// <para>
+    /// A school decides per grade whether applicants sit one, and that answer
+    /// had nowhere to land: the workflow went straight from the interview to
+    /// the committee, so <c>IsAssessmentRequired</c> and the rule that reads it
+    /// governed a step that was never there.
+    /// </para>
+    /// <para>
+    /// It belongs between the interview and the committee, which means the two
+    /// steps after it move down one. Applications already part-way through are
+    /// the reason this is done carefully rather than by re-seeding: an instance
+    /// tracks the step it is on by id, so renumbering does not move it, but its
+    /// recorded step number would be left describing the wrong position and the
+    /// decision step's "send back" target would point at whatever took its old
+    /// number. Both are corrected here.
+    /// </para>
+    /// </summary>
+    private async Task AddAssessmentStepAsync(WorkflowDefinition definition)
+    {
+        var steps = definition.Steps?.OrderBy(s => s.StepOrder).ToList() ?? new List<WorkflowStep>();
+
+        if (steps.Count == 0 || steps.Any(s => s.Name == AssessmentStepName))
+            return;
+
+        var interview = steps.FirstOrDefault(s => s.Name == "Interview");
+        if (interview == null) return;
+
+        var insertAt = interview.StepOrder + 1;
+
+        // Everything from the insertion point down shifts by one. Descending,
+        // so no two steps momentarily share an order.
+        foreach (var step in steps.Where(s => s.StepOrder >= insertAt).OrderByDescending(s => s.StepOrder))
+        {
+            step.StepOrder += 1;
+
+            if (step.NextStepOnApprove >= insertAt) step.NextStepOnApprove += 1;
+            if (step.NextStepOnReject >= insertAt) step.NextStepOnReject += 1;
+
+            await _stepRepository.UpdateAsync(step);
+        }
+
+        // A step before the insertion point can still route forward past it.
+        foreach (var step in steps.Where(s => s.StepOrder < insertAt))
+        {
+            var touched = false;
+            if (step.NextStepOnApprove >= insertAt) { step.NextStepOnApprove += 1; touched = true; }
+            if (step.NextStepOnReject >= insertAt) { step.NextStepOnReject += 1; touched = true; }
+            if (touched) await _stepRepository.UpdateAsync(step);
+        }
+
+        await _stepRepository.InsertAsync(new WorkflowStep
+        {
+            Id = Guid.NewGuid(),
+            WorkflowDefinitionId = definition.Id,
+            StepOrder = insertAt,
+            Name = AssessmentStepName,
+            Description = "Set and mark the placement assessment for the grade applied for.",
+            AssignedRole = "Teacher",
+            ActionType = WorkflowActionType.Review,
+            SkipWhenKey = AssessmentNotRequiredSkipKey,
+            IsOptional = true,
+        });
+
+        // The instances in flight: their step is unchanged, its number is not.
+        var running = await _instanceRepository
+            .GetAll()
+            .Where(i => i.WorkflowDefinitionId == definition.Id
+                        && i.CurrentStepOrder >= insertAt
+                        && (i.Status == WorkflowStatus.NotStarted || i.Status == WorkflowStatus.InProgress))
+            .ToListAsync();
+
+        foreach (var instance in running)
+        {
+            instance.CurrentStepOrder += 1;
+            await _instanceRepository.UpdateAsync(instance);
+        }
     }
 
     /// <summary>
