@@ -562,7 +562,8 @@ export interface IAdmissionAssessment {
   applicationId: string;
   applicationNumber: string;
   applicantName: string;
-  type: string;
+  /** AdmissionAssessmentType, which arrives as a number. */
+  type: number;
   typeDisplayName: string;
   scheduledDate: string;
   assessedGradeId: string;
@@ -581,9 +582,40 @@ export interface IAdmissionAssessment {
   isUpcoming: boolean;
 }
 
+/** psms.Domain.Shared.Enums.AdmissionAssessmentType, as the API sends it. */
+export const AdmissionAssessmentType = {
+  Placement: 1,
+  Diagnostic: 2,
+  Readiness: 3,
+  LanguageProficiency: 4,
+  Mathematics: 5,
+  General: 6,
+} as const;
+
+export const admissionAssessmentTypeOptions = [
+  { value: AdmissionAssessmentType.Placement, label: 'Placement' },
+  { value: AdmissionAssessmentType.Diagnostic, label: 'Diagnostic' },
+  { value: AdmissionAssessmentType.Readiness, label: 'School readiness' },
+  { value: AdmissionAssessmentType.LanguageProficiency, label: 'Language proficiency' },
+  { value: AdmissionAssessmentType.Mathematics, label: 'Mathematics' },
+  { value: AdmissionAssessmentType.General, label: 'General' },
+];
+
+export const admissionAssessmentTypeLabel = (type: number): string =>
+  admissionAssessmentTypeOptions.find((o) => o.value === type)?.label ?? 'Assessment';
+
+/** Somebody the school may put down to set and mark one. */
+export interface IAssessor {
+  userId: number;
+  name: string;
+  emailAddress?: string;
+  roles: string[];
+  outstandingAssessments: number;
+}
+
 export interface IScheduleAssessment {
   applicationId: string;
-  type: string;
+  type: number;
   scheduledDate: string;
   assessedGradeId: string;
   subjects?: string;

@@ -54,7 +54,7 @@ const menuItems = [
       { key: '/teacher/attendance', icon: <CheckSquareOutlined />, label: 'Attendance' },
       { key: '/teacher/mark-sheets', icon: <FileTextOutlined />, label: 'Mark Sheets' },
       { key: '/teacher/reports', icon: <SolutionOutlined />, label: 'Report Cards' },
-      { key: '/teacher/interviews', icon: <AudioOutlined />, label: 'Admission Interviews' },
+      { key: '/teacher/admissions', icon: <AudioOutlined />, label: 'Admissions' },
     ],
   },
   {

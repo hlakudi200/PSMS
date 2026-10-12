@@ -41,4 +41,14 @@ public interface IAdmissionAssessmentAppService : IApplicationService
     /// Cancels an assessment.
     /// </summary>
     Task CancelAsync(Guid id, string reason);
+
+    /// <summary>
+    /// The assessments this person is down to set and mark.
+    /// </summary>
+    Task<ListResultDto<AdmissionAssessmentDto>> GetMineAsync(bool includePast = false);
+
+    /// <summary>
+    /// Who may be put down to set and mark one.
+    /// </summary>
+    Task<ListResultDto<AssessorDto>> GetAssessorsAsync();
 }
