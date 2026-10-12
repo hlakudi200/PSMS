@@ -6,6 +6,8 @@ import {
   AdmissionAssessmentStateContext,
 } from "./context";
 import {
+  IAdmissionAssessment,
+  IAssessor,
   IScheduleAssessment,
   IRecordAssessmentResults,
   IPagedAndSortedResultRequest,
@@ -92,24 +94,52 @@ export const AdmissionAssessmentProvider = ({
       });
   };
 
+  /** The assessments the signed-in person is down to set and mark. */
+  const getMineAsync = async (includePast = false): Promise<IAdmissionAssessment[]> => {
+    const endpoint = `/api/services/app/AdmissionAssessment/GetMine?includePast=${includePast}`;
+    return instance
+      .get(endpoint)
+      .then((response) => response.data.result.items ?? [])
+      .catch((error) => {
+        console.error(error);
+        throw error;
+      });
+  };
+
+  /** Who the school may put down to set one. */
+  const getAssessorsAsync = async (): Promise<IAssessor[]> => {
+    const endpoint = `/api/services/app/AdmissionAssessment/GetAssessors`;
+    return instance
+      .get(endpoint)
+      .then((response) => response.data.result.items ?? [])
+      .catch((error) => {
+        console.error(error);
+        throw error;
+      });
+  };
+
   const scheduleAsync = async (input: IScheduleAssessment) => {
     dispatch(scheduleAssessmentPending());
     const endpoint = `/api/services/app/AdmissionAssessment/Schedule`;
-    await instance
+    return instance
       .post(endpoint, input)
       .then((response) => {
         dispatch(scheduleAssessmentSuccess(response.data.result));
+        return response.data.result as IAdmissionAssessment;
       })
       .catch((error) => {
         console.error(error);
         dispatch(scheduleAssessmentError());
+        // The server's refusal — the notice rule, an assessor who cannot mark
+        // it — is the useful part. Let the screen show it.
+        throw error;
       });
   };
 
   const recordResultsAsync = async (id: string, input: IRecordAssessmentResults) => {
     dispatch(recordResultsPending());
     const endpoint = `/api/services/app/AdmissionAssessment/RecordResults?id=${id}`;
-    await instance
+    return instance
       .post(endpoint, input)
       .then((response) => {
         dispatch(recordResultsSuccess(response.data.result));
@@ -117,6 +147,7 @@ export const AdmissionAssessmentProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(recordResultsError());
+        throw error;
       });
   };
 
@@ -141,6 +172,8 @@ export const AdmissionAssessmentProvider = ({
           getAsync,
           getByApplicationAsync,
           getAllAsync,
+          getMineAsync,
+          getAssessorsAsync,
           scheduleAsync,
           recordResultsAsync,
           cancelAsync,

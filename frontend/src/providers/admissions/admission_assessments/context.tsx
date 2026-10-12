@@ -2,6 +2,7 @@
 import { createContext } from "react";
 import {
   IAdmissionAssessment,
+  IAssessor,
   IScheduleAssessment,
   IRecordAssessmentResults,
   IPagedAndSortedResultRequest,
@@ -20,8 +21,11 @@ export interface IAdmissionAssessmentActionContext {
   getAsync: (id: string) => void;
   getByApplicationAsync: (applicationId: string) => void;
   getAllAsync: (input?: IPagedAndSortedResultRequest) => void;
-  scheduleAsync: (input: IScheduleAssessment) => void;
-  recordResultsAsync: (id: string, input: IRecordAssessmentResults) => void;
+  /** Only ever the signed-in person's own; being named the assessor is the authority. */
+  getMineAsync: (includePast?: boolean) => Promise<IAdmissionAssessment[]>;
+  getAssessorsAsync: () => Promise<IAssessor[]>;
+  scheduleAsync: (input: IScheduleAssessment) => Promise<IAdmissionAssessment>;
+  recordResultsAsync: (id: string, input: IRecordAssessmentResults) => Promise<void>;
   cancelAsync: (id: string, reason: string) => void;
 }
 

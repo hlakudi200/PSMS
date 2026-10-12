@@ -54,6 +54,7 @@ import type {
   IAdmissionAssessment,
 } from '@/providers/admissions/shared/interfaces';
 import {
+  admissionAssessmentTypeLabel,
   interviewStatusColour,
   interviewStatusLabel,
 } from '@/providers/admissions/shared/interfaces';
@@ -63,6 +64,7 @@ import {
 } from '@/providers/admissions/shared/application-status';
 import { useAuthState } from '@/providers/auth';
 import ScheduleInterviewModal from '@/components/modals/admissions/ScheduleInterviewModal';
+import ScheduleAssessmentModal from '@/components/modals/admissions/ScheduleAssessmentModal';
 
 const { Title, Text } = Typography;
 
@@ -289,18 +291,90 @@ function InterviewSection({
 }
 
 // ─── Assessment Tab ────────────────────────────────────────────
-function AssessmentSection({ applicationId }: { applicationId: string }) {
+function AssessmentSection({
+  applicationId,
+  applicantName,
+  gradeId,
+  gradeName,
+}: {
+  applicationId: string;
+  applicantName?: string;
+  gradeId?: string;
+  gradeName?: string;
+}) {
   const { assessment: admissionAssessment, isPending } = useAdmissionAssessmentState();
   const { getByApplicationAsync } = useAdmissionAssessmentActions();
+  const { currentRole } = useAuthState();
+  const [scheduling, setScheduling] = useState(false);
 
   useEffect(() => {
     getByApplicationAsync(applicationId);
   }, [applicationId, getByApplicationAsync]);
 
+  // The roles the school grants Admissions.Assessments.Schedule to; the server
+  // is the authority and refuses anyone else.
+  const maySchedule = ['Admin', 'Principal', 'VicePrincipal', 'AdmissionsOfficer']
+    .includes(currentRole ?? '');
+
+  const scheduleModal = (
+    <ScheduleAssessmentModal
+      open={scheduling}
+      applicationId={applicationId}
+      applicantName={applicantName}
+      gradeId={gradeId}
+      gradeName={gradeName}
+      onClose={() => setScheduling(false)}
+      onScheduled={() => getByApplicationAsync(applicationId)}
+    />
+  );
+
   if (isPending) return <Spin />;
-  if (!admissionAssessment) return <Empty description="No assessment scheduled" image={Empty.PRESENTED_IMAGE_SIMPLE} />;
+
+  /* This said "No assessment scheduled" and offered nothing: Schedule existed
+     on the server and no screen called it, so the workflow's assessment step
+     was a step about something that could not happen. */
+  if (!admissionAssessment) {
+    return (
+      <>
+        <Empty description="No assessment scheduled" image={Empty.PRESENTED_IMAGE_SIMPLE}>
+          {maySchedule && (
+            <Button type="primary" icon={<CalendarOutlined />} onClick={() => setScheduling(true)}>
+              Set an assessment
+            </Button>
+          )}
+        </Empty>
+        {scheduleModal}
+      </>
+    );
+  }
 
   const a = admissionAssessment as IAdmissionAssessment;
+
+  /* Scores are meaningless until the paper has been marked — an unmarked
+     assessment used to show 0 out of 100 and a red "Failed". */
+  if (!a.isCompleted) {
+    return (
+      <>
+        <Alert
+          type="info"
+          showIcon
+          style={{ marginBottom: 16 }}
+          message="This assessment has not been marked yet"
+          description={`${a.assessorName || 'The assessor'} records the result once the learner has sat it.`}
+        />
+        <Descriptions bordered size="small" column={{ xs: 1, sm: 2 }}>
+          <Descriptions.Item label="Type">{admissionAssessmentTypeLabel(a.type)}</Descriptions.Item>
+          <Descriptions.Item label="Date">{dayjs(a.scheduledDate).format('DD MMM YYYY')}</Descriptions.Item>
+          <Descriptions.Item label="Grade">{a.gradeName}</Descriptions.Item>
+          <Descriptions.Item label="Assessor">{a.assessorName || '—'}</Descriptions.Item>
+          <Descriptions.Item label="Out of">{a.maxScore}</Descriptions.Item>
+          {a.subjects && <Descriptions.Item label="Covers" span={2}>{a.subjects}</Descriptions.Item>}
+        </Descriptions>
+        {scheduleModal}
+      </>
+    );
+  }
+
   return (
     <div>
       <Row gutter={16} style={{ marginBottom: 16 }}>
@@ -321,7 +395,7 @@ function AssessmentSection({ applicationId }: { applicationId: string }) {
         </Col>
       </Row>
       <Descriptions bordered size="small" column={{ xs: 1, sm: 2 }}>
-        <Descriptions.Item label="Type">{a.typeDisplayName}</Descriptions.Item>
+        <Descriptions.Item label="Type">{admissionAssessmentTypeLabel(a.type)}</Descriptions.Item>
         <Descriptions.Item label="Date">{dayjs(a.scheduledDate).format('DD MMM YYYY')}</Descriptions.Item>
         <Descriptions.Item label="Grade">{a.gradeName}</Descriptions.Item>
         <Descriptions.Item label="Assessor">{a.assessorName}</Descriptions.Item>
@@ -525,7 +599,14 @@ function ApplicationDetailContent() {
     {
       key: 'assessment',
       label: <span><FormOutlined /> Assessment</span>,
-      children: <AssessmentSection applicationId={applicationId} />,
+      children: (
+        <AssessmentSection
+          applicationId={applicationId}
+          applicantName={app.fullName}
+          gradeId={app.applyingForGradeId}
+          gradeName={app.applyingForGradeName}
+        />
+      ),
     },
     {
       key: 'fee',
