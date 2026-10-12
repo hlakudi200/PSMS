@@ -38,15 +38,18 @@ public class WorkflowSeedService : ApplicationService
     private readonly IRepository<WorkflowDefinition, Guid> _definitionRepository;
     private readonly IRepository<WorkflowStep, Guid> _stepRepository;
     private readonly IRepository<WorkflowInstance, Guid> _instanceRepository;
+    private readonly IRepository<WorkflowTransition, Guid> _transitionRepository;
 
     public WorkflowSeedService(
         IRepository<WorkflowDefinition, Guid> definitionRepository,
         IRepository<WorkflowStep, Guid> stepRepository,
-        IRepository<WorkflowInstance, Guid> instanceRepository)
+        IRepository<WorkflowInstance, Guid> instanceRepository,
+        IRepository<WorkflowTransition, Guid> transitionRepository)
     {
         _definitionRepository = definitionRepository;
         _stepRepository = stepRepository;
         _instanceRepository = instanceRepository;
+        _transitionRepository = transitionRepository;
     }
 
     /// <summary>
@@ -120,16 +123,6 @@ public class WorkflowSeedService : ApplicationService
                 Id = Guid.NewGuid(),
                 WorkflowDefinitionId = definition.Id,
                 StepOrder = 2,
-                Name = "Document Verification",
-                Description = "Verify all required documents are present and valid.",
-                AssignedRole = "Admin",
-                ActionType = WorkflowActionType.Review
-            },
-            new WorkflowStep
-            {
-                Id = Guid.NewGuid(),
-                WorkflowDefinitionId = definition.Id,
-                StepOrder = 3,
                 Name = "Interview",
                 Description = "Schedule and conduct parent/student interview.",
                 // The teacher does the interview, so the step belongs to them.
@@ -144,7 +137,7 @@ public class WorkflowSeedService : ApplicationService
             {
                 Id = Guid.NewGuid(),
                 WorkflowDefinitionId = definition.Id,
-                StepOrder = 4,
+                StepOrder = 3,
                 Name = AssessmentStepName,
                 Description = "Set and mark the placement assessment for the grade applied for.",
                 // Whoever sets the paper marks it; it is a different paper for
@@ -158,23 +151,15 @@ public class WorkflowSeedService : ApplicationService
             {
                 Id = Guid.NewGuid(),
                 WorkflowDefinitionId = definition.Id,
-                StepOrder = 5,
-                Name = "Committee Review",
-                Description = "Admissions committee reviews the complete application.",
-                AssignedRole = "Admin",
-                ActionType = WorkflowActionType.Review
-            },
-            new WorkflowStep
-            {
-                Id = Guid.NewGuid(),
-                WorkflowDefinitionId = definition.Id,
-                StepOrder = 6,
+                StepOrder = 4,
                 Name = PrincipalDecisionStepName,
                 Description = "Principal makes the final admission decision.",
                 AssignedRole = "Principal",
                 ActionType = WorkflowActionType.Approve,
                 IsTerminal = true,
-                NextStepOnReject = 5, // Send back to committee for reconsideration
+                // Sending it back means another look at the review, which is
+                // where the committee step used to point before it was removed.
+                NextStepOnReject = 1,
                 // Without this the step has no decision to make: every completion
                 // fell through to Accepted, so nobody could waitlist or reject.
                 DecisionSchemaKey = ApplicationDecisionKey
@@ -197,11 +182,32 @@ public class WorkflowSeedService : ApplicationService
     /// values — a school that has since configured its own is left alone.
     /// </para>
     /// </summary>
+    /// <summary>
+    /// Brings a tenant seeded earlier onto the current shape. Each pass stands
+    /// on its own and leaves alone anything the school has made its own.
+    /// </summary>
     private async Task UpgradeAdmissionsWorkflow(WorkflowDefinition definition)
     {
-        var interview = definition.Steps?
-            .FirstOrDefault(s => s.Name == "Interview" && s.StepOrder == 3);
+        await GiveTheInterviewToTeachersAsync(definition);
+        await AddAssessmentStepAsync(definition);
+        await GiveThePrincipalADecisionToMakeAsync(definition);
+        await RemoveTheStepsThatDecideNothingAsync(definition);
+    }
 
+    /// <summary>
+    /// The interview belongs to the teacher who conducts it, and steps itself
+    /// over for a grade that does not interview.
+    /// <para>
+    /// This used to insist the step was third, which it was when the pass was
+    /// written. Removing the two steps that decided nothing moved it to second
+    /// — and because the whole upgrade was gated on finding it there, every
+    /// later pass stopped running the moment that happened. A pass matches on
+    /// what a step <i>is</i>, never on where it sits.
+    /// </para>
+    /// </summary>
+    private async Task GiveTheInterviewToTeachersAsync(WorkflowDefinition definition)
+    {
+        var interview = definition.Steps?.FirstOrDefault(s => s.Name == "Interview");
         if (interview == null) return;
 
         var changed = false;
@@ -221,10 +227,155 @@ public class WorkflowSeedService : ApplicationService
 
         if (changed)
             await _stepRepository.UpdateAsync(interview);
-
-        await AddAssessmentStepAsync(definition);
-        await GiveThePrincipalADecisionToMakeAsync(definition);
     }
+
+    /// <summary>
+    /// Steps a school was seeded with that never decided anything.
+    /// <para>
+    /// <b>Document Verification</b> was a step assigned to Admin that verified
+    /// nothing: the guard written for it was attached to no step, and there was
+    /// no way to mark a document verified in the first place. It belongs as a
+    /// condition on the review it was sitting next to, not as a stage of its
+    /// own.
+    /// </para>
+    /// <para>
+    /// <b>Committee Review</b> named a committee this system cannot express —
+    /// a step has one role and, at most, one fixed person, so there is no panel
+    /// and no quorum. It sat between two other Admin steps and the deliberation
+    /// it claimed already happens at the principal's decision.
+    /// </para>
+    /// <para>
+    /// Only ever removes a step still holding its seeded name, role and action,
+    /// so a school that has made either step its own keeps it.
+    /// </para>
+    /// </summary>
+    private async Task RemoveTheStepsThatDecideNothingAsync(WorkflowDefinition definition)
+    {
+        /* The passes before this one insert a step and renumber others, and the
+           definition's own Steps collection was loaded before any of that — so
+           it can be a step short. Flush, then ask the database what is actually
+           there: renumbering against a stale list collides two steps onto one
+           number and the save fails with nothing useful to say. */
+        await CurrentUnitOfWork.SaveChangesAsync();
+
+        var ordered = await _stepRepository
+            .GetAll()
+            .Where(s => s.WorkflowDefinitionId == definition.Id)
+            .OrderBy(s => s.StepOrder)
+            .ToListAsync();
+
+        if (ordered.Count == 0) return;
+
+        var doomed = ordered.Where(StillTheSeededPlaceholder).ToList();
+        if (doomed.Count == 0) return;
+
+        var surviving = ordered.Except(doomed).ToList();
+        if (surviving.Count == 0 || !surviving.Any(s => s.IsTerminal))
+        {
+            // Never leave a definition with nothing, or with no way to finish.
+            Logger.Warn($"Refusing to remove steps from definition {definition.Id}: nothing usable would remain.");
+            return;
+        }
+
+        /* Capture the old numbering before touching anything — routing targets
+           and instance positions are both recorded as step *numbers*, so every
+           one of them has to be translated through this map. */
+        var oldOrderOf = ordered.ToDictionary(s => s.Id, s => s.StepOrder);
+        var newOrderOf = surviving
+            .Select((s, i) => (s.Id, Order: i + 1))
+            .ToDictionary(x => x.Id, x => x.Order);
+
+        // Where each old number now points. A removed step forwards to the next
+        // step that survived it, which is also where anything sitting on it goes.
+        var landsOn = new Dictionary<int, WorkflowStep>();
+        foreach (var step in ordered)
+        {
+            var destination = newOrderOf.ContainsKey(step.Id)
+                ? step
+                : surviving.FirstOrDefault(s => oldOrderOf[s.Id] > oldOrderOf[step.Id]) ?? surviving.Last();
+            landsOn[oldOrderOf[step.Id]] = destination;
+        }
+
+        /* Applications caught on a step that is about to disappear. They move
+           forward to the next surviving step rather than back: the work of the
+           earlier stages has been done, and making a family wait while a school
+           redoes it would be the unkinder reading of a tidy-up they did not
+           ask for. Each move leaves a line in the history saying why. */
+        var stranded = await _instanceRepository
+            .GetAll()
+            .Where(i => i.WorkflowDefinitionId == definition.Id
+                        && i.CurrentStepId.HasValue
+                        && (i.Status == WorkflowStatus.NotStarted || i.Status == WorkflowStatus.InProgress))
+            .ToListAsync();
+
+        foreach (var instance in stranded)
+        {
+            var wasOn = ordered.FirstOrDefault(s => s.Id == instance.CurrentStepId.Value);
+            if (wasOn == null) continue;
+
+            var destination = landsOn[oldOrderOf[wasOn.Id]];
+
+            if (destination.Id != wasOn.Id)
+            {
+                await _transitionRepository.InsertAsync(new WorkflowTransition
+                {
+                    Id = Guid.NewGuid(),
+                    TenantId = definition.TenantId,
+                    WorkflowInstanceId = instance.Id,
+                    FromStepId = wasOn.Id,
+                    ToStepId = destination.Id,
+                    Action = WorkflowActionType.Waive,
+                    ActorUserId = AbpSession.UserId ?? 0,
+                    ActorUserName = "System",
+                    Comment = $"'{wasOn.Name}' was removed from this workflow — it decided nothing. Moved on to '{destination.Name}'.",
+                    TransitionDate = DateTime.UtcNow,
+                    IsWaived = true,
+                });
+            }
+
+            instance.CurrentStepId = destination.Id;
+            instance.CurrentStepOrder = newOrderOf[destination.Id];
+            await _instanceRepository.UpdateAsync(instance);
+        }
+
+        // Renumber what is left, translating every routing target with it.
+        foreach (var step in surviving)
+        {
+            step.StepOrder = newOrderOf[step.Id];
+
+            if (step.NextStepOnApprove.HasValue && landsOn.TryGetValue(step.NextStepOnApprove.Value, out var onApprove))
+                step.NextStepOnApprove = newOrderOf[onApprove.Id];
+
+            /* A reject target that survived keeps pointing at it. One that was
+               removed goes back to the first step rather than forward with the
+               others: "send this back" means another look, and forwarding it
+               would have aimed the principal's send-back at the terminal step
+               below them — completing the workflow instead of returning it. */
+            if (step.NextStepOnReject.HasValue)
+            {
+                var target = ordered.FirstOrDefault(s => oldOrderOf[s.Id] == step.NextStepOnReject.Value);
+                step.NextStepOnReject = target != null && newOrderOf.TryGetValue(target.Id, out var kept)
+                    ? kept
+                    : 1;
+            }
+
+            await _stepRepository.UpdateAsync(step);
+        }
+
+        foreach (var step in doomed)
+            await _stepRepository.DeleteAsync(step);
+    }
+
+    /// <summary>
+    /// Whether this is one of the two seeded steps being retired, untouched —
+    /// same name, same role, same action as it was seeded with. A school that
+    /// has renamed, reassigned or repurposed either one has made it theirs.
+    /// </summary>
+    private static bool StillTheSeededPlaceholder(WorkflowStep step) =>
+        step.ActionType == WorkflowActionType.Review
+        && step.AssignedRole == "Admin"
+        && !step.IsTerminal
+        && (step.Name == "Document Verification" || step.Name == "Committee Review");
 
     /// <summary>
     /// Attaches the admission decision form to the principal's step.
