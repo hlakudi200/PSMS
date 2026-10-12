@@ -141,6 +141,10 @@ export interface IApplication {
   documentCount: number;
   hasInterview: boolean;
   hasAssessment: boolean;
+  /** Whether the grade applied to asks for one. Undefined when the school has
+   *  not configured that grade, which is not the same as "no". */
+  requiresInterview?: boolean;
+  requiresAssessment?: boolean;
   waitlistPosition?: number;
   isFeePaid: boolean;
   canEdit: boolean;
