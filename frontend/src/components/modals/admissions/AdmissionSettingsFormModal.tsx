@@ -224,6 +224,15 @@ export default function AdmissionSettingsFormModal({
 
     try {
       if (isNew) {
+        /* A school opens its admissions grade by grade. The schema stays
+           permissive because the same shape is used to edit an existing row,
+           including a year-wide one left over from before. */
+        if (!v.gradeId) {
+          setError('Choose the grade these settings are for.');
+          setSaving(false);
+          return;
+        }
+
         const created = await createAsync({
           academicYearId: v.academicYearId,
           gradeId: v.gradeId || undefined,
@@ -241,15 +250,7 @@ export default function AdmissionSettingsFormModal({
           requiredDocuments: v.requiredDocuments || undefined,
           notes: v.notes || undefined,
         });
-        /* Leaving the grade empty writes one intake per grade, so say how many
-           rather than "added" — the school is about to see a table that grew by
-           twelve, and should know that was the point. */
-        const howMany = created?.length ?? 1;
-        message.success(
-          howMany === 1
-            ? 'Admission settings added'
-            : `Admission settings added for ${howMany} grades. Open any one of them to set its places, assessment or documents apart.`
-        );
+        message.success(`Applications set up for ${created?.[0]?.gradeName ?? 'this grade'}`);
         onSaved();
         onClose();
         return;
@@ -324,16 +325,12 @@ export default function AdmissionSettingsFormModal({
               <Form.Item
                 label="Grade"
                 name="gradeId"
-                extra={
-                  chosenGradeId
-                    ? 'One intake, for this grade.'
-                    : 'Leave empty and these settings are written once for every grade, so you can then set each one apart — Grade 1 takes a different number of learners to Grade 8, and sits a different assessment.'
-                }
+                rules={[{ required: true, message: 'Choose the grade these settings are for.' }]}
+                extra="Admissions open grade by grade: the places, the age range, the documents and the assessment are each decided for one grade at a time."
               >
                 <Select
-                  allowClear
                   showSearch
-                  placeholder="Set up every grade"
+                  placeholder="Choose a grade"
                   optionFilterProp="label"
                   options={gradeOptions.map((g) => ({ value: g.id, label: g.gradeName }))}
                 />

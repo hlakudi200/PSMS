@@ -155,23 +155,29 @@ public class AdmissionSettingsAppService : ApplicationService, IAdmissionSetting
     /// end: they picked the only thing on offer and the form refused it.
     /// </para>
     /// <para>
-    /// So "every grade" now means what it says — one set of settings per
-    /// grade, identical to start with and each editable afterwards, which is
-    /// where a school sets Grade 1's capacity apart from Grade 8's.
+    /// So a grade is required. A school opens its admissions grade by grade,
+    /// which is a decision per grade rather than a form filled in once — how
+    /// many places Grade 1 has, what Grade 11 must bring, which of them sit an
+    /// assessment at all.
+    /// </para>
+    /// <para>
+    /// <see cref="ExpandToEveryGradeAsync"/> remains for the rows written
+    /// before this, which is repair work on data that already exists rather
+    /// than a way to make more of it.
     /// </para>
     /// </summary>
     [AbpAuthorize(PermissionNames.Admissions_Settings_Manage)]
     public async Task<ListResultDto<AdmissionSettingsDto>> CreateAsync(CreateAdmissionSettingsDto input)
     {
-        if (input.GradeId.HasValue)
-        {
-            var created = await CreateOneAsync(input, input.GradeId.Value);
-            await CurrentUnitOfWork.SaveChangesAsync();
-            return new ListResultDto<AdmissionSettingsDto>(
-                new List<AdmissionSettingsDto> { await GetAsync(created.Id) });
-        }
+        if (!input.GradeId.HasValue)
+            throw new UserFriendlyException(AdmissionsExceptionCodes.InvalidAdmissionSettings,
+                "Choose the grade these settings are for. A school opens its admissions grade by grade — the places, the age range, the documents and the assessment are all different for each one.");
 
-        return await WriteOnePerGradeAsync(input);
+        var created = await CreateOneAsync(input, input.GradeId.Value);
+        await CurrentUnitOfWork.SaveChangesAsync();
+
+        return new ListResultDto<AdmissionSettingsDto>(
+            new List<AdmissionSettingsDto> { await GetAsync(created.Id) });
     }
 
     /// <summary>
