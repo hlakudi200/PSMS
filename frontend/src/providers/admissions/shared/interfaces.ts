@@ -698,6 +698,9 @@ export interface IEnrollment {
   enrollmentCompletedDate?: string;
   createdStudentId?: string;
   admissionNumber?: string;
+  /** Returned once, on the enrolment that created the account. Never on a read. */
+  loginUserName?: string;
+  temporaryPassword?: string;
 }
 
 export interface IAcceptOffer {
