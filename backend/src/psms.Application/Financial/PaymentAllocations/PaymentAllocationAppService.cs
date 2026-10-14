@@ -2,8 +2,11 @@ using Abp.Application.Services;
 using Abp.Application.Services.Dto;
 using Abp.Authorization;
 using Abp.Domain.Repositories;
+using Abp.Linq.Extensions;
 using Abp.UI;
 using Microsoft.EntityFrameworkCore;
+using psms.Academic.Parents;
+using psms.Academic.Students;
 using psms.Authorization;
 using psms.Domain.Financial.Entities;
 using psms.Domain.Shared.Enums;
@@ -25,26 +28,50 @@ public class PaymentAllocationAppService : ApplicationService, IPaymentAllocatio
     private readonly IRepository<PaymentAllocation, Guid> _paymentAllocationRepository;
     private readonly IRepository<Payment, Guid> _paymentRepository;
     private readonly IRepository<StudentFee, Guid> _studentFeeRepository;
+    private readonly ICurrentStudentResolver _currentStudent;
+    private readonly ICurrentParentResolver _currentParent;
 
     public PaymentAllocationAppService(
         IRepository<PaymentAllocation, Guid> paymentAllocationRepository,
         IRepository<Payment, Guid> paymentRepository,
-        IRepository<StudentFee, Guid> studentFeeRepository)
+        IRepository<StudentFee, Guid> studentFeeRepository,
+        ICurrentStudentResolver currentStudent,
+        ICurrentParentResolver currentParent)
     {
         _paymentAllocationRepository = paymentAllocationRepository;
         _paymentRepository = paymentRepository;
         _studentFeeRepository = studentFeeRepository;
+        _currentStudent = currentStudent;
+        _currentParent = currentParent;
+    }
+
+    /// <summary>
+    /// The learners a family caller may see allocations for; null for staff.
+    /// Parents hold <c>Financial.Payments.View</c>, and an allocation names the
+    /// learner, the fee and the amount — so it is scoped like the payment it
+    /// belongs to (MOB-BE-04 follow-up).
+    /// </summary>
+    private async Task<List<Guid>> FamilyScopeAsync()
+    {
+        var selfId = await _currentStudent.GetCurrentStudentIdAsync();
+        if (selfId.HasValue) return new List<Guid> { selfId.Value };
+
+        return await _currentParent.GetCurrentChildStudentIdsAsync();
     }
 
     [AbpAuthorize(PermissionNames.Financial_Payments_View)]
     public async Task<PaymentAllocationDto> GetAsync(Guid id)
     {
+        var scope = await FamilyScopeAsync();
+
         var allocation = await _paymentAllocationRepository
             .GetAll()
             .Include(pa => pa.Payment)
             .Include(pa => pa.StudentFee).ThenInclude(sf => sf.FeeStructure)
             .Include(pa => pa.StudentFee).ThenInclude(sf => sf.Student)
             .Where(pa => pa.Payment.TenantId == AbpSession.TenantId)
+            .WhereIf(scope != null, pa => scope.Contains(pa.Payment.StudentId)
+                && scope.Contains(pa.StudentFee.StudentId))
             .FirstOrDefaultAsync(pa => pa.Id == id);
 
         if (allocation == null)
@@ -57,12 +84,16 @@ public class PaymentAllocationAppService : ApplicationService, IPaymentAllocatio
     [AbpAuthorize(PermissionNames.Financial_Payments_View)]
     public async Task<ListResultDto<PaymentAllocationListDto>> GetByPaymentAsync(Guid paymentId)
     {
+        var scope = await FamilyScopeAsync();
+
         var items = await _paymentAllocationRepository
             .GetAll()
             .Include(pa => pa.Payment)
             .Include(pa => pa.StudentFee).ThenInclude(sf => sf.FeeStructure)
             .Include(pa => pa.StudentFee).ThenInclude(sf => sf.Student)
             .Where(pa => pa.Payment.TenantId == AbpSession.TenantId && pa.PaymentId == paymentId)
+            .WhereIf(scope != null, pa => scope.Contains(pa.Payment.StudentId)
+                && scope.Contains(pa.StudentFee.StudentId))
             .OrderBy(pa => pa.AllocatedDate)
             .ToListAsync();
 
@@ -73,12 +104,16 @@ public class PaymentAllocationAppService : ApplicationService, IPaymentAllocatio
     [AbpAuthorize(PermissionNames.Financial_Payments_View)]
     public async Task<ListResultDto<PaymentAllocationListDto>> GetByStudentFeeAsync(Guid studentFeeId)
     {
+        var scope = await FamilyScopeAsync();
+
         var items = await _paymentAllocationRepository
             .GetAll()
             .Include(pa => pa.Payment)
             .Include(pa => pa.StudentFee).ThenInclude(sf => sf.FeeStructure)
             .Include(pa => pa.StudentFee).ThenInclude(sf => sf.Student)
             .Where(pa => pa.Payment.TenantId == AbpSession.TenantId && pa.StudentFeeId == studentFeeId)
+            .WhereIf(scope != null, pa => scope.Contains(pa.Payment.StudentId)
+                && scope.Contains(pa.StudentFee.StudentId))
             .OrderBy(pa => pa.AllocatedDate)
             .ToListAsync();
 

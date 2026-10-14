@@ -5,6 +5,8 @@ using Abp.Domain.Repositories;
 using Abp.Linq.Extensions;
 using Abp.UI;
 using Microsoft.EntityFrameworkCore;
+using psms.Academic.Parents;
+using psms.Academic.Students;
 using psms.Authorization;
 using psms.Domain.Academic.Entities;
 using psms.Domain.Financial.Entities;
@@ -28,15 +30,62 @@ public class PaymentAppService : ApplicationService, IPaymentAppService
     private readonly IRepository<Payment, Guid> _paymentRepository;
     private readonly IRepository<Student, Guid> _studentRepository;
     private readonly IRepository<Parent, Guid> _parentRepository;
+    private readonly ICurrentStudentResolver _currentStudent;
+    private readonly ICurrentParentResolver _currentParent;
 
     public PaymentAppService(
         IRepository<Payment, Guid> paymentRepository,
         IRepository<Student, Guid> studentRepository,
-        IRepository<Parent, Guid> parentRepository)
+        IRepository<Parent, Guid> parentRepository,
+        ICurrentStudentResolver currentStudent,
+        ICurrentParentResolver currentParent)
     {
         _paymentRepository = paymentRepository;
         _studentRepository = studentRepository;
         _parentRepository = parentRepository;
+        _currentStudent = currentStudent;
+        _currentParent = currentParent;
+    }
+
+    /// <summary>
+    /// The learners a family caller may see payments for: a student themselves,
+    /// a parent their linked children. Null for staff, who are not scoped.
+    /// <para>
+    /// Parents hold <c>Financial.Payments.View</c> for their own payments, and
+    /// nothing here checked whose payment it was — any payment in the school
+    /// could be read by id, by learner, by parent, or by walking the sequential
+    /// receipt numbers (MOB-BE-04 follow-up).
+    /// </para>
+    /// </summary>
+    private async Task<List<Guid>> FamilyScopeAsync()
+    {
+        var selfId = await _currentStudent.GetCurrentStudentIdAsync();
+        if (selfId.HasValue) return new List<Guid> { selfId.Value };
+
+        return await _currentParent.GetCurrentChildStudentIdsAsync();
+    }
+
+    /// <summary>
+    /// Out of scope reads the same as missing, so the response does not confirm
+    /// that the payment exists.
+    /// </summary>
+    private async Task AssertInFamilyScopeAsync(Payment payment)
+    {
+        var scope = await FamilyScopeAsync();
+        if (scope != null && !scope.Contains(payment.StudentId))
+            throw new UserFriendlyException(FinancialExceptionCodes.PaymentNotFound,
+                "Payment not found.");
+    }
+
+    /// <summary>
+    /// Settling a payment is the school's or the gateway's word that the money
+    /// arrived. Parents hold <c>Financial.Payments.Process</c>, and without this
+    /// a parent could mark their own pending EFT as paid without paying it.
+    /// </summary>
+    private async Task AssertNotFamilyCallerAsync()
+    {
+        if (await FamilyScopeAsync() != null)
+            throw new AbpAuthorizationException("Only the school can settle a payment.");
     }
 
     [AbpAuthorize(PermissionNames.Financial_Payments_View)]
@@ -53,18 +102,23 @@ public class PaymentAppService : ApplicationService, IPaymentAppService
             throw new UserFriendlyException(FinancialExceptionCodes.PaymentNotFound,
                 "Payment not found.");
 
+        await AssertInFamilyScopeAsync(payment);
+
         return ObjectMapper.Map<PaymentDto>(payment);
     }
 
     [AbpAuthorize(PermissionNames.Financial_Payments_ViewAll)]
     public async Task<PagedResultDto<PaymentListDto>> GetAllAsync(GetPaymentsInput input)
     {
+        var scope = await FamilyScopeAsync();
+
         var query = _paymentRepository
             .GetAll()
             .Include(p => p.Student)
             .Include(p => p.Parent)
             .Include(p => p.PaymentAllocations)
             .Where(p => p.TenantId == AbpSession.TenantId)
+            .WhereIf(scope != null, p => scope.Contains(p.StudentId))
             .WhereIf(input.StudentId.HasValue, p => p.StudentId == input.StudentId.Value)
             .WhereIf(input.ParentId.HasValue, p => p.ParentId == input.ParentId.Value)
             .WhereIf(input.Status.HasValue, p => p.Status == input.Status.Value)
@@ -96,12 +150,15 @@ public class PaymentAppService : ApplicationService, IPaymentAppService
     [AbpAuthorize(PermissionNames.Financial_Payments_View)]
     public async Task<ListResultDto<PaymentListDto>> GetByStudentAsync(Guid studentId)
     {
+        var scope = await FamilyScopeAsync();
+
         var items = await _paymentRepository
             .GetAll()
             .Include(p => p.Student)
             .Include(p => p.Parent)
             .Include(p => p.PaymentAllocations)
             .Where(p => p.TenantId == AbpSession.TenantId && p.StudentId == studentId)
+            .WhereIf(scope != null, p => scope.Contains(p.StudentId))
             .OrderByDescending(p => p.PaymentDate)
             .ToListAsync();
 
@@ -112,12 +169,15 @@ public class PaymentAppService : ApplicationService, IPaymentAppService
     [AbpAuthorize(PermissionNames.Financial_Payments_View)]
     public async Task<ListResultDto<PaymentListDto>> GetByParentAsync(Guid parentId)
     {
+        var scope = await FamilyScopeAsync();
+
         var items = await _paymentRepository
             .GetAll()
             .Include(p => p.Student)
             .Include(p => p.Parent)
             .Include(p => p.PaymentAllocations)
             .Where(p => p.TenantId == AbpSession.TenantId && p.ParentId == parentId)
+            .WhereIf(scope != null, p => scope.Contains(p.StudentId))
             .OrderByDescending(p => p.PaymentDate)
             .ToListAsync();
 
@@ -200,6 +260,8 @@ public class PaymentAppService : ApplicationService, IPaymentAppService
     [AbpAuthorize(PermissionNames.Financial_Payments_Process)]
     public async Task<PaymentDto> CompleteAsync(Guid id)
     {
+        await AssertNotFamilyCallerAsync();
+
         var payment = await _paymentRepository
             .FirstOrDefaultAsync(p => p.Id == id && p.TenantId == AbpSession.TenantId);
 
@@ -225,6 +287,8 @@ public class PaymentAppService : ApplicationService, IPaymentAppService
     [AbpAuthorize(PermissionNames.Financial_Payments_Process)]
     public async Task<PaymentDto> FailAsync(Guid id)
     {
+        await AssertNotFamilyCallerAsync();
+
         var payment = await _paymentRepository
             .FirstOrDefaultAsync(p => p.Id == id && p.TenantId == AbpSession.TenantId);
 
@@ -315,6 +379,10 @@ public class PaymentAppService : ApplicationService, IPaymentAppService
         if (payment == null)
             throw new UserFriendlyException(FinancialExceptionCodes.PaymentNotFound,
                 "Payment not found for the given receipt number.");
+
+        // Receipt numbers are sequential (REC-000001, …), so without this a
+        // parent could read every payment in the school by counting.
+        await AssertInFamilyScopeAsync(payment);
 
         return ObjectMapper.Map<PaymentDto>(payment);
     }
