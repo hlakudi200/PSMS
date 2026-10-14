@@ -296,6 +296,88 @@ public class RemovingStepsThatDecideNothing_Tests : psmsTestBase
     }
 
     [Fact]
+    public async Task A_school_that_reordered_its_steps_by_hand_still_ends_up_right()
+    {
+        /* The shape found on a live tenant: the seeded five, shuffled through
+           the definition editor's up and down arrows — Document Verification
+           dragged above Admin Review, Interview pushed below the committee —
+           and Admin Review given a required comment. None of the upgrades had
+           ever run on it, because nothing in the application called the seeder
+           at all.
+
+           Every pass has to match on what a step is rather than where it sits,
+           or a school that rearranged its own workflow is left behind. */
+        var definitionId = Guid.NewGuid();
+
+        UsingDbContext(1, context =>
+        {
+            foreach (var old in context.WorkflowDefinitions
+                         .Include(d => d.Steps)
+                         .Where(d => d.EntityType == WorkflowEntityType.Application)
+                         .ToList())
+            {
+                context.WorkflowSteps.RemoveRange(old.Steps);
+                context.WorkflowDefinitions.Remove(old);
+            }
+
+            context.WorkflowDefinitions.Add(new WorkflowDefinition
+            {
+                Id = definitionId,
+                TenantId = 1,
+                Name = "Admissions Approval",
+                EntityType = WorkflowEntityType.Application,
+                IsActive = true,
+            });
+
+            var scrambled = new (string Name, int Order, string Role, bool Terminal, bool Comment)[]
+            {
+                ("Document Verification", 1, "Admin", false, false),
+                ("Admin Review", 2, "Admin", false, true),
+                ("Committee Review", 3, "Admin", false, false),
+                ("Interview", 4, "Admin", false, false),
+                ("Principal Decision", 5, "Principal", true, false),
+            };
+
+            foreach (var s in scrambled)
+            {
+                context.WorkflowSteps.Add(new WorkflowStep
+                {
+                    Id = Guid.NewGuid(),
+                    WorkflowDefinitionId = definitionId,
+                    StepOrder = s.Order,
+                    Name = s.Name,
+                    AssignedRole = s.Role,
+                    ActionType = s.Terminal ? WorkflowActionType.Approve : WorkflowActionType.Review,
+                    IsTerminal = s.Terminal,
+                    IsCommentRequired = s.Comment,
+                });
+            }
+
+            context.SaveChanges();
+        });
+
+        await RunTheSeederAsync();
+
+        var steps = StepsOf(definitionId);
+
+        steps.Select(s => s.Name).ShouldBe(new[]
+        {
+            "Admin Review",
+            "Interview",
+            "Placement Assessment",
+            "Principal Decision",
+        });
+
+        // The interview found its teacher and its skip rule,
+        steps.Single(s => s.Name == "Interview").AssignedRole.ShouldBe("Teacher");
+        steps.Single(s => s.Name == "Interview").SkipWhenKey.ShouldNotBeNullOrWhiteSpace();
+        // the principal got a decision to make,
+        steps.Single(s => s.Name == "Principal Decision").DecisionSchemaKey.ShouldBe("application.decision");
+        // and the school's own change to Admin Review survived all of it.
+        steps.Single(s => s.Name == "Admin Review").IsCommentRequired.ShouldBeTrue();
+    }
+
+    [Fact]
     public async Task A_fresh_school_is_seeded_with_the_four_steps_directly()
     {
         UsingDbContext(1, context =>

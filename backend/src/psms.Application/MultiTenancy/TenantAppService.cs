@@ -10,6 +10,7 @@ using Abp.Runtime.Security;
 using psms.Authorization;
 using psms.Authorization.Roles;
 using psms.Authorization.Users;
+using psms.Workflow.Seed;
 using psms.Domain.Tenancy.Entities;
 using psms.Editions;
 using psms.MultiTenancy.Dto;
@@ -31,6 +32,7 @@ public class TenantAppService : AsyncCrudAppService<Tenant, TenantDto, int, Page
     private readonly IAbpZeroDbMigrator _abpZeroDbMigrator;
     private readonly PsmsRolePermissionSeeder _rolePermissionSeeder;
     private readonly IRepository<SchoolBranding, Guid> _brandingRepository;
+    private readonly WorkflowSeedService _workflowSeeder;
 
     public TenantAppService(
         IRepository<Tenant, int> repository,
@@ -40,7 +42,8 @@ public class TenantAppService : AsyncCrudAppService<Tenant, TenantDto, int, Page
         RoleManager roleManager,
         IAbpZeroDbMigrator abpZeroDbMigrator,
         PsmsRolePermissionSeeder rolePermissionSeeder,
-        IRepository<SchoolBranding, Guid> brandingRepository)
+        IRepository<SchoolBranding, Guid> brandingRepository,
+        WorkflowSeedService workflowSeeder)
         : base(repository)
     {
         _tenantManager = tenantManager;
@@ -50,6 +53,7 @@ public class TenantAppService : AsyncCrudAppService<Tenant, TenantDto, int, Page
         _abpZeroDbMigrator = abpZeroDbMigrator;
         _rolePermissionSeeder = rolePermissionSeeder;
         _brandingRepository = brandingRepository;
+        _workflowSeeder = workflowSeeder;
     }
 
     public override async Task<TenantDto> CreateAsync(CreateTenantDto input)
@@ -107,6 +111,16 @@ public class TenantAppService : AsyncCrudAppService<Tenant, TenantDto, int, Page
             // converge without a data backfill.
             await _brandingRepository.InsertAsync(new SchoolBranding(Guid.NewGuid(), tenant.Id));
             await CurrentUnitOfWork.SaveChangesAsync();
+
+            /* The workflow definitions a school runs on — admissions, report
+               approval, leave, the rest. WorkflowSeedService wrote them and
+               nothing ever called it, so a new school started with no
+               definitions at all: TryStartWorkflowAsync would log "no active
+               workflow definition" and return, and every submitted application
+               sat under review with no process behind it and nobody's inbox to
+               appear in. */
+            await _workflowSeeder.SeedDefaultsAsync();
+            await CurrentUnitOfWork.SaveChangesAsync();
         }
 
         return MapToEntityDto(tenant);
@@ -156,6 +170,35 @@ public class TenantAppService : AsyncCrudAppService<Tenant, TenantDto, int, Page
         using (CurrentUnitOfWork.SetTenantId(tenant.Id))
         {
             await _rolePermissionSeeder.SeedRolePermissionsAsync(tenant.Id);
+            await CurrentUnitOfWork.SaveChangesAsync();
+        }
+    }
+
+    /// <summary>
+    /// Writes the default workflow definitions for an existing tenant, and
+    /// brings ones written earlier onto the current shape.
+    /// <para>
+    /// <c>WorkflowSeedService</c> had no caller anywhere in the application. It
+    /// was reachable only because ABP generates a controller for every
+    /// application service, so a school's definitions existed if somebody had
+    /// once posted to that endpoint by hand — and every upgrade written since
+    /// then had never run on anybody.
+    /// </para>
+    /// <para>
+    /// New tenants are seeded on creation now. This is the same work for the
+    /// ones that came before, and it is safe to run on a live school: each pass
+    /// leaves alone any step that has been renamed, reassigned or repurposed.
+    /// Idempotent.
+    /// </para>
+    /// </summary>
+    [AbpAuthorize(PermissionNames.Pages_Tenants)]
+    public async Task SeedWorkflowDefinitionsAsync(EntityDto<int> input)
+    {
+        var tenant = await _tenantManager.GetByIdAsync(input.Id);
+
+        using (CurrentUnitOfWork.SetTenantId(tenant.Id))
+        {
+            await _workflowSeeder.SeedDefaultsAsync();
             await CurrentUnitOfWork.SaveChangesAsync();
         }
     }
