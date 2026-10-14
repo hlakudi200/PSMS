@@ -51,6 +51,11 @@ public static class FinancialExceptionCodes
     public const string FeeWaiverNotFound = "FIN_FEE_WAIVER_NOT_FOUND";
     public const string InvalidFeeWaiverStatusTransition = "FIN_INVALID_FEE_WAIVER_STATUS";
 
+    // FeeStatement
+    public const string StatementPeriodInvalid = "FIN_STATEMENT_PERIOD_INVALID";
+    public const string StatementStudentRequired = "FIN_STATEMENT_STUDENT_REQUIRED";
+    public const string TermNotFound = "FIN_TERM_NOT_FOUND";
+
     // ExpenseRequest
     public const string ExpenseNotFound = "EXP_NOT_FOUND";
     public const string ExpenseNumberDuplicate = "EXP_NUMBER_DUPLICATE";
