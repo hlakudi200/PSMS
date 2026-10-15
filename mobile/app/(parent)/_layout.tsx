@@ -1,12 +1,15 @@
 import { Stack } from "expo-router";
 import { RoleGuard } from "../../src/navigation/RoleGuard";
 import { ChildrenProvider } from "../../src/providers/children";
+import { MarksProvider } from "../../src/providers/marks";
 
 export default function ParentLayout() {
   return (
     <RoleGuard role="parent">
       <ChildrenProvider>
-        <Stack screenOptions={{ headerShown: false }} />
+        <MarksProvider>
+          <Stack screenOptions={{ headerShown: false }} />
+        </MarksProvider>
       </ChildrenProvider>
     </RoleGuard>
   );

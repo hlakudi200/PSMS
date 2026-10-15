@@ -11,6 +11,7 @@ export interface IChildSummary {
   studentId: string;
   studentName: string;
   admissionNumber?: string;
+  classId?: string;
   className?: string;
   gradeName?: string;
   /** Attendance for the current term — undefined when it couldn't be loaded, or when no register has been captured yet. */

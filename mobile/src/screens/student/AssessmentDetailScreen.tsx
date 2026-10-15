@@ -5,13 +5,9 @@ import { colors, spacing, typography } from "../../theme";
 import { useMarksActions, useMarksState } from "../../providers/marks";
 import type { IAssessmentDetail, IMark } from "../../providers/marks/context";
 import {
-  ACHIEVEMENT_LEVEL_LABELS, ACHIEVEMENT_LEVEL_TONES,
+  ACHIEVEMENT_LEVEL_LABELS, ACHIEVEMENT_LEVEL_TONES, ASSESSMENT_TYPE_LABELS,
   formatDate, formatPercentage, markDisplayStatusLabel, markDisplayStatusTone,
 } from "../../utils/assessment-labels";
-
-const ASSESSMENT_TYPE_LABELS: Record<number, string> = {
-  1: "Test", 2: "Exam", 3: "Assignment", 4: "Practical", 5: "Oral", 6: "Project", 7: "Other",
-};
 
 export function AssessmentDetailScreen({ assessmentId }: { assessmentId: string }) {
   const { assessmentDetailsById } = useMarksState();

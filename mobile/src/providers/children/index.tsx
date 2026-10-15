@@ -114,6 +114,7 @@ export const ChildrenProvider = ({ children }: { children: React.ReactNode }) =>
             studentId: student.id,
             studentName: student.fullName,
             admissionNumber: student.admissionNumber ?? undefined,
+            classId: student.currentClassId ?? undefined,
             className: student.currentClassName ?? undefined,
             gradeName: student.currentGradeName ?? undefined,
             attendancePercentage: attendance?.attendancePercentage,
