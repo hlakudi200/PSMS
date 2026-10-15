@@ -86,6 +86,14 @@ export function ChildPerformanceScreen() {
         </ScrollView>
       )}
 
+      <AttendanceCard
+        percentage={child.attendancePercentage}
+        daysPresent={child.attendanceDaysPresent}
+        totalDays={child.attendanceTotalDays}
+        onPress={() => router.push("/(parent)/attendance")}
+      />
+
+      <Text style={styles.sectionTitle}>Marks</Text>
       {terms && terms.length > 0 && (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
           {terms.map((term) => (
@@ -142,6 +150,30 @@ export function ChildPerformanceScreen() {
   );
 }
 
+/** This term's figure, already loaded for Home; the attendance screen has the detail. */
+function AttendanceCard({ percentage, daysPresent, totalDays, onPress }: {
+  percentage?: number;
+  daysPresent?: number;
+  totalDays?: number;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable accessibilityRole="button" accessibilityLabel="Open attendance" onPress={onPress} style={styles.cardWrapper}>
+      <Card>
+        <View style={styles.cardTop}>
+          <Text style={styles.subjectName}>Attendance this term</Text>
+          {percentage != null && <Text style={styles.average}>{formatPercentage(percentage)}</Text>}
+        </View>
+        <Text style={styles.meta}>
+          {percentage != null
+            ? `Present ${daysPresent ?? 0} of ${totalDays} recorded days · see every day`
+            : "No register captured yet · see attendance"}
+        </Text>
+      </Card>
+    </Pressable>
+  );
+}
+
 function SubjectCard({ section, previousAverage, onPress }: {
   section: ISubjectSection;
   previousAverage?: number;
@@ -194,6 +226,7 @@ function SubjectCard({ section, previousAverage, onPress }: {
 const styles = StyleSheet.create({
   title: { color: colors.text, fontSize: typography.title, fontWeight: "800", marginTop: spacing.lg },
   subtitle: { color: colors.textMuted, fontSize: 14, marginTop: spacing.xs },
+  sectionTitle: { color: colors.text, fontSize: 18, fontWeight: "800", marginTop: spacing.xl },
   chips: { gap: spacing.sm, marginTop: spacing.md },
   inlineError: { color: colors.danger, fontSize: 14, marginTop: spacing.md },
   list: { paddingBottom: spacing.xxl },
