@@ -139,40 +139,41 @@ export const AdvanceWorkflowModal: React.FC<AdvanceWorkflowModalProps> = ({
   }, [open, form, currentStepActionType, currentStepOrder, currentStepIsOptional]);
 
   const handleSubmit = async () => {
+    /* Every "required" message now comes from the field's own rule, so pressing
+       OK checks what is on screen now. The messages used to be set by hand, and
+       a message set by hand is not cleared when the field changes: a principal
+       who pressed OK on an empty Decision, then chose one, was still being told
+       the decision was required, with no way to get rid of it. */
+    let values: Record<string, any>;
     try {
-      const values = form.getFieldsValue();
+      values = await form.validateFields();
+    } catch {
+      return; // validateFields has put the messages on the fields
+    }
 
-      if (needsComment && !values.comment?.trim()) {
-        form.setFields([{ name: 'comment', errors: [isWaive ? 'A reason is required to waive this step' : 'Comment is required for this step'] }]);
-        return;
-      }
-      if (guardBlocks && !values.overrideGuard) {
-        form.setFields([{ name: 'action', errors: ['The exit criteria are not met. Complete the work, waive the step, or override with a reason.'] }]);
-        return;
-      }
+    if (guardBlocks && !values.overrideGuard) {
+      form.setFields([{ name: 'action', errors: ['The exit criteria are not met. Complete the work, waive the step, or override with a reason.'] }]);
+      return;
+    }
 
-      const result = advanceSchema.safeParse(values);
-      if (!result.success) {
-        form.setFields(result.error.issues.map(err => ({ name: err.path as string[], errors: [err.message] })));
-        return;
-      }
+    const result = advanceSchema.safeParse(values);
+    if (!result.success) {
+      form.setFields(result.error.issues.map(err => ({ name: err.path as string[], errors: [err.message] })));
+      return;
+    }
 
-      // WF-32: collect the decision fields, checking required ones client-side so
-      // the actor gets the message on the field (the server validates again).
-      let decision: Record<string, unknown> | undefined;
-      if (showDecision && decisionSchema) {
-        decision = {};
-        const missing: { name: string[]; errors: string[] }[] = [];
-        for (const f of decisionSchema.fields) {
-          let v = values[f.key];
-          if (f.type === 'date' && v) v = dayjs(v).format('YYYY-MM-DD');
-          const empty = v === undefined || v === null || v === '';
-          if (f.required && empty) missing.push({ name: [f.key], errors: [`${f.label} is required`] });
-          if (!empty) decision[f.key] = v;
-        }
-        if (missing.length) { form.setFields(missing); return; }
+    // WF-32: the decision the step asked for, in the shape the engine reads.
+    let decision: Record<string, unknown> | undefined;
+    if (showDecision && decisionSchema) {
+      decision = {};
+      for (const f of decisionSchema.fields) {
+        let v = values[f.key];
+        if (f.type === 'date' && v) v = dayjs(v).format('YYYY-MM-DD');
+        if (v !== undefined && v !== null && v !== '') decision[f.key] = v;
       }
+    }
 
+    try {
       setLoading(true);
       await advanceAsync(instanceId, {
         action: result.data.action,
@@ -218,7 +219,7 @@ export const AdvanceWorkflowModal: React.FC<AdvanceWorkflowModalProps> = ({
         />
       )}
       <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
-        <Form.Item label="Action" name="action" rules={[{ required: true }]}>
+        <Form.Item label="Action" name="action" rules={[{ required: true, message: 'Choose what you are doing with this step' }]}>
           <Select options={actionOptions} placeholder="Select action" />
         </Form.Item>
 
@@ -248,7 +249,11 @@ export const AdvanceWorkflowModal: React.FC<AdvanceWorkflowModalProps> = ({
         <Form.Item
           label={isWaive ? 'Reason for waiving' : 'Comment'}
           name="comment"
-          rules={needsComment ? [{ required: true, message: 'Comment is required' }] : []}
+          rules={needsComment ? [{
+            required: true,
+            whitespace: true,
+            message: isWaive ? 'A reason is required to waive this step' : 'Comment is required for this step',
+          }] : []}
         >
           <Input.TextArea
             rows={4}
