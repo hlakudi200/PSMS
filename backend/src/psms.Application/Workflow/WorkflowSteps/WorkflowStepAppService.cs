@@ -287,11 +287,51 @@ public class WorkflowStepAppService : ApplicationService, IWorkflowStepAppServic
             throw new UserFriendlyException(WorkflowExceptionCodes.InvalidNextStep,
                 "Step IDs do not match the steps in this definition.");
 
-        // Assign new order
-        for (var i = 0; i < input.StepIds.Count; i++)
+        /* Routing is recorded as step *numbers*, so moving a step and leaving
+           the targets alone silently re-aims them at whatever lands on that
+           number. A principal's "send this back to the committee" would arrive
+           at the assessment, or at the terminal step below them — completing
+           the workflow instead of returning it — with nothing to say so.
+
+           Translate through identity: what each old number pointed AT, and
+           where that step has ended up. */
+        var oldOrderToStepId = steps.ToDictionary(s => s.StepOrder, s => s.Id);
+        var newOrderOfStepId = input.StepIds
+            .Select((id, i) => (Id: id, Order: i + 1))
+            .ToDictionary(x => x.Id, x => x.Order);
+
+        int? Retarget(int? oldTarget) =>
+            oldTarget.HasValue
+            && oldOrderToStepId.TryGetValue(oldTarget.Value, out var targetId)
+            && newOrderOfStepId.TryGetValue(targetId, out var moved)
+                ? moved
+                : oldTarget;
+
+        var retargeted = steps
+            .Select(s => (Step: s, Approve: Retarget(s.NextStepOnApprove), Reject: Retarget(s.NextStepOnReject)))
+            .ToList();
+
+        foreach (var (step, approve, reject) in retargeted)
         {
-            var step = steps.First(s => s.Id == input.StepIds[i]);
-            step.StepOrder = i + 1;
+            step.StepOrder = newOrderOfStepId[step.Id];
+            step.NextStepOnApprove = approve;
+            step.NextStepOnReject = reject;
+        }
+
+        /* Instances in flight record the number of the step they are on, which
+           has just moved under them. The step itself is unchanged, so correct
+           the number rather than the position. */
+        var running = await _instanceRepository
+            .GetAll()
+            .Where(i => i.WorkflowDefinitionId == input.WorkflowDefinitionId
+                        && i.CurrentStepId.HasValue
+                        && (i.Status == WorkflowStatus.NotStarted || i.Status == WorkflowStatus.InProgress))
+            .ToListAsync();
+
+        foreach (var instance in running)
+        {
+            if (newOrderOfStepId.TryGetValue(instance.CurrentStepId.Value, out var nowAt))
+                instance.CurrentStepOrder = nowAt;
         }
 
         await CurrentUnitOfWork.SaveChangesAsync();
