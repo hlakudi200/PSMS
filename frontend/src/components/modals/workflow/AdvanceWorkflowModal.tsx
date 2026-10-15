@@ -124,20 +124,29 @@ function buildFieldRules(field: IWorkflowDecisionField): Rule[] {
   return rules;
 }
 
-function DecisionFieldInput({ field }: { field: IWorkflowDecisionField }) {
+/**
+ * Form.Item hands its child the things that make it a field — value, onChange,
+ * id — by cloning it. This component sat in between and kept only `field`, so
+ * every decision control was an uncontrolled input: it showed what the actor
+ * picked and the form store stayed empty. The decision never reached the
+ * server, and "Decision is required" was telling the truth.
+ *
+ * Everything Form.Item injects is spread onto the control.
+ */
+function DecisionFieldInput({ field, ...control }: { field: IWorkflowDecisionField } & Record<string, any>) {
   switch (field.type) {
     case 'number':
-      return <InputNumber style={{ width: '100%' }} min={field.min} max={field.max} precision={2} placeholder={field.placeholder} />;
+      return <InputNumber {...control} style={{ width: '100%' }} min={field.min} max={field.max} precision={2} placeholder={field.placeholder} />;
     case 'select':
-      return <Select options={(field.options ?? []).map((o) => ({ value: o.value, label: o.label }))} placeholder={field.placeholder ?? 'Select'} />;
+      return <Select {...control} options={(field.options ?? []).map((o) => ({ value: o.value, label: o.label }))} placeholder={field.placeholder ?? 'Select'} />;
     case 'date':
-      return <DatePicker style={{ width: '100%' }} />;
+      return <DatePicker {...control} style={{ width: '100%' }} />;
     case 'boolean':
-      return <Switch />;
+      return <Switch {...control} />;
     case 'textarea':
-      return <Input.TextArea rows={3} maxLength={field.max ?? 2000} placeholder={field.placeholder} />;
+      return <Input.TextArea {...control} rows={3} maxLength={field.max ?? 2000} placeholder={field.placeholder} />;
     default:
-      return <Input maxLength={field.max ?? 500} placeholder={field.placeholder} />;
+      return <Input {...control} maxLength={field.max ?? 500} placeholder={field.placeholder} />;
   }
 }
 
