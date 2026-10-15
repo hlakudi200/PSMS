@@ -26,6 +26,9 @@ export enum EnrollmentActionEnums {
   acceptOfferPending = "ACCEPT_OFFER_PENDING",
   acceptOfferSuccess = "ACCEPT_OFFER_SUCCESS",
   acceptOfferError = "ACCEPT_OFFER_ERROR",
+  declineOfferPending = "DECLINE_OFFER_PENDING",
+  declineOfferSuccess = "DECLINE_OFFER_SUCCESS",
+  declineOfferError = "DECLINE_OFFER_ERROR",
 
   // AssignClass
   assignClassPending = "ASSIGN_CLASS_PENDING",
@@ -123,6 +126,27 @@ export const acceptOfferSuccess = createAction<IEnrollmentStateContext, IEnrollm
 
 export const acceptOfferError = createAction<IEnrollmentStateContext>(
   EnrollmentActionEnums.acceptOfferError,
+  () => ({ isPending: false, isSuccess: false, isError: true })
+);
+
+// DeclineOffer Actions
+export const declineOfferPending = createAction<IEnrollmentStateContext>(
+  EnrollmentActionEnums.declineOfferPending,
+  () => ({ isPending: true, isSuccess: false, isError: false })
+);
+
+export const declineOfferSuccess = createAction<IEnrollmentStateContext, IEnrollment>(
+  EnrollmentActionEnums.declineOfferSuccess,
+  (enrollment: IEnrollment) => ({
+    isPending: false,
+    isSuccess: true,
+    isError: false,
+    enrollment,
+  })
+);
+
+export const declineOfferError = createAction<IEnrollmentStateContext>(
+  EnrollmentActionEnums.declineOfferError,
   () => ({ isPending: false, isSuccess: false, isError: true })
 );
 

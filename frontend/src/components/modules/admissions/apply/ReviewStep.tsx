@@ -9,6 +9,7 @@ import dayjs from 'dayjs';
 import { useApplicationFeeActions } from '@/providers/admissions/application_fees';
 import type { IFeeCheckout } from '@/providers/admissions/application_fees/context';
 import type { IApplicantParent, IApplication } from '@/providers/admissions/shared/interfaces';
+import OfferPanel from '@/components/modules/admissions/apply/OfferPanel';
 import {
   ApplicationStatus, applicationStatusLabel, canWithdraw,
 } from '@/providers/admissions/shared/application-status';
@@ -181,6 +182,10 @@ export default function ReviewStep({
           }
         />
 
+        {application.status === ApplicationStatus.Approved && (
+          <OfferPanel application={application} onAnswered={onRefresh} />
+        )}
+
         {awaitingPayment && (
           <Card title="Application fee" style={{ marginTop: 8 }}>
             <Paragraph>
@@ -231,12 +236,14 @@ export default function ReviewStep({
           />
         )}
 
-        <div style={{ marginTop: 24 }}>
-          <Paragraph type="secondary" style={{ marginBottom: 4 }}>
-            Changed your mind, or taken a place somewhere else?
-          </Paragraph>
-          {withdrawAffordance}
-        </div>
+        {application.status !== ApplicationStatus.Approved && (
+          <div style={{ marginTop: 24 }}>
+            <Paragraph type="secondary" style={{ marginBottom: 4 }}>
+              Changed your mind, or taken a place somewhere else?
+            </Paragraph>
+            {withdrawAffordance}
+          </div>
+        )}
       </>
     );
   }

@@ -1,4 +1,4 @@
-using Abp.Authorization;
+﻿using Abp.Authorization;
 using Abp.Localization;
 using Abp.MultiTenancy;
 
@@ -111,6 +111,7 @@ public class psmsAuthorizationProvider : AuthorizationProvider
         var enrollment = admissions.CreateChildPermission(PermissionNames.Admissions_Enrollment, L("Enrollment"));
         enrollment.CreateChildPermission(PermissionNames.Admissions_Enrollment_View, L("ViewEnrollment"));
         enrollment.CreateChildPermission(PermissionNames.Admissions_Enrollment_AcceptOffer, L("AcceptEnrollmentOffer"));
+        enrollment.CreateChildPermission(PermissionNames.Admissions_Enrollment_DeclineOffer, L("DeclineEnrollmentOffer"));
         enrollment.CreateChildPermission(PermissionNames.Admissions_Enrollment_SubmitForms, L("SubmitEnrollmentForms"));
         enrollment.CreateChildPermission(PermissionNames.Admissions_Enrollment_AssignClass, L("AssignEnrollmentClass"));
         enrollment.CreateChildPermission(PermissionNames.Admissions_Enrollment_Complete, L("CompleteEnrollment"));

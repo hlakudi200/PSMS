@@ -1,4 +1,4 @@
-namespace psms.Authorization;
+﻿namespace psms.Authorization;
 
 /// <summary>
 /// Permission names for the PSMS (Private School Management System).
@@ -82,6 +82,7 @@ public static class PermissionNames
     public const string Admissions_Enrollment = "Admissions.Enrollment";
     public const string Admissions_Enrollment_View = "Admissions.Enrollment.View";
     public const string Admissions_Enrollment_AcceptOffer = "Admissions.Enrollment.AcceptOffer";
+    public const string Admissions_Enrollment_DeclineOffer = "Admissions.Enrollment.DeclineOffer";
     public const string Admissions_Enrollment_SubmitForms = "Admissions.Enrollment.SubmitForms";
     public const string Admissions_Enrollment_AssignClass = "Admissions.Enrollment.AssignClass";
     public const string Admissions_Enrollment_Complete = "Admissions.Enrollment.Complete";

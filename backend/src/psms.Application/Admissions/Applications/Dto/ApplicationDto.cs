@@ -1,4 +1,4 @@
-using Abp.Application.Services.Dto;
+﻿using Abp.Application.Services.Dto;
 using psms.Domain.Shared.Enums;
 using System;
 
@@ -56,6 +56,17 @@ public class ApplicationDto : FullAuditedEntityDto<Guid>
     // Offer Expiry
     public DateTime? OfferExpiryDate { get; set; }
     public bool IsOfferExpired => OfferExpiryDate.HasValue && OfferExpiryDate.Value < DateTime.UtcNow;
+
+    /// <summary>
+    /// When the family said yes, and null until they have. Carried here so the
+    /// family's own screen knows whether it is still asking them something.
+    /// </summary>
+    public DateTime? OfferAcceptedDate { get; set; }
+
+    /// <summary>When the family turned the place down.</summary>
+    public DateTime? OfferDeclinedDate { get; set; }
+
+    public bool IsOfferAccepted => OfferAcceptedDate.HasValue;
 
     // Enrollment
     public Guid? CreatedStudentId { get; set; }

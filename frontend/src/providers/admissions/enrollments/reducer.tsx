@@ -55,6 +55,18 @@ export const EnrollmentReducer = handleActions<
       ...state,
       ...action.payload,
     }),
+    [EnrollmentActionEnums.declineOfferPending]: (state, action) => ({
+      ...state,
+      ...action.payload,
+    }),
+    [EnrollmentActionEnums.declineOfferSuccess]: (state, action) => ({
+      ...state,
+      ...action.payload,
+    }),
+    [EnrollmentActionEnums.declineOfferError]: (state, action) => ({
+      ...state,
+      ...action.payload,
+    }),
     [EnrollmentActionEnums.assignClassPending]: (state, action) => ({
       ...state,
       ...action.payload,

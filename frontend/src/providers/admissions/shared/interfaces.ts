@@ -156,6 +156,11 @@ export interface IApplication {
   canSubmit: boolean;
   canWithdraw: boolean;
   canMakeDecision: boolean;
+  /** When the family said yes; absent until they have. */
+  offerAcceptedDate?: string;
+  /** When the family turned the place down. */
+  offerDeclinedDate?: string;
+  isOfferAccepted?: boolean;
 }
 
 export interface IApplicationList {
@@ -694,6 +699,14 @@ export interface IEnrollment {
   isClassAssigned: boolean;
   isEnrollmentComplete: boolean;
   offerAcceptedDate?: string;
+  /** Who recorded the acceptance: the family, or staff taking their word for it. */
+  offerAcceptedByUserId?: number;
+  /** Set when the family turned the place down, with their reason. */
+  offerDeclinedDate?: string;
+  offerDeclineReason?: string;
+  /** The deadline the family is working to, and whether it has passed. */
+  offerExpiryDate?: string;
+  isOfferExpired?: boolean;
   formsSubmittedDate?: string;
   enrollmentCompletedDate?: string;
   createdStudentId?: string;
@@ -707,6 +720,13 @@ export interface IAcceptOffer {
   applicationId: string;
   confirmAcceptance: boolean;
   parentSignature?: string;
+}
+
+export interface IDeclineOffer {
+  applicationId: string;
+  confirmDecline: boolean;
+  /** Optional — nobody owes the school a reason. */
+  reason?: string;
 }
 
 export interface IAssignClass {
