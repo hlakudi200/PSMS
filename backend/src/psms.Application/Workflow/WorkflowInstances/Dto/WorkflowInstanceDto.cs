@@ -41,6 +41,17 @@ public class WorkflowInstanceDto : FullAuditedEntityDto<Guid>
     public WorkflowGuardStatusDto CurrentStepGuard { get; set; }
     /// <summary>WF-32: the decision fields the actor must supply on this step (null when none).</summary>
     public WorkflowDecisionSchemaDto CurrentStepDecisionSchema { get; set; }
+
+    /// <summary>
+    /// The final step does not ask for a decision, although this kind of record
+    /// has a decision form registered for it.
+    /// <para>
+    /// A misconfiguration, and one the person looking at the step cannot fix:
+    /// they fill the dialog in, press OK, and are told the step has nothing to
+    /// act on. Surfaced here so the screen can say so before they bother.
+    /// </para>
+    /// </summary>
+    public bool CurrentStepIsMissingItsDecisionForm { get; set; }
 }
 
 public class WorkflowGuardStatusDto

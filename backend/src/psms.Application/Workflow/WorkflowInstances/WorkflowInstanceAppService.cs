@@ -131,6 +131,15 @@ public class WorkflowInstanceAppService : ApplicationService, IWorkflowInstanceA
             var schema = _extensions.GetDecisionSchema(step.DecisionSchemaKey, instance.EntityType);
             dto.CurrentStepDecisionSchema = WorkflowDecisionSchemaDto.From(schema);
         }
+        else if (step.IsTerminal)
+        {
+            /* A final step with no decision form, for a kind of record that has
+               one written for it. The actor cannot tell from the dialog — it
+               shows an action and a comment box like any other step — so they
+               fill it in, press OK, and are refused. Say it on the way in. */
+            dto.CurrentStepIsMissingItsDecisionForm =
+                _extensions.DecisionSchemas.Any(s => s.EntityType == instance.EntityType);
+        }
 
         return dto;
     }

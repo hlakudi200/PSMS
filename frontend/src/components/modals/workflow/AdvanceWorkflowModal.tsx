@@ -41,6 +41,12 @@ interface AdvanceWorkflowModalProps {
   decisionSchema?: IWorkflowDecisionSchema;
   /** WF-30: whether the viewer may override a failing guard (server enforces the permission). */
   canOverrideGuard?: boolean;
+  /**
+   * The final step was never given its decision form. Said here rather than
+   * after the attempt: the dialog otherwise looks like any other step, and the
+   * refusal arrives only once everything has been filled in.
+   */
+  missingDecisionForm?: boolean;
 }
 
 // The primary "forward" action for each step type. Submit / Review / Approve all
@@ -104,6 +110,7 @@ export const AdvanceWorkflowModal: React.FC<AdvanceWorkflowModalProps> = ({
   currentStepGuard,
   decisionSchema,
   canOverrideGuard,
+  missingDecisionForm,
 }) => {
   const [form] = Form.useForm();
   const { advanceAsync } = useWorkflowInstanceActions();
@@ -199,6 +206,15 @@ export const AdvanceWorkflowModal: React.FC<AdvanceWorkflowModalProps> = ({
           style={{ marginTop: 16 }}
           message={currentStepGuard.satisfied ? `Exit criteria met: ${currentStepGuard.displayName}` : `Exit criteria not met: ${currentStepGuard.displayName}`}
           description={!currentStepGuard.satisfied ? currentStepGuard.message : undefined}
+        />
+      )}
+      {missingDecisionForm && (
+        <Alert
+          type="error"
+          showIcon
+          style={{ marginTop: 16 }}
+          message="This step cannot record a decision yet"
+          description="It is the final step, but it was never set up to ask what the decision is — so there is nothing for it to record, and anything entered here will be refused. An administrator needs to add the decision form to this step first."
         />
       )}
       <Form form={form} layout="vertical" style={{ marginTop: 16 }}>

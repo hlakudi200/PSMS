@@ -357,6 +357,7 @@ function DetailContent() {
         decisionSchema={wfInstance?.currentStepDecisionSchema}
         canOverrideGuard={canManageInstance}
         currentStepOrder={wfInstance?.currentStepOrder}
+        missingDecisionForm={wfInstance?.currentStepIsMissingItsDecisionForm}
       />
     </div>
   );
