@@ -5,7 +5,8 @@ Every external channel ships with a `NotConfigured*Gateway` that logs and return
 "not configured" — so nothing is sent until you (1) implement a real gateway and
 (2) replace its single DI registration in `psmsApplicationModule.cs`.
 
-> **Status:** all gateways below are currently the not-configured default. In-app is live.
+> **Status:** in-app is live, and email is wired to Resend (set the keys below to turn it on).
+> WhatsApp, SMS and Push are still the not-configured default.
 
 ---
 
@@ -65,22 +66,39 @@ channels, the channel **routing** (COMM-11), and per-category **preferences** (C
 - **Notes:** body-only, ~160 chars/segment (cost per segment); normalize number to
   E.164. Delivery receipts → update the delivery log by provider message id.
 
-## Channel: Email  — gateway: `IEmailGateway`  (COMM-09)
-- **Providers:** SendGrid, Amazon SES, Mailgun.
-- **Config keys (fill in):**
-  | Key | Example / notes |
-  | --- | --- |
-  | `Communication:Email:Provider` | `SendGrid` \| `SES` \| `Mailgun` |
-  | `Communication:Email:ApiKey` | provider API key (**secret**) |
-  | `Communication:Email:FromAddress` | `noreply@yourschool.co.za` |
-  | `Communication:Email:FromName` | display name |
-  | `Communication:Email:ApiBaseUrl` | provider endpoint (or SMTP host) |
-  | `Communication:Email:BounceWebhookSecret` | bounce/complaint callbacks (**secret**) |
-- **Deliverability:** configure **SPF / DKIM / DMARC** on the sending domain.
-- **Notes:** body is HTML — template variable values are HTML-encoded at render time,
-  and the template-less literal fallback is HTML-encoded + line-broken too. Validate/
-  trim the recipient address in the gateway. Handle bounces/complaints → suppress +
-  update the delivery log.
+## Channel: Email  — gateway: `IEmailGateway`  (COMM-09)  ✅ wired (Resend)
+
+`ResendEmailGateway` is the registered implementation. It reports **NotConfigured**
+when no key is set — exactly as the scaffold did — so the same build runs with and
+without email, and there is nothing to switch when the key arrives.
+
+- **Provider:** [Resend](https://resend.com) — one HTTPS `POST https://api.resend.com/emails` per message.
+- **Config keys:**
+
+  | Key | Env var (Render) | Notes |
+  | --- | --- | --- |
+  | `Resend:ApiKey` | `Resend__ApiKey` | starts `re_` (**secret** — never commit it) |
+  | `Resend:From` | `Resend__From` | `St. Peters <admissions@yourschool.co.za>` |
+  | `Resend:ReplyTo` | `Resend__ReplyTo` | optional, e.g. the school office address |
+
+- **The sending domain is the thing that bites.** Resend only delivers to arbitrary
+  recipients from a domain verified in its dashboard. The out-of-the-box
+  `onboarding@resend.dev` sender reaches **only the Resend account holder's own
+  address** — fine for a smoke test, useless for emailing parents. Add the school's
+  domain in Resend, publish the DNS records it gives you (SPF, DKIM, and a DMARC
+  record of your own), then point `Resend__From` at it.
+- **Rate limit:** the lower plans allow ~2 requests a second. The gateway paces its
+  own sends ~550ms apart, so a fan-out to a grade's parents is slow rather than a
+  wall of 429s.
+- **Failure handling:** a refusal comes back as a failed `GatewaySendResult`, logged
+  with the recipient masked (`zz***@example.com`) and never the key or the body. A
+  bad key and an unverified domain each say so in plain words. Dispatch is
+  idempotent on `(key, channel, recipient)`, so a job-level retry will not
+  double-send.
+- **Not done yet:** bounce and complaint webhooks — Resend can post delivery events,
+  and nothing consumes them, so the delivery log never learns that a message bounced.
+- **Body:** HTML. Template variable values are HTML-encoded at render time, and the
+  template-less literal fallback is HTML-encoded and line-broken too.
 
 ## Channel: Push  — gateway: `IPushGateway`  (COMM-10)
 - **Providers:** Firebase Cloud Messaging (Android + web), Apple APNS (iOS). FCM +
