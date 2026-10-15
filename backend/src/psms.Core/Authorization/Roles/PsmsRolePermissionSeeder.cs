@@ -129,6 +129,43 @@ public class PsmsRolePermissionSeeder : ITransientDependency
     }
 
     /// <summary>
+    /// Brings every role of the CURRENT tenant up to what the code now says it
+    /// should hold, additively — nothing is ever taken away.
+    /// <para>
+    /// A permission added to a role in code only reaches tenants created after
+    /// it. <see cref="SeedRolePermissionsAsync"/> would fix that and cannot be
+    /// used, because it REPLACES a role’s whole set and would wipe a school’s
+    /// customisations; the two existing backfills each cover one feature group
+    /// and a new one was needed per feature. So schools quietly fall behind.
+    /// </para>
+    /// <para>
+    /// This is what that cost in practice: #368 gave the admissions Interview
+    /// step to the Teacher role and granted teachers the interview permissions
+    /// to go with it. Both seeders carry those grants. An existing school’s
+    /// Teacher role held none of them, so the teacher sitting in the interview
+    /// could not see it, record it, or open their own admissions page — which
+    /// answered 403 — while the workflow went on handing them the step.
+    /// </para>
+    /// <para>
+    /// Additive on purpose, and the trade-off is real: a school that
+    /// deliberately took a permission away from a role will have it put back.
+    /// That is the price of never silently removing one.
+    /// </para>
+    /// </summary>
+    public async Task CatchUpEveryRoleAsync()
+    {
+        await AddPermissionsToRoleAsync(StaticRoleNames.Tenants.Principal, GetPrincipalPermissions());
+        await AddPermissionsToRoleAsync(StaticRoleNames.Tenants.VicePrincipal, GetVicePrincipalPermissions());
+        await AddPermissionsToRoleAsync(StaticRoleNames.Tenants.HOD, GetHODPermissions());
+        await AddPermissionsToRoleAsync(StaticRoleNames.Tenants.AdmissionsOfficer, GetAdmissionsOfficerPermissions());
+        await AddPermissionsToRoleAsync(StaticRoleNames.Tenants.Finance, GetFinancePermissions());
+        await AddPermissionsToRoleAsync(StaticRoleNames.Tenants.Teacher, GetTeacherPermissions());
+        await AddPermissionsToRoleAsync(StaticRoleNames.Tenants.Parent, GetParentPermissions());
+        await AddPermissionsToRoleAsync(StaticRoleNames.Tenants.Student, GetStudentPermissions());
+        await AddPermissionsToRoleAsync(StaticRoleNames.Tenants.Applicant, GetApplicantPermissions());
+    }
+
+    /// <summary>
     /// Additively grant the operations feature groups (Parents, Transfers, Fee
     /// Waivers, Expenses, Discipline, Staff Leave, Field Trips, Extramurals,
     /// Transport, After Care — see <see cref="PsmsOperationsPermissions"/>) to the

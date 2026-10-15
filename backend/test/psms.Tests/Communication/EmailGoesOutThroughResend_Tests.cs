@@ -111,13 +111,13 @@ public class EmailGoesOutThroughResend_Tests
     }
 
     [Fact]
-    public void The_scaffold_default_still_exists_for_the_channels_that_need_it()
+    public async Task The_scaffold_default_still_exists_for_the_channels_that_need_it()
     {
         // WhatsApp, SMS and Push are still no-ops; this is the shape they share,
         // and the shape an unconfigured Resend has to keep.
         var scaffold = new NotConfiguredEmailGateway();
 
-        var result = scaffold.SendAsync("parent@example.test", "s", "<p>b</p>").Result;
+        var result = await scaffold.SendAsync("parent@example.test", "s", "<p>b</p>");
 
         result.NotConfigured.ShouldBeTrue();
         GatewaySendResult.NotConfiguredResult("Email").NotConfigured.ShouldBeTrue();
