@@ -102,9 +102,13 @@ public class ApplicationWorkflowHandler : EntityHandlerBase<Application>, ITrans
            somebody nobody chose to admit. */
         var decision = ctx.Decision.GetEnum<AdmissionDecision>("decision");
         if (decision == null)
+            // Addressed to whoever is standing in front of it — usually a
+            // principal, who cannot edit a workflow definition and should not
+            // be told to attach anything.
             throw new UserFriendlyException(WorkflowExceptionCodes.DecisionInvalid,
-                "This step has no admission decision on it, so there is nothing to act on. "
-                + "Attach the admission decision form to the step and try again.");
+                "This step has not been set up to ask for an admission decision, so there is "
+                + "nothing to record. An administrator needs to add the admission decision form "
+                + "to it before this application can be decided.");
 
         var reason = ctx.Decision.GetString("reason") ?? ctx.Comment;
         var days = ctx.Decision.GetInt("offerExpiryDays") ?? 14;

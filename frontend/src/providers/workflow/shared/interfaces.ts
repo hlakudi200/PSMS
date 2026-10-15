@@ -296,6 +296,8 @@ export interface IWorkflowInstance {
   currentStepGuard?: IWorkflowGuardStatus;
   /** WF-32: decision fields the actor must supply on the current step (absent when none). */
   currentStepDecisionSchema?: IWorkflowDecisionSchema;
+  /** The final step has no decision form, though this kind of record has one. */
+  currentStepIsMissingItsDecisionForm?: boolean;
 }
 
 export interface IWorkflowEntitySummaryField {
