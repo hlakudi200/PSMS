@@ -65,6 +65,7 @@ import {
   applicationStepIndex,
 } from '@/providers/admissions/shared/application-status';
 import { useAuthState } from '@/providers/auth';
+import { isOneOfRoles } from '@/utils/roles';
 import ScheduleInterviewModal from '@/components/modals/admissions/ScheduleInterviewModal';
 import ScheduleAssessmentModal from '@/components/modals/admissions/ScheduleAssessmentModal';
 import EnrolLearnerModal from '@/components/modals/admissions/EnrolLearnerModal';
@@ -236,8 +237,7 @@ function InterviewSection({
   /* The roles the school grants Admissions.Interviews.Schedule to. The server
      is the authority and refuses anyone else; this only decides whether to
      offer the button. */
-  const maySchedule = ['Admin', 'Principal', 'VicePrincipal', 'AdmissionsOfficer']
-    .includes(currentRole ?? '');
+  const maySchedule = isOneOfRoles(currentRole, ['Admin', 'Principal', 'VicePrincipal', 'AdmissionsOfficer']);
 
   const scheduleModal = (
     <ScheduleInterviewModal
@@ -316,8 +316,7 @@ function AssessmentSection({
 
   // The roles the school grants Admissions.Assessments.Schedule to; the server
   // is the authority and refuses anyone else.
-  const maySchedule = ['Admin', 'Principal', 'VicePrincipal', 'AdmissionsOfficer']
-    .includes(currentRole ?? '');
+  const maySchedule = isOneOfRoles(currentRole, ['Admin', 'Principal', 'VicePrincipal', 'AdmissionsOfficer']);
 
   const scheduleModal = (
     <ScheduleAssessmentModal
@@ -581,8 +580,7 @@ function ApplicationDetailContent() {
 
   /* The roles the school grants Admissions.Enrollment.Complete to. The server
      refuses anyone else; this only decides whether to offer the button. */
-  const mayEnrol = ['Admin', 'Principal', 'VicePrincipal', 'AdmissionsOfficer']
-    .includes(currentRole ?? '');
+  const mayEnrol = isOneOfRoles(currentRole, ['Admin', 'Principal', 'VicePrincipal', 'AdmissionsOfficer']);
   /* Ended without a place. Enrolled is an ending too, but it is the last step
      of the timeline rather than a reason to hide it. */
   const isTerminal =

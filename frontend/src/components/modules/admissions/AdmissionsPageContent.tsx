@@ -26,6 +26,7 @@ import { EnrollmentProvider } from '@/providers/admissions/enrollments';
 import { AcademicYearProvider, useAcademicYearState, useAcademicYearActions } from '@/providers/academic/academic_years';
 import { GradeProvider, useGradeState, useGradeActions } from '@/providers/academic/grades';
 import { useAuthState } from '@/providers/auth';
+import { isOneOfRoles } from '@/utils/roles';
 import type { IApplicationList } from '@/providers/admissions/shared/interfaces';
 import type { IAdmissionSettings } from '@/providers/admissions/shared/interfaces';
 import AdmissionSettingsFormModal from '@/components/modals/admissions/AdmissionSettingsFormModal';
@@ -136,8 +137,7 @@ function AdmissionsContent() {
 
   /* Who the school grants Admissions.Enrollment.Complete to. The server is the
      authority; this only decides whether to offer the button. */
-  const mayEnrol = ['Admin', 'Principal', 'VicePrincipal', 'AdmissionsOfficer']
-    .includes(currentRole ?? '');
+  const mayEnrol = isOneOfRoles(currentRole, ['Admin', 'Principal', 'VicePrincipal', 'AdmissionsOfficer']);
 
   const [selectedAcademicYearId, setSelectedAcademicYearId] = useState<string | undefined>(undefined);
   const [selectedGradeId, setSelectedGradeId] = useState<string | undefined>(undefined);
