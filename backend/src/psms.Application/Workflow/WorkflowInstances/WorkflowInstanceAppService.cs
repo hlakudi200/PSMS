@@ -1,4 +1,4 @@
-using Abp.Application.Services;
+﻿using Abp.Application.Services;
 using Abp.Application.Services.Dto;
 using Abp.Authorization;
 using Abp.Domain.Repositories;
@@ -10,6 +10,7 @@ using psms.Authorization.Users;
 using psms.Domain.Workflow.Entities;
 using psms.Domain.Workflow.Enums;
 using psms.Workflow.Engine;
+using psms.Workflow.Engine.Decisions;
 using psms.Workflow.Shared;
 using Newtonsoft.Json;
 using psms.Workflow.WorkflowInstances.Dto;
@@ -352,7 +353,11 @@ public class WorkflowInstanceAppService : ApplicationService, IWorkflowInstanceA
             if (!string.IsNullOrWhiteSpace(currentStep.DecisionSchemaKey))
             {
                 var schema = _extensions.GetDecisionSchema(currentStep.DecisionSchemaKey, instance.EntityType);
-                var error = schema.Validate(decision);
+                /* The schema's own pass first — it holds the cross-field rules and
+                   the wording written for them — then what the fields declare, which
+                   is the same thing the dialog validates against. */
+                var error = schema.Validate(decision)
+                    ?? WorkflowDecisionFieldRules.Validate(schema.Fields, decision);
                 if (error != null)
                     throw new UserFriendlyException(WorkflowExceptionCodes.DecisionInvalid, error);
             }

@@ -234,6 +234,23 @@ export interface IWorkflowDecisionField {
   min?: number;
   max?: number;
   options?: IWorkflowDecisionOption[];
+  /** Requirements that only apply for certain values of another field. */
+  conditions?: IWorkflowDecisionCondition[];
+}
+
+/**
+ * "A reason of at least 50 characters, but only when rejecting." Declared by
+ * the backend on the field so the dialog and the server enforce one rule.
+ */
+export interface IWorkflowDecisionCondition {
+  /** Key of the field whose value decides whether this applies. */
+  whenField: string;
+  /** The values of that field it applies to, compared case-insensitively. */
+  whenValueIn: string[];
+  required: boolean;
+  minLength?: number;
+  /** What to tell the actor when it is not met. */
+  message: string;
 }
 
 export interface IWorkflowDecisionSchema {

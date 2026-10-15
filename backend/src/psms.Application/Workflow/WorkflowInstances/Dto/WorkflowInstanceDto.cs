@@ -1,4 +1,4 @@
-using Abp.Application.Services.Dto;
+﻿using Abp.Application.Services.Dto;
 using psms.Domain.Workflow.Enums;
 using psms.Workflow.WorkflowSteps.Dto;
 using System;
@@ -77,6 +77,11 @@ public class WorkflowDecisionSchemaDto
             Key = f.Key, Label = f.Label, Type = f.Type, Required = f.Required, Placeholder = f.Placeholder,
             Min = f.Min, Max = f.Max,
             Options = f.Options?.Select(o => new WorkflowDecisionOptionDto { Value = o.Value, Label = o.Label }).ToList(),
+            Conditions = f.Conditions?.Select(c => new WorkflowDecisionConditionDto
+            {
+                WhenField = c.WhenField, WhenValueIn = c.WhenValueIn?.ToList(),
+                Required = c.Required, MinLength = c.MinLength, Message = c.Message,
+            }).ToList(),
         }).ToList(),
     };
 }
@@ -91,6 +96,21 @@ public class WorkflowDecisionFieldDto
     public decimal? Min { get; set; }
     public decimal? Max { get; set; }
     public List<WorkflowDecisionOptionDto> Options { get; set; }
+
+    /// <summary>
+    /// Requirements that only apply for certain values of another field, so the
+    /// dialog can enforce them on the field instead of refusing a filled-in form.
+    /// </summary>
+    public List<WorkflowDecisionConditionDto> Conditions { get; set; }
+}
+
+public class WorkflowDecisionConditionDto
+{
+    public string WhenField { get; set; }
+    public List<string> WhenValueIn { get; set; }
+    public bool Required { get; set; }
+    public int? MinLength { get; set; }
+    public string Message { get; set; }
 }
 
 public class WorkflowDecisionOptionDto

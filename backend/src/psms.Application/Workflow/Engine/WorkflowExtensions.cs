@@ -1,4 +1,4 @@
-using psms.Domain.Workflow.Enums;
+﻿using psms.Domain.Workflow.Enums;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -115,6 +115,41 @@ public sealed class WorkflowDecisionField
     public decimal? Min { get; init; }
     public decimal? Max { get; init; }
     public IReadOnlyList<WorkflowDecisionOption> Options { get; init; }
+
+    /// <summary>
+    /// Requirements that apply only for certain values of another field — "a
+    /// reason of at least 50 characters, but only when rejecting".
+    /// <para>
+    /// Declared on the field rather than buried in <see cref="IWorkflowDecisionSchema.Validate"/>
+    /// so the dialog can say it on the field, where the actor is looking, instead
+    /// of refusing the whole thing once everything has been filled in.
+    /// </para>
+    /// </summary>
+    public IReadOnlyList<WorkflowDecisionCondition> Conditions { get; init; }
+}
+
+/// <summary>
+/// A requirement on one field that only applies for certain values of another.
+/// Both the dialog and <see cref="Decisions.WorkflowDecisionFieldRules"/> read
+/// the same declaration, so what the form asks for and what the server accepts
+/// cannot drift apart.
+/// </summary>
+public sealed class WorkflowDecisionCondition
+{
+    /// <summary>Key of the field whose value decides whether this applies.</summary>
+    public string WhenField { get; init; }
+
+    /// <summary>The values of that field it applies to, compared case-insensitively.</summary>
+    public IReadOnlyList<string> WhenValueIn { get; init; }
+
+    /// <summary>The field must be filled in.</summary>
+    public bool Required { get; init; }
+
+    /// <summary>Minimum number of characters, for text.</summary>
+    public int? MinLength { get; init; }
+
+    /// <summary>What to tell the actor when it is not met.</summary>
+    public string Message { get; init; }
 }
 
 public sealed class WorkflowDecisionOption

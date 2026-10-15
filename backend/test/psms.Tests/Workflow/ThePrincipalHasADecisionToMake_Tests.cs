@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using psms.Domain.Shared.Enums;
 using psms.Domain.Workflow.Entities;
 using psms.Domain.Workflow.Enums;
@@ -123,24 +123,23 @@ public class ThePrincipalHasADecisionToMake_Tests : psmsTestBase
     [Fact]
     public void A_rejection_carries_a_reason_worth_reading()
     {
-        // ADM-020, unreachable until the form was attached to anything.
+        // ADM-020, unreachable until the form was attached to anything. The rule
+        // now sits on the reason field as a condition, so the dialog enforces the
+        // same one; this checks it through the composition the engine runs.
         var schema = new ApplicationDecisionSchema();
 
-        var tooShort = schema.Validate(new WorkflowDecision(new Dictionary<string, object>
+        string Check(string reason)
         {
-            ["decision"] = nameof(AdmissionDecision.Rejected),
-            ["reason"] = "No.",
-        }));
+            var d = new WorkflowDecision(new Dictionary<string, object>
+            {
+                ["decision"] = nameof(AdmissionDecision.Rejected),
+                ["reason"] = reason,
+            });
+            return schema.Validate(d) ?? WorkflowDecisionFieldRules.Validate(schema.Fields, d);
+        }
 
-        tooShort.ShouldContain("50 characters");
-
-        var proper = schema.Validate(new WorkflowDecision(new Dictionary<string, object>
-        {
-            ["decision"] = nameof(AdmissionDecision.Rejected),
-            ["reason"] = new string('x', ApplicationDecisionSchema.MinRejectionReasonLength),
-        }));
-
-        proper.ShouldBeNull();
+        Check("No.").ShouldContain("50 characters");
+        Check(new string('x', ApplicationDecisionSchema.MinRejectionReasonLength)).ShouldBeNull();
     }
 
     [Fact]
