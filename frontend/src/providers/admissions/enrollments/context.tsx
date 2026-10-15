@@ -3,6 +3,7 @@ import { createContext } from "react";
 import {
   IEnrollment,
   IAcceptOffer,
+  IDeclineOffer,
   IAssignClass,
   ICompleteEnrollment,
   IClassAvailability,
@@ -23,7 +24,8 @@ export interface IEnrollmentActionContext {
   getByApplicationAsync: (applicationId: string) => void;
   getPendingEnrollmentsAsync: (input: IPagedAndSortedResultRequest) => void;
   getAvailableClassesAsync: (gradeId: string) => Promise<IClassAvailability[]>;
-  acceptOfferAsync: (input: IAcceptOffer) => void;
+  acceptOfferAsync: (input: IAcceptOffer) => Promise<IEnrollment>;
+  declineOfferAsync: (input: IDeclineOffer) => Promise<IEnrollment>;
   assignClassAsync: (input: IAssignClass) => void;
   completeEnrollmentAsync: (input: ICompleteEnrollment) => Promise<IEnrollment>;
 }

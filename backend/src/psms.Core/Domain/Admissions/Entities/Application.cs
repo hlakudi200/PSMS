@@ -151,6 +151,32 @@ namespace psms.Domain.Admissions.Entities
         public DateTime? ExpiryDate { get; set; }
 
         /// <summary>
+        /// When the family said yes to the offer, and null until they have.
+        /// <para>
+        /// Acceptance used to be inferred from the school's own decision — an
+        /// approved application read back as an accepted offer, dated the day
+        /// the school decided. The school was shown a consent nobody had given,
+        /// and could enrol a child on it. A family saying yes is their act, and
+        /// it is recorded here or it has not happened.
+        /// </para>
+        /// </summary>
+        public DateTime? OfferAcceptedDate { get; set; }
+
+        /// <summary>
+        /// Who recorded the acceptance: the family themselves, or the member of
+        /// staff who took the phone call. Both are legitimate; which one it was
+        /// is not something to guess at later.
+        /// </summary>
+        public long? OfferAcceptedByUserId { get; set; }
+
+        /// <summary>When the family turned the offer down.</summary>
+        public DateTime? OfferDeclinedDate { get; set; }
+
+        /// <summary>Why they turned it down, in their words. Optional.</summary>
+        [MaxLength(1000)]
+        public string OfferDeclineReason { get; set; }
+
+        /// <summary>
         /// Student ID if application was converted to student
         /// </summary>
         public Guid? CreatedStudentId { get; set; }
@@ -477,6 +503,49 @@ namespace psms.Domain.Admissions.Entities
             Status = ApplicationStatus.Approved;
             Decision = AdmissionDecision.Accepted;
             ExpiryDate = DateTime.UtcNow.AddDays(offerExpiryDays);
+        }
+
+        /// <summary>
+        /// The family accepts the place (ADM-025). Recorded, never inferred.
+        /// </summary>
+        /// <param name="acceptedByUserId">
+        /// Whoever entered it — the family on their own screen, or staff taking
+        /// their word for it over the phone.
+        /// </param>
+        public void AcceptOffer(long? acceptedByUserId)
+        {
+            if (Status != ApplicationStatus.Approved)
+                throw new InvalidOperationException("Only an approved application has an offer to accept.");
+
+            if (OfferDeclinedDate.HasValue)
+                throw new InvalidOperationException("This offer has already been declined.");
+
+            if (IsOfferExpired())
+                throw new InvalidOperationException("The offer has expired.");
+
+            // Saying yes twice is not an error; it does not move the date either.
+            if (OfferAcceptedDate.HasValue) return;
+
+            OfferAcceptedDate = DateTime.UtcNow;
+            OfferAcceptedByUserId = acceptedByUserId;
+        }
+
+        /// <summary>
+        /// The family turns the place down (ADM-026). The application ends and
+        /// the place goes back to the grade, which is the point of asking.
+        /// </summary>
+        public void DeclineOffer(string reason = null)
+        {
+            if (Status != ApplicationStatus.Approved)
+                throw new InvalidOperationException("Only an approved application has an offer to decline.");
+
+            if (OfferAcceptedDate.HasValue)
+                throw new InvalidOperationException("This offer has already been accepted.");
+
+            OfferDeclinedDate = DateTime.UtcNow;
+            OfferDeclineReason = reason;
+            Status = ApplicationStatus.Withdrawn;
+            DecisionReason = reason;
         }
 
         /// <summary>

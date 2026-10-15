@@ -1,4 +1,4 @@
-using Abp.Application.Services.Dto;
+﻿using Abp.Application.Services.Dto;
 using psms.Domain.Shared.Enums;
 using System;
 
@@ -31,6 +31,17 @@ public class EnrollmentDto : EntityDto<Guid>
     public bool IsFormsSubmitted { get; set; }
     public bool IsClassAssigned { get; set; }
     public bool IsEnrollmentComplete { get; set; }
+
+    /// <summary>Who recorded the acceptance: the family, or staff taking their word.</summary>
+    public long? OfferAcceptedByUserId { get; set; }
+
+    /// <summary>Set when the family turned the place down, with their reason.</summary>
+    public DateTime? OfferDeclinedDate { get; set; }
+    public string OfferDeclineReason { get; set; }
+
+    /// <summary>The deadline the family is working to, and whether it has passed.</summary>
+    public DateTime? OfferExpiryDate { get; set; }
+    public bool IsOfferExpired { get; set; }
 
     // Dates
     public DateTime? OfferAcceptedDate { get; set; }

@@ -7,6 +7,7 @@ import {
 } from "./context";
 import {
   IAcceptOffer,
+  IDeclineOffer,
   IAssignClass,
   IClassAvailability,
   ICompleteEnrollment,
@@ -28,6 +29,9 @@ import {
   acceptOfferPending,
   acceptOfferSuccess,
   acceptOfferError,
+  declineOfferPending,
+  declineOfferSuccess,
+  declineOfferError,
   assignClassPending,
   assignClassSuccess,
   assignClassError,
@@ -93,17 +97,43 @@ export const EnrollmentProvider = ({
       });
   };
 
+  /**
+   * Accepting a place swallowed its own failures, so an expired offer looked
+   * exactly like an accepted one: the screen simply did not change.
+   */
   const acceptOfferAsync = async (input: IAcceptOffer) => {
     dispatch(acceptOfferPending());
     const endpoint = `/api/services/app/Enrollment/AcceptOffer`;
-    await instance
+    return instance
       .post(endpoint, input)
       .then((response) => {
         dispatch(acceptOfferSuccess(response.data.result));
+        return response.data.result;
       })
       .catch((error) => {
         console.error(error);
         dispatch(acceptOfferError());
+        throw error;
+      });
+  };
+
+  /**
+   * Turning a place down ends the application, so the caller is told when it
+   * fails rather than left looking at a screen that did not change.
+   */
+  const declineOfferAsync = async (input: IDeclineOffer) => {
+    dispatch(declineOfferPending());
+    const endpoint = `/api/services/app/Enrollment/DeclineOffer`;
+    return instance
+      .post(endpoint, input)
+      .then((response) => {
+        dispatch(declineOfferSuccess(response.data.result));
+        return response.data.result;
+      })
+      .catch((error) => {
+        console.error(error);
+        dispatch(declineOfferError());
+        throw error;
       });
   };
 
@@ -152,6 +182,7 @@ export const EnrollmentProvider = ({
           getPendingEnrollmentsAsync,
           getAvailableClassesAsync,
           acceptOfferAsync,
+          declineOfferAsync,
           assignClassAsync,
           completeEnrollmentAsync,
         }}

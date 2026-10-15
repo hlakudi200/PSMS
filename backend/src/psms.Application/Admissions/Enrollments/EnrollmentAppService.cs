@@ -1,4 +1,4 @@
-using Abp.Application.Services;
+﻿using Abp.Application.Services;
 using Abp.Application.Services.Dto;
 using Abp.Authorization;
 using Abp.Domain.Repositories;
@@ -34,6 +34,7 @@ public class EnrollmentAppService : ApplicationService, IEnrollmentAppService
     private readonly IRepository<Parent, Guid> _parentRepository;
     private readonly IRepository<Domain.Admissions.Entities.AdmissionSettings, Guid> _settingsRepository;
     private readonly psms.Academic.Students.IStudentLoginProvisioner _loginProvisioner;
+    private readonly ICurrentApplicantResolver _currentApplicant;
 
     public EnrollmentAppService(
         IRepository<Application, Guid> applicationRepository,
@@ -43,7 +44,8 @@ public class EnrollmentAppService : ApplicationService, IEnrollmentAppService
         IRepository<StudentParent, Guid> studentParentRepository,
         IRepository<Parent, Guid> parentRepository,
         IRepository<Domain.Admissions.Entities.AdmissionSettings, Guid> settingsRepository,
-        psms.Academic.Students.IStudentLoginProvisioner loginProvisioner)
+        psms.Academic.Students.IStudentLoginProvisioner loginProvisioner,
+        ICurrentApplicantResolver currentApplicant)
     {
         _applicationRepository = applicationRepository;
         _studentRepository = studentRepository;
@@ -53,20 +55,38 @@ public class EnrollmentAppService : ApplicationService, IEnrollmentAppService
         _parentRepository = parentRepository;
         _settingsRepository = settingsRepository;
         _loginProvisioner = loginProvisioner;
+        _currentApplicant = currentApplicant;
+    }
+
+    /// <summary>
+    /// An applicant holds Enrollment.View so they can watch their own offer.
+    /// Nothing checked that the record they asked for was theirs, so any id
+    /// returned another family's child - name, date of birth and grade - and
+    /// the pending list handed back every approved applicant at the school.
+    /// Staff are told apart by Applications.ViewAll, which no applicant holds.
+    /// </summary>
+    private async Task<Application> GetOwnOrAnyAsync(Guid applicationId, IQueryable<Application> query)
+    {
+        var application = await query.FirstOrDefaultAsync(a => a.Id == applicationId);
+
+        if (application == null)
+            throw new UserFriendlyException(AdmissionsExceptionCodes.ApplicationNotFound, "Application not found.");
+
+        var ownerOnly = await _currentApplicant.GetOwnApplicationsOnlyForAsync();
+        if (ownerOnly.HasValue && application.CreatorUserId != ownerOnly.Value)
+            throw new UserFriendlyException(AdmissionsExceptionCodes.ApplicationNotFound, "Application not found.");
+
+        return application;
     }
 
     [AbpAuthorize(PermissionNames.Admissions_Enrollment_View)]
     public async Task<EnrollmentDto> GetByApplicationAsync(Guid applicationId)
     {
-        var application = await _applicationRepository
+        var application = await GetOwnOrAnyAsync(applicationId, _applicationRepository
             .GetAll()
             .Include(a => a.AppliedGrade)
             .Include(a => a.CreatedStudent)
-                .ThenInclude(s => s.CurrentClass)
-            .FirstOrDefaultAsync(a => a.Id == applicationId);
-
-        if (application == null)
-            throw new UserFriendlyException(AdmissionsExceptionCodes.ApplicationNotFound, "Application not found.");
+                .ThenInclude(s => s.CurrentClass));
 
         return MapToEnrollmentDto(application);
     }
@@ -74,10 +94,15 @@ public class EnrollmentAppService : ApplicationService, IEnrollmentAppService
     [AbpAuthorize(PermissionNames.Admissions_Enrollment_View)]
     public async Task<PagedResultDto<EnrollmentDto>> GetPendingEnrollmentsAsync(GetPendingEnrollmentsInput input)
     {
+        // The queue of people waiting to be enrolled is the school's list. An
+        // applicant asking for it gets their own application and nobody else's.
+        var ownerOnly = await _currentApplicant.GetOwnApplicationsOnlyForAsync();
+
         var query = _applicationRepository
             .GetAll()
             .Include(a => a.AppliedGrade)
             .Where(a => a.Status == ApplicationStatus.Approved)
+            .WhereIf(ownerOnly.HasValue, a => a.CreatorUserId == ownerOnly.Value)
             .WhereIf(!string.IsNullOrWhiteSpace(input.Keyword),
                 a => a.ProspectiveStudentFirstName.ToLower().Contains(input.Keyword.ToLower())
                     || a.ProspectiveStudentLastName.ToLower().Contains(input.Keyword.ToLower())
@@ -120,36 +145,74 @@ public class EnrollmentAppService : ApplicationService, IEnrollmentAppService
         }).ToList();
     }
 
+    /// <summary>
+    /// The family says yes (ADM-025).
+    /// <para>
+    /// This used to validate the offer carefully and then save nothing, under a
+    /// note that acceptance "could be tracked with additional fields". Meanwhile
+    /// the mapper reported every approved application as accepted, dated the day
+    /// the school itself decided. The school was shown a yes nobody had given,
+    /// and could enrol a child on it.
+    /// </para>
+    /// <para>
+    /// Staff may record it too - families telephone, and some have no email -
+    /// but it is then their act, against their name, rather than an assumption.
+    /// </para>
+    /// </summary>
     [AbpAuthorize(PermissionNames.Admissions_Enrollment_AcceptOffer)]
     public async Task<EnrollmentDto> AcceptOfferAsync(AcceptOfferDto input)
     {
-        var application = await _applicationRepository
-            .GetAll()
-            .Include(a => a.AppliedGrade)
-            .FirstOrDefaultAsync(a => a.Id == input.ApplicationId);
-
-        if (application == null)
-            throw new UserFriendlyException(AdmissionsExceptionCodes.ApplicationNotFound, "Application not found.");
-
-        if (application.Status != ApplicationStatus.Approved)
-            throw new UserFriendlyException(AdmissionsExceptionCodes.InvalidStatusTransition,
-                "Only approved applications can accept offers.");
+        var application = await GetOwnOrAnyAsync(input.ApplicationId,
+            _applicationRepository.GetAll().Include(a => a.AppliedGrade));
 
         if (!input.ConfirmAcceptance)
             throw new UserFriendlyException("ACCEPTANCE_NOT_CONFIRMED",
-                "You must confirm acceptance of the offer.");
+                "Confirm that you are accepting the place before this can be recorded.");
 
-        // Check if offer has expired
+        if (application.Status != ApplicationStatus.Approved)
+            throw new UserFriendlyException(AdmissionsExceptionCodes.InvalidStatusTransition,
+                "There is no offer on this application to accept.");
+
+        if (application.OfferDeclinedDate.HasValue)
+            throw new UserFriendlyException(AdmissionsExceptionCodes.InvalidStatusTransition,
+                "This offer was turned down already. The school has to make a new one.");
+
         if (application.IsOfferExpired())
             throw new UserFriendlyException(AdmissionsExceptionCodes.OfferExpired,
-                "The admission offer has expired.");
+                "This offer has expired. Speak to the school about extending it.");
 
-        // Note: Application status remains Approved until enrollment is complete
-        // This could be tracked with additional fields or a separate enrollment record
-
+        application.AcceptOffer(AbpSession.UserId);
         await CurrentUnitOfWork.SaveChangesAsync();
 
         return await GetByApplicationAsync(input.ApplicationId);
+    }
+
+    /// <summary>
+    /// The family turns the place down (ADM-026). The application ends and the
+    /// place stops being held, which is what makes it worth asking.
+    /// </summary>
+    [AbpAuthorize(PermissionNames.Admissions_Enrollment_DeclineOffer)]
+    public async Task<EnrollmentDto> DeclineOfferAsync(DeclineOfferDto input)
+    {
+        var application = await GetOwnOrAnyAsync(input.ApplicationId,
+            _applicationRepository.GetAll().Include(a => a.AppliedGrade));
+
+        if (!input.ConfirmDecline)
+            throw new UserFriendlyException("DECLINE_NOT_CONFIRMED",
+                "Confirm that you are turning the place down before this can be recorded.");
+
+        if (application.Status != ApplicationStatus.Approved)
+            throw new UserFriendlyException(AdmissionsExceptionCodes.InvalidStatusTransition,
+                "There is no offer on this application to turn down.");
+
+        if (application.OfferAcceptedDate.HasValue)
+            throw new UserFriendlyException(AdmissionsExceptionCodes.InvalidStatusTransition,
+                "This offer was accepted already. Speak to the school to withdraw instead.");
+
+        application.DeclineOffer(input.Reason);
+        await CurrentUnitOfWork.SaveChangesAsync();
+
+        return MapToEnrollmentDto(application);
     }
 
     [AbpAuthorize(PermissionNames.Admissions_Enrollment_AssignClass)]
@@ -208,6 +271,18 @@ public class EnrollmentAppService : ApplicationService, IEnrollmentAppService
         if (application.CreatedStudentId.HasValue)
             throw new UserFriendlyException("ALREADY_ENROLLED",
                 "This application has already been enrolled.");
+
+        /* A place is given, not taken. Enrolment creates a learner record and a
+           portal sign-in for somebody's child, and it used to run off an
+           acceptance the mapper had invented from the school's own decision.
+           If the family has not said yes on their own screen, somebody at the
+           school has to record that they said yes some other way - which is a
+           deliberate act with a name against it, and takes two clicks. */
+        if (!application.OfferAcceptedDate.HasValue)
+            throw new UserFriendlyException(AdmissionsExceptionCodes.OfferNotAccepted,
+                "This family has not accepted the place yet. They can accept it on their own "
+                + "application screen, or record their acceptance here if they told the school "
+                + "another way.");
 
         // Validate class exists and has capacity
         var targetClass = await _classRepository
@@ -321,11 +396,16 @@ public class EnrollmentAppService : ApplicationService, IEnrollmentAppService
             GradeName = application.AppliedGrade?.GradeName,
             AssignedClassId = application.CreatedStudent?.CurrentClassId,
             AssignedClassName = application.CreatedStudent?.CurrentClass?.ClassName,
-            IsOfferAccepted = application.Status == ApplicationStatus.Approved || application.Status == ApplicationStatus.Enrolled,
+            IsOfferAccepted = application.OfferAcceptedDate.HasValue,
             IsFormsSubmitted = application.CreatedStudentId.HasValue,
             IsClassAssigned = application.CreatedStudent?.CurrentClassId != null,
             IsEnrollmentComplete = application.Status == ApplicationStatus.Enrolled,
-            OfferAcceptedDate = application.DecisionDate,
+            OfferAcceptedDate = application.OfferAcceptedDate,
+            OfferAcceptedByUserId = application.OfferAcceptedByUserId,
+            OfferDeclinedDate = application.OfferDeclinedDate,
+            OfferDeclineReason = application.OfferDeclineReason,
+            OfferExpiryDate = application.ExpiryDate,
+            IsOfferExpired = application.IsOfferExpired(),
             EnrollmentCompletedDate = application.Status == ApplicationStatus.Enrolled ? application.LastModificationTime : null,
             CreatedStudentId = application.CreatedStudentId,
             AdmissionNumber = application.CreatedStudent?.AdmissionNumber

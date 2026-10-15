@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { Alert, Button, Card, Empty, List, Space, Spin, Tag, Typography } from 'antd';
-import { SolutionOutlined } from '@ant-design/icons';
+import { Alert, Button, Card, Empty, Input, List, Modal, Space, Spin, Tag, Typography, message } from 'antd';
+import { PhoneOutlined, SolutionOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { useEnrollmentActions, useEnrollmentState } from '@/providers/admissions/enrollments';
 import type { IEnrollment } from '@/providers/admissions/shared/interfaces';
@@ -20,8 +20,10 @@ const { Title, Paragraph, Text } = Typography;
  */
 export default function PendingEnrolmentsTab({ mayEnrol }: { mayEnrol: boolean }) {
   const { enrollments, totalCount, isPending } = useEnrollmentState();
-  const { getPendingEnrollmentsAsync } = useEnrollmentActions();
+  const { getPendingEnrollmentsAsync, acceptOfferAsync } = useEnrollmentActions();
   const [enrolling, setEnrolling] = useState<IEnrollment | undefined>();
+  const [recording, setRecording] = useState<IEnrollment | undefined>();
+  const [saving, setSaving] = useState(false);
 
   const load = useCallback(() => {
     getPendingEnrollmentsAsync({ maxResultCount: 50, skipCount: 0 });
@@ -30,6 +32,24 @@ export default function PendingEnrolmentsTab({ mayEnrol }: { mayEnrol: boolean }
   useEffect(() => { load(); }, []);
 
   const waiting = enrollments ?? [];
+
+  /* Families telephone, and some have no email. Staff may take their word for
+     it — but as their own act, with their name on it, rather than the mapper
+     quietly reporting every approved application as accepted. */
+  const recordAcceptance = async () => {
+    if (!recording) return;
+    setSaving(true);
+    try {
+      await acceptOfferAsync({ applicationId: recording.applicationId, confirmAcceptance: true });
+      message.success(`Recorded that ${recording.applicantName}'s family accepted the place.`);
+      setRecording(undefined);
+      load();
+    } catch {
+      // The interceptor shows why.
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <>
@@ -66,25 +86,39 @@ export default function PendingEnrolmentsTab({ mayEnrol }: { mayEnrol: boolean }
                     {e.isClassAssigned && e.assignedClassName && (
                       <Tag color="blue">Class {e.assignedClassName}</Tag>
                     )}
-                    {!e.isOfferAccepted && <Tag color="gold">Offer not yet accepted</Tag>}
+                    {e.isOfferAccepted
+                      ? <Tag color="green">Place accepted</Tag>
+                      : <Tag color="gold">Waiting for the family to answer</Tag>}
                   </Space>
                   <Text type="secondary" style={{ fontSize: 12 }}>
                     {e.applicationNumber}
                     {e.offerAcceptedDate
                       ? ` · accepted ${dayjs(e.offerAcceptedDate).format('DD MMM YYYY')}`
-                      : ''}
+                      : e.offerExpiryDate
+                        ? ` · offer open until ${dayjs(e.offerExpiryDate).format('DD MMM YYYY')}`
+                        : ''}
                   </Text>
                 </Space>
 
                 {mayEnrol && (
-                  <Button
-                    type="primary"
-                    size="small"
-                    icon={<SolutionOutlined />}
-                    onClick={() => setEnrolling(e)}
-                  >
-                    Enrol
-                  </Button>
+                  e.isOfferAccepted ? (
+                    <Button
+                      type="primary"
+                      size="small"
+                      icon={<SolutionOutlined />}
+                      onClick={() => setEnrolling(e)}
+                    >
+                      Enrol
+                    </Button>
+                  ) : (
+                    <Button
+                      size="small"
+                      icon={<PhoneOutlined />}
+                      onClick={() => setRecording(e)}
+                    >
+                      They have accepted
+                    </Button>
+                  )
                 )}
               </Space>
             </Card>
@@ -92,18 +126,33 @@ export default function PendingEnrolmentsTab({ mayEnrol }: { mayEnrol: boolean }
         />
       )}
 
-      {/* Nothing records a family's acceptance yet — the endpoint saves no
-          field — so an approved applicant shows here whether or not they have
-          said yes. Worth knowing when reading the list. */}
       {!isPending && waiting.some((e) => !e.isOfferAccepted) && (
         <Alert
           type="info"
           showIcon
           style={{ marginTop: 8 }}
-          message="Acceptance is not recorded yet"
-          description="Nothing in the system yet captures a family saying yes to their offer, so that tag reflects a field nobody can set. Check with the family before enrolling."
+          message="Some of these families have not answered yet"
+          description="A place is not held for ever and a child is not enrolled on a maybe. The family can accept on their own application screen; if they told you some other way, record it with the button beside their name."
         />
       )}
+
+      <Modal
+        open={!!recording}
+        title={`Record that ${recording?.applicantName ?? 'this family'} accepted the place`}
+        okText="Record it"
+        okButtonProps={{ loading: saving }}
+        onOk={recordAcceptance}
+        onCancel={() => setRecording(undefined)}
+      >
+        <Paragraph>
+          Only do this if the family has actually told you they want the place — in person, by
+          telephone or in writing. It is recorded against your name and is what lets the child be
+          enrolled.
+        </Paragraph>
+        <Paragraph type="secondary" style={{ marginBottom: 0 }}>
+          If they have not answered yet, leave it: they can accept on their own application screen.
+        </Paragraph>
+      </Modal>
 
       <EnrolLearnerModal
         open={!!enrolling}

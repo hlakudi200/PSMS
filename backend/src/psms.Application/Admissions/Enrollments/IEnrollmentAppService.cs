@@ -1,4 +1,4 @@
-using Abp.Application.Services;
+﻿using Abp.Application.Services;
 using Abp.Application.Services.Dto;
 using psms.Admissions.Enrollments.Dto;
 using System;
@@ -32,6 +32,12 @@ public interface IEnrollmentAppService : IApplicationService
     /// Accepts an admission offer.
     /// </summary>
     Task<EnrollmentDto> AcceptOfferAsync(AcceptOfferDto input);
+
+    /// <summary>
+    /// ADM-026: the family turns the place down. Ends the application and stops
+    /// the place being held for them.
+    /// </summary>
+    Task<EnrollmentDto> DeclineOfferAsync(DeclineOfferDto input);
 
     /// <summary>
     /// Assigns a class to an enrolling student.

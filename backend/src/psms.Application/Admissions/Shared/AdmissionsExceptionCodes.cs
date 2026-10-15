@@ -35,6 +35,9 @@ public static class AdmissionsExceptionCodes
     // Decision (ADM-017 to ADM-020)
     public const string UnauthorizedAdmissionDecision = "ADM017_UNAUTHORIZED_ADMISSION_DECISION";
     public const string OfferExpired = "ADM018_OFFER_EXPIRED";
+
+    /// <summary>Enrolment attempted before the family accepted the place (ADM-025).</summary>
+    public const string OfferNotAccepted = "ADM025_OFFER_NOT_ACCEPTED";
     public const string RejectionReasonRequired = "ADM020_REJECTION_REASON_REQUIRED";
 
     // Waitlist (ADM-021 to ADM-024)

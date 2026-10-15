@@ -1,4 +1,4 @@
-using Abp.Authorization.Roles;
+﻿using Abp.Authorization.Roles;
 using Microsoft.EntityFrameworkCore;
 using psms.Authorization;
 using psms.Authorization.Roles;
@@ -146,6 +146,8 @@ public class DefaultRolesCreator
             PermissionNames.Admissions_Enrollment_View,
             PermissionNames.Admissions_Enrollment_SubmitForms,
             PermissionNames.Admissions_Enrollment_AssignClass,
+            PermissionNames.Admissions_Enrollment_AcceptOffer,
+            PermissionNames.Admissions_Enrollment_DeclineOffer,
             PermissionNames.Admissions_Enrollment_Complete,
             PermissionNames.Admissions_Settings,
             PermissionNames.Admissions_Settings_View,
@@ -390,6 +392,8 @@ public class DefaultRolesCreator
             PermissionNames.Admissions_Enrollment_View,
             PermissionNames.Admissions_Enrollment_SubmitForms,
             PermissionNames.Admissions_Enrollment_AssignClass,
+            PermissionNames.Admissions_Enrollment_AcceptOffer,
+            PermissionNames.Admissions_Enrollment_DeclineOffer,
             PermissionNames.Admissions_Enrollment_Complete,
             PermissionNames.Admissions_Settings,
             PermissionNames.Admissions_Settings_View,
@@ -690,6 +694,8 @@ public class DefaultRolesCreator
             PermissionNames.Admissions_Enrollment_View,
             PermissionNames.Admissions_Enrollment_SubmitForms,
             PermissionNames.Admissions_Enrollment_AssignClass,
+            PermissionNames.Admissions_Enrollment_AcceptOffer,
+            PermissionNames.Admissions_Enrollment_DeclineOffer,
             PermissionNames.Admissions_Enrollment_Complete,
             PermissionNames.Admissions_Settings,
             PermissionNames.Admissions_Settings_View,
@@ -1027,6 +1033,7 @@ public class DefaultRolesCreator
             PermissionNames.Admissions_Enrollment,
             PermissionNames.Admissions_Enrollment_View,
             PermissionNames.Admissions_Enrollment_AcceptOffer,
+            PermissionNames.Admissions_Enrollment_DeclineOffer,
             PermissionNames.Admissions_Enrollment_SubmitForms,
 
             // Financial - Pay application fee
