@@ -223,6 +223,33 @@ public class TenantAppService : AsyncCrudAppService<Tenant, TenantDto, int, Page
     }
 
     /// <summary>
+    /// Brings one school's roles up to what the code now says they should hold,
+    /// additively. The host counterpart of
+    /// <see cref="psms.Authorization.RolePermissionCatchUpService"/>.
+    /// <para>
+    /// Both exist because each is the only usable one for somebody. A school's
+    /// administrator can run the tenant-level service and cannot reach this,
+    /// which is host-only; an operator bringing every school up to date after a
+    /// release has no sign-in for most of them and needs this.
+    /// </para>
+    /// <para>
+    /// Additive and idempotent — unlike <c>SeedRolePermissionsAsync</c>, which
+    /// replaces a role's whole set and would wipe a school's customisations.
+    /// </para>
+    /// </summary>
+    [AbpAuthorize(PermissionNames.Pages_Tenants)]
+    public async Task CatchUpRolePermissionsAsync(EntityDto<int> input)
+    {
+        var tenant = await _tenantManager.GetByIdAsync(input.Id);
+
+        using (CurrentUnitOfWork.SetTenantId(tenant.Id))
+        {
+            await _rolePermissionSeeder.CatchUpEveryRoleAsync();
+            await CurrentUnitOfWork.SaveChangesAsync();
+        }
+    }
+
+    /// <summary>
     /// Additively grant the operations feature groups (Parents, Transfers, Fee
     /// Waivers, Expenses, Discipline, Staff Leave, Field Trips, Extramurals,
     /// Transport, After Care) to an existing tenant's staff roles without

@@ -1,4 +1,4 @@
-using Abp.Authorization;
+﻿using Abp.Authorization;
 using psms.Authorization;
 using psms.Authorization.Roles;
 using Shouldly;
@@ -88,6 +88,27 @@ public class RolesCatchUpWithTheCode_Tests
         guard.ShouldNotBeNull();
         guard.Permissions.ShouldContain(PermissionNames.Pages_Roles);
         guard.Permissions.ShouldNotContain(PermissionNames.Pages_Tenants);
+    }
+
+    [Fact]
+    public void Both_the_school_and_the_operator_have_a_way_in()
+    {
+        /* Each is the only usable one for somebody. A school's administrator
+           can run the tenant-level service and cannot reach the host-only one;
+           an operator bringing every school up to date after a release has no
+           sign-in for most of them and needs the host one. Losing either
+           silently strands a set of tenants, which is the bug this whole thing
+           is about. */
+        var host = typeof(psms.MultiTenancy.TenantAppService)
+            .GetMethod(nameof(psms.MultiTenancy.TenantAppService.CatchUpRolePermissionsAsync));
+
+        host.ShouldNotBeNull();
+        host.GetCustomAttribute<AbpAuthorizeAttribute>()
+            .Permissions.ShouldContain(PermissionNames.Pages_Tenants);
+
+        typeof(psms.Authorization.RolePermissionCatchUpService)
+            .GetMethod(nameof(psms.Authorization.RolePermissionCatchUpService.CatchUpAsync))
+            .ShouldNotBeNull();
     }
 
     private static string SeederSourcePath()
