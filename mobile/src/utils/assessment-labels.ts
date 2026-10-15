@@ -36,6 +36,22 @@ export function markDisplayStatusTone(status: MarkStatus, marksReleased: boolean
   return MARK_STATUS_TONES[status];
 }
 
+/** Backend AcademicAssessmentType. */
+export const ASSESSMENT_TYPE_LABELS: Record<number, string> = {
+  1: "Test", 2: "Assignment", 3: "Exam", 4: "Practical", 5: "Oral", 6: "Project", 7: "Other",
+};
+
+/** The CAPS 7-point scale bands (backend CapsAchievementScale). */
+export function achievementLevelFor(percentage: number): CapsAchievementLevel {
+  if (percentage >= 80) return 7;
+  if (percentage >= 70) return 6;
+  if (percentage >= 60) return 5;
+  if (percentage >= 50) return 4;
+  if (percentage >= 40) return 3;
+  if (percentage >= 30) return 2;
+  return 1;
+}
+
 export function formatPercentage(value?: number): string {
   if (value === undefined || value === null) return "—";
   return `${Math.round(value * 10) / 10}%`;

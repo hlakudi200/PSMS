@@ -1,5 +1,6 @@
 import { useCallback, useContext, useMemo, useReducer, useRef } from "react";
 import { getAxiosInstance } from "../../utils/axios-instance";
+import { averageBySubject } from "../../utils/marks-sections";
 import { MarksReducer } from "./reducer";
 import {
   INITIAL_STATE, MarksActionContext, MarksStateContext,
@@ -7,7 +8,7 @@ import {
 } from "./context";
 import {
   cacheAssessmentDetail, getClassAssessmentsSuccess, getMarksError, getMarksPending, getMarksSuccess,
-  getTermError, getTermPending, getTermSuccess, mergeMark,
+  getTermError, getTermPending, getTermSuccess, getTrendError, getTrendPending, getTrendSuccess, mergeMark,
 } from "./actions";
 
 const mapTerm = (dto: any): ITerm => ({
@@ -24,6 +25,7 @@ const mapTerm = (dto: any): ITerm => ({
 const mapMark = (dto: any): IMark => ({
   id: dto.id,
   assessmentId: dto.assessmentId,
+  studentId: dto.studentId,
   rawMark: dto.rawMark ?? undefined,
   percentage: dto.percentage ?? undefined,
   achievementLevel: dto.achievementLevel ?? undefined,
@@ -59,6 +61,13 @@ export const MarksProvider = ({ children }: { children: React.ReactNode }) => {
   assessmentDetailsRef.current = state.assessmentDetailsById;
   const marksRef = useRef(state.marks);
   marksRef.current = state.marks;
+  const termsRef = useRef(state.terms);
+  termsRef.current = state.terms;
+  // A parent can switch child or term before the last load lands; only the
+  // latest request of each kind may write to state.
+  const latestMarksRequestRef = useRef(0);
+  const latestClassAssessmentsRequestRef = useRef(0);
+  const latestTrendRequestRef = useRef(0);
 
   const getAssessmentDetailAsync = useCallback(async (assessmentId: string) => {
     const cached = assessmentDetailsRef.current[assessmentId];
@@ -89,22 +98,25 @@ export const MarksProvider = ({ children }: { children: React.ReactNode }) => {
   }, [instance]);
 
   const getMarksByStudentAsync = useCallback(async (studentId: string, termId: string) => {
+    const requestId = ++latestMarksRequestRef.current;
     dispatch(getMarksPending());
     try {
       const { data } = await instance.get("/api/services/app/Mark/GetByStudent", {
         params: { studentId, termId },
       });
+      if (requestId !== latestMarksRequestRef.current) return;
       const marks = (data.result.items as any[]).map(mapMark);
-      dispatch(getMarksSuccess({ marks, termId }));
+      dispatch(getMarksSuccess({ marks, termId, studentId }));
 
       const uniqueAssessmentIds = [...new Set(marks.map((m) => m.assessmentId))];
       await Promise.all(uniqueAssessmentIds.map((id) => getAssessmentDetailAsync(id)));
     } catch {
-      dispatch(getMarksError());
+      if (requestId === latestMarksRequestRef.current) dispatch(getMarksError());
     }
   }, [instance, getAssessmentDetailAsync]);
 
   const getClassAssessmentsAsync = useCallback(async (classId: string, termId: string) => {
+    const requestId = ++latestClassAssessmentsRequestRef.current;
     try {
       const { data } = await instance.get("/api/services/app/Assessment/GetAll", {
         params: { ClassId: classId, TermId: termId, IsPublished: true, MaxResultCount: 200 },
@@ -124,20 +136,22 @@ export const MarksProvider = ({ children }: { children: React.ReactNode }) => {
         subjectName: dto.subjectName,
         termName: dto.termName,
       }));
-      dispatch(getClassAssessmentsSuccess(items));
+      if (requestId !== latestClassAssessmentsRequestRef.current) return;
+      dispatch(getClassAssessmentsSuccess({ classAssessments: items, key: `${classId}:${termId}` }));
     } catch {
       // Non-fatal: assessments the teacher hasn't captured a mark for yet just won't show
       // as placeholders; everything already-marked is unaffected.
     }
   }, [instance]);
 
-  const ensureMarkForAssessmentAsync = useCallback(async (assessmentId: string) => {
-    const existing = marksRef.current?.find((m) => m.assessmentId === assessmentId);
+  const ensureMarkForAssessmentAsync = useCallback(async (assessmentId: string, studentId?: string) => {
+    const isWanted = (m: IMark) => m.assessmentId === assessmentId && (!studentId || m.studentId === studentId);
+    const existing = marksRef.current?.find(isWanted);
     if (existing) return existing;
     try {
       const { data } = await instance.get("/api/services/app/Mark/GetByAssessment", { params: { assessmentId } });
-      const items = (data.result.items as any[]).map(mapMark);
-      const mine = items[0];
+      // A student only ever gets their own mark back; a parent gets one per child in the class.
+      const mine = (data.result.items as any[]).map(mapMark).find(isWanted);
       if (mine) dispatch(mergeMark(mine));
       return mine;
     } catch {
@@ -145,9 +159,48 @@ export const MarksProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }, [instance]);
 
+  const getSubjectTrendAsync = useCallback(async (studentId: string) => {
+    const now = new Date().toISOString();
+    const startedTerms = (termsRef.current ?? []).filter((term) => term.startDate <= now);
+    if (startedTerms.length === 0) return;
+
+    const requestId = ++latestTrendRequestRef.current;
+    dispatch(getTrendPending());
+    try {
+      const marksByTerm = await Promise.all(startedTerms.map(async (term) => {
+        const { data } = await instance.get("/api/services/app/Mark/GetByStudent", {
+          params: { studentId, termId: term.id },
+        });
+        return { termId: term.id, marks: (data.result.items as any[]).map(mapMark) };
+      }));
+
+      // MarkListDto carries no subject, so each assessment's detail is needed to group by it.
+      const assessmentIds = [...new Set(marksByTerm.flatMap(({ marks }) => marks.map((m) => m.assessmentId)))];
+      const details = await Promise.all(assessmentIds.map((id) => getAssessmentDetailAsync(id)));
+      const detailsById = Object.fromEntries(
+        details.filter((d): d is IAssessmentDetail => !!d).map((d) => [d.id, d])
+      );
+
+      if (requestId !== latestTrendRequestRef.current) return;
+      dispatch(getTrendSuccess({
+        studentId,
+        averagesByTermId: Object.fromEntries(
+          marksByTerm.map(({ termId, marks }) => [termId, averageBySubject(marks, detailsById)])
+        ),
+      }));
+    } catch {
+      // The trend is a nice-to-have; the current term's marks are unaffected.
+      if (requestId === latestTrendRequestRef.current) dispatch(getTrendError());
+    }
+  }, [instance, getAssessmentDetailAsync]);
+
   const actions = useMemo<IMarksActionContext>(() => ({
-    getCurrentTermAsync, getMarksByStudentAsync, getClassAssessmentsAsync, getAssessmentDetailAsync, ensureMarkForAssessmentAsync,
-  }), [getCurrentTermAsync, getMarksByStudentAsync, getClassAssessmentsAsync, getAssessmentDetailAsync, ensureMarkForAssessmentAsync]);
+    getCurrentTermAsync, getMarksByStudentAsync, getClassAssessmentsAsync, getAssessmentDetailAsync,
+    ensureMarkForAssessmentAsync, getSubjectTrendAsync,
+  }), [
+    getCurrentTermAsync, getMarksByStudentAsync, getClassAssessmentsAsync, getAssessmentDetailAsync,
+    ensureMarkForAssessmentAsync, getSubjectTrendAsync,
+  ]);
 
   return (
     <MarksStateContext.Provider value={state}>

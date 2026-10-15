@@ -6,44 +6,28 @@ import type { BadgeTone } from "../../components/Badge";
 import { colors, radius, spacing, typography } from "../../theme";
 import { useAuthState } from "../../providers/auth";
 import { useMarksActions, useMarksState } from "../../providers/marks";
-import type { CapsAchievementLevel, ITerm } from "../../providers/marks/context";
-import { getAxiosInstance } from "../../utils/axios-instance";
+import type { ITerm } from "../../providers/marks/context";
 import {
   ACHIEVEMENT_LEVEL_LABELS, ACHIEVEMENT_LEVEL_TONES,
   formatPercentage, markDisplayStatusLabel, markDisplayStatusTone,
 } from "../../utils/assessment-labels";
+import { buildSubjectSections, type IMarkRow, type ISubjectSection } from "../../utils/marks-sections";
 
-interface IRow {
-  key: string;
-  assessmentId: string;
-  assessmentName: string;
-  subjectName: string;
-  hasMark: boolean;
-  marksReleased: boolean;
-  percentage?: number;
-  rawMark?: number;
-  achievementLevel?: CapsAchievementLevel;
-  wasAbsent: boolean;
-  hasFeedback: boolean;
-}
+type IRow = IMarkRow;
 
-interface ISubjectSection {
-  title: string;
-  average?: number;
+interface ISubjectSectionWithTrend extends ISubjectSection {
   previousAverage?: number;
-  data: IRow[];
 }
 
 export function MarksScreen() {
   const { currentStudentId, currentClassId } = useAuthState();
   const {
     currentTerm, terms, isTermPending, isTermError,
-    marks, isMarksPending, isMarksError, classAssessments, assessmentDetailsById,
+    marks, isMarksPending, isMarksError, classAssessments, assessmentDetailsById, subjectTrend,
   } = useMarksState();
-  const { getCurrentTermAsync, getMarksByStudentAsync, getClassAssessmentsAsync } = useMarksActions();
+  const { getCurrentTermAsync, getMarksByStudentAsync, getClassAssessmentsAsync, getSubjectTrendAsync } = useMarksActions();
 
   const [selectedTermId, setSelectedTermId] = useState<string | undefined>(undefined);
-  const [previousAverages, setPreviousAverages] = useState<Record<string, number>>({});
 
   useEffect(() => { void getCurrentTermAsync(); }, [getCurrentTermAsync]);
 
@@ -58,92 +42,23 @@ export function MarksScreen() {
 
   useEffect(() => { reloadMarks(); }, [reloadMarks]);
 
-  // Best-effort trend comparison against the previous term — local, non-blocking, no shared state.
+  // Best-effort trend comparison against the previous term — non-blocking.
   useEffect(() => {
-    setPreviousAverages({});
-    if (!currentStudentId || !selectedTermId || !terms) return;
+    if (currentStudentId && terms) void getSubjectTrendAsync(currentStudentId);
+  }, [currentStudentId, terms, getSubjectTrendAsync]);
+
+  const previousAverages = useMemo(() => {
+    if (!terms || !selectedTermId || subjectTrend?.studentId !== currentStudentId) return {};
     const index = terms.findIndex((t) => t.id === selectedTermId);
     const previousTerm = index > 0 ? terms[index - 1] : undefined;
-    if (!previousTerm) return;
+    return (previousTerm && subjectTrend?.averagesByTermId[previousTerm.id]) ?? {};
+  }, [terms, selectedTermId, subjectTrend, currentStudentId]);
 
-    let cancelled = false;
-    const loadPreviousAverages = async () => {
-      try {
-        const instance = getAxiosInstance();
-        const { data } = await instance.get("/api/services/app/Mark/GetByStudent", {
-          params: { studentId: currentStudentId, termId: previousTerm.id },
-        });
-        if (cancelled) return;
-        const bySubject: Record<string, number[]> = {};
-        for (const item of data.result.items as any[]) {
-          const detail = assessmentDetailsById[item.assessmentId];
-          if (!detail || item.percentage == null) continue;
-          (bySubject[detail.subjectName] ??= []).push(item.percentage);
-        }
-        const averages: Record<string, number> = {};
-        for (const [subject, values] of Object.entries(bySubject)) {
-          averages[subject] = values.reduce((a, b) => a + b, 0) / values.length;
-        }
-        setPreviousAverages(averages);
-      } catch {
-        // Trend is a nice-to-have; silently skip on failure.
-      }
-    };
-    void loadPreviousAverages();
-    return () => { cancelled = true; };
-  }, [currentStudentId, selectedTermId, terms, assessmentDetailsById]);
-
-  const sections = useMemo<ISubjectSection[]>(() => {
-    const rows = new Map<string, IRow>(); // keyed by assessmentId
-
-    for (const mark of marks ?? []) {
-      const detail = assessmentDetailsById[mark.assessmentId];
-      rows.set(mark.assessmentId, {
-        key: mark.id,
-        assessmentId: mark.assessmentId,
-        assessmentName: mark.assessmentName,
-        subjectName: detail?.subjectName ?? "Other",
-        hasMark: true,
-        marksReleased: detail?.marksReleased ?? false,
-        percentage: mark.percentage,
-        rawMark: mark.rawMark,
-        achievementLevel: mark.achievementLevel,
-        wasAbsent: mark.wasAbsent,
-        hasFeedback: !!mark.feedback,
-      });
-    }
-
-    // "An assessment whose marks are not yet released shows as pending, not missing" —
-    // fill in any published class assessment that doesn't have a Mark row yet.
-    for (const assessment of classAssessments ?? []) {
-      if (rows.has(assessment.id)) continue;
-      rows.set(assessment.id, {
-        key: `pending-${assessment.id}`,
-        assessmentId: assessment.id,
-        assessmentName: assessment.name,
-        subjectName: assessment.subjectName,
-        hasMark: false,
-        marksReleased: false,
-        wasAbsent: false,
-        hasFeedback: false,
-      });
-    }
-
-    const bySubject = new Map<string, IRow[]>();
-    for (const row of rows.values()) {
-      const list = bySubject.get(row.subjectName) ?? [];
-      list.push(row);
-      bySubject.set(row.subjectName, list);
-    }
-
-    return [...bySubject.entries()]
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([title, data]) => {
-        const graded = data.filter((r) => r.marksReleased && r.percentage != null);
-        const average = graded.length ? graded.reduce((a, r) => a + (r.percentage ?? 0), 0) / graded.length : undefined;
-        return { title, average, previousAverage: previousAverages[title], data };
-      });
-  }, [marks, classAssessments, assessmentDetailsById, previousAverages]);
+  const sections = useMemo<ISubjectSectionWithTrend[]>(
+    () => buildSubjectSections(marks ?? [], classAssessments ?? [], assessmentDetailsById)
+      .map((section) => ({ ...section, previousAverage: previousAverages[section.title] })),
+    [marks, classAssessments, assessmentDetailsById, previousAverages]
+  );
 
   const openAssessment = useCallback((assessmentId: string) => {
     router.push({ pathname: "/(student)/assessment/[id]", params: { id: assessmentId } });
@@ -205,7 +120,7 @@ function TermChip({ term, selected, onPress }: { term: ITerm; selected: boolean;
   );
 }
 
-function SubjectHeader({ section }: { section: ISubjectSection }) {
+function SubjectHeader({ section }: { section: ISubjectSectionWithTrend }) {
   const delta = section.average != null && section.previousAverage != null
     ? Math.round((section.average - section.previousAverage) * 10) / 10
     : undefined;

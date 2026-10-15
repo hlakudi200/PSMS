@@ -6,6 +6,7 @@ export type MarkStatus = 1 | 2 | 3 | 4 | 5; // Pending | Completed | Absent | Ex
 export interface IMark {
   id: string;
   assessmentId: string;
+  studentId: string;
   rawMark?: number;
   percentage?: number;
   achievementLevel?: CapsAchievementLevel;
@@ -45,6 +46,12 @@ export interface ITerm {
   isCurrent: boolean;
 }
 
+export interface ISubjectTrend {
+  studentId: string;
+  /** termId → subjectName → average percentage. A subject with no released marks in a term has no entry. */
+  averagesByTermId: Record<string, Record<string, number>>;
+}
+
 export interface IMarksStateContext {
   isTermPending: boolean;
   isTermError: boolean;
@@ -55,10 +62,18 @@ export interface IMarksStateContext {
   isMarksError: boolean;
   marks?: IMark[];
   marksTermId?: string;
+  /** Whose marks are loaded — a parent switches between children, so a screen checks it matches. */
+  marksStudentId?: string;
 
   /** Every published assessment for the student's class in the selected term — used to show
    *  assessments the teacher hasn't captured a mark for yet as "pending", not absent from the list. */
   classAssessments?: IAssessmentDetail[];
+  /** `${classId}:${termId}` the class assessments above were loaded for. */
+  classAssessmentsKey?: string;
+
+  /** Released-mark average per subject, per term of the current year, for one student. */
+  subjectTrend?: ISubjectTrend;
+  isTrendPending: boolean;
 
   assessmentDetailsById: Record<string, IAssessmentDetail>;
 }
@@ -72,8 +87,11 @@ export interface IMarksActionContext {
   getClassAssessmentsAsync: (classId: string, termId: string) => Promise<void>;
   /** Returns cached assessment detail if present, else fetches and caches it. */
   getAssessmentDetailAsync: (assessmentId: string) => Promise<IAssessmentDetail | undefined>;
-  /** Ensures a mark for this assessment is in state (for deep-linked detail screens). */
-  ensureMarkForAssessmentAsync: (assessmentId: string) => Promise<IMark | undefined>;
+  /** Ensures a mark for this assessment is in state (for deep-linked detail screens).
+   *  A parent passes the child, since the backend returns every one of their children's marks. */
+  ensureMarkForAssessmentAsync: (assessmentId: string, studentId?: string) => Promise<IMark | undefined>;
+  /** Loads per-subject averages for every term of the current year that has started (after getCurrentTermAsync). */
+  getSubjectTrendAsync: (studentId: string) => Promise<void>;
 }
 
 export const INITIAL_STATE: IMarksStateContext = {
@@ -81,6 +99,7 @@ export const INITIAL_STATE: IMarksStateContext = {
   isTermError: false,
   isMarksPending: false,
   isMarksError: false,
+  isTrendPending: false,
   assessmentDetailsById: {},
 };
 
