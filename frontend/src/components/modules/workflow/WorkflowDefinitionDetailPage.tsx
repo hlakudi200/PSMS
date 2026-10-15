@@ -1,15 +1,8 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Card, Descriptions, Tag, Button, Table, Space, message, Typography, Popconfirm } from 'antd';
-import {
-  PlusOutlined,
-  EditOutlined,
-  DeleteOutlined,
-  ArrowUpOutlined,
-  ArrowDownOutlined,
-  ArrowLeftOutlined,
-} from '@ant-design/icons';
+import { Card, Descriptions, Tag, Button, message, Typography } from 'antd';
+import { PlusOutlined, ArrowLeftOutlined } from '@ant-design/icons';
 import { useParams, useRouter } from 'next/navigation';
 import { useWorkflowBasePath } from './useWorkflowBasePath';
 import {
@@ -23,12 +16,10 @@ import {
   useWorkflowStepActions,
 } from '@/providers/workflow/workflow-steps';
 import { WorkflowStepFormModal } from '@/components/modals/workflow/WorkflowStepFormModal';
+import WorkflowStepFlow from './WorkflowStepFlow';
 import { WorkflowExtensionProvider } from '@/providers/workflow/workflow-extensions';
 import type { IWorkflowStep } from '@/providers/workflow/shared/interfaces';
-import {
-  WorkflowEntityTypeLabels,
-  WorkflowActionTypeLabels,
-} from '@/providers/workflow/shared/interfaces';
+import { WorkflowEntityTypeLabels } from '@/providers/workflow/shared/interfaces';
 
 const { Title, Text } = Typography;
 
@@ -64,21 +55,26 @@ function DetailContent() {
     if (refresh) refreshSteps();
   };
 
-  const handleMoveStep = async (stepId: string, direction: 'up' | 'down') => {
-    if (!steps || !id) return;
-    const sortedSteps = [...steps].sort((a, b) => a.stepOrder - b.stepOrder);
-    const idx = sortedSteps.findIndex(s => s.id === stepId);
-    if (direction === 'up' && idx > 0) {
-      [sortedSteps[idx], sortedSteps[idx - 1]] = [sortedSteps[idx - 1], sortedSteps[idx]];
-    } else if (direction === 'down' && idx < sortedSteps.length - 1) {
-      [sortedSteps[idx], sortedSteps[idx + 1]] = [sortedSteps[idx + 1], sortedSteps[idx]];
+  /**
+   * The order the person just dragged the steps into.
+   *
+   * This used to report "Steps reordered" whatever happened: the provider
+   * swallowed the failure and the message fired unconditionally, so a reorder
+   * the server had refused looked exactly like one that worked — which is why
+   * the arrows appeared to do nothing.
+   */
+  const handleReorder = async (orderedIds: string[]) => {
+    if (!id) return;
+    try {
+      await reorderAsync({ workflowDefinitionId: id, stepIds: orderedIds });
+      message.success('Order saved');
+    } catch (e) {
+      const abp = (e as { response?: { data?: { error?: { message?: string; details?: string } } } })
+        ?.response?.data?.error;
+      message.error(abp?.message || abp?.details || 'Could not save the new order.');
+    } finally {
+      refreshSteps();
     }
-    await reorderAsync({
-      workflowDefinitionId: id,
-      stepIds: sortedSteps.map(s => s.id),
-    });
-    message.success('Steps reordered');
-    refreshSteps();
   };
 
   const handleDeleteStep = async (stepId: string) => {
@@ -94,111 +90,6 @@ function DetailContent() {
     ? Math.max(...sortedSteps.map(s => s.stepOrder)) + 1
     : 1;
 
-  const columns = [
-    {
-      title: '#',
-      dataIndex: 'stepOrder',
-      key: 'stepOrder',
-      width: 50,
-    },
-    {
-      title: 'Name',
-      dataIndex: 'name',
-      key: 'name',
-    },
-    {
-      title: 'Role',
-      dataIndex: 'assignedRole',
-      key: 'assignedRole',
-      render: (val: string) => <Tag>{val}</Tag>,
-    },
-    {
-      title: 'Action',
-      dataIndex: 'actionType',
-      key: 'actionType',
-      render: (val: number) => WorkflowActionTypeLabels[val] ?? val,
-    },
-    {
-      title: 'Terminal',
-      dataIndex: 'isTerminal',
-      key: 'isTerminal',
-      width: 80,
-      render: (val: boolean) => val ? <Tag color="volcano">Yes</Tag> : <Tag>No</Tag>,
-    },
-    {
-      title: 'Comment Req.',
-      dataIndex: 'isCommentRequired',
-      key: 'isCommentRequired',
-      width: 100,
-      render: (val: boolean) => val ? 'Yes' : 'No',
-    },
-    {
-      title: 'SLA (hrs)',
-      dataIndex: 'slaHours',
-      key: 'slaHours',
-      width: 80,
-      render: (val?: number) => val ?? '—',
-    },
-    {
-      title: 'Exit criteria',
-      key: 'guardKey',
-      render: (_: unknown, record: IWorkflowStep) => (
-        <Space size={4} wrap>
-          {record.guardKey ? <Tag color="geekblue">{record.guardKey}</Tag> : <Text type="secondary">—</Text>}
-          {record.isOptional && <Tag>optional</Tag>}
-        </Space>
-      ),
-    },
-    {
-      title: 'Effects / decision',
-      key: 'effects',
-      render: (_: unknown, record: IWorkflowStep) => {
-        const parts = [
-          record.entryEffectKey ? `on entry: ${record.entryEffectKey}` : null,
-          record.exitEffectKey ? `on exit: ${record.exitEffectKey}` : null,
-          record.decisionSchemaKey ? `decision: ${record.decisionSchemaKey}` : null,
-        ].filter(Boolean);
-        return parts.length ? (
-          <Space direction="vertical" size={0}>
-            {parts.map((p) => <Text key={p as string} style={{ fontSize: 12 }}>{p}</Text>)}
-          </Space>
-        ) : <Text type="secondary">—</Text>;
-      },
-    },
-    {
-      title: 'Actions',
-      key: 'actions',
-      width: 180,
-      render: (_: unknown, record: IWorkflowStep, index: number) => (
-        <Space size="small">
-          <Button
-            size="small"
-            icon={<ArrowUpOutlined />}
-            disabled={index === 0}
-            onClick={() => handleMoveStep(record.id, 'up')}
-          />
-          <Button
-            size="small"
-            icon={<ArrowDownOutlined />}
-            disabled={index === sortedSteps.length - 1}
-            onClick={() => handleMoveStep(record.id, 'down')}
-          />
-          <Button
-            size="small"
-            icon={<EditOutlined />}
-            onClick={() => { setEditStep(record); setModalOpen(true); }}
-          />
-          <Popconfirm
-            title="Delete this step?"
-            description="Steps in use by active instances cannot be deleted."
-            onConfirm={() => handleDeleteStep(record.id)}
-          >
-            <Button size="small" icon={<DeleteOutlined />} danger />
-          </Popconfirm>
-        </Space>
-      ),
-    },
-  ];
 
   return (
     <div style={{ padding: 24 }}>
@@ -240,13 +131,12 @@ function DetailContent() {
           </Button>
         }
       >
-        <Table<IWorkflowStep>
-          dataSource={sortedSteps}
-          columns={columns}
-          rowKey="id"
+        <WorkflowStepFlow
+          steps={sortedSteps}
           loading={stepsPending}
-          pagination={false}
-          size="small"
+          onEdit={(step) => { setEditStep(step); setModalOpen(true); }}
+          onDelete={handleDeleteStep}
+          onReorder={handleReorder}
         />
       </Card>
 

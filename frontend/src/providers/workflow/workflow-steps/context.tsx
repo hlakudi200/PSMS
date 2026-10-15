@@ -21,7 +21,7 @@ export interface IWorkflowStepActionContext {
   createAsync: (input: ICreateWorkflowStep) => void;
   updateAsync: (id: string, input: IUpdateWorkflowStep) => void;
   deleteAsync: (id: string) => void;
-  reorderAsync: (input: IReorderWorkflowSteps) => void;
+  reorderAsync: (input: IReorderWorkflowSteps) => Promise<IWorkflowStep[]>;
 }
 
 export const INITIAL_STATE: IWorkflowStepStateContext = {

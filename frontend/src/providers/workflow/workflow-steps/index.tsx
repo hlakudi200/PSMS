@@ -6,6 +6,7 @@ import {
   WorkflowStepStateContext,
 } from "./context";
 import type {
+  IWorkflowStep,
   ICreateWorkflowStep,
   IUpdateWorkflowStep,
   IReorderWorkflowSteps,
@@ -113,19 +114,27 @@ export const WorkflowStepProvider = ({
       });
   };
 
-  const reorderAsync = async (input: IReorderWorkflowSteps) => {
+  /**
+   * Reorder returns a bare list of steps, not a paged result — reading
+   * `.result.items` off it gave undefined and blanked the steps in state. And
+   * the failure was swallowed, so the screen said "Steps reordered" over a
+   * reorder that had been refused: the arrows looked broken because nothing
+   * ever told anyone they were.
+   */
+  const reorderAsync = async (input: IReorderWorkflowSteps): Promise<IWorkflowStep[]> => {
     dispatch(reorderStepsPending());
     const endpoint = `/api/services/app/WorkflowStep/Reorder`;
-    await instance
+    return instance
       .post(endpoint, input)
       .then((response) => {
-        dispatch(reorderStepsSuccess({
-          items: response.data.result.items,
-        }));
+        const items: IWorkflowStep[] = response.data.result ?? [];
+        dispatch(reorderStepsSuccess({ items }));
+        return items;
       })
       .catch((error) => {
         console.error(error);
         dispatch(reorderStepsError());
+        throw error;
       });
   };
 
