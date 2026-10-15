@@ -1,7 +1,8 @@
-using Abp.Application.Services;
+﻿using Abp.Application.Services;
 using Abp.Authorization;
 using psms.Authorization;
 using psms.Authorization.Roles;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace psms.Authorization;
@@ -36,11 +37,13 @@ public class RolePermissionCatchUpService : ApplicationService
 
     /// <summary>
     /// Grants every role of the signed-in school whatever the current code says
-    /// it should have and is missing. Safe to run repeatedly.
+    /// it should have and is missing, and reports what that was. Safe to run
+    /// repeatedly: a second run reports nothing granted.
     /// </summary>
-    public async Task CatchUpAsync()
+    public async Task<List<RoleCatchUp>> CatchUpAsync()
     {
-        await _seeder.CatchUpEveryRoleAsync();
+        var report = await _seeder.CatchUpEveryRoleAsync();
         await CurrentUnitOfWork.SaveChangesAsync();
+        return report;
     }
 }
