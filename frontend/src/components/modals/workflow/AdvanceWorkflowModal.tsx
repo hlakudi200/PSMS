@@ -10,10 +10,12 @@ import {
   WorkflowActionTypeLabels,
 } from '@/providers/workflow/shared/interfaces';
 import type {
+  IWorkflowDecisionCondition,
   IWorkflowDecisionField,
   IWorkflowDecisionSchema,
   IWorkflowGuardStatus,
 } from '@/providers/workflow/shared/interfaces';
+import type { Rule } from 'antd/es/form';
 
 const { Text } = Typography;
 
@@ -81,6 +83,47 @@ function buildActionOptions(actionType?: number, currentStepOrder?: number, isOp
   return options;
 }
 
+/**
+ * Whether a condition is in force right now — "only when the decision is
+ * Reject". The backend ships the same declaration it validates against, so a
+ * rule the dialog enforces is never a guess about what the server will accept.
+ */
+function conditionApplies(condition: IWorkflowDecisionCondition, values: Record<string, unknown> | undefined) {
+  const actual = values?.[condition.whenField];
+  if (actual === undefined || actual === null || actual === '') return false;
+  return (condition.whenValueIn ?? []).some(
+    (v) => String(v).toLowerCase() === String(actual).toLowerCase()
+  );
+}
+
+function isEmpty(value: unknown) {
+  if (typeof value === 'string') return value.trim() === '';
+  return value === undefined || value === null;
+}
+
+/**
+ * The field's own rules plus its conditional ones. The conditional rules read
+ * the live form, so changing the decision re-decides what the reason box has to
+ * say — the actor is told before pressing OK, not refused afterwards.
+ */
+function buildFieldRules(field: IWorkflowDecisionField): Rule[] {
+  const rules: Rule[] = [];
+  if (field.required) rules.push({ required: true, message: `${field.label} is required` });
+
+  for (const condition of field.conditions ?? []) {
+    rules.push(({ getFieldsValue }) => ({
+      validator(_, value) {
+        if (!conditionApplies(condition, getFieldsValue())) return Promise.resolve();
+        if (condition.required && isEmpty(value)) return Promise.reject(new Error(condition.message));
+        if (condition.minLength != null && String(value ?? '').trim().length < condition.minLength)
+          return Promise.reject(new Error(condition.message));
+        return Promise.resolve();
+      },
+    }));
+  }
+  return rules;
+}
+
 function DecisionFieldInput({ field }: { field: IWorkflowDecisionField }) {
   switch (field.type) {
     case 'number':
@@ -121,6 +164,7 @@ export const AdvanceWorkflowModal: React.FC<AdvanceWorkflowModalProps> = ({
     [currentStepActionType, currentStepOrder, currentStepIsOptional]
   );
 
+  const allValues = Form.useWatch([], form) as Record<string, unknown> | undefined;
   const selectedAction = Form.useWatch('action', form) as number | undefined;
   const overrideChecked = Form.useWatch('overrideGuard', form) as boolean | undefined;
   const isForward = selectedAction != null && FORWARD_ACTIONS.has(selectedAction);
@@ -232,7 +276,9 @@ export const AdvanceWorkflowModal: React.FC<AdvanceWorkflowModalProps> = ({
                 label={f.label}
                 name={f.key}
                 valuePropName={f.type === 'boolean' ? 'checked' : 'value'}
-                rules={f.required ? [{ required: true, message: `${f.label} is required` }] : []}
+                dependencies={Array.from(new Set((f.conditions ?? []).map((c) => c.whenField)))}
+                required={f.required || (f.conditions ?? []).some((c) => c.required && conditionApplies(c, allValues))}
+                rules={buildFieldRules(f)}
               >
                 <DecisionFieldInput field={f} />
               </Form.Item>

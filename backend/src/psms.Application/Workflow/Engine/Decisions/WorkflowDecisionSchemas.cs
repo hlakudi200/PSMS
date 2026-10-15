@@ -1,4 +1,4 @@
-using Abp.Dependency;
+﻿using Abp.Dependency;
 using psms.Domain.Shared.Enums;
 using psms.Domain.Workflow.Enums;
 using System;
@@ -134,26 +134,41 @@ public class ApplicationDecisionSchema : IWorkflowDecisionSchema, ITransientDepe
                 new WorkflowDecisionOption { Value = nameof(AdmissionDecision.Rejected), Label = "Reject" },
             },
         },
-        new WorkflowDecisionField { Key = "reason", Label = "Reason / conditions", Type = "textarea", Required = false, Placeholder = "Required for rejection (min 50 characters) and conditional acceptance" },
+        new WorkflowDecisionField
+        {
+            Key = "reason", Label = "Reason / conditions", Type = "textarea", Required = false,
+            Placeholder = "Required for rejection (min 50 characters) and conditional acceptance",
+            Conditions = new[]
+            {
+                new WorkflowDecisionCondition
+                {
+                    WhenField = "decision",
+                    WhenValueIn = new[] { nameof(AdmissionDecision.Rejected) },
+                    Required = true, MinLength = MinRejectionReasonLength,
+                    Message = $"A rejection reason of at least {MinRejectionReasonLength} characters is required.",
+                },
+                new WorkflowDecisionCondition
+                {
+                    WhenField = "decision",
+                    WhenValueIn = new[] { nameof(AdmissionDecision.ConditionalAcceptance) },
+                    Required = true,
+                    Message = "State the conditions of acceptance.",
+                },
+            },
+        },
         new WorkflowDecisionField { Key = "offerExpiryDays", Label = "Offer valid for (days)", Type = "number", Required = false, Min = 1, Max = 60, Placeholder = "14" },
     };
 
+    /// <summary>
+    /// Only what the fields cannot say for themselves. The reason rules live on
+    /// the reason field as conditions, and the offer window as its own bounds,
+    /// so the dialog enforces them where the actor is typing rather than
+    /// refusing a filled-in form.
+    /// </summary>
     public string Validate(WorkflowDecision d)
     {
         var decision = d.GetEnum<AdmissionDecision>("decision");
         if (decision == null) return "Select a decision.";
-        var reason = d.GetString("reason");
-        switch (decision)
-        {
-            case AdmissionDecision.Rejected when string.IsNullOrWhiteSpace(reason) || reason.Length < MinRejectionReasonLength:
-                return $"A rejection reason of at least {MinRejectionReasonLength} characters is required.";
-            case AdmissionDecision.ConditionalAcceptance when string.IsNullOrWhiteSpace(reason):
-                return "State the conditions of acceptance.";
-            case AdmissionDecision.Pending:
-                return "Pending is not a decision.";
-        }
-        var days = d.GetInt("offerExpiryDays");
-        if (days is < 1 or > 60) return "Offer validity must be between 1 and 60 days.";
-        return null;
+        return decision == AdmissionDecision.Pending ? "Pending is not a decision." : null;
     }
 }
