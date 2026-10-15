@@ -57,7 +57,7 @@ public class RolesCatchUpWithTheCode_Tests
         var source = System.IO.File.ReadAllText(SeederSourcePath());
 
         var full = RoleNamesIn(source, "public async Task SeedRolePermissionsAsync");
-        var catchUp = RoleNamesIn(source, "public async Task CatchUpEveryRoleAsync");
+        var catchUp = RoleNamesIn(source, "private static IEnumerable<(string RoleName, List<string> Permissions)> EveryRolesPermissions");
 
         catchUp.ShouldNotBeEmpty();
         full.ShouldNotBeEmpty();
@@ -71,7 +71,7 @@ public class RolesCatchUpWithTheCode_Tests
            school's customisations — which is exactly why the full seeder cannot
            be pointed at a live tenant. The catch-up must only ever grant. */
         var source = System.IO.File.ReadAllText(SeederSourcePath());
-        var body = MethodBody(source, "public async Task CatchUpEveryRoleAsync");
+        var body = MethodBody(source, "public async Task<List<RoleCatchUp>> CatchUpEveryRoleAsync");
 
         body.ShouldNotContain("GrantPermissionsToRoleAsync");
         body.ShouldContain("AddPermissionsToRoleAsync");
@@ -109,6 +109,29 @@ public class RolesCatchUpWithTheCode_Tests
         typeof(psms.Authorization.RolePermissionCatchUpService)
             .GetMethod(nameof(psms.Authorization.RolePermissionCatchUpService.CatchUpAsync))
             .ShouldNotBeNull();
+    }
+
+    [Fact]
+    public void A_catch_up_says_what_it_changed()
+    {
+        /* The backfill that answered a bare 200 is how a school sat two
+           releases behind without anybody noticing — and a host token cannot
+           read a tenant's roles afterwards to check for itself, so the answer
+           is the only evidence there is. */
+        var report = new RoleCatchUp { RoleName = "Teacher" };
+        report.GrantedCount.ShouldBe(0);
+        report.RoleMissing.ShouldBeFalse();
+
+        report.Granted.Add(PermissionNames.Admissions_Interviews_View);
+        report.GrantedCount.ShouldBe(1);
+
+        typeof(psms.Authorization.RolePermissionCatchUpService)
+            .GetMethod(nameof(psms.Authorization.RolePermissionCatchUpService.CatchUpAsync))
+            .ReturnType.ShouldBe(typeof(System.Threading.Tasks.Task<List<RoleCatchUp>>));
+
+        typeof(psms.MultiTenancy.TenantAppService)
+            .GetMethod(nameof(psms.MultiTenancy.TenantAppService.CatchUpRolePermissionsAsync))
+            .ReturnType.ShouldBe(typeof(System.Threading.Tasks.Task<List<RoleCatchUp>>));
     }
 
     private static string SeederSourcePath()

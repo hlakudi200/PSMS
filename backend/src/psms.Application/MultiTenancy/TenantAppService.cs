@@ -18,6 +18,7 @@ using Microsoft.AspNetCore.Identity;
 using System;
 using System.Linq;
 using System.Linq.Dynamic.Core;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace psms.MultiTenancy;
@@ -238,14 +239,19 @@ public class TenantAppService : AsyncCrudAppService<Tenant, TenantDto, int, Page
     /// </para>
     /// </summary>
     [AbpAuthorize(PermissionNames.Pages_Tenants)]
-    public async Task CatchUpRolePermissionsAsync(EntityDto<int> input)
+    public async Task<List<psms.Authorization.RoleCatchUp>> CatchUpRolePermissionsAsync(EntityDto<int> input)
     {
         var tenant = await _tenantManager.GetByIdAsync(input.Id);
 
         using (CurrentUnitOfWork.SetTenantId(tenant.Id))
         {
-            await _rolePermissionSeeder.CatchUpEveryRoleAsync();
+            /* Reported back rather than answered with a bare 200: an operator
+               running this across every school needs to see which were behind,
+               and a host token cannot read a tenant's roles afterwards to
+               check for itself. */
+            var report = await _rolePermissionSeeder.CatchUpEveryRoleAsync();
             await CurrentUnitOfWork.SaveChangesAsync();
+            return report;
         }
     }
 

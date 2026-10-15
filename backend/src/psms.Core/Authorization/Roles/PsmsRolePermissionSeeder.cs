@@ -152,17 +152,32 @@ public class PsmsRolePermissionSeeder : ITransientDependency
     /// That is the price of never silently removing one.
     /// </para>
     /// </summary>
-    public async Task CatchUpEveryRoleAsync()
+    public async Task<List<RoleCatchUp>> CatchUpEveryRoleAsync()
     {
-        await AddPermissionsToRoleAsync(StaticRoleNames.Tenants.Principal, GetPrincipalPermissions());
-        await AddPermissionsToRoleAsync(StaticRoleNames.Tenants.VicePrincipal, GetVicePrincipalPermissions());
-        await AddPermissionsToRoleAsync(StaticRoleNames.Tenants.HOD, GetHODPermissions());
-        await AddPermissionsToRoleAsync(StaticRoleNames.Tenants.AdmissionsOfficer, GetAdmissionsOfficerPermissions());
-        await AddPermissionsToRoleAsync(StaticRoleNames.Tenants.Finance, GetFinancePermissions());
-        await AddPermissionsToRoleAsync(StaticRoleNames.Tenants.Teacher, GetTeacherPermissions());
-        await AddPermissionsToRoleAsync(StaticRoleNames.Tenants.Parent, GetParentPermissions());
-        await AddPermissionsToRoleAsync(StaticRoleNames.Tenants.Student, GetStudentPermissions());
-        await AddPermissionsToRoleAsync(StaticRoleNames.Tenants.Applicant, GetApplicantPermissions());
+        var report = new List<RoleCatchUp>();
+
+        foreach (var (roleName, wanted) in EveryRolesPermissions())
+            report.Add(await AddPermissionsToRoleAsync(roleName, wanted));
+
+        return report;
+    }
+
+    /// <summary>
+    /// Every role and what the code says it should hold. Read by the full seed
+    /// and by the catch-up, so the two cannot drift: a catch-up that quietly
+    /// skips a role is the same bug as never running one.
+    /// </summary>
+    private static IEnumerable<(string RoleName, List<string> Permissions)> EveryRolesPermissions()
+    {
+        yield return (StaticRoleNames.Tenants.Principal, GetPrincipalPermissions());
+        yield return (StaticRoleNames.Tenants.VicePrincipal, GetVicePrincipalPermissions());
+        yield return (StaticRoleNames.Tenants.HOD, GetHODPermissions());
+        yield return (StaticRoleNames.Tenants.AdmissionsOfficer, GetAdmissionsOfficerPermissions());
+        yield return (StaticRoleNames.Tenants.Finance, GetFinancePermissions());
+        yield return (StaticRoleNames.Tenants.Teacher, GetTeacherPermissions());
+        yield return (StaticRoleNames.Tenants.Parent, GetParentPermissions());
+        yield return (StaticRoleNames.Tenants.Student, GetStudentPermissions());
+        yield return (StaticRoleNames.Tenants.Applicant, GetApplicantPermissions());
     }
 
     /// <summary>
@@ -191,17 +206,36 @@ public class PsmsRolePermissionSeeder : ITransientDependency
     /// materialise an explicit grant row (robust even if a permission's default
     /// grant ever changes).
     /// </summary>
-    private async Task AddPermissionsToRoleAsync(string roleName, List<string> permissionNames)
+    private async Task<RoleCatchUp> AddPermissionsToRoleAsync(string roleName, List<string> permissionNames)
     {
+        var result = new RoleCatchUp { RoleName = roleName };
+
         var role = _roleManager.Roles.FirstOrDefault(r => r.Name == roleName);
-        if (role == null) return;
+        if (role == null)
+        {
+            // A school that never had this role is not an error — it is a school
+            // that does not use it — but the operator should see which.
+            result.RoleMissing = true;
+            return result;
+        }
 
         var toGrant = _permissionManager.GetAllPermissions()
             .Where(p => permissionNames.Contains(p.Name))
             .ToList();
 
         foreach (var permission in toGrant)
+        {
+            /* Asked before granting purely so the report can say what changed.
+               A backfill that answers 200 and nothing else is one nobody can
+               check, which is how a school sat two releases behind without
+               anybody noticing. */
+            if (!await _roleManager.IsGrantedAsync(role.Id, permission))
+                result.Granted.Add(permission.Name);
+
             await _roleManager.GrantPermissionAsync(role, permission);
+        }
+
+        return result;
     }
 
     // NOTE: the workflow permission sets below are also embedded inline in the
@@ -1242,4 +1276,21 @@ public class PsmsRolePermissionSeeder : ITransientDependency
     }
 
     #endregion
+}
+
+/// <summary>
+/// What a catch-up actually changed for one role, so an operator running it
+/// across every school can see which were behind and by how much.
+/// </summary>
+public class RoleCatchUp
+{
+    public string RoleName { get; set; }
+
+    /// <summary>The school does not have this role at all.</summary>
+    public bool RoleMissing { get; set; }
+
+    /// <summary>Permissions the role was missing and has now been given.</summary>
+    public List<string> Granted { get; set; } = new List<string>();
+
+    public int GrantedCount => Granted.Count;
 }
