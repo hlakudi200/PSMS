@@ -94,7 +94,11 @@ public class MarkAppService : ApplicationService, IMarkAppService
         // see that the task was excused, from the status, but not what the
         // school wrote against it.
         if (selfId.HasValue || childIds != null)
+        {
             dto.ExemptionReason = null;
+            if (IsWithheldFromFamily(mark))
+                WithholdUntilReleased(dto);
+        }
 
         return dto;
     }
@@ -136,7 +140,7 @@ public class MarkAppService : ApplicationService, IMarkAppService
 
         return new PagedResultDto<MarkListDto>(
             totalCount,
-            ObjectMapper.Map<List<MarkListDto>>(items));
+            MapForCaller(items, selfId.HasValue || childIds != null));
     }
 
     [AbpAuthorize(PermissionNames.Assessment_Marks_View)]
@@ -161,7 +165,7 @@ public class MarkAppService : ApplicationService, IMarkAppService
             .ToListAsync();
 
         return new ListResultDto<MarkListDto>(
-            ObjectMapper.Map<List<MarkListDto>>(items));
+            MapForCaller(items, selfId.HasValue || childIds != null));
     }
 
     [AbpAuthorize(PermissionNames.Assessment_Marks_View)]
@@ -188,7 +192,7 @@ public class MarkAppService : ApplicationService, IMarkAppService
             .ToListAsync();
 
         return new ListResultDto<MarkListDto>(
-            ObjectMapper.Map<List<MarkListDto>>(items));
+            MapForCaller(items, selfId.HasValue || childIds != null));
     }
 
     [AbpAuthorize(PermissionNames.Assessment_Marks_Create)]
@@ -646,5 +650,56 @@ public class MarkAppService : ApplicationService, IMarkAppService
                 "Cannot record marks for a future term.");
 
         return assessment;
+    }
+
+    /// <summary>
+    /// #405. A learner and their family see a mark when the teacher releases it,
+    /// not when it is captured.
+    /// <para>
+    /// Until release the teacher may still correct or moderate it, and the
+    /// feedback edit window (T-T24) only opens at release. So for a student
+    /// reading their own marks or a parent reading their child's, an unreleased
+    /// mark keeps its status — the portal can say "pending" — and nothing it was
+    /// given. A mark whose assessment did not load is treated as unreleased.
+    /// </para>
+    /// </summary>
+    private static bool IsWithheldFromFamily(Mark mark) => mark.Assessment?.MarksReleased != true;
+
+    private static void WithholdUntilReleased(MarkDto dto)
+    {
+        dto.RawMark = null;
+        dto.Percentage = null;
+        dto.AchievementLevel = null;
+        dto.TeacherComment = null;
+        dto.Feedback = null;
+        dto.FeedbackHistory = null;
+        dto.IsModerated = false;
+        dto.ModerationAdjustment = null;
+    }
+
+    private static void WithholdUntilReleased(MarkListDto dto)
+    {
+        dto.RawMark = null;
+        dto.Percentage = null;
+        dto.AchievementLevel = null;
+        dto.TeacherComment = null;
+        dto.Feedback = null;
+        dto.IsModerated = false;
+        dto.ModerationAdjustment = null;
+    }
+
+    /// <summary>Maps a family caller's marks, withholding the unreleased ones (#405).</summary>
+    private List<MarkListDto> MapForCaller(List<Mark> marks, bool isFamilyCaller)
+    {
+        var dtos = ObjectMapper.Map<List<MarkListDto>>(marks);
+        if (!isFamilyCaller)
+            return dtos;
+
+        for (var i = 0; i < marks.Count; i++)
+        {
+            if (IsWithheldFromFamily(marks[i]))
+                WithholdUntilReleased(dtos[i]);
+        }
+        return dtos;
     }
 }
