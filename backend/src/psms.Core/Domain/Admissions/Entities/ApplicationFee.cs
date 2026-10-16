@@ -39,6 +39,19 @@ namespace psms.Domain.Admissions.Entities
 
         public DateTime? PaymentDate { get; set; }
 
+        /// <summary>
+        /// The gateway's own id for the checkout the payer was sent to.
+        /// <para>
+        /// Kept so the server can ask what became of it. Settlement normally
+        /// arrives on a webhook, and a webhook is best-effort — not registered,
+        /// pointed at the wrong URL, refused for a signature, retried into a
+        /// dead end. Without this there is nothing to ask about, and a parent
+        /// who paid stays unpaid on the school's screen with no way back.
+        /// </para>
+        /// </summary>
+        [StringLength(MaxReferenceLength)]
+        public string GatewayCheckoutId { get; set; }
+
         [StringLength(MaxReceiptNumberLength)]
         public string ReceiptNumber { get; set; }
 

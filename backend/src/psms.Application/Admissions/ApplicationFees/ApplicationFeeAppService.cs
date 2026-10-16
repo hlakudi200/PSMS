@@ -149,15 +149,14 @@ public class ApplicationFeeAppService : ApplicationService, IApplicationFeeAppSe
             throw new UserFriendlyException(AdmissionsExceptionCodes.PaymentGatewayNotAvailable,
                 "There is no application fee to pay for this grade.");
 
-        /* The reference the webhook will be matched on. Kept on the fee row
-           before the payer leaves, so a webhook that beats them back still
-           finds something to settle. */
         var reference = $"YOCO-{application.ApplicationNumber}-{DateTime.UtcNow:yyyyMMddHHmmss}";
-        await EnsureFeeAsync(application, amount, reference);
-        await CurrentUnitOfWork.SaveChangesAsync();
-
         var returnTo = _configuration["App:ClientRootAddress"]?.TrimEnd('/') ?? string.Empty;
 
+        /* The checkout is created before the row is written so that both the
+           reference and the gateway's id for the checkout go in together, in
+           one insert. Nothing can arrive in between: the payer has not been
+           redirected yet, so there is no payment for a webhook to tell us
+           about until after this method has returned. */
         var checkout = await _yoco.CreateCheckoutAsync(
             amount,
             reference,
@@ -169,6 +168,12 @@ public class ApplicationFeeAppService : ApplicationService, IApplicationFeeAppSe
         if (!checkout.Success)
             throw new UserFriendlyException(AdmissionsExceptionCodes.PaymentGatewayNotAvailable,
                 checkout.Error ?? "Could not start the payment.");
+
+        /* The reference is what the webhook is matched on, and the checkout id
+           is what lets the server go and ask the gateway when no webhook ever
+           comes — which is what happened on the first real sandbox payment. */
+        await EnsureFeeAsync(application, amount, reference, checkout.CheckoutId);
+        await CurrentUnitOfWork.SaveChangesAsync();
 
         return new StartPaymentDto
         {
@@ -203,6 +208,71 @@ public class ApplicationFeeAppService : ApplicationService, IApplicationFeeAppSe
         });
     }
 
+    /// <summary>
+    /// Asks the gateway what became of this application's checkout, and settles
+    /// the fee if the money was taken.
+    /// <para>
+    /// The webhook is the normal path; this is the safety net that path needs.
+    /// A webhook can be unregistered, pointed at the wrong URL, refused for its
+    /// signature, or retried into a dead end — and on a live sandbox payment
+    /// that is exactly what happened: Yoco took the money and returned the
+    /// payer to the success URL, and the fee sat Pending. A parent who has paid
+    /// must not be left unpaid on the school's screen with no way back.
+    /// </para>
+    /// <para>
+    /// Safe to call repeatedly and safe to race the webhook: an already-settled
+    /// fee is reported as settled and nothing is written twice. It can only ever
+    /// agree with the gateway, never decide on its own.
+    /// </para>
+    /// </summary>
+    [AbpAuthorize(PermissionNames.Admissions_Applications_Submit)]
+    public async Task<PaymentResultDto> ConfirmPaymentAsync(Guid applicationId)
+    {
+        var application = await _applicationRepository.GetAsync(applicationId);
+        var fee = await _feeRepository.FirstOrDefaultAsync(f => f.ApplicationId == applicationId);
+
+        // The webhook may well have got here first. That is the happy case.
+        if (fee != null && fee.Status == PaymentStatus.Completed)
+            return new PaymentResultDto
+            {
+                Success = true,
+                ApplicationId = applicationId,
+                PaymentReference = fee.PaymentReference,
+                Status = fee.Status,
+                Message = "This fee is already paid.",
+            };
+
+        if (fee == null || string.IsNullOrWhiteSpace(fee.GatewayCheckoutId))
+            return new PaymentResultDto
+            {
+                Success = false,
+                ApplicationId = applicationId,
+                Message = "No online payment has been started for this application.",
+            };
+
+        var state = await _yoco.GetCheckoutAsync(fee.GatewayCheckoutId);
+
+        if (!string.IsNullOrWhiteSpace(state.Error))
+            return new PaymentResultDto { Success = false, ApplicationId = applicationId, Message = state.Error };
+
+        if (!state.IsPaid)
+            return new PaymentResultDto
+            {
+                Success = false,
+                ApplicationId = applicationId,
+                // Yoco's own word, not a guess at what it means. Whoever reads
+                // this needs to know what the gateway actually said.
+                Message = $"The payment service reports this checkout as '{state.Status ?? "unknown"}'.",
+            };
+
+        return await SettleAsync(application, new RecordPaymentDto
+        {
+            PaymentMethod = SouthAfricanPaymentMethod.CreditCard,
+            PaymentReference = fee.PaymentReference,
+            ReceiptNumber = state.PaymentId,
+        });
+    }
+
     [AbpAuthorize(PermissionNames.Financial_Payments_RecordManual)]
     public async Task<PaymentResultDto> RecordPaymentAsync(Guid applicationId, RecordPaymentDto input)
     {
@@ -231,13 +301,15 @@ public class ApplicationFeeAppService : ApplicationService, IApplicationFeeAppSe
     /// not exist yet and the save throws — which is what a parent pressing Pay
     /// on an application with no fee row actually got: a bare 500.
     /// </para>
-    private async Task<ApplicationFee> EnsureFeeAsync(Application application, decimal amount, string reference)
+    private async Task<ApplicationFee> EnsureFeeAsync(
+        Application application, decimal amount, string reference, string gatewayCheckoutId = null)
     {
         var fee = await _feeRepository.FirstOrDefaultAsync(f => f.ApplicationId == application.Id);
 
         if (fee != null)
         {
             fee.PaymentReference = reference;
+            if (gatewayCheckoutId != null) fee.GatewayCheckoutId = gatewayCheckoutId;
             await _feeRepository.UpdateAsync(fee);
             return fee;
         }
@@ -246,6 +318,7 @@ public class ApplicationFeeAppService : ApplicationService, IApplicationFeeAppSe
         {
             TenantId = AbpSession.TenantId,
             PaymentReference = reference,
+            GatewayCheckoutId = gatewayCheckoutId,
         };
 
         await _feeRepository.InsertAsync(fee);

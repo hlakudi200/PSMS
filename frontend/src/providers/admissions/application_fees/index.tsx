@@ -98,6 +98,22 @@ export const ApplicationFeeProvider = ({
     return response.data?.result;
   };
 
+  /**
+   * Asks the gateway what became of the checkout, and settles the fee if the
+   * money was taken.
+   *
+   * The webhook is the normal path and this is its safety net. A webhook can
+   * be unregistered, pointed at the wrong URL or refused for its signature,
+   * and a parent who has paid must not be left unpaid on the school's screen.
+   * It can only ever agree with the gateway, never decide on its own.
+   */
+  const confirmPaymentAsync = async (applicationId: string) => {
+    const response = await instance.post(
+      `/api/services/app/ApplicationFee/ConfirmPayment?applicationId=${applicationId}`
+    );
+    return response.data?.result;
+  };
+
   /** No money moves; the server refuses this unless the stand-in is configured. */
   const simulatePaymentAsync = async (applicationId: string) => {
     await instance.post(
@@ -128,6 +144,7 @@ export const ApplicationFeeProvider = ({
           processPaymentCallbackAsync,
           getCheckoutAsync,
           startPaymentAsync,
+          confirmPaymentAsync,
           simulatePaymentAsync,
           getPaymentStatusAsync,
         }}
