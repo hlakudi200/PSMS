@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Alert, Avatar, Button, Form, Input, Select, Spin, Typography, message } from "antd";
+import { Alert, Avatar, Button, Checkbox, Form, Input, Select, Spin, Typography, message } from "antd";
 import { BankOutlined, LockOutlined, MailOutlined, UserOutlined } from "@ant-design/icons";
 import { useRouter } from "next/navigation";
 import { z } from "zod";
@@ -41,6 +41,7 @@ const schema = z
       .regex(/[A-Z]/, "Include a capital letter.")
       .regex(/\d/, "Include a number."),
     confirmPassword: z.string(),
+    mayEmailMe: z.boolean(),
   })
   .refine((v) => v.password === v.confirmPassword, {
     path: ["confirmPassword"],
@@ -136,6 +137,7 @@ export default function RegisterPage() {
           surname: parsed.data.surname,
           emailAddress: parsed.data.emailAddress,
           password: parsed.data.password,
+          mayEmailMe: parsed.data.mayEmailMe,
         },
         { headers: { "Abp-TenantId": String(tenantId) }, suppressErrorModal: true }
       );
@@ -210,7 +212,15 @@ export default function RegisterPage() {
             />
           )}
 
-          <Form form={form} name="register" onFinish={handleSubmit} layout="vertical" size="large" disabled={submitting}>
+          <Form
+            form={form}
+            name="register"
+            onFinish={handleSubmit}
+            layout="vertical"
+            size="large"
+            disabled={submitting}
+            initialValues={{ mayEmailMe: true }}
+          >
             <Form.Item
               name="tenancyName"
               label="School you are applying to"
@@ -281,6 +291,20 @@ export default function RegisterPage() {
             <Form.Item name="confirmPassword" label="Confirm password" rules={[{ required: true, message: "Type the password again." }]}>
               <Input.Password placeholder="Confirm password" autoComplete="new-password" />
             </Form.Item>
+
+            {/* Every channel but in-app is consent-gated, and nothing asked. So
+                no applicant had a consent row, and the email telling a family
+                they had been offered a place was suppressed before it was sent
+                — while the offer ran out of time. Ticked to begin with: this is
+                the address they have just given in order to apply, and the line
+                above says it is where the school will contact them. */}
+            <Form.Item name="mayEmailMe" valuePropName="checked" style={{ marginBottom: 8 }}>
+              <Checkbox>Email me about this application</Checkbox>
+            </Form.Item>
+            <Paragraph type="secondary" style={{ fontSize: 12, marginTop: -4 }}>
+              Only about your own application — the fee, the school&rsquo;s decision, and
+              anything they need from you. You can turn this off at any time.
+            </Paragraph>
 
             <div className={styles.buttonRow}>
               <Button type="primary" htmlType="submit" loading={submitting} className={styles.signInButton}>
