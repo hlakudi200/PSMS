@@ -1,4 +1,4 @@
-using Abp.Dependency;
+﻿using Abp.Dependency;
 using Abp.Domain.Repositories;
 using Microsoft.EntityFrameworkCore;
 using psms.Domain.Academic.Entities;
@@ -14,6 +14,7 @@ using psms.Workflow.WorkflowInstances.Dto;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using psms.Shared;
 using System.Threading.Tasks;
 
 namespace psms.Workflow.Shared;
@@ -37,6 +38,8 @@ public class WorkflowEntitySummaryProvider : ITransientDependency
     private readonly IRepository<FieldTrip, Guid> _fieldTripRepository;
     private readonly IRepository<ExpenseRequest, Guid> _expenseRepository;
     private readonly IRepository<Student, Guid> _studentRepository;
+    private readonly IRepository<AdmissionInterview, Guid> _interviewRepository;
+    private readonly IRepository<AdmissionAssessment, Guid> _assessmentRepository;
 
     public WorkflowEntitySummaryProvider(
         IRepository<Application, Guid> applicationRepository,
@@ -47,7 +50,9 @@ public class WorkflowEntitySummaryProvider : ITransientDependency
         IRepository<StaffLeaveRequest, Guid> leaveRepository,
         IRepository<FieldTrip, Guid> fieldTripRepository,
         IRepository<ExpenseRequest, Guid> expenseRepository,
-        IRepository<Student, Guid> studentRepository)
+        IRepository<Student, Guid> studentRepository,
+        IRepository<AdmissionInterview, Guid> interviewRepository,
+        IRepository<AdmissionAssessment, Guid> assessmentRepository)
     {
         _applicationRepository = applicationRepository;
         _reportRepository = reportRepository;
@@ -58,6 +63,8 @@ public class WorkflowEntitySummaryProvider : ITransientDependency
         _fieldTripRepository = fieldTripRepository;
         _expenseRepository = expenseRepository;
         _studentRepository = studentRepository;
+        _interviewRepository = interviewRepository;
+        _assessmentRepository = assessmentRepository;
     }
 
     public async Task<WorkflowEntitySummaryDto> GetSummaryAsync(WorkflowEntityType entityType, Guid entityId)
@@ -236,6 +243,18 @@ public class WorkflowEntitySummaryProvider : ITransientDependency
 
     // ── per-type projections ──────────────────────────────────────────────
 
+    /// <summary>
+    /// Free text in a table cell: kept readable rather than pushing every other
+    /// column off the screen. The full note lives on the interview or the
+    /// assessment itself.
+    /// </summary>
+    private static string Trim(string text, int limit = 160)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return "\u2014";
+        var one = text.Replace("\r", " ").Replace("\n", " ").Trim();
+        return one.Length <= limit ? one : one.Substring(0, limit - 1) + "\u2026";
+    }
+
     private async Task<WorkflowEntitySummaryDto> ApplicationSummary(Guid id)
     {
         // Single round-trip: the application + its grade + parents + documents.
@@ -253,8 +272,15 @@ public class WorkflowEntitySummaryProvider : ITransientDependency
         F(applicant, "Full Name", Join(a.ProspectiveStudentFirstName, a.ProspectiveStudentMiddleName, a.ProspectiveStudentLastName));
         F(applicant, "Date of Birth", Date(a.DateOfBirth));
         F(applicant, "Gender", a.Gender.ToString());
-        F(applicant, "ID Number", a.IdNumber);
-        F(applicant, "Passport", a.PassportNumber);
+        /* Masked here as it is everywhere else a screen shows it. This summary
+           renders the linked record for whoever can view the workflow instance,
+           which is a wider group than the admissions permissions admit: a
+           teacher holding the Interview step is refused Application/Get and
+           ApplicationDocument/GetAllByApplication outright, and was still being
+           handed the learner's full thirteen-digit identity number through
+           here. Knowing who you are interviewing does not require it. */
+        F(applicant, "ID Number", PiiMasking.Mask(a.IdNumber));
+        F(applicant, "Passport", PiiMasking.Mask(a.PassportNumber));
         F(applicant, "SA Citizen", Bool(a.IsSACitizen));
         Add(dto, applicant);
 
@@ -287,6 +313,63 @@ public class WorkflowEntitySummaryProvider : ITransientDependency
                     Relationship(p.Relationship),
                     p.Email ?? p.PhoneNumber ?? "—",
                     Bool(p.IsPrimaryContact),
+                });
+            dto.Tables.Add(t);
+        }
+
+        /* What the Interview and Placement Assessment steps produced.
+           Recording an outcome that the decider never sees is the same as not
+           recording one: the assessment dialog tells the teacher "the principal
+           reads this before deciding", and until now the principal's screen
+           showed the applicant, the parents and the documents, and nothing at
+           all about either. */
+        var assessments = await _assessmentRepository.GetAll()
+            .Where(x => x.ApplicationId == id)
+            .OrderBy(x => x.ScheduledDate)
+            .ToListAsync();
+
+        if (assessments.Any())
+        {
+            var t = new WorkflowEntitySummaryTableDto
+            {
+                Heading = "Placement assessment",
+                Columns = new List<string> { "Set for", "Kind", "Result", "Outcome", "Notes" },
+            };
+            foreach (var x in assessments)
+                t.Rows.Add(new List<string>
+                {
+                    Date(x.ScheduledDate),
+                    x.Type.ToString(),
+                    x.CompletedDate.HasValue
+                        ? $"{x.TotalScore:0.##} / {x.MaxScore:0.##} ({x.Percentage:0.#}%)"
+                        : "Not marked yet",
+                    x.CompletedDate.HasValue ? (x.Passed ? "Passed" : "Did not pass") : "—",
+                    Trim(x.Feedback),
+                });
+            dto.Tables.Add(t);
+        }
+
+        var interviews = await _interviewRepository.GetAll()
+            .Where(x => x.ApplicationId == id)
+            .OrderBy(x => x.ScheduledDate)
+            .ToListAsync();
+
+        if (interviews.Any())
+        {
+            var t = new WorkflowEntitySummaryTableDto
+            {
+                Heading = "Interview",
+                Columns = new List<string> { "When", "Interviewer", "Status", "Rating", "Recommended", "Notes" },
+            };
+            foreach (var x in interviews)
+                t.Rows.Add(new List<string>
+                {
+                    Date(x.ScheduledDate),
+                    x.InterviewerName ?? "—",
+                    x.Status.ToString(),
+                    x.Rating.HasValue ? $"{x.Rating} / 5" : "—",
+                    x.Recommended.HasValue ? Bool(x.Recommended.Value) : "—",
+                    Trim(x.Notes),
                 });
             dto.Tables.Add(t);
         }
