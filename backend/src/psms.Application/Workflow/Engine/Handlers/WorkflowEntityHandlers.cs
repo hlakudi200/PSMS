@@ -2,6 +2,7 @@
 using Abp.Domain.Repositories;
 using Abp.UI;
 using Microsoft.EntityFrameworkCore;
+using psms.Admissions.Shared;
 using psms.Domain.Academic.Entities;
 using psms.Domain.Activities.Entities;
 using psms.Domain.Admissions.Entities;
@@ -38,7 +39,7 @@ public abstract class EntityHandlerBase<TEntity> : IWorkflowEntityHandler
     /// <summary>Default: the record returns to the requester as a draft.</summary>
     protected abstract void Reopened(TEntity entity, WorkflowEffectContext ctx);
 
-    public Task OnCompletedAsync(WorkflowEffectContext ctx) => RunAsync(ctx, Completed, "approve", AfterCompletedAsync);
+    public Task OnCompletedAsync(WorkflowEffectContext ctx) => RunAsync(ctx, Completed, "approve", AfterCompletedAsync, BeforeCompletedAsync);
     public Task OnRejectedAsync(WorkflowEffectContext ctx) => RunAsync(ctx, Rejected, "reject", AfterRejectedAsync);
     public Task OnCancelledAsync(WorkflowEffectContext ctx) => RunAsync(ctx, Reopened, "reopen");
     public Task OnRecalledAsync(WorkflowEffectContext ctx) => RunAsync(ctx, Reopened, "reopen");
@@ -61,16 +62,34 @@ public abstract class EntityHandlerBase<TEntity> : IWorkflowEntityHandler
 
     protected virtual Task AfterRejectedAsync(TEntity entity, WorkflowEffectContext ctx) => Task.CompletedTask;
 
+    /// <summary>
+    /// A last look before the decision is written, for anything that has to be
+    /// refused and cannot be asked synchronously.
+    /// <para>
+    /// Throwing here stops the write-back and rolls the transition back, so
+    /// the workflow and the record stay in step. It runs before the entity is
+    /// touched, which is the point: a refusal after <c>Completed</c> has
+    /// already changed the aggregate would be a refusal of something that had
+    /// in part happened.
+    /// </para>
+    /// </summary>
+    protected virtual Task BeforeCompletedAsync(TEntity entity, WorkflowEffectContext ctx) => Task.CompletedTask;
+
     private async Task RunAsync(
         WorkflowEffectContext ctx,
         Action<TEntity, WorkflowEffectContext> action,
         string verb,
-        Func<TEntity, WorkflowEffectContext, Task> after = null)
+        Func<TEntity, WorkflowEffectContext, Task> after = null,
+        Func<TEntity, WorkflowEffectContext, Task> before = null)
     {
         var entity = await Repository.GetAll().FirstOrDefaultAsync(e => e.Id == ctx.EntityId);
         if (entity == null)
             throw new UserFriendlyException(WorkflowExceptionCodes.EntityWriteBackFailed,
                 $"The linked {typeof(TEntity).Name} no longer exists, so the workflow cannot {verb} it.");
+
+        if (before != null)
+            await before(entity, ctx);
+
         try
         {
             action(entity, ctx);
@@ -94,14 +113,64 @@ public class ApplicationWorkflowHandler : EntityHandlerBase<Application>, ITrans
 {
     private readonly IRepository<Waitlist, Guid> _waitlists;
     private readonly psms.Admissions.Offers.AdmissionsNotifier _notifier;
+    private readonly psms.Admissions.AdmissionSettings.GradeCapacityReader _capacity;
 
     public ApplicationWorkflowHandler(
         IRepository<Application, Guid> r,
         IRepository<Waitlist, Guid> waitlists,
-        psms.Admissions.Offers.AdmissionsNotifier notifier) : base(r)
+        psms.Admissions.Offers.AdmissionsNotifier notifier,
+        psms.Admissions.AdmissionSettings.GradeCapacityReader capacity) : base(r)
     {
         _waitlists = waitlists;
         _notifier = notifier;
+        _capacity = capacity;
+    }
+
+    /// <summary>The decisions that give a child a place.</summary>
+    private static bool IsAnOffer(AdmissionDecision? decision) =>
+        decision == AdmissionDecision.Accepted
+        || decision == AdmissionDecision.ConditionalAcceptance
+        || decision == null;   // the default branch below accepts
+
+    /// <summary>
+    /// Offering a place in a grade that has none left is refused once, with the
+    /// numbers, unless the principal says to do it anyway.
+    /// <para>
+    /// Capacity was checked only at enrolment, which is far too late: ten
+    /// applicants could be accepted for two places, all ten told yes, and the
+    /// eight who could not be enrolled found out after they had been offered a
+    /// place. The screens had warned and the arithmetic was right; the decision
+    /// simply never consulted it.
+    /// </para>
+    /// <para>
+    /// Not a hard block, deliberately. Schools over-offer on purpose, expecting
+    /// some families to decline, and a system that forbade it would be wrong
+    /// about how admissions actually works. The point is that going past the
+    /// last place should be something somebody chose, with the numbers in front
+    /// of them — not something nobody was told about. Ticking the box is
+    /// recorded in the decision, so there is an answer to "who offered the
+    /// eleventh place".
+    /// </para>
+    /// </summary>
+    protected override async Task BeforeCompletedAsync(Application a, WorkflowEffectContext ctx)
+    {
+        var decision = ctx.Decision.GetEnum<AdmissionDecision>("decision");
+        if (!IsAnOffer(decision)) return;
+
+        // Already holds a place: re-deciding an approved application is not a
+        // new demand on the grade.
+        if (a.Status == ApplicationStatus.Approved || a.Status == ApplicationStatus.Enrolled) return;
+
+        if (ctx.Decision.GetBool("offerBeyondCapacity") == true) return;
+
+        var (wouldOverfill, explanation) = await _capacity
+            .WouldOverfillAsync(a.AcademicYearId, a.AppliedGradeId);
+
+        if (!wouldOverfill) return;
+
+        throw new UserFriendlyException(AdmissionsExceptionCodes.GradeCapacityFull,
+            explanation + " Place this applicant on the waitlist, or tick "
+            + "'Offer even though the grade is full' to offer anyway.");
     }
 
     public override WorkflowEntityType EntityType => WorkflowEntityType.Application;

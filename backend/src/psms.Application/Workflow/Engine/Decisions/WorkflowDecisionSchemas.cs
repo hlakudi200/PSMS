@@ -157,6 +157,19 @@ public class ApplicationDecisionSchema : IWorkflowDecisionSchema, ITransientDepe
             },
         },
         new WorkflowDecisionField { Key = "offerExpiryDays", Label = "Offer valid for (days)", Type = "number", Required = false, Min = 1, Max = 60, Placeholder = "14" },
+        new WorkflowDecisionField
+        {
+            // Off by default and only consulted when the grade is actually
+            // full: a principal with places left never has to think about it,
+            // and one without is refused once, told the numbers, and has to
+            // come back and tick this. Schools do over-offer on purpose, so
+            // the answer to a full grade is a decision, not a prohibition —
+            // and ticking it is recorded against the person who did.
+            Key = "offerBeyondCapacity",
+            Label = "Offer even though the grade is full",
+            Type = "boolean",
+            Required = false,
+        },
     };
 
     /// <summary>
