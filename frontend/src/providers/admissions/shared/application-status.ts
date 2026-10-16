@@ -56,6 +56,24 @@ const forParents: Record<number, Presentation> = {
 export const applicationStatusLabel = (status: number): string =>
   forParents[status]?.label ?? 'In progress';
 
+/**
+ * The same line, once the family's own answer is known.
+ *
+ * "Offered a place" is the truth about an application the school has approved
+ * and nobody has answered. It stops being the truth the moment the family
+ * accepts, and it was still being printed directly above "You accepted the
+ * place in Grade 11" — the screen contradicting itself a line apart.
+ */
+export const applicationStandingLabel = (
+  status: number,
+  offerAcceptedDate?: string,
+  offerDeclinedDate?: string,
+): string => {
+  if (status === ApplicationStatus.Approved && offerAcceptedDate) return 'Place accepted';
+  if (status === ApplicationStatus.Approved && offerDeclinedDate) return 'Place turned down';
+  return applicationStatusLabel(status);
+};
+
 export const applicationStatusColor = (status: number): string =>
   forParents[status]?.color ?? 'default';
 

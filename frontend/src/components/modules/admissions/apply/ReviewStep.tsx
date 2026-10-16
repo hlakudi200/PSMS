@@ -12,7 +12,7 @@ import type { IApplicantParent, IApplication } from '@/providers/admissions/shar
 import OfferPanel from '@/components/modules/admissions/apply/OfferPanel';
 import WaitlistPanel from '@/components/modules/admissions/apply/WaitlistPanel';
 import {
-  ApplicationStatus, applicationStatusLabel, canWithdraw,
+  ApplicationStatus, applicationStandingLabel, applicationStatusLabel, canWithdraw,
 } from '@/providers/admissions/shared/application-status';
 
 const { Paragraph, Text } = Typography;
@@ -177,7 +177,11 @@ export default function ReviewStep({
               </Text>
               <Text type="secondary">Keep that number — the school will ask for it.</Text>
               <Text type="secondary">
-                Where it stands: {applicationStatusLabel(application.status)}.
+                Where it stands: {applicationStandingLabel(
+                  application.status,
+                  application.offerAcceptedDate,
+                  application.offerDeclinedDate,
+                )}.
               </Text>
             </Space>
           }
