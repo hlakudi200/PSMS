@@ -1,4 +1,4 @@
-using Castle.Core.Logging;
+﻿using Castle.Core.Logging;
 using System.Threading.Tasks;
 
 namespace psms.Communication.Channels.Email;
@@ -30,6 +30,20 @@ public class ConfiguredEmailGateway : IEmailGateway
         _smtp = smtp;
         _resend = resend;
     }
+
+    /// <summary>
+    /// Which provider a send would go through right now: <c>Smtp</c>,
+    /// <c>Resend</c>, or <c>none</c>.
+    /// <para>
+    /// Worth asking, because precedence is invisible from the outside. A
+    /// deployment whose SMTP settings cannot work — this host blocks outbound
+    /// SMTP — keeps choosing SMTP until those settings are cleared, and
+    /// "it still is not sending" after adding a Resend key is a confusing
+    /// place to be without being told which one is being tried.
+    /// </para>
+    /// </summary>
+    public string SelectedProvider =>
+        _smtp.IsConfigured ? "Smtp" : _resend.IsConfigured ? "Resend" : "none";
 
     public Task<GatewaySendResult> SendAsync(string toEmail, string subject, string htmlBody)
     {

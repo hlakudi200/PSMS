@@ -191,6 +191,28 @@ public class EmailGoesOutThroughResend_Tests
     }
 
     [Fact]
+    public void The_diagnostic_says_which_provider_it_tried()
+    {
+        /* Precedence is invisible from outside. A deployment whose SMTP
+           settings cannot work — this host blocks outbound SMTP — keeps
+           choosing SMTP until those settings are cleared, and "it still is not
+           sending" after adding a Resend key is a confusing place to be
+           without being told which one is being tried. */
+        Routed().SelectedProvider.ShouldBe("none");
+
+        Routed(("Resend:ApiKey", "re_test_key"), ("Resend:From", "a@example.test"))
+            .SelectedProvider.ShouldBe("Resend");
+
+        Routed(("Smtp:Host", "smtp.gmail.com"), ("Smtp:UserName", "a@example.test"), ("Smtp:Password", "p"))
+            .SelectedProvider.ShouldBe("Smtp");
+
+        // Both set: SMTP still wins, which is the thing that needs saying out loud.
+        Routed(("Smtp:Host", "smtp.gmail.com"), ("Smtp:UserName", "a@example.test"), ("Smtp:Password", "p"),
+               ("Resend:ApiKey", "re_test_key"), ("Resend:From", "a@example.test"))
+            .SelectedProvider.ShouldBe("Smtp");
+    }
+
+    [Fact]
     public void There_is_a_way_to_ask_whether_email_works_at_all()
     {
         /* Finding out otherwise meant registering an applicant, filling in an
