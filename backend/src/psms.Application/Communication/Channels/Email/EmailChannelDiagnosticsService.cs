@@ -1,4 +1,4 @@
-using Abp.Application.Services;
+﻿using Abp.Application.Services;
 using Abp.Authorization;
 using Abp.Domain.Repositories;
 using Abp.Runtime.Session;
@@ -11,6 +11,9 @@ namespace psms.Communication.Channels.Email;
 /// <summary>What the email channel did when asked to prove itself.</summary>
 public class EmailChannelTestResult
 {
+    /// <summary>Which provider was tried: Smtp, Resend, or none.</summary>
+    public string Provider { get; set; }
+
     /// <summary>Where it was sent, masked.</summary>
     public string SentTo { get; set; }
 
@@ -68,6 +71,7 @@ public class EmailChannelDiagnosticsService : ApplicationService
         if (string.IsNullOrWhiteSpace(user.EmailAddress))
             return new EmailChannelTestResult
             {
+                Provider = (_gateway as ConfiguredEmailGateway)?.SelectedProvider ?? "unknown",
                 Success = false,
                 Error = "Your account has no email address, so there is nowhere to send it.",
             };
@@ -81,6 +85,7 @@ public class EmailChannelDiagnosticsService : ApplicationService
 
         return new EmailChannelTestResult
         {
+            Provider = (_gateway as ConfiguredEmailGateway)?.SelectedProvider ?? "unknown",
             SentTo = ResendEmailGateway.Mask(user.EmailAddress),
             Success = result.Success,
             NotConfigured = result.NotConfigured,
