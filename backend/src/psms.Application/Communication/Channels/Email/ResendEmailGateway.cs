@@ -1,4 +1,4 @@
-using Castle.Core.Logging;
+﻿using Castle.Core.Logging;
 using Microsoft.Extensions.Configuration;
 using System;
 using System.Net;
@@ -80,8 +80,20 @@ public class ResendEmailGateway : IEmailGateway
 
         if (string.IsNullOrWhiteSpace(apiKey) || string.IsNullOrWhiteSpace(from))
         {
-            Logger.Info("Email send skipped — set Resend__ApiKey and Resend__From to enable it.");
-            return GatewaySendResult.NotConfiguredResult("Email");
+            /* Which setting is missing, in the result and not only the server
+               log. An operator debugging a silent channel reads the delivery
+               log, and "Email gateway is not configured" after they have just
+               set a key sends them looking in the wrong place — the usual
+               answer being that they set the key and not the from address,
+               which this gateway needs both of. */
+            var missing = string.IsNullOrWhiteSpace(apiKey)
+                ? (string.IsNullOrWhiteSpace(from) ? "Resend__ApiKey and Resend__From" : "Resend__ApiKey")
+                : "Resend__From";
+
+            var message = $"Email is not configured: set {missing}.";
+            Logger.Info($"Email send skipped — {message}");
+
+            return new GatewaySendResult { NotConfigured = true, Success = false, Error = message };
         }
 
         if (string.IsNullOrWhiteSpace(toEmail))

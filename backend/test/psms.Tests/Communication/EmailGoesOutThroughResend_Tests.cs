@@ -70,6 +70,24 @@ public class EmailGoesOutThroughResend_Tests
         result.NotConfigured.ShouldBeTrue();
         result.Success.ShouldBeFalse();
         result.Error.ShouldContain("not configured");
+        // Which setting, because the operator reads the delivery log.
+        result.Error.ShouldContain("Resend__ApiKey");
+        result.Error.ShouldContain("Resend__From");
+    }
+
+    [Fact]
+    public async Task A_key_with_no_from_address_says_which_one_is_missing()
+    {
+        /* The usual way to get this wrong, and the one that cost a round trip:
+           the key is set, the from address is not, and "Email gateway is not
+           configured" sends you looking at the key you just set. */
+        var gateway = With(("Resend:ApiKey", "re_test_key"));
+
+        var result = await gateway.SendAsync("parent@example.test", "s", "<p>b</p>");
+
+        result.NotConfigured.ShouldBeTrue();
+        result.Error.ShouldContain("Resend__From");
+        result.Error.ShouldNotContain("Resend__ApiKey");
     }
 
     [Fact]
