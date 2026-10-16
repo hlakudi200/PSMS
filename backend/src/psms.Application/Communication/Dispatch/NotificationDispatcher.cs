@@ -1,4 +1,4 @@
-using Abp.BackgroundJobs;
+﻿using Abp.BackgroundJobs;
 using Abp.Dependency;
 using Abp.Domain.Repositories;
 using Castle.Core.Logging;
@@ -138,7 +138,18 @@ public class NotificationDispatcher : INotificationDispatcher, ITransientDepende
                 await WriteSuppressedLogAsync(request, recipientUserId, channel, $"Disabled by the recipient's preference for {request.Type}.");
                 return SendOutcome.Suppressed;
             }
-            if (!gate.GrantedChannels.Contains(channel))
+            if (gate.RefusedChannels.Contains(channel))
+            {
+                // An actual no, from somebody who was asked. Always honoured.
+                await WriteSuppressedLogAsync(request, recipientUserId, channel, "The recipient has turned this channel off.");
+                return SendOutcome.Suppressed;
+            }
+
+            /* No row at all. For anything broadcast that means no, and it stays
+               no. For a message about the recipient's own application it means
+               nobody ever asked them — and suppressing on that basis is how a
+               family missed the offer of a place. */
+            if (!request.IsTransactional && !gate.GrantedChannels.Contains(channel))
             {
                 await WriteSuppressedLogAsync(request, recipientUserId, channel, "No consent on file for this channel.");
                 return SendOutcome.Suppressed;
@@ -182,6 +193,13 @@ public class NotificationDispatcher : INotificationDispatcher, ITransientDepende
     {
         public HashSet<NotificationChannel> DisabledChannels { get; set; } = new HashSet<NotificationChannel>();
         public HashSet<NotificationChannel> GrantedChannels { get; set; } = new HashSet<NotificationChannel>();
+
+        /// <summary>
+        /// Channels the recipient has actually said no to, as opposed to ones
+        /// nobody ever asked them about. A transactional message may override
+        /// the second and never the first.
+        /// </summary>
+        public HashSet<NotificationChannel> RefusedChannels { get; set; } = new HashSet<NotificationChannel>();
     }
 
     /// <summary>Load the recipient's per-category opt-outs + granted consents once per recipient.</summary>
@@ -192,15 +210,18 @@ public class NotificationDispatcher : INotificationDispatcher, ITransientDepende
             .Select(p => p.Channel)
             .ToListAsync();
 
-        var granted = await _consentRepository.GetAll()
-            .Where(c => c.UserId == userId && c.IsGranted)
-            .Select(c => c.Channel)
+        var consents = await _consentRepository.GetAll()
+            .Where(c => c.UserId == userId)
+            .Select(c => new { c.Channel, c.IsGranted })
             .ToListAsync();
 
         return new RecipientGate
         {
             DisabledChannels = disabled.ToHashSet(),
-            GrantedChannels = granted.ToHashSet()
+            GrantedChannels = consents.Where(c => c.IsGranted).Select(c => c.Channel).ToHashSet(),
+            // Told apart from "no row" on purpose: silence is not a no, but a
+            // no is, and only one of the two may ever be overridden.
+            RefusedChannels = consents.Where(c => !c.IsGranted).Select(c => c.Channel).ToHashSet(),
         };
     }
 

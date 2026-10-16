@@ -170,21 +170,24 @@ public class EmailGoesOutThroughResend_Tests
     }
 
     [Fact]
-    public async Task Smtp_wins_when_a_school_has_filled_it_in()
+    public async Task Smtp_is_used_when_it_is_the_only_one_configured()
     {
-        /* A school that configured SMTP has said what it wants. Reaching for
-           Resend instead would send from an address they did not choose. */
+        /* This used to assert the opposite — that SMTP won whenever it was
+           configured, on the grounds that a school filling it in had said what
+           it wanted. That was wrong in the way that mattered: the host blocks
+           outbound SMTP, so the preference chose a provider that could not work
+           while a working one sat beside it, and every admissions email failed
+           with "the mail server did not answer within 20 seconds". The API is
+           preferred now; SMTP is for a school that has only a mail account. */
         var routed = Routed(
             ("Smtp:Host", "smtp.invalid.test"),
             ("Smtp:UserName", "school@example.test"),
-            ("Smtp:Password", "app-password"),
-            ("Resend:ApiKey", "re_test_key"),
-            ("Resend:From", "a@example.test"));
+            ("Smtp:Password", "app-password"));
 
         var result = await routed.SendAsync("parent@example.test", "s", "<p>b</p>");
 
-        // The host does not resolve, so it fails — but as SMTP, not as Resend,
-        // and not as "not configured".
+        // The host does not resolve, so it fails — but as SMTP, and not as
+        // "not configured".
         result.NotConfigured.ShouldBeFalse();
         result.Success.ShouldBeFalse();
         result.Error.ShouldContain("mail server");
@@ -206,10 +209,11 @@ public class EmailGoesOutThroughResend_Tests
         Routed(("Smtp:Host", "smtp.gmail.com"), ("Smtp:UserName", "a@example.test"), ("Smtp:Password", "p"))
             .SelectedProvider.ShouldBe("Smtp");
 
-        // Both set: SMTP still wins, which is the thing that needs saying out loud.
+        // Both set: the API wins, which is the thing that needs saying out loud.
+        // It used to be SMTP, on a host that blocks it.
         Routed(("Smtp:Host", "smtp.gmail.com"), ("Smtp:UserName", "a@example.test"), ("Smtp:Password", "p"),
                ("Resend:ApiKey", "re_test_key"), ("Resend:From", "a@example.test"))
-            .SelectedProvider.ShouldBe("Smtp");
+            .SelectedProvider.ShouldBe("Resend");
     }
 
     [Fact]

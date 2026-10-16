@@ -1,4 +1,4 @@
-using psms.Domain.Shared.Enums;
+﻿using psms.Domain.Shared.Enums;
 using System;
 using System.Collections.Generic;
 
@@ -38,6 +38,26 @@ public class NotificationRequest
     /// double-sends. Null = no dedup (e.g. ad-hoc manual sends).
     /// </summary>
     public string IdempotencyKey { get; set; }
+
+    /// <summary>
+    /// This message is about something the recipient themselves asked for —
+    /// their own application, their own fee, their own child's place.
+    /// <para>
+    /// COMM-05 gates external channels on a consent row, which is right for
+    /// anything broadcast and wrong for this. Nobody had ever been asked, so
+    /// no applicant had a row, so the email telling a family they had been
+    /// offered a place was suppressed before it reached a provider while the
+    /// offer quietly ran out. Registration asks now, but that does nothing for
+    /// a family who applied last term.
+    /// </para>
+    /// <para>
+    /// Transactional messages skip the <i>absence</i> of consent. They do not
+    /// skip a refusal: a recipient who has actually said no, or who has turned
+    /// this category off, is still not sent anything. Silence is not a no, but
+    /// a no is.
+    /// </para>
+    /// </summary>
+    public bool IsTransactional { get; set; }
 
     /// <summary>
     /// COMM-06: optional template key. When set, channel providers render the
