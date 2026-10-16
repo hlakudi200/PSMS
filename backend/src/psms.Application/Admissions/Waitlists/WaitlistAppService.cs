@@ -1,4 +1,4 @@
-using Abp.Application.Services;
+﻿using Abp.Application.Services;
 using Abp.Application.Services.Dto;
 using Abp.Authorization;
 using Abp.Domain.Repositories;
@@ -27,18 +27,67 @@ public class WaitlistAppService : ApplicationService, IWaitlistAppService
 {
     private readonly IRepository<Waitlist, Guid> _waitlistRepository;
     private readonly IRepository<Application, Guid> _applicationRepository;
+    private readonly ICurrentApplicantResolver _currentApplicant;
 
     public WaitlistAppService(
         IRepository<Waitlist, Guid> waitlistRepository,
-        IRepository<Application, Guid> applicationRepository)
+        IRepository<Application, Guid> applicationRepository,
+        ICurrentApplicantResolver currentApplicant)
     {
         _waitlistRepository = waitlistRepository;
         _applicationRepository = applicationRepository;
+        _currentApplicant = currentApplicant;
+    }
+
+    /// <summary>
+    /// Refuses a family anything but their own.
+    /// <para>
+    /// An applicant holds the waitlist view, accept and decline permissions so
+    /// they can answer about their own child. Nothing checked that the entry
+    /// they named was theirs: <c>GetByApplication</c> and <c>GetPosition</c>
+    /// took any application id and answered with another family's child, their
+    /// grade and their place in the queue — and <c>AcceptOffer</c> and
+    /// <c>DeclineOffer</c> took any waitlist id and <b>acted on it</b>. One
+    /// family could take or throw away a place offered to another.
+    /// </para>
+    /// <para>
+    /// Staff are told apart by Applications.ViewAll, which no applicant holds.
+    /// </para>
+    /// </summary>
+    private async Task EnsureTheirsAsync(Guid applicationId)
+    {
+        var ownerOnly = await _currentApplicant.GetOwnApplicationsOnlyForAsync();
+        if (!ownerOnly.HasValue) return;
+
+        var application = await _applicationRepository
+            .FirstOrDefaultAsync(a => a.Id == applicationId);
+
+        // Same answer for "does not exist" and "is not yours", so the ids of
+        // other families' applications cannot be discovered by asking.
+        if (application == null || application.CreatorUserId != ownerOnly.Value)
+            throw new UserFriendlyException(AdmissionsExceptionCodes.ApplicationNotFound,
+                "Application not found.");
+    }
+
+    /// <summary>The same check, for the calls that name a waitlist entry rather than an application.</summary>
+    private async Task EnsureEntryIsTheirsAsync(Guid waitlistId)
+    {
+        var ownerOnly = await _currentApplicant.GetOwnApplicationsOnlyForAsync();
+        if (!ownerOnly.HasValue) return;
+
+        var entry = await _waitlistRepository.FirstOrDefaultAsync(w => w.Id == waitlistId);
+        if (entry == null)
+            throw new UserFriendlyException(AdmissionsExceptionCodes.WaitlistNotFound,
+                "Waitlist entry not found.");
+
+        await EnsureTheirsAsync(entry.ApplicationId);
     }
 
     [AbpAuthorize(PermissionNames.Admissions_Waitlist_View)]
     public async Task<WaitlistDto> GetAsync(Guid id)
     {
+        await EnsureEntryIsTheirsAsync(id);
+
         var waitlist = await _waitlistRepository
             .GetAll()
             .Include(w => w.Application)
@@ -55,6 +104,8 @@ public class WaitlistAppService : ApplicationService, IWaitlistAppService
     [AbpAuthorize(PermissionNames.Admissions_Waitlist_View)]
     public async Task<WaitlistDto> GetByApplicationAsync(Guid applicationId)
     {
+        await EnsureTheirsAsync(applicationId);
+
         var waitlist = await _waitlistRepository
             .GetAll()
             .Include(w => w.Application)
@@ -179,6 +230,8 @@ public class WaitlistAppService : ApplicationService, IWaitlistAppService
     [AbpAuthorize(PermissionNames.Admissions_Waitlist_AcceptOffer)]
     public async Task<WaitlistDto> AcceptOfferAsync(Guid id)
     {
+        await EnsureEntryIsTheirsAsync(id);
+
         var waitlist = await _waitlistRepository.GetAsync(id);
 
         if (waitlist.Status != WaitlistStatus.Offered)
@@ -193,9 +246,14 @@ public class WaitlistAppService : ApplicationService, IWaitlistAppService
         waitlist.AcceptOffer();
         await _waitlistRepository.UpdateAsync(waitlist);
 
-        // Update application status to approved from waitlist
+        /* A place taken off the waiting list is a place taken. ApproveFromWaitlist
+           moves the application to Approved with a fresh offer window on it, and
+           without this the family would be shown that offer and asked to accept
+           the very thing they just accepted. Recorded as their own act, because
+           it is. */
         var application = await _applicationRepository.GetAsync(waitlist.ApplicationId);
         application.ApproveFromWaitlist();
+        application.AcceptOffer(AbpSession.UserId);
         await _applicationRepository.UpdateAsync(application);
 
         await CurrentUnitOfWork.SaveChangesAsync();
@@ -209,6 +267,8 @@ public class WaitlistAppService : ApplicationService, IWaitlistAppService
     [AbpAuthorize(PermissionNames.Admissions_Waitlist_DeclineOffer)]
     public async Task<WaitlistDto> DeclineOfferAsync(Guid id)
     {
+        await EnsureEntryIsTheirsAsync(id);
+
         var waitlist = await _waitlistRepository.GetAsync(id);
 
         if (waitlist.Status != WaitlistStatus.Offered)
@@ -230,6 +290,8 @@ public class WaitlistAppService : ApplicationService, IWaitlistAppService
     [AbpAuthorize(PermissionNames.Admissions_Waitlist_Withdraw)]
     public async Task WithdrawAsync(Guid id)
     {
+        await EnsureEntryIsTheirsAsync(id);
+
         var waitlist = await _waitlistRepository.GetAsync(id);
 
         if (waitlist.Status == WaitlistStatus.Accepted || waitlist.Status == WaitlistStatus.Withdrawn)
@@ -251,6 +313,8 @@ public class WaitlistAppService : ApplicationService, IWaitlistAppService
     [AbpAuthorize(PermissionNames.Admissions_Waitlist_View)]
     public async Task<WaitlistPositionDto> GetPositionAsync(Guid applicationId)
     {
+        await EnsureTheirsAsync(applicationId);
+
         var waitlist = await _waitlistRepository
             .GetAll()
             .Include(w => w.Application)
