@@ -1,6 +1,7 @@
 ﻿using Castle.Core.Logging;
 using Microsoft.Extensions.Configuration;
 using System;
+using System.Collections.Generic;
 using System.Net;
 using System.Net.Mail;
 using System.Threading;
@@ -71,6 +72,24 @@ public class SmtpEmailGateway : IEmailGateway
             return !string.IsNullOrWhiteSpace(host)
                 && !string.IsNullOrWhiteSpace(userName)
                 && !string.IsNullOrWhiteSpace(password);
+        }
+    }
+
+    /// <summary>
+    /// The settings this provider still needs, by the name they are set under.
+    /// Empty when it is ready. Names only, never a value — see the same
+    /// property on <see cref="ResendEmailGateway"/>.
+    /// </summary>
+    public string[] MissingSettings
+    {
+        get
+        {
+            var (host, _, userName, password, _, _, _) = GetConfig();
+            var missing = new List<string>();
+            if (string.IsNullOrWhiteSpace(host)) missing.Add("Smtp__Host");
+            if (string.IsNullOrWhiteSpace(userName)) missing.Add("Smtp__UserName");
+            if (string.IsNullOrWhiteSpace(password)) missing.Add("Smtp__Password");
+            return missing.ToArray();
         }
     }
 
