@@ -1,4 +1,4 @@
-using Abp.Dependency;
+﻿using Abp.Dependency;
 using Abp.Domain.Repositories;
 using Abp.Domain.Uow;
 using Abp.Linq.Extensions;
@@ -40,15 +40,18 @@ public class AdmissionOfferExpirer : ITransientDependency
 {
     private readonly IRepository<Application, Guid> _applications;
     private readonly IUnitOfWorkManager _unitOfWorkManager;
+    private readonly AdmissionsNotifier _notifier;
 
     public ILogger Logger { get; set; } = NullLogger.Instance;
 
     public AdmissionOfferExpirer(
         IRepository<Application, Guid> applications,
-        IUnitOfWorkManager unitOfWorkManager)
+        IUnitOfWorkManager unitOfWorkManager,
+        AdmissionsNotifier notifier)
     {
         _applications = applications;
         _unitOfWorkManager = unitOfWorkManager;
+        _notifier = notifier;
     }
 
     /// <summary>
@@ -65,6 +68,7 @@ public class AdmissionOfferExpirer : ITransientDependency
         using (_unitOfWorkManager.Current.DisableFilter(AbpDataFilters.MayHaveTenant))
         {
             var lapsed = await _applications.GetAll()
+                .Include(a => a.AppliedGrade)
                 .Where(a => a.Status == ApplicationStatus.Approved
                             && a.ExpiryDate.HasValue
                             && a.ExpiryDate.Value < now
@@ -86,6 +90,10 @@ public class AdmissionOfferExpirer : ITransientDependency
                     application.Expire();
                     await _applications.UpdateAsync(application);
                     report.Expired.Add(application.ApplicationNumber);
+
+                    // The family is told their place is gone. Not telling them
+                    // is how a lapse becomes a complaint.
+                    await _notifier.OfferLapsedAsync(application);
                 }
                 catch (InvalidOperationException ex)
                 {
@@ -102,7 +110,48 @@ public class AdmissionOfferExpirer : ITransientDependency
             foreach (var report in byTenant.Values)
                 Logger.Info($"Expired {report.Count} lapsed admission offer(s) for tenant {report.TenantId}.");
 
+            await WarnAboutOffersRunningOutAsync(tenantId, now);
+
             return byTenant.Values.OrderBy(r => r.TenantId).ToList();
         }
     }
+
+    /// <summary>
+    /// Reminds a family before the offer goes, rather than only telling them
+    /// afterwards.
+    /// <para>
+    /// Once a week out and once two days out. The dispatcher dedupes on the
+    /// key, which carries the day count, so the hourly sweep sends each of
+    /// those exactly once however often it runs.
+    /// </para>
+    /// </summary>
+    private async Task WarnAboutOffersRunningOutAsync(int? tenantId, DateTime now)
+    {
+        foreach (var daysLeft in RemindAt)
+        {
+            // Everything whose deadline falls inside the day that many days out.
+            var from = now.Date.AddDays(daysLeft);
+            var to = from.AddDays(1);
+
+            var running = await _applications.GetAll()
+                .Include(a => a.AppliedGrade)
+                .Where(a => a.Status == ApplicationStatus.Approved
+                            && a.ExpiryDate.HasValue
+                            && a.ExpiryDate.Value >= from
+                            && a.ExpiryDate.Value < to
+                            && a.OfferAcceptedDate == null
+                            && a.OfferDeclinedDate == null)
+                .WhereIf(tenantId.HasValue, a => a.TenantId == tenantId.Value)
+                .ToListAsync();
+
+            foreach (var application in running)
+                await _notifier.OfferRunningOutAsync(application, daysLeft);
+
+            if (running.Count > 0)
+                Logger.Info($"Reminded {running.Count} family/families with {daysLeft} day(s) left to answer.");
+        }
+    }
+
+    /// <summary>Days before the deadline a reminder goes out.</summary>
+    private static readonly int[] RemindAt = { 7, 2 };
 }
