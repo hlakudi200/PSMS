@@ -4,6 +4,7 @@ import {
   INITIAL_STATE,
   ApplicationFeeActionContext,
   ApplicationFeeStateContext,
+  type IStartPayment,
 } from "./context";
 import {
   IRecordPayment,
@@ -83,6 +84,20 @@ export const ApplicationFeeProvider = ({
     return response.data?.result;
   };
 
+  /**
+   * Starts a real checkout and returns where to send the payer.
+   *
+   * Nothing is recorded by this call. The fee is marked paid when the gateway
+   * says so on a signed webhook, which may well arrive before the payer gets
+   * back — and may arrive long after, if they paid and closed the tab.
+   */
+  const startPaymentAsync = async (applicationId: string): Promise<IStartPayment> => {
+    const response = await instance.post(
+      `/api/services/app/ApplicationFee/StartPayment?applicationId=${applicationId}`
+    );
+    return response.data?.result;
+  };
+
   /** No money moves; the server refuses this unless the stand-in is configured. */
   const simulatePaymentAsync = async (applicationId: string) => {
     await instance.post(
@@ -112,6 +127,7 @@ export const ApplicationFeeProvider = ({
           recordPaymentAsync,
           processPaymentCallbackAsync,
           getCheckoutAsync,
+          startPaymentAsync,
           simulatePaymentAsync,
           getPaymentStatusAsync,
         }}
