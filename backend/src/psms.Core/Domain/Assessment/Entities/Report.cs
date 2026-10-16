@@ -382,6 +382,14 @@ namespace psms.Domain.Assessment.Entities
             PublishedDate = DateTime.UtcNow;
             Status = ReportStatus.Published;
 
+            // An acknowledgement was of the card that was withdrawn, not of
+            // this corrected one, so the family acknowledges again.
+            if (WasWithdrawn())
+            {
+                ParentAcknowledgedDate = null;
+                ParentComment = null;
+            }
+
             // Issuing it again settles any earlier withdrawal: the card in a
             // family's hands is this one.
             WithdrawnDate = null;
