@@ -264,6 +264,24 @@ public class TheApplicationFeeCanBePaid_Tests
     }
 
     [Fact]
+    public void A_first_payment_does_not_insert_then_update_the_same_row()
+    {
+        /* Found by pressing Pay on an application that had never had a fee
+           row. InsertAsync followed by UpdateAsync on the same entity marks an
+           Added entity Modified, so EF issues an UPDATE against a row that
+           does not exist and the save throws — the parent got a bare 500. */
+        var service = File.ReadAllText(SourceFile(
+            "psms.Application", "Admissions", "ApplicationFees", "ApplicationFeeAppService.cs"));
+
+        var start = service.IndexOf("StartPaymentAsync", StringComparison.Ordinal);
+        var body = service.Substring(start, service.IndexOf("SimulatePaymentAsync", StringComparison.Ordinal) - start);
+
+        // The reference goes in when the row is made, not afterwards.
+        body.ShouldContain("EnsureFeeAsync(application, amount, reference)");
+        body.ShouldNotContain("_feeRepository.UpdateAsync");
+    }
+
+    [Fact]
     public void The_family_has_a_button_that_takes_them_to_the_gateway()
     {
         var review = Frontend("components", "modules", "admissions", "apply", "ReviewStep.tsx");

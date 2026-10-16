@@ -152,10 +152,8 @@ public class ApplicationFeeAppService : ApplicationService, IApplicationFeeAppSe
         /* The reference the webhook will be matched on. Kept on the fee row
            before the payer leaves, so a webhook that beats them back still
            finds something to settle. */
-        var fee = await EnsureFeeAsync(application, amount);
         var reference = $"YOCO-{application.ApplicationNumber}-{DateTime.UtcNow:yyyyMMddHHmmss}";
-        fee.PaymentReference = reference;
-        await _feeRepository.UpdateAsync(fee);
+        await EnsureFeeAsync(application, amount, reference);
         await CurrentUnitOfWork.SaveChangesAsync();
 
         var returnTo = _configuration["App:ClientRootAddress"]?.TrimEnd('/') ?? string.Empty;
@@ -218,21 +216,36 @@ public class ApplicationFeeAppService : ApplicationService, IApplicationFeeAppSe
     }
 
     /// <summary>
-    /// The fee row for this application, created if it is not there yet.
+    /// The fee row for this application, created if it is not there yet, with
+    /// the reference a webhook will be matched on.
     /// <para>
     /// Written before the payer leaves for the gateway so the reference exists
     /// to match a webhook against — one can arrive before the payer gets back,
     /// and often does.
     /// </para>
     /// </summary>
-    private async Task<ApplicationFee> EnsureFeeAsync(Application application, decimal amount)
+    /// <para>
+    /// The reference is set here rather than by the caller, and that is not
+    /// tidiness. Inserting the row and then calling UpdateAsync on it marks an
+    /// Added entity Modified, so EF issues an UPDATE against a row that does
+    /// not exist yet and the save throws — which is what a parent pressing Pay
+    /// on an application with no fee row actually got: a bare 500.
+    /// </para>
+    private async Task<ApplicationFee> EnsureFeeAsync(Application application, decimal amount, string reference)
     {
         var fee = await _feeRepository.FirstOrDefaultAsync(f => f.ApplicationId == application.Id);
-        if (fee != null) return fee;
+
+        if (fee != null)
+        {
+            fee.PaymentReference = reference;
+            await _feeRepository.UpdateAsync(fee);
+            return fee;
+        }
 
         fee = new ApplicationFee(Guid.NewGuid(), application.Id, amount, "ZAR")
         {
             TenantId = AbpSession.TenantId,
+            PaymentReference = reference,
         };
 
         await _feeRepository.InsertAsync(fee);
