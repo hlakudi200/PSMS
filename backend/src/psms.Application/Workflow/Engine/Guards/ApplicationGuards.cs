@@ -5,6 +5,7 @@ using psms.Domain.Admissions.Entities;
 using psms.Domain.Shared.Enums;
 using psms.Domain.Workflow.Enums;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -48,11 +49,33 @@ public class ApplicationParentsCompleteGuard : IWorkflowStepGuard, ITransientDep
     }
 }
 
-/// <summary>Admissions Approval step 2: every required document is verified (ADM-010).</summary>
+/// <summary>
+/// Admissions Approval step 2: every required document is in and verified (ADM-010).
+/// <para>
+/// This used to ask only about documents that had been uploaded —
+/// <c>IsRequired</c> on an <c>ApplicationDocument</c> row — which cannot answer
+/// the question. A document nobody uploaded has no row, so an application with
+/// nothing at all read as "no required documents have been uploaded yet", and
+/// one with a single verified upload read as satisfied however much was still
+/// missing. The requirements are the school's list; it is what the guard
+/// measures against now.
+/// </para>
+/// </summary>
 public class ApplicationDocumentsVerifiedGuard : IWorkflowStepGuard, ITransientDependency
 {
     private readonly IRepository<ApplicationDocument, Guid> _documents;
-    public ApplicationDocumentsVerifiedGuard(IRepository<ApplicationDocument, Guid> documents) { _documents = documents; }
+    private readonly IRepository<Application, Guid> _applications;
+    private readonly IRepository<AdmissionSettings, Guid> _settings;
+
+    public ApplicationDocumentsVerifiedGuard(
+        IRepository<ApplicationDocument, Guid> documents,
+        IRepository<Application, Guid> applications,
+        IRepository<AdmissionSettings, Guid> settings)
+    {
+        _documents = documents;
+        _applications = applications;
+        _settings = settings;
+    }
 
     public string Key => "application.documents-verified";
     public WorkflowEntityType EntityType => WorkflowEntityType.Application;
@@ -60,14 +83,66 @@ public class ApplicationDocumentsVerifiedGuard : IWorkflowStepGuard, ITransientD
 
     public async Task<WorkflowGuardResult> EvaluateAsync(Guid entityId)
     {
-        var required = await _documents.GetAll()
-            .Where(d => d.ApplicationId == entityId && d.IsRequired)
-            .Select(d => new { d.DocumentName, d.IsVerified }).ToListAsync();
-        if (required.Count == 0) return WorkflowGuardResult.Fail("No required documents have been uploaded yet.");
-        var pending = required.Where(d => !d.IsVerified).Select(d => d.DocumentName).ToList();
-        return pending.Count == 0
-            ? WorkflowGuardResult.Ok()
-            : WorkflowGuardResult.Fail($"{pending.Count} required document(s) still unverified: {string.Join(", ", pending)}.");
+        var application = await _applications.GetAll()
+            .Where(a => a.Id == entityId)
+            .Select(a => new { a.AcademicYearId, a.AppliedGradeId })
+            .FirstOrDefaultAsync();
+
+        if (application == null) return WorkflowGuardResult.Fail("The application no longer exists.");
+
+        var stored = await _settings.GetAll()
+            .Where(x => x.AcademicYearId == application.AcademicYearId
+                        && (x.GradeId == application.AppliedGradeId || x.GradeId == null))
+            .OrderBy(x => x.GradeId == null ? 1 : 0)
+            .Select(x => x.RequiredDocuments)
+            .FirstOrDefaultAsync();
+
+        var required = AdmissionSettings.ParseRequiredDocuments(stored);
+
+        var uploaded = await _documents.GetAll()
+            .Where(d => d.ApplicationId == entityId)
+            .Select(d => new { d.Category, d.DocumentName, d.IsVerified, d.IsRequired })
+            .ToListAsync();
+
+        /* No list set. Fall back to what is actually on the application, which
+           is the old behaviour and the best available answer — but say so, so
+           that "verified" is not mistaken for "complete". */
+        if (required.Count == 0)
+        {
+            var markedRequired = uploaded.Where(d => d.IsRequired).ToList();
+            if (markedRequired.Count == 0)
+                return WorkflowGuardResult.Fail(
+                    "No required documents have been uploaded yet, and this grade has no "
+                    + "document list set — so nothing can be checked against it.");
+
+            var unverified = markedRequired.Where(d => !d.IsVerified).Select(d => d.DocumentName).ToList();
+            return unverified.Count == 0
+                ? WorkflowGuardResult.Ok()
+                : WorkflowGuardResult.Fail(
+                    $"{unverified.Count} required document(s) still unverified: {string.Join(", ", unverified)}.");
+        }
+
+        var missing = new List<string>();
+        var unverifiedNames = new List<string>();
+
+        foreach (var category in required)
+        {
+            var document = uploaded.FirstOrDefault(d => d.Category == category);
+            if (document == null) missing.Add(category.ToString());
+            else if (!document.IsVerified) unverifiedNames.Add(document.DocumentName ?? category.ToString());
+        }
+
+        if (missing.Count == 0 && unverifiedNames.Count == 0) return WorkflowGuardResult.Ok();
+
+        // Missing and unverified are different jobs for different people — one
+        // is the family's to do, the other the office's — so they are told apart.
+        var parts = new List<string>();
+        if (missing.Count > 0)
+            parts.Add($"{missing.Count} not uploaded: {string.Join(", ", missing)}");
+        if (unverifiedNames.Count > 0)
+            parts.Add($"{unverifiedNames.Count} awaiting verification: {string.Join(", ", unverifiedNames)}");
+
+        return WorkflowGuardResult.Fail(string.Join(". ", parts) + ".");
     }
 }
 

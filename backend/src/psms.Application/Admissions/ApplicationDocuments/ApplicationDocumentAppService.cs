@@ -101,10 +101,10 @@ public class ApplicationDocumentAppService : ApplicationService, IApplicationDoc
         if (application == null)
             throw new UserFriendlyException(AdmissionsExceptionCodes.ApplicationNotFound, "Application not found.");
 
-        // Get required documents from settings
         var settings = await GetAdmissionSettingsAsync(application.AcademicYearId, application.AppliedGradeId);
 
-        var requiredCategories = GetRequiredDocumentCategories(application.IsSACitizen, application.AppliedGrade?.GradeName);
+        var requiredCategories = GetRequiredDocumentCategories(
+            application.IsSACitizen, application.AppliedGrade?.GradeLevel, settings);
 
         var status = new RequiredDocumentsStatusDto
         {
@@ -375,35 +375,80 @@ public class ApplicationDocumentAppService : ApplicationService, IApplicationDoc
         return settings;
     }
 
-    private List<(DocumentCategory Category, string Description, bool IsRequired)> GetRequiredDocumentCategories(
-        bool isSACitizen, string gradeName)
+    /// <summary>What each category is called when asked for.</summary>
+    private static string DescriptionOf(DocumentCategory category, bool isSACitizen) => category switch
     {
+        DocumentCategory.BirthCertificate => isSACitizen ? "Birth Certificate" : "Passport Copy",
+        DocumentCategory.ParentIdDocument => "Parent/Guardian ID Document",
+        DocumentCategory.PassportPhoto => "Passport-size Photo of Student",
+        DocumentCategory.ProofOfResidence => "Proof of Residence (not older than 3 months)",
+        DocumentCategory.ImmunizationRecord => "Immunization Record (Road to Health Card)",
+        DocumentCategory.PreviousSchoolReport => "Previous School Report Card",
+        DocumentCategory.TransferLetter => "Transfer Letter (if mid-year)",
+        DocumentCategory.StudyPermit => "Valid Study Permit",
+        DocumentCategory.MedicalReport => "Medical Report",
+        DocumentCategory.IdDocument => "Learner ID Document",
+        DocumentCategory.Passport => "Passport",
+        DocumentCategory.Photo => "Photograph",
+        _ => category.ToString(),
+    };
+
+    /// <summary>
+    /// What this application has to produce: the school's own list where they
+    /// have set one, and otherwise the sensible default for the grade.
+    /// <para>
+    /// The school's list used to be read into a variable and dropped on the
+    /// floor — every application got the hardcoded list whatever the school had
+    /// said. Their choice now decides, and only falls back when they have not
+    /// made one (or when what is stored is leftover prose, which cannot mean
+    /// "this school requires nothing").
+    /// </para>
+    /// </summary>
+    private List<(DocumentCategory Category, string Description, bool IsRequired)> GetRequiredDocumentCategories(
+        bool isSACitizen, SouthAfricanGradeLevel? gradeLevel, Domain.Admissions.Entities.AdmissionSettings settings)
+    {
+        var chosen = settings?.RequiredDocumentCategories;
+        if (chosen != null && chosen.Count > 0)
+        {
+            var fromSchool = chosen
+                .Select(c => (c, DescriptionOf(c, isSACitizen), true))
+                .ToList();
+
+            // A study permit is the law's requirement, not the school's, so it
+            // is added even to a list that forgot it.
+            if (!isSACitizen && !chosen.Contains(DocumentCategory.StudyPermit))
+                fromSchool.Add((DocumentCategory.StudyPermit, DescriptionOf(DocumentCategory.StudyPermit, true), true));
+
+            return fromSchool;
+        }
+
         var categories = new List<(DocumentCategory, string, bool)>
         {
             // Required for ALL applications (ADM-008)
-            (DocumentCategory.BirthCertificate, isSACitizen ? "Birth Certificate" : "Passport Copy", true),
-            (DocumentCategory.ParentIdDocument, "Parent/Guardian ID Document", true),
-            (DocumentCategory.PassportPhoto, "Passport-size Photo of Student", true),
-            (DocumentCategory.ProofOfResidence, "Proof of Residence (not older than 3 months)", true)
+            (DocumentCategory.BirthCertificate, DescriptionOf(DocumentCategory.BirthCertificate, isSACitizen), true),
+            (DocumentCategory.ParentIdDocument, DescriptionOf(DocumentCategory.ParentIdDocument, isSACitizen), true),
+            (DocumentCategory.PassportPhoto, DescriptionOf(DocumentCategory.PassportPhoto, isSACitizen), true),
+            (DocumentCategory.ProofOfResidence, DescriptionOf(DocumentCategory.ProofOfResidence, isSACitizen), true),
         };
 
-        // Grade R specific
-        if (gradeName?.ToUpperInvariant() == "GRADE R" || gradeName?.ToUpperInvariant() == "R")
+        /* The grade used to be matched on its name, and "GRADE 4" contains an R
+           because the word GRADE does — so the "not Grade R" branch never ran
+           for any grade, and a previous school report has never been asked of
+           anybody. The grade level is an enum; ask it. */
+        if (gradeLevel == SouthAfricanGradeLevel.GradeR)
         {
-            categories.Add((DocumentCategory.ImmunizationRecord, "Immunization Record (Road to Health Card)", true));
+            categories.Add((DocumentCategory.ImmunizationRecord, DescriptionOf(DocumentCategory.ImmunizationRecord, isSACitizen), true));
         }
-
-        // Grades 1-12
-        if (gradeName != null && !gradeName.ToUpperInvariant().Contains("R"))
+        else if (gradeLevel.HasValue)
         {
-            categories.Add((DocumentCategory.PreviousSchoolReport, "Previous School Report Card", true));
-            categories.Add((DocumentCategory.TransferLetter, "Transfer Letter (if mid-year)", false));
+            categories.Add((DocumentCategory.PreviousSchoolReport, DescriptionOf(DocumentCategory.PreviousSchoolReport, isSACitizen), true));
+            categories.Add((DocumentCategory.TransferLetter, DescriptionOf(DocumentCategory.TransferLetter, isSACitizen), false));
         }
 
         // Non-SA students
         if (!isSACitizen)
         {
-            categories.Add((DocumentCategory.StudyPermit, "Valid Study Permit", true));
+            categories.Add((DocumentCategory.StudyPermit, DescriptionOf(DocumentCategory.StudyPermit, isSACitizen), true));
         }
 
         return categories;
