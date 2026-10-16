@@ -27,6 +27,7 @@ public class AdmissionSettingsAppService : ApplicationService, IAdmissionSetting
     private readonly IRepository<Domain.Admissions.Entities.AdmissionSettings, Guid> _settingsRepository;
     private readonly IRepository<Application, Guid> _applicationRepository;
     private readonly IRepository<Waitlist, Guid> _waitlistRepository;
+    private readonly GradeCapacityReader _capacity;
     private readonly IRepository<psms.Domain.Academic.Entities.AcademicYear, Guid> _academicYearRepository;
     private readonly IRepository<psms.Domain.Academic.Entities.Grade, Guid> _gradeRepository;
 
@@ -35,13 +36,15 @@ public class AdmissionSettingsAppService : ApplicationService, IAdmissionSetting
         IRepository<Application, Guid> applicationRepository,
         IRepository<Waitlist, Guid> waitlistRepository,
         IRepository<psms.Domain.Academic.Entities.AcademicYear, Guid> academicYearRepository,
-        IRepository<psms.Domain.Academic.Entities.Grade, Guid> gradeRepository)
+        IRepository<psms.Domain.Academic.Entities.Grade, Guid> gradeRepository,
+        GradeCapacityReader capacity)
     {
         _settingsRepository = settingsRepository;
         _applicationRepository = applicationRepository;
         _waitlistRepository = waitlistRepository;
         _academicYearRepository = academicYearRepository;
         _gradeRepository = gradeRepository;
+        _capacity = capacity;
     }
 
     [AbpAuthorize(PermissionNames.Admissions_Settings_View)]
@@ -429,58 +432,17 @@ public class AdmissionSettingsAppService : ApplicationService, IAdmissionSetting
     [AbpAuthorize(PermissionNames.Admissions_Settings_View)]
     public async Task<CapacityStatusDto> GetCapacityStatusAsync(Guid academicYearId, Guid gradeId)
     {
-        var settings = await _settingsRepository
-            .GetAll()
-            .Include(s => s.AcademicYear)
-            .Include(s => s.Grade)
-            .FirstOrDefaultAsync(s => s.AcademicYearId == academicYearId && s.GradeId == gradeId);
+        /* The arithmetic moved to GradeCapacityReader so the decision can use
+           the same numbers. It used to live only here, which is how a screen
+           could warn that a grade was full while the decision behind it
+           accepted eight more applicants without a word. */
+        var status = await _capacity.StatusAsync(academicYearId, gradeId);
 
-        // Fall back to default settings
-        if (settings == null)
-        {
-            settings = await _settingsRepository
-                .GetAll()
-                .Include(s => s.AcademicYear)
-                .Include(s => s.Grade)
-                .FirstOrDefaultAsync(s => s.AcademicYearId == academicYearId && s.GradeId == null);
-        }
-
-        if (settings == null)
+        if (status == null)
             throw new UserFriendlyException(AdmissionsExceptionCodes.AdmissionSettingsNotFound,
                 "Admission settings not found for this grade.");
 
-        // Count applications in different states
-        var applicationsQuery = _applicationRepository
-            .GetAll()
-            .Where(a => a.AcademicYearId == academicYearId && a.AppliedGradeId == gradeId);
-
-        var approvedPendingEnrollment = await applicationsQuery
-            .CountAsync(a => a.Status == ApplicationStatus.Approved);
-
-        var underConsideration = await applicationsQuery
-            .CountAsync(a => a.Status == ApplicationStatus.UnderConsideration
-                || a.Status == ApplicationStatus.UnderReview
-                || a.Status == ApplicationStatus.InterviewScheduled
-                || a.Status == ApplicationStatus.AssessmentScheduled);
-
-        var waitlistCount = await _waitlistRepository
-            .GetAll()
-            .CountAsync(w => w.GradeId == gradeId
-                && w.Status == WaitlistStatus.Active
-                && w.Application.AcademicYearId == academicYearId);
-
-        return new CapacityStatusDto
-        {
-            GradeId = gradeId,
-            GradeName = settings.Grade?.GradeName,
-            AcademicYearId = academicYearId,
-            AcademicYearName = settings.AcademicYear?.YearName,
-            Capacity = settings.MaxCapacity ?? 0,
-            CurrentEnrollment = settings.CurrentEnrolledCount,
-            ApprovedPendingEnrollment = approvedPendingEnrollment,
-            UnderConsideration = underConsideration,
-            WaitlistCount = waitlistCount
-        };
+        return status;
     }
 
     [AbpAuthorize(PermissionNames.Admissions_Settings_OpenApplications)]
