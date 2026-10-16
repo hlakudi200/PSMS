@@ -9,6 +9,9 @@ using psms.Authorization.Roles;
 using psms.Authorization.Users;
 using System;
 using System.Linq;
+using Abp.Domain.Repositories;
+using psms.Domain.Communication.Entities;
+using psms.Domain.Shared.Enums;
 using System.Threading.Tasks;
 
 namespace psms.Authorization.Accounts;
@@ -22,17 +25,20 @@ public class AccountAppService : psmsAppServiceBase, IAccountAppService
     private readonly UserManager _userManager;
     private readonly ApplicantSignUpThrottle _throttle;
     private readonly IHttpContextAccessor _httpContextAccessor;
+    private readonly IRepository<NotificationConsent, Guid> _consentRepository;
 
     public AccountAppService(
         UserRegistrationManager userRegistrationManager,
         UserManager userManager,
         ApplicantSignUpThrottle throttle,
-        IHttpContextAccessor httpContextAccessor)
+        IHttpContextAccessor httpContextAccessor,
+        IRepository<NotificationConsent, Guid> consentRepository)
     {
         _userRegistrationManager = userRegistrationManager;
         _userManager = userManager;
         _throttle = throttle;
         _httpContextAccessor = httpContextAccessor;
+        _consentRepository = consentRepository;
     }
 
     public async Task<IsTenantAvailableOutput> IsTenantAvailable(IsTenantAvailableInput input)
@@ -136,6 +142,8 @@ public class AccountAppService : psmsAppServiceBase, IAccountAppService
 
         CheckErrors(await _userManager.SetRolesAsync(user, new[] { StaticRoleNames.Tenants.Applicant }));
 
+        await RecordEmailConsentAsync(user.Id, input.MayEmailMe ?? true);
+
         var isEmailConfirmationRequiredForLogin = await SettingManager.GetSettingValueAsync<bool>(
             AbpZeroSettingNames.UserManagement.IsEmailConfirmationRequiredForLogin);
 
@@ -144,6 +152,34 @@ public class AccountAppService : psmsAppServiceBase, IAccountAppService
             CanLogin = user.IsActive && (user.IsEmailConfirmed || !isEmailConfirmationRequiredForLogin)
         };
     }
+
+    /// <summary>
+    /// Writes down the answer, because the dispatcher will not send without it.
+    /// <para>
+    /// COMM-05 gates every external channel on a consent row, and nothing in
+    /// the system ever created one for an applicant. So an offer notification
+    /// delivered in-app and was suppressed for email — to a family who are not
+    /// signed in and have no idea the in-app notice exists. The place they were
+    /// offered then ran out of time without them ever hearing about it.
+    /// </para>
+    /// <para>
+    /// Recorded either way. A refusal is as much an answer as a grant, and one
+    /// written down is one the school cannot talk itself out of later.
+    /// </para>
+    /// </summary>
+    private async Task RecordEmailConsentAsync(long userId, bool granted)
+    {
+        var consent = new NotificationConsent(
+            Guid.NewGuid(), AbpSession.TenantId, userId, NotificationChannel.Email);
+
+        if (granted) consent.Grant(ConsentSource); else consent.Revoke(ConsentSource);
+
+        await _consentRepository.InsertAsync(consent);
+        await CurrentUnitOfWork.SaveChangesAsync();
+    }
+
+    /// <summary>Where the consent came from, for the audit trail.</summary>
+    private const string ConsentSource = "applicant-registration";
 
     /// <summary>
     /// Who is asking, for the sign-up limit. The proxy header first, because

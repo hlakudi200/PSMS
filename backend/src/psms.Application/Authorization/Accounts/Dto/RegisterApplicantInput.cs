@@ -1,4 +1,4 @@
-using Abp.Auditing;
+﻿using Abp.Auditing;
 using Abp.Authorization.Users;
 using System.ComponentModel.DataAnnotations;
 
@@ -33,4 +33,21 @@ public class RegisterApplicantInput
     [StringLength(AbpUserBase.MaxPlainPasswordLength, MinimumLength = 8)]
     [DisableAuditing]
     public string Password { get; set; }
+
+    /// <summary>
+    /// Whether the school may email this person about their application.
+    /// <para>
+    /// Every external channel is consent-gated (COMM-05) and nothing ever asked,
+    /// so no applicant had a consent row and every admissions email was
+    /// suppressed before it reached the provider — "No consent on file for this
+    /// channel" in the delivery log, which nobody reads. The in-app notice
+    /// landed and the family, who were not signed in, learned nothing.
+    /// </para>
+    /// <para>
+    /// Defaults to true when the form does not say: this is the address they
+    /// have just given in order to apply, on a page that tells them it is where
+    /// the school will contact them. They can turn it off here or later.
+    /// </para>
+    /// </summary>
+    public bool? MayEmailMe { get; set; }
 }
