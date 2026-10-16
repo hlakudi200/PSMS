@@ -1,9 +1,12 @@
 ﻿using System;
 using System.ComponentModel.DataAnnotations;
+using System.Linq;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations.Schema;
 using Abp.Domain.Entities;
 using Abp.Domain.Entities.Auditing;
 using psms.Domain.Academic.Entities;
+using psms.Domain.Shared.Enums;
 
 namespace psms.Domain.Admissions.Entities
 {
@@ -88,10 +91,63 @@ namespace psms.Domain.Admissions.Entities
         public bool IsAcceptingApplications { get; set; }
 
         /// <summary>
-        /// JSON array of required document categories (e.g., ["BirthCertificate", "PreviousSchoolReport"])
+        /// The documents this grade asks for, as <see cref="DocumentCategory"/>
+        /// names — a JSON array, or a plain comma- or newline-separated list.
+        /// <para>
+        /// This was always meant to be the enum; the settings screen offered a
+        /// free-text box, so schools typed prose into it ("Parents ID \n
+        /// Learners birth certificate") and nothing could match that against an
+        /// upload, whose category <i>is</i> the enum. Both the required-documents
+        /// status and the documents-verified guard were left unable to answer the
+        /// one question they exist for.
+        /// </para>
+        /// <para>
+        /// Read it through <see cref="RequiredDocumentCategories"/>, which
+        /// ignores anything it cannot recognise. Prose left over from before
+        /// therefore means "the school has not chosen", and the sensible default
+        /// list applies — not "this school requires nothing".
+        /// </para>
         /// </summary>
         [StringLength(MaxRequiredDocumentsLength)]
         public string RequiredDocuments { get; set; }
+
+        /// <summary>
+        /// <see cref="RequiredDocuments"/> read as categories. Empty when the
+        /// school has not chosen, or when what is stored is prose.
+        /// </summary>
+        [NotMapped]
+        public IReadOnlyList<DocumentCategory> RequiredDocumentCategories
+        {
+            get => ParseRequiredDocuments(RequiredDocuments);
+            set => RequiredDocuments = value == null || value.Count == 0
+                ? null
+                : string.Join(",", value.Select(c => c.ToString()));
+        }
+
+        /// <summary>
+        /// Pulls category names out of whatever is in the column: a JSON array,
+        /// a comma-separated list, or one per line. Unrecognised words are
+        /// dropped rather than failing the read — a school's old free-text note
+        /// must not stop their settings loading.
+        /// </summary>
+        public static IReadOnlyList<DocumentCategory> ParseRequiredDocuments(string stored)
+        {
+            if (string.IsNullOrWhiteSpace(stored)) return new List<DocumentCategory>();
+
+            var words = stored.Split(
+                new[] { ',', '\n', '\r', '[', ']', '"', '\'' },
+                StringSplitOptions.RemoveEmptyEntries);
+
+            var categories = new List<DocumentCategory>();
+            foreach (var word in words)
+            {
+                if (Enum.TryParse<DocumentCategory>(word.Trim(), ignoreCase: true, out var category)
+                    && !categories.Contains(category))
+                    categories.Add(category);
+            }
+
+            return categories;
+        }
 
         /// <summary>
         /// Whether interview is required for this grade

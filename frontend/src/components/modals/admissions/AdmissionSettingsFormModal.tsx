@@ -1,6 +1,11 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import {
+  documentCategoryOptions,
+  parseRequiredDocuments,
+  serialiseRequiredDocuments,
+} from '@/providers/admissions/shared/document-categories';
 import { Alert, Col, DatePicker, Form, Input, InputNumber, Modal, Row, Select, Switch, Typography, message } from 'antd';
 import dayjs from 'dayjs';
 import { z } from 'zod';
@@ -35,7 +40,7 @@ const schema = z
     offerExpiryDays: z.number().int().min(1, 'An offer has to stand for at least a day.'),
     isInterviewRequired: z.boolean(),
     isAssessmentRequired: z.boolean(),
-    requiredDocuments: z.string().max(1000).nullish(),
+    requiredDocuments: z.array(z.number()).optional(),
     notes: z.string().max(2000).nullish(),
   })
   .refine(
@@ -170,7 +175,7 @@ export default function AdmissionSettingsFormModal({
         offerExpiryDays: 14,
         isInterviewRequired: false,
         isAssessmentRequired: false,
-        requiredDocuments: '',
+        requiredDocuments: [],
         notes: '',
       } as FormValues);
       setError(undefined);
@@ -191,7 +196,7 @@ export default function AdmissionSettingsFormModal({
       offerExpiryDays: settings.offerExpiryDays,
       isInterviewRequired: settings.isInterviewRequired,
       isAssessmentRequired: settings.isAssessmentRequired,
-      requiredDocuments: settings.requiredDocuments ?? '',
+      requiredDocuments: parseRequiredDocuments(settings.requiredDocuments),
       notes: settings.notes ?? '',
     });
     setError(undefined);
@@ -247,7 +252,7 @@ export default function AdmissionSettingsFormModal({
           offerExpiryDays: v.offerExpiryDays,
           isInterviewRequired: v.isInterviewRequired,
           isAssessmentRequired: v.isAssessmentRequired,
-          requiredDocuments: v.requiredDocuments || undefined,
+          requiredDocuments: serialiseRequiredDocuments(v.requiredDocuments ?? undefined),
           notes: v.notes || undefined,
         });
         message.success(`Applications set up for ${created?.[0]?.gradeName ?? 'this grade'}`);
@@ -268,7 +273,7 @@ export default function AdmissionSettingsFormModal({
         offerExpiryDays: v.offerExpiryDays,
         isInterviewRequired: v.isInterviewRequired,
         isAssessmentRequired: v.isAssessmentRequired,
-        requiredDocuments: v.requiredDocuments || undefined,
+        requiredDocuments: serialiseRequiredDocuments(v.requiredDocuments ?? undefined),
         notes: v.notes || undefined,
       });
       message.success('Admission settings saved');
@@ -443,12 +448,26 @@ export default function AdmissionSettingsFormModal({
           </Col>
         </Row>
 
+        {/* Chosen from the same list the uploads use, not typed. A school
+            writing "Parents ID" into a box could never be matched against an
+            upload whose category is an enum value, which left the documents
+            guard and the required-documents status unable to answer. */}
         <Form.Item
           label="Documents an applicant must provide"
           name="requiredDocuments"
-          extra={<Text type="secondary">One per line, as the parent will read them.</Text>}
+          extra={
+            <Text type="secondary">
+              Leave empty to ask for the usual documents for the grade.
+            </Text>
+          }
         >
-          <Input.TextArea rows={3} maxLength={1000} showCount />
+          <Select
+            mode="multiple"
+            allowClear
+            placeholder="The usual documents for this grade"
+            options={documentCategoryOptions}
+            optionFilterProp="label"
+          />
         </Form.Item>
 
         <Form.Item label="Notes for the school" name="notes">

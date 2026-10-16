@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { documentCategoryOptions } from '@/providers/admissions/shared/document-categories';
 import { Alert, Button, List, Select, Space, Tag, Typography, Upload, message } from 'antd';
 import { CheckCircleTwoTone, DeleteOutlined, UploadOutlined } from '@ant-design/icons';
 import { useApplicationDocumentActions, useApplicationDocumentState } from '@/providers/admissions/application_documents';
@@ -8,21 +9,10 @@ import { documentsAsList } from './schema';
 
 const { Text, Paragraph } = Typography;
 
-const categories = [
-  { value: 1, label: "Learner's birth certificate" },
-  { value: 2, label: "Learner's ID document" },
-  { value: 13, label: "Learner's passport" },
-  { value: 12, label: 'Study permit' },
-  { value: 3, label: 'Report from the previous school' },
-  { value: 4, label: 'Transfer letter' },
-  { value: 5, label: 'Immunisation record' },
-  { value: 6, label: 'Medical report' },
-  { value: 7, label: 'Proof of residence' },
-  { value: 8, label: "Parent's ID document" },
-  { value: 11, label: 'Passport photo' },
-  { value: 9, label: 'Photo' },
-  { value: 10, label: 'Something else' },
-];
+/* One list, shared with the settings screen that decides which of these the
+   school asks for. It used to live here alone, while the school typed its
+   requirements as prose into a textarea — so the two could never be compared. */
+const categories = documentCategoryOptions;
 
 /**
  * Step three: the documents the school asks for.
