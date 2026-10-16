@@ -315,6 +315,16 @@ export interface IWorkflowInstance {
   currentStepDecisionSchema?: IWorkflowDecisionSchema;
   /** The final step has no decision form, though this kind of record has one. */
   currentStepIsMissingItsDecisionForm?: boolean;
+
+  /**
+   * Whether the signed-in user may act on the current step. The server works
+   * this out: it takes in the step's assignee, the step's role and two kinds
+   * of delegation, none of which this client can see.
+   */
+  currentUserCanAct?: boolean;
+
+  /** Why not, in the words the server would have refused with. */
+  currentUserCannotActReason?: string;
 }
 
 export interface IWorkflowEntitySummaryField {

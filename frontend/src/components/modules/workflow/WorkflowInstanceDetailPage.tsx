@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Card, Descriptions, Tag, Button, Timeline, Typography, Space, Spin, Table, Alert } from 'antd';
+import { Card, Descriptions, Tag, Button, Timeline, Typography, Space, Spin, Table, Alert, Tooltip } from 'antd';
 import {
   ArrowLeftOutlined,
   PlayCircleOutlined,
@@ -108,6 +108,12 @@ function DetailContent() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  /* Defaults to allowed: an older server does not send these, and a button
+     that silently stops working would be the worse failure. */
+  const canAct = wfInstance?.currentUserCanAct !== false;
+  const cannotActReason = wfInstance?.currentUserCannotActReason
+    ?? 'This step is not yours to act on.';
 
   const isInProgress = wfInstance?.status === WorkflowStatus.InProgress;
 
@@ -225,13 +231,20 @@ function DetailContent() {
           <Title level={4} style={{ margin: 0 }}>{wfInstance?.workflowDefinitionName ?? 'Loading...'}</Title>
           {isInProgress && (
             <Space>
-              <Button
-                type="primary"
-                icon={<PlayCircleOutlined />}
-                onClick={() => setAdvanceOpen(true)}
-              >
-                Take Action
-              </Button>
+              {/* Take Action was offered on every step, whoever was looking.
+                  A principal on an Admin step got an enabled button, a dialog,
+                  and the refusal only after filling it in and pressing OK.
+                  The server now says up front, and says why. */}
+              <Tooltip title={canAct ? undefined : cannotActReason}>
+                <Button
+                  type="primary"
+                  icon={<PlayCircleOutlined />}
+                  onClick={() => setAdvanceOpen(true)}
+                  disabled={!canAct}
+                >
+                  Take Action
+                </Button>
+              </Tooltip>
               {canManageInstance && (
                 <>
                   <Button icon={<UndoOutlined />} onClick={handleRecall}>Recall</Button>

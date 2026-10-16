@@ -52,6 +52,24 @@ public class WorkflowInstanceDto : FullAuditedEntityDto<Guid>
     /// </para>
     /// </summary>
     public bool CurrentStepIsMissingItsDecisionForm { get; set; }
+
+    /// <summary>
+    /// Whether the signed-in user may act on the current step.
+    /// <para>
+    /// Take Action used to be offered on every step. A principal looking at an
+    /// Admin step got an enabled button and a dialog, and found out only on OK
+    /// — the same shape as the decision-form bug above, and the same remedy:
+    /// say it before they fill anything in.
+    /// </para>
+    /// <para>
+    /// True when the instance is not in progress or has no current step, since
+    /// there is then nothing to be barred from.
+    /// </para>
+    /// </summary>
+    public bool CurrentUserCanAct { get; set; } = true;
+
+    /// <summary>Why not, in the words the server would have refused with. Null when they can.</summary>
+    public string CurrentUserCannotActReason { get; set; }
 }
 
 public class WorkflowGuardStatusDto

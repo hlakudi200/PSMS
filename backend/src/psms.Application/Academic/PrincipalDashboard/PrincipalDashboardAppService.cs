@@ -101,9 +101,13 @@ public class PrincipalDashboardAppService : ApplicationService, IPrincipalDashbo
         // --- Needs attention ---
         summary.PendingAdmissions = await _applicationRepository.GetAll()
             .Where(a => a.TenantId == tenantId)
+            /* Submitted used to lead this list and is never assigned — see the
+               enum. It is simply dropped rather than swapped for PaymentPending:
+               an unpaid application is waiting on the family, not on the
+               school, and quietly adding it here would change a number the
+               principal reads without anybody deciding to. */
             .CountAsync(a =>
-                a.Status == ApplicationStatus.Submitted
-                || a.Status == ApplicationStatus.UnderReview
+                a.Status == ApplicationStatus.UnderReview
                 || a.Status == ApplicationStatus.DocumentsRequired
                 || a.Status == ApplicationStatus.InterviewScheduled
                 || a.Status == ApplicationStatus.AssessmentScheduled
