@@ -1,4 +1,4 @@
-using Shouldly;
+﻿using Shouldly;
 using System;
 using System.IO;
 using System.Linq;
@@ -122,6 +122,21 @@ public class TheWaitingListCanBeOfferedTo_Tests
 
         review.ShouldContain("ApplicationStatus.UnderReview");
         review.ShouldContain("WaitlistPanel");
+    }
+
+    [Fact]
+    public void The_screen_stops_contradicting_itself_a_line_apart()
+    {
+        /* "Where it stands: Offered a place." was printed directly above "You
+           accepted the place in Grade 11". Both came from the same screen, one
+           from the status and one from what the family had actually done. */
+        var status = Frontend("providers", "admissions", "shared", "application-status.ts");
+        var review = Frontend("components", "modules", "admissions", "apply", "ReviewStep.tsx");
+
+        status.ShouldContain("applicationStandingLabel");
+        status.ShouldContain("Place accepted");
+        status.ShouldContain("Place turned down");
+        review.ShouldContain("applicationStandingLabel(");
     }
 
     [Fact]
