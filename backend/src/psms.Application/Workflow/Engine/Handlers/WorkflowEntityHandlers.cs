@@ -1,4 +1,4 @@
-using Abp.Dependency;
+﻿using Abp.Dependency;
 using Abp.Domain.Repositories;
 using Abp.UI;
 using Microsoft.EntityFrameworkCore;
@@ -38,12 +38,34 @@ public abstract class EntityHandlerBase<TEntity> : IWorkflowEntityHandler
     /// <summary>Default: the record returns to the requester as a draft.</summary>
     protected abstract void Reopened(TEntity entity, WorkflowEffectContext ctx);
 
-    public Task OnCompletedAsync(WorkflowEffectContext ctx) => RunAsync(ctx, Completed, "approve");
-    public Task OnRejectedAsync(WorkflowEffectContext ctx) => RunAsync(ctx, Rejected, "reject");
+    public Task OnCompletedAsync(WorkflowEffectContext ctx) => RunAsync(ctx, Completed, "approve", AfterCompletedAsync);
+    public Task OnRejectedAsync(WorkflowEffectContext ctx) => RunAsync(ctx, Rejected, "reject", AfterRejectedAsync);
     public Task OnCancelledAsync(WorkflowEffectContext ctx) => RunAsync(ctx, Reopened, "reopen");
     public Task OnRecalledAsync(WorkflowEffectContext ctx) => RunAsync(ctx, Reopened, "reopen");
 
-    private async Task RunAsync(WorkflowEffectContext ctx, Action<TEntity, WorkflowEffectContext> action, string verb)
+    /// <summary>
+    /// Anything that has to happen once the write-back has, and cannot be done
+    /// synchronously — telling somebody about it, chiefly.
+    /// <para>
+    /// A separate seam because the write-back itself is deliberately a plain
+    /// synchronous method: it changes the entity and nothing else. Blocking on
+    /// a dispatcher from inside it would make an approval wait on an email
+    /// provider, which is the wrong thing to couple.
+    /// </para>
+    /// <para>
+    /// Runs inside the same unit of work and must not throw: the decision has
+    /// already been made and must stand whatever happens here.
+    /// </para>
+    /// </summary>
+    protected virtual Task AfterCompletedAsync(TEntity entity, WorkflowEffectContext ctx) => Task.CompletedTask;
+
+    protected virtual Task AfterRejectedAsync(TEntity entity, WorkflowEffectContext ctx) => Task.CompletedTask;
+
+    private async Task RunAsync(
+        WorkflowEffectContext ctx,
+        Action<TEntity, WorkflowEffectContext> action,
+        string verb,
+        Func<TEntity, WorkflowEffectContext, Task> after = null)
     {
         var entity = await Repository.GetAll().FirstOrDefaultAsync(e => e.Id == ctx.EntityId);
         if (entity == null)
@@ -59,6 +81,9 @@ public abstract class EntityHandlerBase<TEntity> : IWorkflowEntityHandler
                 $"Cannot {verb} the {typeof(TEntity).Name}: {ex.Message}");
         }
         await Repository.UpdateAsync(entity);
+
+        if (after != null)
+            await after(entity, ctx);
     }
 
     protected static string ReasonOr(WorkflowEffectContext ctx, string fallback) =>
@@ -68,10 +93,15 @@ public abstract class EntityHandlerBase<TEntity> : IWorkflowEntityHandler
 public class ApplicationWorkflowHandler : EntityHandlerBase<Application>, ITransientDependency
 {
     private readonly IRepository<Waitlist, Guid> _waitlists;
+    private readonly psms.Admissions.Offers.AdmissionsNotifier _notifier;
 
-    public ApplicationWorkflowHandler(IRepository<Application, Guid> r, IRepository<Waitlist, Guid> waitlists) : base(r)
+    public ApplicationWorkflowHandler(
+        IRepository<Application, Guid> r,
+        IRepository<Waitlist, Guid> waitlists,
+        psms.Admissions.Offers.AdmissionsNotifier notifier) : base(r)
     {
         _waitlists = waitlists;
+        _notifier = notifier;
     }
 
     public override WorkflowEntityType EntityType => WorkflowEntityType.Application;
@@ -132,6 +162,37 @@ public class ApplicationWorkflowHandler : EntityHandlerBase<Application>, ITrans
                 a.Approve(ctx.ActorUserId, reason, days);
                 break;
         }
+    }
+
+    /// <summary>
+    /// The family is told what was decided. Until now a decision reached
+    /// nobody: an offer sat on a screen with a fourteen-day clock already
+    /// running, and the only way to find out was to sign in and look.
+    /// </summary>
+    protected override async Task AfterCompletedAsync(Application a, WorkflowEffectContext ctx)
+    {
+        /* Re-read for the grade name. EF hands back the instance it is already
+           tracking, so this fills in the navigation property rather than
+           loading the row twice — and "a place in Grade 5" is worth a great
+           deal more to a parent than "a place in the grade applied for". */
+        var withGrade = await Repository.GetAll()
+            .Include(x => x.AppliedGrade)
+            .FirstOrDefaultAsync(x => x.Id == a.Id) ?? a;
+
+        await _notifier.DecisionMadeAsync(withGrade);
+    }
+
+    /// <summary>
+    /// A rejection at the step itself, rather than through the decision form,
+    /// ends the application just as finally and is worth the same courtesy.
+    /// </summary>
+    protected override async Task AfterRejectedAsync(Application a, WorkflowEffectContext ctx)
+    {
+        var withGrade = await Repository.GetAll()
+            .Include(x => x.AppliedGrade)
+            .FirstOrDefaultAsync(x => x.Id == a.Id) ?? a;
+
+        await _notifier.DecisionMadeAsync(withGrade);
     }
 
     protected override void Rejected(Application a, WorkflowEffectContext ctx)
