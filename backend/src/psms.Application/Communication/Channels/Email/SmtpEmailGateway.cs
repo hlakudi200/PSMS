@@ -1,8 +1,9 @@
-using Castle.Core.Logging;
+﻿using Castle.Core.Logging;
 using Microsoft.Extensions.Configuration;
 using System;
 using System.Net;
 using System.Net.Mail;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace psms.Communication.Channels.Email;
@@ -34,6 +35,9 @@ namespace psms.Communication.Channels.Email;
 public class SmtpEmailGateway : IEmailGateway
 {
     private readonly IConfiguration _configuration;
+
+    /// <summary>Long enough for a slow relay, short enough not to look hung.</summary>
+    private const int SendTimeoutSeconds = 20;
 
     public ILogger Logger { get; set; } = NullLogger.Instance;
 
@@ -97,7 +101,9 @@ public class SmtpEmailGateway : IEmailGateway
             {
                 EnableSsl = ssl,
                 Credentials = new NetworkCredential(userName, password),
-                Timeout = 20_000,
+                // Applies to the synchronous Send only. Kept because it costs
+                // nothing; the cancellation below is what actually bounds this.
+                Timeout = SendTimeoutSeconds * 1000,
             };
 
             using var message = new MailMessage
@@ -111,12 +117,29 @@ public class SmtpEmailGateway : IEmailGateway
             };
             message.To.Add(toEmail.Trim());
 
-            await client.SendMailAsync(message);
+            /* SmtpClient.Timeout is NOT honoured by SendMailAsync — it bounds
+               the synchronous Send and nothing else. A host that silently drops
+               outbound SMTP (many block it to deter spam) leaves the connect
+               hanging with no timeout at all, and this is awaited inside the
+               workflow transaction: a principal pressed Approve and the request
+               never came back, so the decision rolled back and the application
+               stayed under review. Cancellation is the only thing that bounds
+               it. */
+            using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(SendTimeoutSeconds));
+            await client.SendMailAsync(message, cancellation.Token);
 
             Logger.Info($"Email handed to {host} for {ResendEmailGateway.Mask(toEmail)}.");
 
             // SMTP gives back no id to match a later delivery event against.
             return GatewaySendResult.Ok(null);
+        }
+        catch (OperationCanceledException)
+        {
+            Logger.Warn($"{host} did not answer within {SendTimeoutSeconds}s.");
+            return GatewaySendResult.Failed(
+                $"The mail server did not answer within {SendTimeoutSeconds} seconds. "
+                + "Some hosts block outbound SMTP — check that port "
+                + $"{port} is reachable from the server.");
         }
         catch (SmtpException ex)
         {
