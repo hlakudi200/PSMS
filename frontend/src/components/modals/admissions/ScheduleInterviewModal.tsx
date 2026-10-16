@@ -90,7 +90,8 @@ export default function ScheduleInterviewModal({
     try {
       await scheduleAsync({
         applicationId,
-        scheduledDate: parsed.data.scheduledDate.toISOString(),
+        // A date, not a moment — see the apply journey's date of birth.
+        scheduledDate: parsed.data.scheduledDate.format('YYYY-MM-DD'),
         // A TimeSpan over the wire, which is what the server's ScheduledTime is.
         scheduledTime: parsed.data.scheduledTime.format('HH:mm:ss'),
         interviewerUserId: parsed.data.interviewerUserId,

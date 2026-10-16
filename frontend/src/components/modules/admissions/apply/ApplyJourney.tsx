@@ -154,7 +154,11 @@ function ApplyContent() {
       firstName: parsed.data.firstName,
       middleName: parsed.data.middleName || undefined,
       lastName: parsed.data.lastName,
-      dateOfBirth: parsed.data.dateOfBirth.toISOString(),
+      /* A date, not a moment: sent as YYYY-MM-DD so no time zone is implied.
+         toISOString() turned local midnight into the previous day in UTC, and
+         the learner then read as born a day earlier on every screen that
+         formatted it there. */
+      dateOfBirth: parsed.data.dateOfBirth.format('YYYY-MM-DD'),
       gender: parsed.data.gender,
       isSACitizen: parsed.data.isSACitizen,
       idNumber: parsed.data.idNumber || undefined,
