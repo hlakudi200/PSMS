@@ -4,6 +4,7 @@ import { router } from "expo-router";
 import { Badge, Button, Card, Screen, StateView } from "../../components";
 import { colors, spacing, typography } from "../../theme";
 import { useAuthActions, useAuthState } from "../../providers/auth";
+import { useAnnouncementsActions, useAnnouncementsState } from "../../providers/announcements";
 import { useChildrenActions, useChildrenState } from "../../providers/children";
 import type { IChildSummary } from "../../providers/children/context";
 import { formatDate, formatPercentage } from "../../utils/assessment-labels";
@@ -13,8 +14,15 @@ export function ParentHomeScreen() {
   const { signOut } = useAuthActions();
   const { myChildren, selectedChildId, isPending, isError, unreadNotifications } = useChildrenState();
   const { getMyChildrenAsync, selectChild } = useChildrenActions();
+  const { unreadCount: unreadAnnouncements } = useAnnouncementsState();
+  const { getUnreadCountAsync } = useAnnouncementsActions();
 
   useEffect(() => { void getMyChildrenAsync(); }, [getMyChildrenAsync]);
+
+  const refresh = useCallback(async () => {
+    await getMyChildrenAsync();
+    await getUnreadCountAsync();
+  }, [getMyChildrenAsync, getUnreadCountAsync]);
 
   const handleSignOut = useCallback(async () => {
     await signOut();
@@ -42,7 +50,7 @@ export function ParentHomeScreen() {
         data={myChildren}
         keyExtractor={(child) => child.studentId}
         contentContainerStyle={styles.list}
-        refreshControl={<RefreshControl refreshing={isPending} onRefresh={() => void getMyChildrenAsync()} />}
+        refreshControl={<RefreshControl refreshing={isPending} onRefresh={() => void refresh()} />}
         ListHeaderComponent={
           <View>
             <Badge label="PARENT PORTAL" />
@@ -56,6 +64,7 @@ export function ParentHomeScreen() {
               </View>
             )}
             {isError && <Text style={styles.inlineError}>Couldn&apos;t refresh — showing what loaded earlier.</Text>}
+            <AnnouncementsCard unreadCount={unreadAnnouncements} onPress={() => router.navigate("/(parent)/(tabs)/messages")} />
           </View>
         }
         ListEmptyComponent={
@@ -75,6 +84,23 @@ export function ParentHomeScreen() {
         }
       />
     </Screen>
+  );
+}
+
+/** The badge count, already loaded for the tab bar; the Messages tab has the feed. */
+function AnnouncementsCard({ unreadCount, onPress }: { unreadCount?: number; onPress: () => void }) {
+  return (
+    <Pressable accessibilityRole="button" accessibilityLabel="Open school announcements" onPress={onPress} style={styles.cardWrapper}>
+      <Card>
+        <View style={styles.cardTop}>
+          <Text style={styles.childName}>School announcements</Text>
+          {!!unreadCount && <Badge label={`${unreadCount} new`} tone="success" />}
+        </View>
+        <Text style={styles.subtitle}>
+          {unreadCount ? "News from the school you haven't read yet" : "You're up to date · see all announcements"}
+        </Text>
+      </Card>
+    </Pressable>
   );
 }
 

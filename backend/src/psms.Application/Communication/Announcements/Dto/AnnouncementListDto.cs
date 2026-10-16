@@ -16,4 +16,7 @@ public class AnnouncementListDto : EntityDto<Guid>
     public bool IsPinned { get; set; }
     public long CreatedByUserId { get; set; }
     public int ReadCount { get; set; }
+
+    /// <summary>Whether the signed-in user has opened this announcement.</summary>
+    public bool IsReadByMe { get; set; }
 }

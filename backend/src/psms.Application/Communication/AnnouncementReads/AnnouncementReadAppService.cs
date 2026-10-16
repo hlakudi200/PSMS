@@ -6,6 +6,7 @@ using Abp.UI;
 using Microsoft.EntityFrameworkCore;
 using psms.Authorization;
 using psms.Communication.AnnouncementReads.Dto;
+using psms.Communication.Announcements;
 using psms.Communication.Shared;
 using psms.Domain.Communication.Entities;
 using System;
@@ -20,22 +21,29 @@ public class AnnouncementReadAppService : ApplicationService, IAnnouncementReadA
 {
     private readonly IRepository<AnnouncementRead, Guid> _announcementReadRepository;
     private readonly IRepository<Announcement, Guid> _announcementRepository;
+    private readonly IFamilyAnnouncementScope _familyScope;
 
     public AnnouncementReadAppService(
         IRepository<AnnouncementRead, Guid> announcementReadRepository,
-        IRepository<Announcement, Guid> announcementRepository)
+        IRepository<Announcement, Guid> announcementRepository,
+        IFamilyAnnouncementScope familyScope)
     {
         _announcementReadRepository = announcementReadRepository;
         _announcementRepository = announcementRepository;
+        _familyScope = familyScope;
     }
 
     [AbpAuthorize(PermissionNames.Communication_Announcements_View)]
     public async Task MarkAsReadAsync(Guid announcementId)
     {
-        // Verify announcement exists and belongs to tenant
+        // Verify announcement exists and belongs to tenant. #203: and, for a
+        // parent or learner, is one they can read.
+        var audience = await _familyScope.ResolveAsync();
         var announcementExists = await _announcementRepository
             .GetAll()
-            .AnyAsync(a => a.Id == announcementId && a.TenantId == AbpSession.TenantId);
+            .Where(a => a.TenantId == AbpSession.TenantId)
+            .VisibleTo(audience)
+            .AnyAsync(a => a.Id == announcementId);
 
         if (!announcementExists)
             throw new UserFriendlyException(CommunicationExceptionCodes.AnnouncementNotFound,
@@ -91,12 +99,17 @@ public class AnnouncementReadAppService : ApplicationService, IAnnouncementReadA
     {
         var currentUserId = AbpSession.UserId.Value;
 
+        // #203: for a parent or learner, only what their feed shows, or the
+        // badge counts notices they can never open.
+        var audience = await _familyScope.ResolveAsync();
+
         // Count published announcements for this tenant that the current user hasn't read
         var unreadCount = await _announcementRepository
             .GetAll()
             .Where(a => a.TenantId == AbpSession.TenantId
                 && a.IsPublished
                 && !a.Reads.Any(r => r.UserId == currentUserId))
+            .VisibleTo(audience)
             .CountAsync();
 
         return unreadCount;
