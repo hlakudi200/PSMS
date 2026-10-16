@@ -1,12 +1,12 @@
-namespace psms.Admissions.ApplicationFees;
+﻿namespace psms.Admissions.ApplicationFees;
 
 /// <summary>
 /// Which payment gateway, if any, this deployment is wired to.
 /// <para>
-/// There is no real one yet. Until there is, an applicant has to be able to get
-/// past the fee step somehow, so the school can run the rest of the journey end
-/// to end and see what it does. That is what <see cref="Simulated"/> is for, and
-/// it is the reason the mode exists at all rather than being assumed.
+/// <see cref="Simulated"/> came first and still earns its place: it is how the
+/// admissions journey was walked end to end before any real gateway existed,
+/// and how it still is on a machine with no keys. It moves no money and says
+/// so everywhere it appears.
 /// </para>
 /// </summary>
 public enum PaymentGatewayMode
@@ -27,4 +27,12 @@ public enum PaymentGatewayMode
     /// </para>
     /// </summary>
     Simulated = 1,
+
+    /// <summary>
+    /// Yoco's hosted checkout. The payer is sent to Yoco's own page, so no card
+    /// details reach this application, and settlement comes back as a signed
+    /// webhook rather than on the redirect — a payer closing the tab after
+    /// paying is ordinary, and the redirect cannot be relied on to happen.
+    /// </summary>
+    Yoco = 2,
 }

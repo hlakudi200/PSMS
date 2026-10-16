@@ -28,19 +28,22 @@ public class ApplicationFeeAppService : ApplicationService, IApplicationFeeAppSe
     private readonly IRepository<Domain.Admissions.Entities.AdmissionSettings, Guid> _settingsRepository;
     private readonly WorkflowStarterService _workflowStarter;
     private readonly IConfiguration _configuration;
+    private readonly psms.Admissions.ApplicationFees.Yoco.YocoPaymentGateway _yoco;
 
     public ApplicationFeeAppService(
         IRepository<ApplicationFee, Guid> feeRepository,
         IRepository<Application, Guid> applicationRepository,
         IRepository<Domain.Admissions.Entities.AdmissionSettings, Guid> settingsRepository,
         WorkflowStarterService workflowStarter,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        psms.Admissions.ApplicationFees.Yoco.YocoPaymentGateway yoco)
     {
         _feeRepository = feeRepository;
         _applicationRepository = applicationRepository;
         _settingsRepository = settingsRepository;
         _workflowStarter = workflowStarter;
         _configuration = configuration;
+        _yoco = yoco;
     }
 
     [AbpAuthorize(PermissionNames.Admissions_Applications_View)]
@@ -63,10 +66,21 @@ public class ApplicationFeeAppService : ApplicationService, IApplicationFeeAppSe
     /// Which payment gateway this deployment is wired to. There is no real one
     /// yet; see <see cref="PaymentGatewayMode"/>.
     /// </summary>
-    public PaymentGatewayMode GatewayMode =>
-        Enum.TryParse<PaymentGatewayMode>(_configuration["Admissions:PaymentGateway"], ignoreCase: true, out var mode)
-            ? mode
-            : PaymentGatewayMode.Simulated;
+    public PaymentGatewayMode GatewayMode
+    {
+        get
+        {
+            // Named explicitly, whatever else is lying around.
+            if (Enum.TryParse<PaymentGatewayMode>(
+                    _configuration["Admissions:PaymentGateway"], ignoreCase: true, out var mode))
+                return mode;
+
+            /* Otherwise: a Yoco key means Yoco. Defaulting to Simulated while a
+               real key sits in the configuration would take no money and tell
+               nobody, which is the worst of the three. */
+            return _yoco.IsConfigured ? PaymentGatewayMode.Yoco : PaymentGatewayMode.Simulated;
+        }
+    }
 
     /// <summary>
     /// What the applicant needs in order to deal with the fee: how much, what
@@ -107,6 +121,66 @@ public class ApplicationFeeAppService : ApplicationService, IApplicationFeeAppSe
     /// payment the school actually received.
     /// </para>
     /// </summary>
+    /// <summary>
+    /// Starts a real checkout and hands back where to send the payer.
+    /// <para>
+    /// Nothing is recorded here. The fee is marked paid when Yoco says so, on a
+    /// signed webhook — a payer who reaches the success page has not
+    /// necessarily paid, and one who paid and closed the tab has.
+    /// </para>
+    /// </summary>
+    [AbpAuthorize(PermissionNames.Admissions_Applications_Submit)]
+    public async Task<StartPaymentDto> StartPaymentAsync(Guid applicationId)
+    {
+        if (GatewayMode != PaymentGatewayMode.Yoco)
+            throw new UserFriendlyException(AdmissionsExceptionCodes.PaymentGatewayNotAvailable,
+                "Online card payment is not available for this school.");
+
+        var application = await _applicationRepository.GetAsync(applicationId);
+
+        if (application.Status != ApplicationStatus.PaymentPending)
+            throw new UserFriendlyException(AdmissionsExceptionCodes.FeeAlreadyPaid,
+                "This application is not waiting for payment.");
+
+        var settings = await GetAdmissionSettingsAsync(application.AcademicYearId, application.AppliedGradeId);
+        var amount = settings?.ApplicationFeeAmount ?? 0m;
+
+        if (amount <= 0)
+            throw new UserFriendlyException(AdmissionsExceptionCodes.PaymentGatewayNotAvailable,
+                "There is no application fee to pay for this grade.");
+
+        /* The reference the webhook will be matched on. Kept on the fee row
+           before the payer leaves, so a webhook that beats them back still
+           finds something to settle. */
+        var fee = await EnsureFeeAsync(application, amount);
+        var reference = $"YOCO-{application.ApplicationNumber}-{DateTime.UtcNow:yyyyMMddHHmmss}";
+        fee.PaymentReference = reference;
+        await _feeRepository.UpdateAsync(fee);
+        await CurrentUnitOfWork.SaveChangesAsync();
+
+        var returnTo = _configuration["App:ClientRootAddress"]?.TrimEnd('/') ?? string.Empty;
+
+        var checkout = await _yoco.CreateCheckoutAsync(
+            amount,
+            reference,
+            application.Id,
+            successUrl: $"{returnTo}/apply?paid={application.Id}",
+            cancelUrl: $"{returnTo}/apply?cancelled={application.Id}",
+            failureUrl: $"{returnTo}/apply?failed={application.Id}");
+
+        if (!checkout.Success)
+            throw new UserFriendlyException(AdmissionsExceptionCodes.PaymentGatewayNotAvailable,
+                checkout.Error ?? "Could not start the payment.");
+
+        return new StartPaymentDto
+        {
+            ApplicationId = application.Id,
+            RedirectUrl = checkout.RedirectUrl,
+            Amount = amount,
+            PaymentReference = reference,
+        };
+    }
+
     [AbpAuthorize(PermissionNames.Admissions_Applications_Submit)]
     public async Task<PaymentResultDto> SimulatePaymentAsync(Guid applicationId)
     {
@@ -141,6 +215,28 @@ public class ApplicationFeeAppService : ApplicationService, IApplicationFeeAppSe
                 "Application is not in payment pending status.");
 
         return await SettleAsync(application, input);
+    }
+
+    /// <summary>
+    /// The fee row for this application, created if it is not there yet.
+    /// <para>
+    /// Written before the payer leaves for the gateway so the reference exists
+    /// to match a webhook against — one can arrive before the payer gets back,
+    /// and often does.
+    /// </para>
+    /// </summary>
+    private async Task<ApplicationFee> EnsureFeeAsync(Application application, decimal amount)
+    {
+        var fee = await _feeRepository.FirstOrDefaultAsync(f => f.ApplicationId == application.Id);
+        if (fee != null) return fee;
+
+        fee = new ApplicationFee(Guid.NewGuid(), application.Id, amount, "ZAR")
+        {
+            TenantId = AbpSession.TenantId,
+        };
+
+        await _feeRepository.InsertAsync(fee);
+        return fee;
     }
 
     /// <summary>
