@@ -21,13 +21,16 @@ public class CommunicationMapper : Profile
 
     private void CreateAnnouncementMappings()
     {
+        // IsReadByMe depends on who is asking, so the service sets it.
         CreateMap<Announcement, AnnouncementDto>()
             .ForMember(dest => dest.ReadCount,
-                opt => opt.MapFrom(src => src.Reads != null ? src.Reads.Count : 0));
+                opt => opt.MapFrom(src => src.Reads != null ? src.Reads.Count : 0))
+            .ForMember(dest => dest.IsReadByMe, opt => opt.Ignore());
 
         CreateMap<Announcement, AnnouncementListDto>()
             .ForMember(dest => dest.ReadCount,
-                opt => opt.MapFrom(src => src.Reads != null ? src.Reads.Count : 0));
+                opt => opt.MapFrom(src => src.Reads != null ? src.Reads.Count : 0))
+            .ForMember(dest => dest.IsReadByMe, opt => opt.Ignore());
     }
 
     private void CreateAnnouncementReadMappings()
