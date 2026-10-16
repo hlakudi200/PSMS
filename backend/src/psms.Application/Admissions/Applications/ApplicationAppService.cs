@@ -277,6 +277,8 @@ public class ApplicationAppService : ApplicationService, IApplicationAppService
             throw new UserFriendlyException(AdmissionsExceptionCodes.InvalidProspectiveStudentInfo,
                 "An email address is needed so the school can write to you about this application.");
 
+        await AssertNotAlreadyAppliedAsync(input);
+
         // Generate application number (ADM-001)
         var applicationNumber = await GenerateApplicationNumberAsync(input.AcademicYearId);
 
@@ -542,6 +544,53 @@ public class ApplicationAppService : ApplicationService, IApplicationAppService
     /// in full. Everybody else still gets the mask.
     /// </para>
     /// </summary>
+    /// <summary>
+    /// Refuses a second live application for the same child, grade and year.
+    /// <para>
+    /// <c>ADM_DUPLICATE_APPLICATION</c> was defined and never thrown, so the
+    /// same family could apply for the same learner as many times as they
+    /// liked — which is mostly an accident (a parent who is not sure the first
+    /// one saved) and leaves the school deciding the same child twice, each
+    /// decision counting separately against the grade's places.
+    /// </para>
+    /// <para>
+    /// The child is matched on the identity document where there is one, since
+    /// a name can be spelled two ways, and otherwise on name and date of birth.
+    /// A withdrawn or rejected application does not block a new one: both are
+    /// endings, and a family that withdrew in March may well mean it in June.
+    /// </para>
+    /// </summary>
+    private async Task AssertNotAlreadyAppliedAsync(CreateApplicationDto input)
+    {
+        var sameIntake = _applicationRepository
+            .GetAll()
+            .Where(a => a.AcademicYearId == input.AcademicYearId
+                        && a.AppliedGradeId == input.ApplyingForGradeId
+                        && a.Status != ApplicationStatus.Withdrawn
+                        && a.Status != ApplicationStatus.Rejected);
+
+        var identifier = !string.IsNullOrWhiteSpace(input.IdNumber) ? input.IdNumber
+            : !string.IsNullOrWhiteSpace(input.PassportNumber) ? input.PassportNumber
+            : null;
+
+        var existing = identifier != null
+            ? await sameIntake.FirstOrDefaultAsync(a =>
+                a.IdNumber == identifier || a.PassportNumber == identifier)
+            : await sameIntake.FirstOrDefaultAsync(a =>
+                a.ProspectiveStudentFirstName == input.FirstName
+                && a.ProspectiveStudentLastName == input.LastName
+                && a.DateOfBirth == input.DateOfBirth);
+
+        if (existing == null) return;
+
+        // Name the application they already have, so they can go and find it
+        // rather than wonder which one the school means.
+        throw new UserFriendlyException(AdmissionsExceptionCodes.DuplicateApplication,
+            $"There is already an application for this learner in this grade for this year "
+            + $"({existing.ApplicationNumber}). You can open that one instead, or withdraw it "
+            + "if you would rather start again.");
+    }
+
     private async Task<ApplicationDto> MapForCallerAsync(Application application)
     {
         var dto = ObjectMapper.Map<ApplicationDto>(application);
@@ -573,6 +622,19 @@ public class ApplicationAppService : ApplicationService, IApplicationAppService
 
         dto.RequiresInterview = settings?.IsInterviewRequired;
         dto.RequiresAssessment = settings?.IsAssessmentRequired;
+
+        /* Who decided. The entity records the id and the mapper left the name
+           for the service to fill in, which nothing ever did — so every decided
+           application came back with a null reviewer and the screens had
+           nobody to name against the outcome. */
+        if (application.ReviewedByUserId.HasValue)
+        {
+            dto.ReviewedByUserName = await _userRepository
+                .GetAll()
+                .Where(u => u.Id == application.ReviewedByUserId.Value)
+                .Select(u => u.UserName)
+                .FirstOrDefaultAsync();
+        }
 
         return dto;
     }

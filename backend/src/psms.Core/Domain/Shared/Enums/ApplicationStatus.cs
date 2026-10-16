@@ -1,3 +1,5 @@
+using System;
+
 namespace psms.Domain.Shared.Enums
 {
     /// <summary>
@@ -12,8 +14,19 @@ namespace psms.Domain.Shared.Enums
         Draft = 1,
 
         /// <summary>
-        /// Application submitted by parent, awaiting fee payment
+        /// Never assigned. Kept so that any row already carrying a 2 still
+        /// reads back as something.
+        /// <para>
+        /// <c>Submit</c> moves an application straight to
+        /// <see cref="PaymentPending"/> or <see cref="UnderReview"/> depending
+        /// on whether a fee is due, which is the whole of what this was for.
+        /// Nothing sets it, yet it was counted by the principal's dashboard
+        /// and drawn in the status stepper — a state the school could watch
+        /// for and never see.
+        /// </para>
         /// </summary>
+        [Obsolete("Never assigned; Submit() goes to PaymentPending or UnderReview. "
+                  + "Do not count or display this as a live state.")]
         Submitted = 2,
 
         /// <summary>

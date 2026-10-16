@@ -24,18 +24,49 @@ public class WorkflowStarterService : ITransientDependency
     private readonly IRepository<WorkflowDefinition, Guid> _definitionRepository;
     private readonly IRepository<WorkflowTransition, Guid> _transitionRepository;
     private readonly IUnitOfWorkManager _unitOfWorkManager;
+    private readonly IRepository<psms.Authorization.Users.User, long> _userRepository;
     public ILogger Logger { get; set; } = NullLogger.Instance;
 
     public WorkflowStarterService(
         IRepository<WorkflowInstance, Guid> instanceRepository,
         IRepository<WorkflowDefinition, Guid> definitionRepository,
         IRepository<WorkflowTransition, Guid> transitionRepository,
-        IUnitOfWorkManager unitOfWorkManager)
+        IUnitOfWorkManager unitOfWorkManager,
+        IRepository<psms.Authorization.Users.User, long> userRepository)
     {
         _instanceRepository = instanceRepository;
         _definitionRepository = definitionRepository;
         _transitionRepository = transitionRepository;
         _unitOfWorkManager = unitOfWorkManager;
+        _userRepository = userRepository;
+    }
+
+    /// <summary>
+    /// The name to write in the history for whoever started this.
+    /// <para>
+    /// Callers used to pass one themselves, and two of the three passed
+    /// <c>AbpSession.UserId.ToString()</c> — so an applicant's own first
+    /// transition read "by 191" among entries that read "by admin". The id is
+    /// already on the transition; the name is what somebody reading the
+    /// history needs, so it is resolved here rather than trusted from above.
+    /// </para>
+    /// </summary>
+    private async Task<string> NameForAsync(long userId, string supplied)
+    {
+        // A caller that genuinely means something other than a user — "System"
+        // for a gateway callback — still gets to say so.
+        if (!string.IsNullOrWhiteSpace(supplied) && !long.TryParse(supplied, out _))
+            return supplied;
+
+        if (userId <= 0) return "System";
+
+        var userName = await _userRepository
+            .GetAll()
+            .Where(u => u.Id == userId)
+            .Select(u => u.UserName)
+            .FirstOrDefaultAsync();
+
+        return string.IsNullOrWhiteSpace(userName) ? "System" : userName;
     }
 
     /// <summary>
@@ -166,7 +197,7 @@ public class WorkflowStarterService : ITransientDependency
             ToStepId = firstStep.Id,
             Action = WorkflowActionType.Submit,
             ActorUserId = initiatorUserId,
-            ActorUserName = initiatorUserName,
+            ActorUserName = await NameForAsync(initiatorUserId, initiatorUserName),
             Comment = "Workflow auto-started.",
             TransitionDate = DateTime.UtcNow
         };

@@ -142,6 +142,14 @@ public class WorkflowInstanceAppService : ApplicationService, IWorkflowInstanceA
                 _extensions.DecisionSchemas.Any(s => s.EntityType == instance.EntityType);
         }
 
+        /* Whether this viewer may act at all. Asked here rather than worked out
+           by the screen, because the answer takes in the step's assignee, the
+           step's role and two kinds of delegation — none of which the client
+           can see. */
+        var (canAct, _, whyNot) = await CanActOnStepAsync(step);
+        dto.CurrentUserCanAct = canAct;
+        dto.CurrentUserCannotActReason = whyNot;
+
         return dto;
     }
 
@@ -934,9 +942,28 @@ public class WorkflowInstanceAppService : ApplicationService, IWorkflowInstanceA
 
     private async Task ValidateUserCanActOnStep(WorkflowStep step)
     {
+        var (canAct, code, reason) = await CanActOnStepAsync(step);
+        if (!canAct) throw new UserFriendlyException(code, reason);
+    }
+
+    /// <summary>
+    /// Whether the signed-in user may act on this step, and why not when they
+    /// may not — the same question <see cref="ValidateUserCanActOnStep"/> asks,
+    /// without throwing.
+    /// <para>
+    /// Split out so the detail screen can be told before the dialog is filled
+    /// in. Take Action was offered on every step: a principal looking at an
+    /// Admin step got an enabled button, a dialog, and only on OK the refusal
+    /// naming a role they do not hold. The screen cannot work this out for
+    /// itself — the step's assignee, the step's role and two kinds of
+    /// delegation all count — so the server has to say.
+    /// </para>
+    /// </summary>
+    private async Task<(bool CanAct, string Code, string Reason)> CanActOnStepAsync(WorkflowStep step)
+    {
         var userId = AbpSession.UserId;
         if (!userId.HasValue)
-            throw new UserFriendlyException(WorkflowExceptionCodes.UnauthorizedAction,
+            return (false, WorkflowExceptionCodes.UnauthorizedAction,
                 "You must be logged in to perform this action.");
 
         // If step is assigned to a specific user
@@ -952,35 +979,34 @@ public class WorkflowInstanceAppService : ApplicationService, IWorkflowInstanceA
                     ? await _userManager.GetRolesAsync(assignedUser)
                     : new List<string>();
                 if (assignedRoles.Any(r => r.Equals(step.AssignedRole, StringComparison.OrdinalIgnoreCase)))
-                    return;
+                    return (true, null, null);
 
-                throw new UserFriendlyException(WorkflowExceptionCodes.AssignedUserMissingRole,
+                return (false, WorkflowExceptionCodes.AssignedUserMissingRole,
                     $"You no longer hold the required role '{step.AssignedRole}' for this step.");
             }
 
             // Check if current user has an active delegation from the assigned user
             if (await HasActiveDelegationFromUser(step.AssignedUserId.Value, userId.Value, null, null))
-                return;
+                return (true, null, null);
 
-            throw new UserFriendlyException(WorkflowExceptionCodes.UserNotAssignedToStep,
+            return (false, WorkflowExceptionCodes.UserNotAssignedToStep,
                 "This step is assigned to a specific user. You are not authorized to act on it.");
         }
 
         // Validate by role
         var user = await _userManager.FindByIdAsync(userId.Value.ToString());
         if (user == null)
-            throw new UserFriendlyException(WorkflowExceptionCodes.UnauthorizedAction,
-                "User not found.");
+            return (false, WorkflowExceptionCodes.UnauthorizedAction, "User not found.");
 
         var roles = await _userManager.GetRolesAsync(user);
         if (roles.Any(r => r.Equals(step.AssignedRole, StringComparison.OrdinalIgnoreCase)))
-            return;
+            return (true, null, null);
 
         // Check if someone with the required role delegated to the current user
         if (await HasActiveDelegationForRole(userId.Value, step.AssignedRole))
-            return;
+            return (true, null, null);
 
-        throw new UserFriendlyException(WorkflowExceptionCodes.UserNotAssignedToStep,
+        return (false, WorkflowExceptionCodes.UserNotAssignedToStep,
             $"You do not have the required role '{step.AssignedRole}' to act on this step.");
     }
 
