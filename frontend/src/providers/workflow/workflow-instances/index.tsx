@@ -65,11 +65,22 @@ export const WorkflowInstanceProvider = ({
       });
   };
 
+  /**
+   * Asks whether a record has a workflow running on it right now.
+   *
+   * "No" comes back as a 404, and no is an ordinary answer: a workflow that
+   * has run to completion has no active instance, and neither does one that
+   * never started. The callers all handle it — the application screen says
+   * "the workflow has already completed" — but the interceptor did not know
+   * that and threw its error dialog over the page, so opening any decided
+   * application greeted the user with "No active workflow instance found for
+   * this entity" and a modal they had to dismiss before touching anything.
+   */
   const getByEntityAsync = async (entityType: number, entityId: string) => {
     dispatch(getInstancePending());
     const endpoint = `/api/services/app/WorkflowInstance/GetByEntity?entityType=${entityType}&entityId=${entityId}`;
     await instance
-      .get(endpoint)
+      .get(endpoint, { suppressErrorModal: true })
       .then((response) => {
         dispatch(getInstanceSuccess(response.data.result));
       })
