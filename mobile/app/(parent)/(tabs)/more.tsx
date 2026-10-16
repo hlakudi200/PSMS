@@ -1,2 +1,1 @@
-import { Screen, StateView } from "../../../src/components";
-export default function MoreRoute() { return <Screen><StateView state="empty" message="More parent features will appear here." /></Screen>; }
+export { ParentMoreScreen as default } from "../../../src/screens/parent/ParentMoreScreen";
