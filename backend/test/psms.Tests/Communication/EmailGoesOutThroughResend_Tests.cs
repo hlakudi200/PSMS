@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Configuration;
+﻿using System.Reflection;
+using Microsoft.Extensions.Configuration;
 using psms.Communication.Channels;
 using psms.Communication.Channels.Email;
 using Shouldly;
@@ -187,6 +188,47 @@ public class EmailGoesOutThroughResend_Tests
         result.NotConfigured.ShouldBeFalse();
         result.Success.ShouldBeFalse();
         result.Error.ShouldContain("mail server");
+    }
+
+    [Fact]
+    public void There_is_a_way_to_ask_whether_email_works_at_all()
+    {
+        /* Finding out otherwise meant registering an applicant, filling in an
+           application, pushing it through four workflow steps, making an
+           admission decision and reading the delivery log — a ten-minute round
+           trip per guess, on live data. Three guesses in: a missing consent
+           row, a missing setting, and a host that blocks outbound SMTP. */
+        var service = typeof(EmailChannelDiagnosticsService);
+
+        service.GetMethod(nameof(EmailChannelDiagnosticsService.SendTestEmailAsync))
+            .ShouldNotBeNull();
+
+        service.GetCustomAttribute<Abp.Authorization.AbpAuthorizeAttribute>()
+            .Permissions.ShouldContain(psms.Authorization.PermissionNames.Communication_Notifications_Configure);
+    }
+
+    [Fact]
+    public void The_test_email_can_only_go_to_whoever_asked_for_it()
+    {
+        /* A diagnostic that can address a stranger is a spam tool. It takes no
+           recipient at all — the address comes from the session. */
+        typeof(EmailChannelDiagnosticsService)
+            .GetMethod(nameof(EmailChannelDiagnosticsService.SendTestEmailAsync))
+            .GetParameters().ShouldBeEmpty();
+
+        var source = System.IO.File.ReadAllText(SourceFile());
+        source.ShouldContain("AbpSession.GetUserId()");
+        source.ShouldContain("ResendEmailGateway.Mask(user.EmailAddress)");
+    }
+
+    private static string SourceFile()
+    {
+        var directory = new System.IO.DirectoryInfo(System.AppContext.BaseDirectory);
+        while (directory != null && !System.IO.Directory.Exists(System.IO.Path.Combine(directory.FullName, "src")))
+            directory = directory.Parent;
+
+        return System.IO.Path.Combine(directory.FullName, "src", "psms.Application",
+            "Communication", "Channels", "Email", "EmailChannelDiagnosticsService.cs");
     }
 
     [Fact]
