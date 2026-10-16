@@ -263,6 +263,61 @@ public class TheApplicationFeeCanBePaid_Tests
         status.Reachable.ShouldBeFalse();
     }
 
+    [Fact]
+    public void The_family_has_a_button_that_takes_them_to_the_gateway()
+    {
+        var review = Frontend("components", "modules", "admissions", "apply", "ReviewStep.tsx");
+
+        review.ShouldContain("startPaymentAsync(");
+        review.ShouldContain("PaymentGatewayMode.Yoco");
+        review.ShouldContain("window.location.href = started.redirectUrl");
+    }
+
+    [Fact]
+    public void Coming_back_from_the_gateway_is_not_treated_as_proof_of_payment()
+    {
+        /* The redirect says where the payer went, not whether the money
+           arrived — settlement comes on a webhook that can be seconds behind.
+           Saying "paid" before it has is a lie the school pays for. */
+        var review = Frontend("components", "modules", "admissions", "apply", "ReviewStep.tsx");
+
+        review.ShouldContain("Checking with the bank");
+        review.ShouldContain("next.awaitingPayment");
+        // And it gives up rather than spinning for ever.
+        review.ShouldContain("attempts < 7");
+    }
+
+    [Fact]
+    public void A_cancelled_payment_says_nothing_was_charged()
+    {
+        var review = Frontend("components", "modules", "admissions", "apply", "ReviewStep.tsx");
+
+        review.ShouldContain("Nothing has been charged");
+    }
+
+    [Fact]
+    public void The_simulated_button_still_says_what_it_is()
+    {
+        /* It stays, for a school with no gateway and for walking the journey
+           on a machine with no keys — but a simulated payment a parent could
+           take for a real one would be worse than no payment step at all. */
+        var review = Frontend("components", "modules", "admissions", "apply", "ReviewStep.tsx");
+
+        review.ShouldContain("no money will be taken");
+        review.ShouldContain("Simulate paying R");
+    }
+
+    private static string Frontend(params string[] parts)
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory != null && !Directory.Exists(Path.Combine(directory.FullName, "frontend")))
+            directory = directory.Parent;
+
+        directory.ShouldNotBeNull("could not find the frontend folder");
+        return File.ReadAllText(
+            Path.Combine(new[] { directory.FullName, "frontend", "src" }.Concat(parts).ToArray()));
+    }
+
     private static string SourceFile(params string[] parts)
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);

@@ -22,6 +22,7 @@ export interface IApplicationFeeActionContext {
   getPaymentStatusAsync: (applicationId: string) => void;
   /** How much is owed, what state it is in, and whether there is anything to click. */
   getCheckoutAsync: (applicationId: string) => Promise<IFeeCheckout>;
+  startPaymentAsync: (applicationId: string) => Promise<IStartPayment>;
   /** Settles it through the stand-in gateway. No money moves. */
   simulatePaymentAsync: (applicationId: string) => Promise<void>;
 }
@@ -55,4 +56,13 @@ export interface IFeeCheckout {
   gatewayMode: number;
   /** True while the deployment uses the stand-in gateway. The screen must say so. */
   isSimulated: boolean;
+}
+
+/** Where to send a payer, and what they are about to be charged. */
+export interface IStartPayment {
+  applicationId: string;
+  /** The gateway's own page. No card details touch this application. */
+  redirectUrl: string;
+  amount: number;
+  paymentReference: string;
 }

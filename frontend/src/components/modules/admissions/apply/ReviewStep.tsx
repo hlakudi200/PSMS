@@ -12,7 +12,7 @@ import type { IApplicantParent, IApplication } from '@/providers/admissions/shar
 import OfferPanel from '@/components/modules/admissions/apply/OfferPanel';
 import WaitlistPanel from '@/components/modules/admissions/apply/WaitlistPanel';
 import {
-  ApplicationStatus, applicationStandingLabel, applicationStatusLabel, canWithdraw,
+  ApplicationStatus, PaymentGatewayMode, applicationStandingLabel, applicationStatusLabel, canWithdraw,
 } from '@/providers/admissions/shared/application-status';
 
 const { Paragraph, Text } = Typography;
@@ -48,9 +48,21 @@ export default function ReviewStep({
   withdrawing: boolean;
   onRefresh: () => void;
 }) {
-  const { getCheckoutAsync, simulatePaymentAsync } = useApplicationFeeActions();
+  const { getCheckoutAsync, startPaymentAsync, simulatePaymentAsync } = useApplicationFeeActions();
   const [checkout, setCheckout] = useState<IFeeCheckout | undefined>();
   const [paying, setPaying] = useState(false);
+  const [startingPayment, setStartingPayment] = useState(false);
+
+  /* The gateway sends them back here with one of these on the URL. Read once
+     on mount: a refresh should not re-announce a payment from an hour ago. */
+  const [[justPaid, justCancelled]] = useState<[boolean, boolean]>(() => {
+    if (typeof window === 'undefined') return [false, false];
+    const query = new URLSearchParams(window.location.search);
+    return [
+      query.get('paid') === application.id,
+      query.get('cancelled') === application.id || query.get('failed') === application.id,
+    ];
+  });
   const [askingToWithdraw, setAskingToWithdraw] = useState(false);
   const [reason, setReason] = useState('');
 
@@ -124,6 +136,65 @@ export default function ReviewStep({
     if (isDraft) return;
     getCheckoutAsync(application.id).then(setCheckout).catch(() => undefined);
   }, [application.id, application.status, isDraft]);
+
+  /* Back from the gateway. The redirect says where the payer went, not whether
+     the money arrived — settlement comes on a webhook that can be seconds
+     behind. So this asks the server a few times rather than asserting
+     anything, and stops as soon as the fee is settled. */
+  useEffect(() => {
+    if (!justPaid) return;
+
+    let attempts = 0;
+    let alive = true;
+
+    const ask = async () => {
+      attempts += 1;
+      const next = await getCheckoutAsync(application.id).catch(() => undefined);
+      if (!alive) return;
+
+      if (next) setCheckout(next);
+
+      if (next && !next.awaitingPayment) {
+        message.success('Payment received. Your application is now with the school.');
+        onRefresh();
+        return;
+      }
+
+      // Roughly twenty seconds, then leave it: the webhook will land whether
+      // this page is open or not, and a spinner that never stops is worse
+      // than a page that says the school will see it either way.
+      if (attempts < 7) timer = setTimeout(ask, 3000);
+    };
+
+    let timer = setTimeout(ask, 1500);
+    return () => { alive = false; clearTimeout(timer); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [justPaid, application.id]);
+
+  /**
+   * Hands the payer over to the gateway.
+   *
+   * Nothing is recorded here, and the page is left behind deliberately — the
+   * card details are entered on the gateway's own page and never touch this
+   * application.
+   */
+  const payOnline = async () => {
+    setStartingPayment(true);
+    try {
+      const started = await startPaymentAsync(application.id);
+      if (!started?.redirectUrl) {
+        message.error('Could not start the payment. Please try again.');
+        return;
+      }
+      window.location.href = started.redirectUrl;
+    } catch (e) {
+      const abp = (e as { response?: { data?: { error?: { message?: string; details?: string } } } })
+        ?.response?.data?.error;
+      message.error(abp?.message || abp?.details || 'Could not start the payment.');
+    } finally {
+      setStartingPayment(false);
+    }
+  };
 
   const pay = async () => {
     setPaying(true);
@@ -201,6 +272,30 @@ export default function ReviewStep({
               R {checkout!.amount.toFixed(2)} is owed before the school begins reviewing the application.
             </Paragraph>
 
+            {justPaid && (
+              /* They have come back from the gateway. Whether the money has
+                 landed here yet is a different question: settlement arrives on
+                 a webhook, which can be seconds behind the redirect. Saying
+                 "paid" before it has would be a lie the school pays for. */
+              <Alert
+                type="info"
+                showIcon
+                style={{ marginBottom: 16 }}
+                message="Checking with the bank"
+                description="This can take a few seconds. You can close this page — the school will see the payment either way."
+              />
+            )}
+
+            {justCancelled && (
+              <Alert
+                type="warning"
+                showIcon
+                style={{ marginBottom: 16 }}
+                message="The payment was not completed"
+                description="Nothing has been charged. You can try again whenever you are ready."
+              />
+            )}
+
             {checkout!.isSimulated ? (
               <>
                 <Alert
@@ -213,6 +308,21 @@ export default function ReviewStep({
                 <Button type="primary" icon={<CreditCardOutlined />} loading={paying} onClick={pay} danger>
                   Simulate paying R {checkout!.amount.toFixed(2)}
                 </Button>
+              </>
+            ) : checkout!.gatewayMode === PaymentGatewayMode.Yoco ? (
+              <>
+                <Button
+                  type="primary"
+                  icon={<CreditCardOutlined />}
+                  loading={startingPayment}
+                  onClick={payOnline}
+                >
+                  Pay R {checkout!.amount.toFixed(2)}
+                </Button>
+                <Paragraph type="secondary" style={{ fontSize: 12, marginTop: 8, marginBottom: 0 }}>
+                  You will be taken to a secure payment page to enter your card details. The school
+                  never sees them.
+                </Paragraph>
               </>
             ) : (
               <Alert

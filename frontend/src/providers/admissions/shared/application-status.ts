@@ -117,3 +117,14 @@ export const applicationStepIndex = (status: number): number => {
   };
   return steps[status] ?? 0;
 };
+
+/**
+ * Which payment gateway this deployment is wired to. Mirrors the server's
+ * PaymentGatewayMode — the fee card shows a different thing for each, and
+ * "simulated" has to be unmistakable.
+ */
+export const PaymentGatewayMode = {
+  OfflineOnly: 0,
+  Simulated: 1,
+  Yoco: 2,
+} as const;
