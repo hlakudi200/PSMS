@@ -1,4 +1,4 @@
-using Abp.Application.Services;
+﻿using Abp.Application.Services;
 using Abp.Authorization;
 using Abp.Domain.Repositories;
 using Abp.UI;
@@ -79,6 +79,8 @@ public class WorkflowSeedService : ApplicationService
     /// with conditions, waitlist, or reject. Matches ApplicationDecisionSchema.Key.
     /// </summary>
     private const string ApplicationDecisionKey = "application.decision";
+    private const string InterviewRecordedGuardKey = "application.interview-recorded";
+    private const string AssessmentRecordedGuardKey = "application.assessment-recorded";
 
     private async Task SeedAdmissionsWorkflow()
     {
@@ -131,7 +133,12 @@ public class WorkflowSeedService : ApplicationService
                 // A school that does not interview for this grade never sees it.
                 SkipWhenKey = InterviewNotRequiredSkipKey,
                 // And one that normally does can still waive it for a case.
-                IsOptional = true
+                IsOptional = true,
+                /* The step is named after a thing that has to happen. Without
+                   this it recorded nothing: whoever held it clicked forward and
+                   the principal decided with no interview behind the decision,
+                   while the school's own settings said one was required. */
+                GuardKey = InterviewRecordedGuardKey
             },
             new WorkflowStep
             {
@@ -145,7 +152,8 @@ public class WorkflowSeedService : ApplicationService
                 AssignedRole = "Teacher",
                 ActionType = WorkflowActionType.Review,
                 SkipWhenKey = AssessmentNotRequiredSkipKey,
-                IsOptional = true
+                IsOptional = true,
+                GuardKey = AssessmentRecordedGuardKey
             },
             new WorkflowStep
             {
@@ -192,6 +200,59 @@ public class WorkflowSeedService : ApplicationService
         await AddAssessmentStepAsync(definition);
         await GiveThePrincipalADecisionToMakeAsync(definition);
         await RemoveTheStepsThatDecideNothingAsync(definition);
+        await MakeTheInterviewAndAssessmentMeanSomethingAsync(definition);
+    }
+
+    /// <summary>
+    /// The two steps named after something that has to happen now wait for it
+    /// to have happened.
+    /// <para>
+    /// Both were plain review steps: the actor was offered an action and a
+    /// comment, clicked forward, and nothing was recorded. Walking a Grade 5
+    /// application — a grade whose own settings require both — through to a
+    /// decision left <c>AdmissionInterview</c> and <c>AdmissionAssessment</c>
+    /// empty, and the principal decided on nothing.
+    /// </para>
+    /// <para>
+    /// The guards for exactly this were written, registered and attached to no
+    /// step. Attaching them is the whole fix. A grade that requires neither
+    /// still never sees the steps — the skip rules run first — and a school
+    /// with a reason can still waive, which is recorded with the reason.
+    /// </para>
+    /// <para>
+    /// Runs last and requeries, because the pass before this one renumbers and
+    /// deletes: a stale navigation property here would write the guard onto a
+    /// step that no longer exists.
+    /// </para>
+    /// </summary>
+    private async Task MakeTheInterviewAndAssessmentMeanSomethingAsync(WorkflowDefinition definition)
+    {
+        await CurrentUnitOfWork.SaveChangesAsync();
+
+        var steps = await _stepRepository.GetAll()
+            .Where(s => s.WorkflowDefinitionId == definition.Id)
+            .ToListAsync();
+
+        var changed = false;
+
+        foreach (var (name, guardKey) in new[]
+                 {
+                     ("Interview", InterviewRecordedGuardKey),
+                     (AssessmentStepName, AssessmentRecordedGuardKey),
+                 })
+        {
+            var step = steps.FirstOrDefault(s => s.Name == name);
+
+            // Only where the school has not chosen its own: a guard somebody
+            // picked deliberately is theirs, not ours to overwrite.
+            if (step == null || !string.IsNullOrWhiteSpace(step.GuardKey)) continue;
+
+            step.GuardKey = guardKey;
+            await _stepRepository.UpdateAsync(step);
+            changed = true;
+        }
+
+        if (changed) await CurrentUnitOfWork.SaveChangesAsync();
     }
 
     /// <summary>

@@ -1,4 +1,4 @@
-using Abp.Dependency;
+﻿using Abp.Dependency;
 using Abp.Domain.Repositories;
 using Microsoft.EntityFrameworkCore;
 using psms.Domain.Admissions.Entities;
@@ -84,10 +84,20 @@ public class ApplicationInterviewRecordedGuard : IWorkflowStepGuard, ITransientD
     public async Task<WorkflowGuardResult> EvaluateAsync(Guid entityId)
     {
         var statuses = await _interviews.GetAll().Where(i => i.ApplicationId == entityId).Select(i => i.Status).ToListAsync();
-        if (statuses.Count == 0) return WorkflowGuardResult.Fail("No interview has been scheduled.");
+        /* Said to whoever is holding the step, which is the teacher who sits in
+           the room — and who cannot book it. Telling them an interview is
+           missing without telling them who arranges one leaves them stuck on a
+           screen with nothing to click. */
+        if (statuses.Count == 0)
+            return WorkflowGuardResult.Fail(
+                "No interview has been arranged yet. The office schedules it from the application, "
+                + "and it will appear under your admissions tasks once it has.");
+
         return statuses.Contains(InterviewStatus.Completed)
             ? WorkflowGuardResult.Ok()
-            : WorkflowGuardResult.Fail("The interview has not been completed and rated.");
+            : WorkflowGuardResult.Fail(
+                "The interview is booked but its outcome has not been recorded. "
+                + "Record it under your admissions tasks.");
     }
 }
 
@@ -104,9 +114,15 @@ public class ApplicationAssessmentRecordedGuard : IWorkflowStepGuard, ITransient
     public async Task<WorkflowGuardResult> EvaluateAsync(Guid entityId)
     {
         var completed = await _assessments.GetAll().Where(a => a.ApplicationId == entityId).Select(a => a.CompletedDate).ToListAsync();
-        if (completed.Count == 0) return WorkflowGuardResult.Fail("No placement assessment has been scheduled.");
+        if (completed.Count == 0)
+            return WorkflowGuardResult.Fail(
+                "No placement assessment has been set yet. The office sets it from the application, "
+                + "and it will appear under your admissions tasks once it has.");
+
         return completed.Any(c => c.HasValue)
             ? WorkflowGuardResult.Ok()
-            : WorkflowGuardResult.Fail("The assessment result has not been recorded.");
+            : WorkflowGuardResult.Fail(
+                "The assessment has been set but no result has been recorded. "
+                + "Record it under your admissions tasks.");
     }
 }
