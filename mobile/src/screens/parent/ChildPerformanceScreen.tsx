@@ -6,7 +6,7 @@ import { colors, spacing, typography } from "../../theme";
 import { useChildrenActions, useChildrenState } from "../../providers/children";
 import { useMarksActions, useMarksState } from "../../providers/marks";
 import {
-  ACHIEVEMENT_LEVEL_LABELS, ACHIEVEMENT_LEVEL_TONES, achievementLevelFor, formatPercentage,
+  ACHIEVEMENT_LEVEL_LABELS, ACHIEVEMENT_LEVEL_TONES, achievementLevelFor, formatDate, formatPercentage,
 } from "../../utils/assessment-labels";
 import type { ISubjectSection } from "../../utils/marks-sections";
 import { useChildMarks } from "./useChildMarks";
@@ -92,6 +92,12 @@ export function ChildPerformanceScreen() {
         totalDays={child.attendanceTotalDays}
         onPress={() => router.push("/(parent)/attendance")}
       />
+      <ReportCardsCard
+        latestTermName={child.latestReport?.termName}
+        latestPublishedDate={child.latestReport?.publishedDate}
+        hasReport={!!child.latestReport}
+        onPress={() => router.push("/(parent)/reports")}
+      />
 
       <Text style={styles.sectionTitle}>Marks</Text>
       {terms && terms.length > 0 && (
@@ -168,6 +174,30 @@ function AttendanceCard({ percentage, daysPresent, totalDays, onPress }: {
           {percentage != null
             ? `Present ${daysPresent ?? 0} of ${totalDays} recorded days · see every day`
             : "No register captured yet · see attendance"}
+        </Text>
+      </Card>
+    </Pressable>
+  );
+}
+
+/** The latest issued card, already loaded for Home; the list has every card. */
+function ReportCardsCard({ latestTermName, latestPublishedDate, hasReport, onPress }: {
+  latestTermName?: string;
+  latestPublishedDate?: string;
+  hasReport: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable accessibilityRole="button" accessibilityLabel="Open report cards" onPress={onPress} style={styles.cardWrapper}>
+      <Card>
+        <View style={styles.cardTop}>
+          <Text style={styles.subjectName}>Report cards</Text>
+          {hasReport && <Badge label="View" tone="neutral" />}
+        </View>
+        <Text style={styles.meta}>
+          {hasReport
+            ? `Latest: ${latestTermName ?? "report card"}${latestPublishedDate ? `, issued ${formatDate(latestPublishedDate)}` : ""}`
+            : "None issued yet · see report cards"}
         </Text>
       </Card>
     </Pressable>
