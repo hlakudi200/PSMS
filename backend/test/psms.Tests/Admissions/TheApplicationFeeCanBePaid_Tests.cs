@@ -242,6 +242,11 @@ public class TheApplicationFeeCanBePaid_Tests
 
         diagnostics.ShouldContain("IHttpContextAccessor");
         diagnostics.ShouldContain("request.Host.HasValue");
+
+        /* And over https. TLS is terminated at the host's proxy, so the request
+           arrives as plain HTTP and Request.Scheme alone said http:// — a URL
+           Yoco would refuse, offered as the one to register. */
+        diagnostics.ShouldContain("X-Forwarded-Proto");
     }
 
     [Fact]

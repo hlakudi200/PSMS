@@ -84,12 +84,26 @@ public class PaymentChannelDiagnosticsService : ApplicationService
     /// reading it printed <c>https://localhost:44311/api/yoco/webhook</c> — an
     /// address nobody could register, handed over as the thing to register.
     /// </para>
+    /// <para>
+    /// The scheme comes from <c>X-Forwarded-Proto</c> where there is one. TLS
+    /// is terminated at the host's proxy and the request arrives as plain HTTP,
+    /// so <c>Request.Scheme</c> alone said <c>http://</c> — a URL Yoco would
+    /// refuse, offered as the one to register.
+    /// </para>
     /// </summary>
     private string ServerRoot()
     {
         var request = _httpContextAccessor.HttpContext?.Request;
         if (request != null && request.Host.HasValue)
-            return $"{request.Scheme}://{request.Host.Value}";
+        {
+            var forwarded = request.Headers["X-Forwarded-Proto"].ToString();
+            var scheme = string.IsNullOrWhiteSpace(forwarded)
+                ? request.Scheme
+                // The header may list several; the first is the client's.
+                : forwarded.Split(',')[0].Trim();
+
+            return $"{scheme}://{request.Host.Value}";
+        }
 
         return _configuration["App:ServerRootAddress"]?.TrimEnd('/') ?? string.Empty;
     }
