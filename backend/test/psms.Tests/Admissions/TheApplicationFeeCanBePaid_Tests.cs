@@ -276,9 +276,13 @@ public class TheApplicationFeeCanBePaid_Tests
         var start = service.IndexOf("StartPaymentAsync", StringComparison.Ordinal);
         var body = service.Substring(start, service.IndexOf("SimulatePaymentAsync", StringComparison.Ordinal) - start);
 
-        // The reference goes in when the row is made, not afterwards.
-        body.ShouldContain("EnsureFeeAsync(application, amount, reference)");
+        /* The reference goes in when the row is made, not afterwards. Matched
+           on the call rather than its exact argument list, so that adding
+           something else the row needs at creation — the gateway's checkout
+           id, for one — is not a failure. Writing the row twice is. */
+        body.ShouldContain("EnsureFeeAsync(application, amount, reference");
         body.ShouldNotContain("_feeRepository.UpdateAsync");
+        body.ShouldNotContain("_feeRepository.InsertAsync");
     }
 
     [Fact]

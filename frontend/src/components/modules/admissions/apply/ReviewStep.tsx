@@ -48,7 +48,8 @@ export default function ReviewStep({
   withdrawing: boolean;
   onRefresh: () => void;
 }) {
-  const { getCheckoutAsync, startPaymentAsync, simulatePaymentAsync } = useApplicationFeeActions();
+  const { getCheckoutAsync, startPaymentAsync, confirmPaymentAsync, simulatePaymentAsync } =
+    useApplicationFeeActions();
   const [checkout, setCheckout] = useState<IFeeCheckout | undefined>();
   const [paying, setPaying] = useState(false);
   const [startingPayment, setStartingPayment] = useState(false);
@@ -138,9 +139,13 @@ export default function ReviewStep({
   }, [application.id, application.status, isDraft]);
 
   /* Back from the gateway. The redirect says where the payer went, not whether
-     the money arrived — settlement comes on a webhook that can be seconds
-     behind. So this asks the server a few times rather than asserting
-     anything, and stops as soon as the fee is settled. */
+     the money arrived, so this asks the server rather than asserting anything.
+
+     It asks the server to go and ask the gateway, instead of only re-reading
+     the local row. Settlement normally arrives on a webhook, and a webhook is
+     best-effort — on a live sandbox payment the money was taken, the payer was
+     returned here, and the webhook never came. Re-reading a row nothing had
+     written would have shown "still waiting" for ever. */
   useEffect(() => {
     if (!justPaid) return;
 
@@ -149,20 +154,23 @@ export default function ReviewStep({
 
     const ask = async () => {
       attempts += 1;
+
+      // Never fatal: the gateway may be slow or the parent offline. The fee is
+      // settled by the webhook or by the school either way.
+      const confirmed = await confirmPaymentAsync(application.id).catch(() => undefined);
       const next = await getCheckoutAsync(application.id).catch(() => undefined);
       if (!alive) return;
 
       if (next) setCheckout(next);
 
-      if (next && !next.awaitingPayment) {
+      if (confirmed?.success || (next && !next.awaitingPayment)) {
         message.success('Payment received. Your application is now with the school.');
         onRefresh();
         return;
       }
 
-      // Roughly twenty seconds, then leave it: the webhook will land whether
-      // this page is open or not, and a spinner that never stops is worse
-      // than a page that says the school will see it either way.
+      // Roughly twenty seconds, then leave it: a spinner that never stops is
+      // worse than a page that says the school will see it either way.
       if (attempts < 7) timer = setTimeout(ask, 3000);
     };
 

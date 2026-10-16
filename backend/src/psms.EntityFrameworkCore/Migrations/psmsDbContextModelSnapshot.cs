@@ -3650,6 +3650,10 @@ namespace psms.Migrations
                         .HasMaxLength(3)
                         .HasColumnType("character varying(3)");
 
+                    b.Property<string>("GatewayCheckoutId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
                     b.Property<bool>("IsRefundable")
                         .HasColumnType("boolean");
 

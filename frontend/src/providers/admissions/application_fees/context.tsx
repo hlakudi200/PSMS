@@ -23,6 +23,7 @@ export interface IApplicationFeeActionContext {
   /** How much is owed, what state it is in, and whether there is anything to click. */
   getCheckoutAsync: (applicationId: string) => Promise<IFeeCheckout>;
   startPaymentAsync: (applicationId: string) => Promise<IStartPayment>;
+  confirmPaymentAsync: (applicationId: string) => Promise<{ success?: boolean; message?: string }>;
   /** Settles it through the stand-in gateway. No money moves. */
   simulatePaymentAsync: (applicationId: string) => Promise<void>;
 }

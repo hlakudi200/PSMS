@@ -45,6 +45,43 @@ public class YocoCheckout
 /// second no webhook is believed, which is deliberate.
 /// </para>
 /// </summary>
+/// <summary>What Yoco reports about a checkout that was already created.</summary>
+public class YocoCheckoutState
+{
+    /// <summary>True when Yoco answered about it at all.</summary>
+    public bool Found { get; set; }
+
+    /// <summary>
+    /// Yoco's own word for where the checkout got to, carried verbatim.
+    /// </summary>
+    public string Status { get; set; }
+
+    /// <summary>Yoco's id for the payment, where one was taken.</summary>
+    public string PaymentId { get; set; }
+
+    public bool NotConfigured { get; set; }
+
+    public string Error { get; set; }
+
+    /// <summary>
+    /// Whether the money was actually taken.
+    /// <para>
+    /// A payment id is the stronger signal — Yoco only has one once a payment
+    /// exists — and the status word is accepted alongside it. Anything this
+    /// does not recognise is <b>not</b> treated as paid: the webhook, the
+    /// school, and the payer asking again are all still there to settle it,
+    /// whereas marking an unpaid application paid cannot be undone by any of
+    /// them.
+    /// </para>
+    /// </summary>
+    public bool IsPaid =>
+        Found
+        && (!string.IsNullOrWhiteSpace(PaymentId)
+            || string.Equals(Status, "completed", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(Status, "succeeded", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(Status, "successful", StringComparison.OrdinalIgnoreCase));
+}
+
 public class YocoPaymentGateway : ITransientDependency
 {
     private const string CheckoutsUrl = "https://payments.yoco.com/api/checkouts";
@@ -174,6 +211,72 @@ public class YocoPaymentGateway : ITransientDependency
         {
             Logger.Warn($"Could not read Yoco's answer for {reference}: {ex.Message}");
             return new YocoCheckout { Error = "The payment service answered with something unreadable." };
+        }
+    }
+
+    /// <summary>
+    /// What Yoco says became of a checkout.
+    /// <para>
+    /// The webhook is the normal path and this is the safety net. A webhook is
+    /// best-effort by nature — not registered, registered against the wrong
+    /// URL, rejected for a signature, retried into a dead end — and a parent
+    /// who has paid must not be left unpaid on the school's screen because a
+    /// POST went missing. When the payer comes back, the server asks.
+    /// </para>
+    /// </summary>
+    public async Task<YocoCheckoutState> GetCheckoutAsync(string checkoutId)
+    {
+        if (!IsConfigured)
+            return new YocoCheckoutState { NotConfigured = true, Error = "Online payment is not configured." };
+
+        if (string.IsNullOrWhiteSpace(checkoutId))
+            return new YocoCheckoutState { Error = "There is no checkout to ask about." };
+
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, $"{CheckoutsUrl}/{checkoutId}");
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", SecretKey);
+
+            using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(TimeoutSeconds));
+            using var response = await Http.SendAsync(request, cancellation.Token);
+            var body = await response.Content.ReadAsStringAsync();
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var error = Describe(response.StatusCode, body);
+                Logger.Warn($"Yoco would not say what became of checkout {checkoutId}: {error}");
+                return new YocoCheckoutState { Error = error };
+            }
+
+            using var document = JsonDocument.Parse(body);
+            var root = document.RootElement;
+
+            var status = root.TryGetProperty("status", out var s) ? s.GetString() : null;
+            var paymentId = root.TryGetProperty("paymentId", out var pid) ? pid.GetString() : null;
+
+            /* The raw word is carried out rather than only a verdict. Yoco's
+               vocabulary here is theirs to change, and a state this code does
+               not recognise must be visible rather than silently read as "not
+               paid" — which would lose exactly the payment this exists to
+               catch. */
+            return new YocoCheckoutState
+            {
+                Found = true,
+                Status = status,
+                PaymentId = paymentId,
+            };
+        }
+        catch (OperationCanceledException)
+        {
+            return new YocoCheckoutState { Error = $"The payment service did not answer within {TimeoutSeconds} seconds." };
+        }
+        catch (HttpRequestException ex)
+        {
+            return new YocoCheckoutState { Error = $"Could not reach the payment service: {ex.Message}" };
+        }
+        catch (JsonException)
+        {
+            return new YocoCheckoutState { Error = "The payment service answered with something unreadable." };
         }
     }
 

@@ -150,4 +150,55 @@ public class PaymentChannelDiagnosticsService : ApplicationService
 
         return status;
     }
+
+    /// <summary>
+    /// What the gateway says about one checkout, in its own words.
+    /// <para>
+    /// The webhook is not the only way a payment can be confirmed, and the
+    /// retrieve call had never been made against a real checkout — the status
+    /// vocabulary came from documentation. This reports the raw word, so the
+    /// first real use proves it rather than assuming it.
+    /// </para>
+    /// <para>
+    /// Reads only. It settles nothing; ApplicationFee/ConfirmPayment is what
+    /// acts on the answer.
+    /// </para>
+    /// </summary>
+    public async Task<CheckoutProbe> ProbeCheckoutAsync(string checkoutId)
+    {
+        var state = await _yoco.GetCheckoutAsync(checkoutId);
+
+        return new CheckoutProbe
+        {
+            CheckoutId = checkoutId,
+            Found = state.Found,
+            Status = state.Status,
+            HasPaymentId = !string.IsNullOrWhiteSpace(state.PaymentId),
+            ReadAsPaid = state.IsPaid,
+            Error = state.Error,
+        };
+    }
+}
+
+/// <summary>What the gateway reports about one checkout, for diagnosis only.</summary>
+public class CheckoutProbe
+{
+    public string CheckoutId { get; set; }
+
+    /// <summary>Whether the gateway answered about it at all.</summary>
+    public bool Found { get; set; }
+
+    /// <summary>The gateway's own word, carried verbatim.</summary>
+    public string Status { get; set; }
+
+    /// <summary>
+    /// Whether a payment id came back — never the id itself, which identifies
+    /// a real transaction and this result travels over the wire.
+    /// </summary>
+    public bool HasPaymentId { get; set; }
+
+    /// <summary>What ConfirmPayment would make of it.</summary>
+    public bool ReadAsPaid { get; set; }
+
+    public string Error { get; set; }
 }
