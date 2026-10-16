@@ -161,6 +161,13 @@ public static class AssessmentExceptionCodes
     public const string NotTheParent = "ASM_NOT_THE_PARENT";
 
     /// <summary>
+    /// A parent tried to acknowledge a report card that has already been
+    /// acknowledged. The first acknowledgement is the record of when the family
+    /// received the card, and a second one would overwrite it.
+    /// </summary>
+    public const string ReportAlreadyAcknowledged = "ASM_REPORT_ALREADY_ACKNOWLEDGED";
+
+    /// <summary>
     /// A report was submitted for approval in a school with no active report
     /// approval workflow. Approval only happens through the engine, so there
     /// would be nobody to review it.
