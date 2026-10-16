@@ -53,6 +53,13 @@ public class PaymentAllocationAppService : ApplicationService, IPaymentAllocatio
     /// </summary>
     private async Task<List<Guid>> FamilyScopeAsync()
     {
+        // Staff who can see the whole school's payments are not a family here,
+        // even when they are also a parent of a learner at this school. See the
+        // same gate in PaymentAppService: a bursar whose own child attends must
+        // keep school-wide sight, and no parent holds ViewAll.
+        if (await IsGrantedAsync(PermissionNames.Financial_Payments_ViewAll))
+            return null;
+
         var selfId = await _currentStudent.GetCurrentStudentIdAsync();
         if (selfId.HasValue) return new List<Guid> { selfId.Value };
 

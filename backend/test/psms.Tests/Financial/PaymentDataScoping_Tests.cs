@@ -49,6 +49,7 @@ public class PaymentDataScoping_Tests : psmsTestBase
     private Guid _benAllocationId;
     private long _parentAUserId;
     private long _financeUserId;
+    private long _bursarWhoIsAlsoAParentUserId;
 
     public PaymentDataScoping_Tests()
     {
@@ -62,12 +63,21 @@ public class PaymentDataScoping_Tests : psmsTestBase
         var parentAUser = CreateUser("pay.parent.a");
         var parentBUser = CreateUser("pay.parent.b");
         var financeUser = CreateUser("pay.finance");
+
+        // The school's bursar, whose own child is also a learner here. Staff
+        // children attending the school they work at is ordinary, and it must
+        // not cost her the job she was hired to do.
+        var bursarUser = CreateUser("pay.bursar.who.is.a.parent");
+
         _parentAUserId = parentAUser.Id;
         _financeUserId = financeUser.Id;
+        _bursarWhoIsAlsoAParentUserId = bursarUser.Id;
 
         AssignRole(parentAUser.Id, StaticRoleNames.Tenants.Parent);
         AssignRole(parentBUser.Id, StaticRoleNames.Tenants.Parent);
         AssignRole(financeUser.Id, StaticRoleNames.Tenants.Finance);
+        AssignRole(bursarUser.Id, StaticRoleNames.Tenants.Finance);
+        AssignRole(bursarUser.Id, StaticRoleNames.Tenants.Parent);
 
         var yearId = Guid.NewGuid();
         var gradeId = Guid.NewGuid();
@@ -92,6 +102,10 @@ public class PaymentDataScoping_Tests : psmsTestBase
             context.Parents.Add(new Parent(_parentBId, 1, parentBUser.Id, "Bob", "Brown", "pay.parent.b@test.local", "0710000012"));
             context.StudentParents.Add(new StudentParent(Guid.NewGuid(), _annId, _parentAId, RelationshipType.Mother));
             context.StudentParents.Add(new StudentParent(Guid.NewGuid(), _benId, _parentBId, RelationshipType.Father));
+
+            var bursarParentId = Guid.NewGuid();
+            context.Parents.Add(new Parent(bursarParentId, 1, bursarUser.Id, "Thandi", "Nkosi", "pay.bursar@test.local", "0710000013"));
+            context.StudentParents.Add(new StudentParent(Guid.NewGuid(), _annId, bursarParentId, RelationshipType.Mother));
 
             var annFee = new StudentFee(Guid.NewGuid(), 1, _annId, structureId, 3000m, DateTime.Today);
             var benFee = new StudentFee(Guid.NewGuid(), 1, _benId, structureId, 3000m, DateTime.Today);
@@ -227,6 +241,32 @@ public class PaymentDataScoping_Tests : psmsTestBase
     public async Task Staff_can_still_settle_a_payment()
     {
         LoginAs(_financeUserId);
+
+        var settled = await _payments.CompleteAsync(_benPendingPaymentId);
+
+        settled.Status.ShouldBe(PaymentStatus.Completed);
+    }
+
+    // ---- staff who are also parents at the school ----
+
+    [Fact]
+    public async Task A_bursar_whose_own_child_is_a_learner_here_still_sees_the_whole_school()
+    {
+        LoginAs(_bursarWhoIsAlsoAParentUserId);
+
+        // Having a Parent row was read as "this caller is a family", which cut
+        // her sight down to her own child and hid every other learner's money
+        // from the person whose job is to collect it.
+        (await _payments.GetAsync(_benPaymentId)).Id.ShouldBe(_benPaymentId);
+        (await _payments.GetAllAsync(new GetPaymentsInput { MaxResultCount = 50 })).Items
+            .Select(p => p.Id).ShouldBe(new[] { _annPaymentId, _benPaymentId, _benPendingPaymentId }, ignoreOrder: true);
+        (await _allocations.GetAsync(_benAllocationId)).Id.ShouldBe(_benAllocationId);
+    }
+
+    [Fact]
+    public async Task A_bursar_whose_own_child_is_a_learner_here_can_still_settle_a_payment()
+    {
+        LoginAs(_bursarWhoIsAlsoAParentUserId);
 
         var settled = await _payments.CompleteAsync(_benPendingPaymentId);
 

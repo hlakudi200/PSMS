@@ -59,6 +59,17 @@ public class PaymentAppService : ApplicationService, IPaymentAppService
     /// </summary>
     private async Task<List<Guid>> FamilyScopeAsync()
     {
+        // Staff who can see the whole school's payments are not a family here,
+        // even when they are also a parent of a learner at this school — which
+        // is ordinary at a small private school, where staff children often
+        // attend. Without this, a bursar who enrolled her own child could read
+        // and settle payments for that child and no one else, because having a
+        // Parent row was taken to mean "this caller is a parent". Parents hold
+        // Payments.View; only Principal, Vice-Principal and Finance hold
+        // ViewAll, so this widens nothing for a family.
+        if (await IsGrantedAsync(PermissionNames.Financial_Payments_ViewAll))
+            return null;
+
         var selfId = await _currentStudent.GetCurrentStudentIdAsync();
         if (selfId.HasValue) return new List<Guid> { selfId.Value };
 
