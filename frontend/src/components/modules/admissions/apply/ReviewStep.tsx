@@ -10,6 +10,7 @@ import { useApplicationFeeActions } from '@/providers/admissions/application_fee
 import type { IFeeCheckout } from '@/providers/admissions/application_fees/context';
 import type { IApplicantParent, IApplication } from '@/providers/admissions/shared/interfaces';
 import OfferPanel from '@/components/modules/admissions/apply/OfferPanel';
+import WaitlistPanel from '@/components/modules/admissions/apply/WaitlistPanel';
 import {
   ApplicationStatus, applicationStatusLabel, canWithdraw,
 } from '@/providers/admissions/shared/application-status';
@@ -186,6 +187,10 @@ export default function ReviewStep({
           <OfferPanel application={application} onAnswered={onRefresh} />
         )}
 
+        {application.status === ApplicationStatus.Waitlisted && (
+          <WaitlistPanel application={application} onAnswered={onRefresh} />
+        )}
+
         {awaitingPayment && (
           <Card title="Application fee" style={{ marginTop: 8 }}>
             <Paragraph>
@@ -232,7 +237,15 @@ export default function ReviewStep({
             showIcon
             style={{ marginTop: 8 }}
             message="There is no application fee for this grade"
-            description="The school is reviewing your application."
+            description={
+              /* It said "The school is reviewing your application" under every
+                 status, including waitlisted and decided, where it was simply
+                 untrue. The panels above say where things stand; this one is
+                 about the fee and should stay about the fee. */
+              application.status === ApplicationStatus.UnderReview
+                ? 'The school is reviewing your application.'
+                : undefined
+            }
           />
         )}
 
