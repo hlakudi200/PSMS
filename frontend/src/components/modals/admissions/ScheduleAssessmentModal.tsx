@@ -90,7 +90,8 @@ export default function ScheduleAssessmentModal({
       await scheduleAsync({
         applicationId,
         type: parsed.data.type,
-        scheduledDate: parsed.data.scheduledDate.toISOString(),
+        // A date, not a moment — see the apply journey's date of birth.
+        scheduledDate: parsed.data.scheduledDate.format('YYYY-MM-DD'),
         assessedGradeId: gradeId,
         assessorUserId: parsed.data.assessorUserId,
         maxScore: parsed.data.maxScore,

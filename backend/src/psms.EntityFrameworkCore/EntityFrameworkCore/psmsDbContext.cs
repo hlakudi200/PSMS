@@ -3,6 +3,7 @@ using psms.Authorization.Roles;
 using psms.Authorization.Users;
 using psms.MultiTenancy;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using System.Linq;
 using System;
@@ -461,6 +462,34 @@ public class psmsDbContext : AbpZeroDbContext<Tenant, Role, User, psmsDbContext>
             .HasDatabaseName("IX_SchoolBrandings_TenantId");
     }
 
+    /// <summary>
+    /// The values that are a <b>date</b> and not a moment.
+    /// <para>
+    /// A date of birth is 14 March 2015 wherever you are standing. Stored as a
+    /// timestamp it became 2015-03-13T22:00:00Z — the right instant for
+    /// midnight in Johannesburg, and the wrong date to anything that formats in
+    /// UTC. The same learner then read as born on the 14th on the apply form
+    /// and the 13th on the workflow summary, and an assessment set for Monday
+    /// the 26th showed as the 25th on the screen the principal decides from.
+    /// </para>
+    /// <para>
+    /// These are mapped to a Postgres <c>date</c> instead, which carries no
+    /// zone to be converted through and serialises without a Z for a client to
+    /// shift. Everything else stays a timestamp: a submission, a decision or an
+    /// expiry really is a moment, and really is in UTC.
+    /// </para>
+    /// </summary>
+    private static readonly (Type Entity, string Property)[] DateOnlyProperties =
+    {
+        (typeof(psms.Domain.Admissions.Entities.Application), nameof(psms.Domain.Admissions.Entities.Application.DateOfBirth)),
+        (typeof(Student), nameof(Student.DateOfBirth)),
+        (typeof(psms.Domain.Admissions.Entities.AdmissionInterview), nameof(psms.Domain.Admissions.Entities.AdmissionInterview.ScheduledDate)),
+        (typeof(psms.Domain.Admissions.Entities.AdmissionAssessment), nameof(psms.Domain.Admissions.Entities.AdmissionAssessment.ScheduledDate)),
+    };
+
+    private static bool IsDateOnly(IMutableEntityType entityType, IMutableProperty property) =>
+        DateOnlyProperties.Any(d => d.Entity == entityType.ClrType && d.Property == property.Name);
+
     private void ConfigureDateTimeUtcConversion(ModelBuilder modelBuilder)
     {
         // Value converter for DateTime (non-nullable)
@@ -475,11 +504,19 @@ public class psmsDbContext : AbpZeroDbContext<Tenant, Role, User, psmsDbContext>
             v => v.HasValue ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) : v
         );
 
-        // Apply converters to all DateTime and DateTime? properties across all entities
+        // Apply converters to all DateTime and DateTime? properties across all
+        // entities — except the ones that are a date rather than a moment, which
+        // must not be dragged through a time zone on the way in or out.
         foreach (var entityType in modelBuilder.Model.GetEntityTypes())
         {
             foreach (var property in entityType.GetProperties())
             {
+                if (IsDateOnly(entityType, property))
+                {
+                    property.SetColumnType("date");
+                    continue;
+                }
+
                 if (property.ClrType == typeof(DateTime))
                 {
                     property.SetValueConverter(dateTimeConverter);

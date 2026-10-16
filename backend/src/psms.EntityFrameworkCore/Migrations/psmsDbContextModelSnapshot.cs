@@ -2247,7 +2247,7 @@ namespace psms.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("DateOfBirth")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("date");
 
                     b.Property<long?>("DeleterUserId")
                         .HasColumnType("bigint");
@@ -3145,7 +3145,7 @@ namespace psms.Migrations
                         .HasColumnType("numeric");
 
                     b.Property<DateTime>("ScheduledDate")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("date");
 
                     b.Property<string>("Subjects")
                         .HasMaxLength(500)
@@ -3218,7 +3218,7 @@ namespace psms.Migrations
                         .HasColumnType("integer");
 
                     b.Property<DateTime>("ScheduledDate")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("date");
 
                     b.Property<TimeSpan>("ScheduledTime")
                         .HasColumnType("interval");
@@ -3453,7 +3453,7 @@ namespace psms.Migrations
                         .HasColumnType("bigint");
 
                     b.Property<DateTime>("DateOfBirth")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("date");
 
                     b.Property<int?>("Decision")
                         .HasColumnType("integer");
