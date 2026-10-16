@@ -28,8 +28,8 @@ export interface IApplicationDocumentActionContext {
   uploadFileToStorageAsync: (uploadUrl: string, file: File) => Promise<void>;
   uploadAsync: (input: IUploadDocument) => Promise<void>;
   deleteAsync: (id: string) => void;
-  verifyAsync: (id: string, input: IVerifyDocument) => void;
-  rejectAsync: (id: string, reason: string) => void;
+  verifyAsync: (id: string, input: IVerifyDocument) => Promise<IApplicationDocument>;
+  rejectAsync: (id: string, reason: string) => Promise<IApplicationDocument>;
   // Returns a short-lived signed URL for the private document, or undefined on error.
   getDownloadUrlAsync: (id: string) => Promise<string | undefined>;
 }

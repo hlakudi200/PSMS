@@ -81,6 +81,8 @@ public class WorkflowSeedService : ApplicationService
     private const string ApplicationDecisionKey = "application.decision";
     private const string InterviewRecordedGuardKey = "application.interview-recorded";
     private const string AssessmentRecordedGuardKey = "application.assessment-recorded";
+    private const string DocumentsVerifiedGuardKey = "application.documents-verified";
+    private const string AdminReviewStepName = "Admin Review";
 
     private async Task SeedAdmissionsWorkflow()
     {
@@ -115,10 +117,15 @@ public class WorkflowSeedService : ApplicationService
                 Id = Guid.NewGuid(),
                 WorkflowDefinitionId = definition.Id,
                 StepOrder = 1,
-                Name = "Admin Review",
+                Name = AdminReviewStepName,
                 Description = "Admin reviews the submitted application for completeness.",
                 AssignedRole = "Admin",
-                ActionType = WorkflowActionType.Review
+                ActionType = WorkflowActionType.Review,
+                /* Every document the grade asks for has to have been looked at
+                   and marked verified before the application goes any further.
+                   Nothing could mark one until now, so this would have been a
+                   guard nobody could satisfy. */
+                GuardKey = DocumentsVerifiedGuardKey
             },
             new WorkflowStep
             {
@@ -199,8 +206,47 @@ public class WorkflowSeedService : ApplicationService
         await GiveTheInterviewToTeachersAsync(definition);
         await AddAssessmentStepAsync(definition);
         await GiveThePrincipalADecisionToMakeAsync(definition);
+        await TheLastStepCanFinishAsync(definition);
         await RemoveTheStepsThatDecideNothingAsync(definition);
         await MakeTheInterviewAndAssessmentMeanSomethingAsync(definition);
+    }
+
+    /// <summary>
+    /// The step that ends the workflow is marked as ending it.
+    /// <para>
+    /// A live school was found with its Principal Decision step carrying
+    /// <c>IsTerminal = false</c>. Completion still worked — the engine finishes
+    /// when a step has nothing after it — so nothing looked wrong. What it
+    /// quietly broke was every pass that looks for the terminal step:
+    /// <see cref="GiveThePrincipalADecisionToMakeAsync"/> searches by it, and
+    /// <see cref="RemoveTheStepsThatDecideNothingAsync"/> refuses to remove
+    /// anything unless a terminal step would survive. So the tidy-up declined,
+    /// silently, and the school kept a Document Verification step the seeder
+    /// had been trying to retire for three releases.
+    /// </para>
+    /// <para>
+    /// Only the last step, and only when it is the decision step: a school that
+    /// has deliberately added stages after the principal is not being corrected
+    /// here.
+    /// </para>
+    /// </summary>
+    private async Task TheLastStepCanFinishAsync(WorkflowDefinition definition)
+    {
+        await CurrentUnitOfWork.SaveChangesAsync();
+
+        var ordered = await _stepRepository.GetAll()
+            .Where(s => s.WorkflowDefinitionId == definition.Id)
+            .OrderBy(s => s.StepOrder)
+            .ToListAsync();
+
+        var last = ordered.LastOrDefault();
+        if (last == null || last.IsTerminal || last.Name != PrincipalDecisionStepName) return;
+
+        last.IsTerminal = true;
+        await _stepRepository.UpdateAsync(last);
+        await CurrentUnitOfWork.SaveChangesAsync();
+
+        Logger.Info($"Marked '{last.Name}' as the terminal step of definition {definition.Id}.");
     }
 
     /// <summary>
@@ -239,6 +285,7 @@ public class WorkflowSeedService : ApplicationService
                  {
                      ("Interview", InterviewRecordedGuardKey),
                      (AssessmentStepName, AssessmentRecordedGuardKey),
+                     (AdminReviewStepName, DocumentsVerifiedGuardKey),
                  })
         {
             var step = steps.FirstOrDefault(s => s.Name == name);

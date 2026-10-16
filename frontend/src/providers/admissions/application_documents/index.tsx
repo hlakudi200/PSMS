@@ -147,31 +147,38 @@ export const ApplicationDocumentProvider = ({
       });
   };
 
+  /* Both of these swallowed their own failures, so a refusal looked exactly
+     like a success: the row simply did not change. Nothing called either of
+     them, so nobody found out. */
   const verifyAsync = async (id: string, input: IVerifyDocument) => {
     dispatch(verifyDocumentPending());
     const endpoint = `/api/services/app/ApplicationDocument/Verify?id=${id}`;
-    await instance
+    return instance
       .post(endpoint, input)
       .then((response) => {
         dispatch(verifyDocumentSuccess(response.data.result));
+        return response.data.result;
       })
       .catch((error) => {
         console.error(error);
         dispatch(verifyDocumentError());
+        throw error;
       });
   };
 
   const rejectAsync = async (id: string, reason: string) => {
     dispatch(rejectDocumentPending());
     const endpoint = `/api/services/app/ApplicationDocument/Reject?id=${id}&reason=${encodeURIComponent(reason)}`;
-    await instance
+    return instance
       .post(endpoint)
       .then((response) => {
         dispatch(rejectDocumentSuccess(response.data.result));
+        return response.data.result;
       })
       .catch((error) => {
         console.error(error);
         dispatch(rejectDocumentError());
+        throw error;
       });
   };
 
