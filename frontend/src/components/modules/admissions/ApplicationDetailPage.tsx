@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { usePortalBase } from '@/utils/portal-base';
 import {
@@ -16,6 +16,8 @@ import {
   Empty,
   Steps,
   Alert,
+  Modal,
+  Input,
   message,
   Row,
   Col,
@@ -70,7 +72,7 @@ import ScheduleInterviewModal from '@/components/modals/admissions/ScheduleInter
 import ScheduleAssessmentModal from '@/components/modals/admissions/ScheduleAssessmentModal';
 import EnrolLearnerModal from '@/components/modals/admissions/EnrolLearnerModal';
 
-const { Title, Text } = Typography;
+const { Title, Text, Paragraph } = Typography;
 
 const statusSteps = ['Draft', 'Submitted', 'UnderReview', 'Approved', 'Enrolled'];
 
@@ -141,12 +143,56 @@ function ParentsSection({ applicationId }: { applicationId: string }) {
 // ─── Documents Tab ─────────────────────────────────────────────
 function DocumentsSection({ applicationId }: { applicationId: string }) {
   const { documents: applicationDocuments, isPending } = useApplicationDocumentState();
-  const { getAllByApplicationAsync, getDownloadUrlAsync } = useApplicationDocumentActions();
+  const {
+    getAllByApplicationAsync, getDownloadUrlAsync, verifyAsync, rejectAsync,
+  } = useApplicationDocumentActions();
+  const { currentRole } = useAuthState();
   const [openingId, setOpeningId] = useState<string | null>(null);
+  const [workingId, setWorkingId] = useState<string | null>(null);
+  const [rejecting, setRejecting] = useState<IApplicationDocument | undefined>();
+  const [reason, setReason] = useState('');
+
+  /* The roles the school grants Admissions.Documents.Verify to. The server is
+     the authority and refuses anyone else; this only decides whether to offer
+     the buttons. */
+  const mayVerify = isOneOfRoles(currentRole, ['Admin', 'Principal', 'VicePrincipal', 'AdmissionsOfficer']);
+
+  const reload = useCallback(() => {
+    getAllByApplicationAsync(applicationId);
+  }, [applicationId, getAllByApplicationAsync]);
 
   useEffect(() => {
     getAllByApplicationAsync(applicationId);
   }, [applicationId, getAllByApplicationAsync]);
+
+  const verify = async (document: IApplicationDocument) => {
+    setWorkingId(document.id);
+    try {
+      await verifyAsync(document.id, {});
+      message.success(`${document.documentName ?? 'The document'} is verified.`);
+      reload();
+    } catch {
+      // The interceptor shows what the server said.
+    } finally {
+      setWorkingId(null);
+    }
+  };
+
+  const reject = async () => {
+    if (!rejecting) return;
+    setWorkingId(rejecting.id);
+    try {
+      await rejectAsync(rejecting.id, reason.trim());
+      message.success('Sent back to the family.');
+      setRejecting(undefined);
+      setReason('');
+      reload();
+    } catch {
+      // The interceptor shows what the server said.
+    } finally {
+      setWorkingId(null);
+    }
+  };
 
   // The documents bucket is private — there is no public link. Fetch a
   // short-lived signed URL on click and open it. (Opening a blank tab first
@@ -190,30 +236,84 @@ function DocumentsSection({ applicationId }: { applicationId: string }) {
       ),
     },
     {
-      title: '', key: 'action', width: 80,
+      title: '', key: 'action', width: mayVerify ? 230 : 80,
       render: (_: unknown, r: IApplicationDocument) => (
-        <Button
-          type="link"
-          size="small"
-          loading={openingId === r.id}
-          onClick={() => handleView(r.id)}
-        >
-          View
-        </Button>
+        <Space size={0} wrap>
+          <Button
+            type="link"
+            size="small"
+            loading={openingId === r.id}
+            onClick={() => handleView(r.id)}
+          >
+            View
+          </Button>
+
+          {/* The first workflow step is called Document Verification and there
+              was no way to verify anything: the endpoints existed, the
+              permissions were granted, and nothing on any screen called them.
+              So every document sat Pending for ever and the step verified
+              nothing. Checking one is a deliberate act by somebody who has
+              opened it, which is why View comes first. */}
+          {mayVerify && !r.isVerified && (
+            <>
+              <Button
+                type="link"
+                size="small"
+                loading={workingId === r.id}
+                onClick={() => verify(r)}
+              >
+                Verify
+              </Button>
+              <Button
+                type="link"
+                size="small"
+                danger
+                disabled={workingId === r.id}
+                onClick={() => { setRejecting(r); setReason(''); }}
+              >
+                Send back
+              </Button>
+            </>
+          )}
+        </Space>
       ),
     },
   ];
 
   return (
-    <Table<IApplicationDocument>
-      dataSource={applicationDocuments ?? []}
-      columns={columns}
-      rowKey="id"
-      loading={isPending}
-      pagination={false}
-      size="small"
-      locale={{ emptyText: <Empty description="No documents uploaded" image={Empty.PRESENTED_IMAGE_SIMPLE} /> }}
-    />
+    <>
+      <Table<IApplicationDocument>
+        dataSource={applicationDocuments ?? []}
+        columns={columns}
+        rowKey="id"
+        loading={isPending}
+        pagination={false}
+        size="small"
+        locale={{ emptyText: <Empty description="No documents uploaded" image={Empty.PRESENTED_IMAGE_SIMPLE} /> }}
+      />
+
+      <Modal
+        open={!!rejecting}
+        title={`Send back ${rejecting?.documentName ?? 'this document'}?`}
+        okText="Send it back"
+        okButtonProps={{ danger: true, loading: workingId === rejecting?.id }}
+        onOk={reject}
+        onCancel={() => setRejecting(undefined)}
+      >
+        <Paragraph>
+          The family will be asked for it again. Say what is wrong with it — a blurred
+          photograph and the wrong document need different things done about them, and
+          they only have your words to go on.
+        </Paragraph>
+        <Input.TextArea
+          rows={3}
+          maxLength={500}
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          placeholder="For example: the second page is cut off"
+        />
+      </Modal>
+    </>
   );
 }
 
