@@ -23,13 +23,52 @@ public class MessageAppService : ApplicationService, IMessageAppService
 {
     private readonly IRepository<Message, Guid> _messageRepository;
     private readonly IRepository<User, long> _userRepository;
+    private readonly IMessageRecipientResolver _recipientResolver;
 
     public MessageAppService(
         IRepository<Message, Guid> messageRepository,
-        IRepository<User, long> userRepository)
+        IRepository<User, long> userRepository,
+        IMessageRecipientResolver recipientResolver)
     {
         _messageRepository = messageRepository;
         _userRepository = userRepository;
+        _recipientResolver = recipientResolver;
+    }
+
+    /// <summary>"Name Surname" for each user id, in one query.</summary>
+    private async Task<Dictionary<long, string>> NamesAsync(IEnumerable<long> userIds)
+    {
+        var ids = userIds.Distinct().ToList();
+        var users = await _userRepository
+            .GetAll()
+            .Where(u => ids.Contains(u.Id))
+            .Select(u => new { u.Id, u.Name, u.Surname })
+            .ToListAsync();
+        return users.ToDictionary(u => u.Id, u => $"{u.Name} {u.Surname}".Trim());
+    }
+
+    private async Task<List<MessageListDto>> MapListAsync(List<Message> messages)
+    {
+        var dtos = ObjectMapper.Map<List<MessageListDto>>(messages);
+        var names = await NamesAsync(dtos.SelectMany(d => new[] { d.SenderUserId, d.RecipientUserId }));
+        foreach (var dto in dtos)
+        {
+            dto.SenderName = names.GetValueOrDefault(dto.SenderUserId);
+            dto.RecipientName = names.GetValueOrDefault(dto.RecipientUserId);
+        }
+        return dtos;
+    }
+
+    private async Task<List<MessageDto>> MapAsync(List<Message> messages)
+    {
+        var dtos = ObjectMapper.Map<List<MessageDto>>(messages);
+        var names = await NamesAsync(dtos.SelectMany(d => new[] { d.SenderUserId, d.RecipientUserId }));
+        foreach (var dto in dtos)
+        {
+            dto.SenderName = names.GetValueOrDefault(dto.SenderUserId);
+            dto.RecipientName = names.GetValueOrDefault(dto.RecipientUserId);
+        }
+        return dtos;
     }
 
     [AbpAuthorize(PermissionNames.Communication_Messages_View)]
@@ -48,7 +87,7 @@ public class MessageAppService : ApplicationService, IMessageAppService
             throw new UserFriendlyException(CommunicationExceptionCodes.MessageNotVisible,
                 "You do not have access to this message.");
 
-        return ObjectMapper.Map<MessageDto>(message);
+        return (await MapAsync(new List<Message> { message })).Single();
     }
 
     [AbpAuthorize(PermissionNames.Communication_Messages_View)]
@@ -78,7 +117,7 @@ public class MessageAppService : ApplicationService, IMessageAppService
 
         return new PagedResultDto<MessageListDto>(
             totalCount,
-            ObjectMapper.Map<List<MessageListDto>>(items));
+            await MapListAsync(items));
     }
 
     [AbpAuthorize(PermissionNames.Communication_Messages_View)]
@@ -108,7 +147,7 @@ public class MessageAppService : ApplicationService, IMessageAppService
 
         return new PagedResultDto<MessageListDto>(
             totalCount,
-            ObjectMapper.Map<List<MessageListDto>>(items));
+            await MapListAsync(items));
     }
 
     [AbpAuthorize(PermissionNames.Communication_Messages_View)]
@@ -129,7 +168,7 @@ public class MessageAppService : ApplicationService, IMessageAppService
             .ToList();
 
         return new ListResultDto<MessageDto>(
-            ObjectMapper.Map<List<MessageDto>>(visibleMessages));
+            await MapAsync(visibleMessages));
     }
 
     [AbpAuthorize(PermissionNames.Communication_Messages_Send)]
@@ -163,8 +202,28 @@ public class MessageAppService : ApplicationService, IMessageAppService
                 throw new UserFriendlyException(CommunicationExceptionCodes.MessageNotFound,
                     "Parent message not found.");
 
+            // #204: a reply belongs to a conversation the sender is in, and goes
+            // to the other person in it. Without this, anyone holding a message
+            // id could add to another pair's conversation, or a parent could
+            // reach any user by replying "into" a thread with them.
+            var otherParty = parentMessage.SenderUserId == currentUserId ? parentMessage.RecipientUserId
+                : parentMessage.RecipientUserId == currentUserId ? parentMessage.SenderUserId
+                : (long?)null;
+            if (otherParty != input.RecipientUserId)
+                throw new UserFriendlyException(CommunicationExceptionCodes.ReplyOutsideThread,
+                    "You can only reply to someone in this conversation.");
+
             // Inherit thread from parent
             threadId = parentMessage.ThreadId ?? parentMessage.Id;
+        }
+        else
+        {
+            // #204: a parent starts conversations only with their children's
+            // teachers. Anyone else they hear from, they can reply to.
+            var allowed = await _recipientResolver.GetForCurrentParentAsync();
+            if (allowed != null && allowed.All(r => r.UserId != input.RecipientUserId))
+                throw new UserFriendlyException(CommunicationExceptionCodes.RecipientNotAllowed,
+                    "You can message your children's teachers.");
         }
 
         var message = new Message(
@@ -185,7 +244,14 @@ public class MessageAppService : ApplicationService, IMessageAppService
         await _messageRepository.InsertAsync(message);
         await CurrentUnitOfWork.SaveChangesAsync();
 
-        return ObjectMapper.Map<MessageDto>(message);
+        return (await MapAsync(new List<Message> { message })).Single();
+    }
+
+    [AbpAuthorize(PermissionNames.Communication_Messages_Send)]
+    public async Task<ListResultDto<MessageRecipientDto>> GetMyRecipientsAsync()
+    {
+        var recipients = await _recipientResolver.GetForCurrentParentAsync();
+        return new ListResultDto<MessageRecipientDto>(recipients ?? new List<MessageRecipientDto>());
     }
 
     [AbpAuthorize(PermissionNames.Communication_Messages_View)]

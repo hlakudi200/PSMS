@@ -46,8 +46,13 @@ public class CommunicationMapper : Profile
 
     private void CreateMessageMappings()
     {
-        CreateMap<Message, MessageDto>();
-        CreateMap<Message, MessageListDto>();
+        // The names are users, not message fields: the service fills them in.
+        CreateMap<Message, MessageDto>()
+            .ForMember(dest => dest.SenderName, opt => opt.Ignore())
+            .ForMember(dest => dest.RecipientName, opt => opt.Ignore());
+        CreateMap<Message, MessageListDto>()
+            .ForMember(dest => dest.SenderName, opt => opt.Ignore())
+            .ForMember(dest => dest.RecipientName, opt => opt.Ignore());
     }
 
     private void CreateNotificationMappings()

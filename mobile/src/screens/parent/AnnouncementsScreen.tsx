@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, type ReactNode } from "react";
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
 import { router } from "expo-router";
 import { Badge, Button, Card, Screen, StateView } from "../../components";
@@ -10,7 +10,8 @@ import {
   ANNOUNCEMENT_TYPE_LABELS, PARENT_AUDIENCE_LABELS, PRIORITY_BADGES,
 } from "../../utils/announcement-labels";
 
-export function AnnouncementsScreen() {
+/** `switcher` is the Messages tab's Teachers / School news choice, shown in the header. */
+export function AnnouncementsScreen({ switcher }: { switcher?: ReactNode }) {
   const { announcements, isPending, isError, isLoadingMore, unreadCount } = useAnnouncementsState();
   const { getAnnouncementsAsync, loadMoreAsync } = useAnnouncementsActions();
 
@@ -19,13 +20,14 @@ export function AnnouncementsScreen() {
   if (isError && !announcements) {
     return (
       <Screen>
+        {switcher}
         <StateView state="error" message="Couldn't load announcements." />
         <Button onPress={() => void getAnnouncementsAsync()}>Retry</Button>
       </Screen>
     );
   }
   if (!announcements) {
-    return <Screen><StateView state="loading" message="Loading announcements…" /></Screen>;
+    return <Screen>{switcher}<StateView state="loading" message="Loading announcements…" /></Screen>;
   }
 
   return (
@@ -44,6 +46,7 @@ export function AnnouncementsScreen() {
             <Text style={styles.subtitle}>
               {unreadCount ? `${unreadCount} unread` : "You're up to date"}
             </Text>
+            {switcher}
             {isError && <Text style={styles.inlineError}>Couldn&apos;t refresh — showing what loaded earlier.</Text>}
           </View>
         }

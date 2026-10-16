@@ -7,6 +7,10 @@ public class MessageDto : CreationAuditedEntityDto<Guid>
 {
     public long SenderUserId { get; set; }
     public long RecipientUserId { get; set; }
+
+    /// <summary>#204. Set by the service: a user id means nothing to the reader.</summary>
+    public string SenderName { get; set; }
+    public string RecipientName { get; set; }
     public string Subject { get; set; }
     public string Content { get; set; }
     public string AttachmentUrl { get; set; }
