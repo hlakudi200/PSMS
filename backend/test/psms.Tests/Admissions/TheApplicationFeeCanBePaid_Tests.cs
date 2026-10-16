@@ -1,4 +1,4 @@
-using Microsoft.Extensions.Configuration;
+﻿using Microsoft.Extensions.Configuration;
 using psms.Admissions.ApplicationFees;
 using psms.Admissions.ApplicationFees.Yoco;
 using Shouldly;
@@ -214,6 +214,34 @@ public class TheApplicationFeeCanBePaid_Tests
 
         gateway.ShouldContain("amount * 100m");
         gateway.ShouldContain("MidpointRounding.AwayFromZero");
+    }
+
+    [Fact]
+    public void The_probe_is_above_the_amount_Yoco_will_accept()
+    {
+        /* Found by running it: a R1 probe comes back "You cannot process a
+           payment for less than R2.00", which reads like a broken integration
+           and is not. Yoco's own floor is R2.00. */
+        var diagnostics = File.ReadAllText(SourceFile(
+            "psms.Application", "Admissions", "ApplicationFees", "Yoco",
+            "PaymentChannelDiagnosticsService.cs"));
+
+        diagnostics.ShouldContain("ProbeAmount = 2m");
+        diagnostics.ShouldContain("amount: ProbeAmount");
+    }
+
+    [Fact]
+    public void The_webhook_url_is_where_this_deployment_actually_answers()
+    {
+        /* App:ServerRootAddress is a development value on the deployed server,
+           so reading it printed https://localhost:44311/api/yoco/webhook — an
+           address nobody could register, handed over as the thing to register. */
+        var diagnostics = File.ReadAllText(SourceFile(
+            "psms.Application", "Admissions", "ApplicationFees", "Yoco",
+            "PaymentChannelDiagnosticsService.cs"));
+
+        diagnostics.ShouldContain("IHttpContextAccessor");
+        diagnostics.ShouldContain("request.Host.HasValue");
     }
 
     [Fact]

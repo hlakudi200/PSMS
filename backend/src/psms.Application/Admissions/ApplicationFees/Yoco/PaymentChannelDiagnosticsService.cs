@@ -1,4 +1,4 @@
-using Abp.Application.Services;
+﻿using Abp.Application.Services;
 using Abp.Authorization;
 using psms.Authorization;
 using System.Threading.Tasks;
@@ -47,29 +47,56 @@ public class PaymentChannelStatus
 /// test family behind each time.
 /// </para>
 /// <para>
-/// It creates a real checkout for one rand and does not pay it. Nothing is
-/// charged by asking, and an abandoned checkout costs nothing — but it proves
-/// the key, the network and the answer shape all the way through, which is
-/// what reading configuration back cannot do.
+/// It creates a real checkout and does not pay it. Nothing is charged by
+/// asking and an abandoned checkout costs nothing — but it proves the key, the
+/// network and the answer shape all the way through, which is what reading
+/// configuration back cannot do.
 /// </para>
 /// </summary>
 [AbpAuthorize(PermissionNames.Admissions_Settings_Manage)]
 public class PaymentChannelDiagnosticsService : ApplicationService
 {
+    /// <summary>
+    /// Yoco's own floor is R2.00, and a probe below it comes back as a refusal
+    /// that reads like a broken integration. Found exactly that way.
+    /// </summary>
+    private const decimal ProbeAmount = 2m;
+
     private readonly YocoPaymentGateway _yoco;
     private readonly Microsoft.Extensions.Configuration.IConfiguration _configuration;
+    private readonly Microsoft.AspNetCore.Http.IHttpContextAccessor _httpContextAccessor;
 
     public PaymentChannelDiagnosticsService(
         YocoPaymentGateway yoco,
-        Microsoft.Extensions.Configuration.IConfiguration configuration)
+        Microsoft.Extensions.Configuration.IConfiguration configuration,
+        Microsoft.AspNetCore.Http.IHttpContextAccessor httpContextAccessor)
     {
         _yoco = yoco;
         _configuration = configuration;
+        _httpContextAccessor = httpContextAccessor;
+    }
+
+    /// <summary>
+    /// Where this deployment actually answers, taken from the request that is
+    /// asking rather than from configuration.
+    /// <para>
+    /// App:ServerRootAddress is a development value on the deployed server, so
+    /// reading it printed <c>https://localhost:44311/api/yoco/webhook</c> — an
+    /// address nobody could register, handed over as the thing to register.
+    /// </para>
+    /// </summary>
+    private string ServerRoot()
+    {
+        var request = _httpContextAccessor.HttpContext?.Request;
+        if (request != null && request.Host.HasValue)
+            return $"{request.Scheme}://{request.Host.Value}";
+
+        return _configuration["App:ServerRootAddress"]?.TrimEnd('/') ?? string.Empty;
     }
 
     public async Task<PaymentChannelStatus> CheckAsync()
     {
-        var root = _configuration["App:ServerRootAddress"]?.TrimEnd('/') ?? string.Empty;
+        var root = ServerRoot();
 
         var status = new PaymentChannelStatus
         {
@@ -87,7 +114,7 @@ public class PaymentChannelDiagnosticsService : ApplicationService
         }
 
         var checkout = await _yoco.CreateCheckoutAsync(
-            amount: 1m,
+            amount: ProbeAmount,
             reference: "PSMS-CHANNEL-CHECK",
             applicationId: System.Guid.Empty,
             successUrl: $"{root}/api/yoco/check",
