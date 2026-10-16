@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo } from "react";
-import { useChildrenActions, useChildrenState } from "../../providers/children";
 import { useMarksActions, useMarksState } from "../../providers/marks";
 import { buildSubjectSections } from "../../utils/marks-sections";
+import { useSelectedChild } from "./useSelectedChild";
 
 /**
  * The selected child's marks for one term, grouped by subject. Shared by the parent's progress
@@ -9,20 +9,13 @@ import { buildSubjectSections } from "../../utils/marks-sections";
  * so nothing is shown until it matches.
  */
 export function useChildMarks(termId?: string) {
-  const { myChildren, selectedChildId, isPending: isChildrenPending, isError: isChildrenError } = useChildrenState();
-  const { getMyChildrenAsync } = useChildrenActions();
+  const { child, hasChildren, isChildrenError, retryChildren } = useSelectedChild();
   const {
     marks, marksStudentId, marksTermId, isMarksPending, isMarksError,
     classAssessments, classAssessmentsKey, assessmentDetailsById,
   } = useMarksState();
   const { getMarksByStudentAsync, getClassAssessmentsAsync } = useMarksActions();
 
-  // Progress can be the first tab opened; Home is what normally loads the children.
-  useEffect(() => {
-    if (!myChildren && !isChildrenPending && !isChildrenError) void getMyChildrenAsync();
-  }, [myChildren, isChildrenPending, isChildrenError, getMyChildrenAsync]);
-
-  const child = myChildren?.find((c) => c.studentId === selectedChildId);
   const studentId = child?.studentId;
   const classId = child?.classId;
   const isLoaded = !!studentId && !!termId && marksStudentId === studentId && marksTermId === termId;
@@ -47,9 +40,9 @@ export function useChildMarks(termId?: string) {
 
   return {
     child,
-    hasChildren: myChildren ? myChildren.length > 0 : undefined,
-    isChildrenError: isChildrenError && !myChildren,
-    retryChildren: getMyChildrenAsync,
+    hasChildren,
+    isChildrenError,
+    retryChildren,
     isLoaded,
     isMarksPending,
     isMarksError,
