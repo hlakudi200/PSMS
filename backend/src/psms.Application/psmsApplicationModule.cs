@@ -94,4 +94,17 @@ public class psmsApplicationModule : AbpModule
             cfg => cfg.AddMaps(thisAssembly)
         );
     }
+
+    /// <summary>
+    /// Starts the periodic workers. Registered here rather than resolved on
+    /// demand: a worker nobody adds to the manager never ticks, and does so
+    /// silently.
+    /// </summary>
+    public override void PostInitialize()
+    {
+        var workers = IocManager.Resolve<Abp.Threading.BackgroundWorkers.IBackgroundWorkerManager>();
+
+        // ADM-030: releases places the school offered and nobody took.
+        workers.Add(IocManager.Resolve<psms.Admissions.Offers.AdmissionOfferExpiryWorker>());
+    }
 }
