@@ -117,6 +117,11 @@ public class AdmissionsNotifier : ITransientDependency
                 EntityType = nameof(Application),
                 EntityId = a.Id,
                 IdempotencyKey = $"admissions:{what}:{a.Id}",
+                /* About this family's own application, to the address they
+                   gave in order to make it. Not a mailing list, and not
+                   something to withhold because nobody thought to ask them
+                   for permission to answer. */
+                IsTransactional = true,
                 RequestedChannels = Channels,
             });
         }
