@@ -1,4 +1,4 @@
-using Abp.Dependency;
+﻿using Abp.Dependency;
 using Castle.Core.Logging;
 using psms.Communication.Dispatch;
 using psms.Domain.Admissions.Entities;
@@ -98,7 +98,14 @@ public class AdmissionsNotifier : ITransientDependency
 
         try
         {
-            await _dispatcher.DispatchAsync(new NotificationRequest
+            /* Queued, not dispatched. This is called from inside the workflow
+               transaction that writes the decision back, and sending is a
+               network round trip to somebody else's server: dispatching here
+               made a principal's Approve wait on an SMTP connection, and when
+               that connection hung the whole decision rolled back. EnqueueAsync
+               exists for exactly this — "slow external channels" — and the
+               idempotency key makes a job-level retry safe. */
+            await _dispatcher.EnqueueAsync(new NotificationRequest
             {
                 TenantId = a.TenantId,
                 RecipientUserIds = new[] { a.CreatorUserId.Value },

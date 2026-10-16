@@ -1,4 +1,4 @@
-using Shouldly;
+﻿using Shouldly;
 using System;
 using System.IO;
 using System.Linq;
@@ -132,6 +132,38 @@ public class TheFamilyIsToldWhatHappened_Tests
 
         update.ShouldBeGreaterThan(-1);
         hook.ShouldBeGreaterThan(update);
+    }
+
+    [Fact]
+    public void Telling_the_family_is_queued_not_awaited_in_the_transaction()
+    {
+        /* Found on the deployed system. This is called from inside the workflow
+           transaction that writes the decision back, and sending is a network
+           round trip to somebody else's server. Dispatching here made a
+           principal's Approve wait on an SMTP connection — and when that
+           connection hung, the request never returned and the decision rolled
+           back: the application sat at UnderReview with the workflow still on
+           the Principal Decision step, as though nobody had pressed anything.
+           EnqueueAsync exists for "slow external channels". */
+        var source = Notifier();
+
+        source.ShouldContain("_dispatcher.EnqueueAsync");
+        source.ShouldNotContain("_dispatcher.DispatchAsync");
+    }
+
+    [Fact]
+    public void The_smtp_send_is_bounded_by_something_that_actually_works()
+    {
+        /* SmtpClient.Timeout bounds the synchronous Send and is ignored by
+           SendMailAsync. A host that silently drops outbound SMTP — many block
+           it to deter spam — leaves the connect hanging with no timeout at all.
+           Cancellation is the only thing that bounds the async path. */
+        var smtp = System.IO.File.ReadAllText(SourceFile(
+            "psms.Application", "Communication", "Channels", "Email", "SmtpEmailGateway.cs"));
+
+        smtp.ShouldContain("CancellationTokenSource");
+        smtp.ShouldContain("SendMailAsync(message, cancellation.Token)");
+        smtp.ShouldContain("catch (OperationCanceledException)");
     }
 
     [Fact]
