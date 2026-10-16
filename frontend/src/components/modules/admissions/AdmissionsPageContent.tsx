@@ -3,7 +3,9 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { usePortalBase } from '@/utils/portal-base';
-import { Card, Col, Row, Select, Space, Statistic, Tabs, Tag, Tooltip, message } from 'antd';
+import { Card, Col, InputNumber, Modal, Row, Select, Space, Statistic, Tabs, Tag, Tooltip, Typography, message } from 'antd';
+
+const { Paragraph } = Typography;
 import {
   EyeOutlined,
   FileTextOutlined,
@@ -128,7 +130,7 @@ function AdmissionsContent() {
     },
   ];
   const { waitlistEntries, totalCount: waitlistTotal, isPending: waitlistPending, isError: waitlistError } = useWaitlistState();
-  const { getAllAsync: getAllWaitlist } = useWaitlistActions();
+  const { getAllAsync: getAllWaitlist, offerPositionAsync } = useWaitlistActions();
   const { academicYears } = useAcademicYearState();
   const { getAllAsync: getAllAcademicYears } = useAcademicYearActions();
   const { activeGrades } = useGradeState();
@@ -138,6 +140,29 @@ function AdmissionsContent() {
   /* Who the school grants Admissions.Enrollment.Complete to. The server is the
      authority; this only decides whether to offer the button. */
   const mayEnrol = isOneOfRoles(currentRole, ['Admin', 'Principal', 'VicePrincipal', 'AdmissionsOfficer']);
+
+  /* The roles the school grants Admissions.Waitlist.OfferPosition to. The
+     server is the authority and refuses anyone else. */
+  const mayOfferWaitlistPlace = isOneOfRoles(currentRole, ['Admin', 'Principal', 'VicePrincipal', 'AdmissionsOfficer']);
+
+  const [offeringPlaceTo, setOfferingPlaceTo] = useState<IWaitlist | undefined>();
+  const [offerDays, setOfferDays] = useState(7);
+  const [offering, setOffering] = useState(false);
+
+  const offerTheirPlace = async () => {
+    if (!offeringPlaceTo) return;
+    setOffering(true);
+    try {
+      await offerPositionAsync(offeringPlaceTo.id, offerDays);
+      message.success(`${offeringPlaceTo.applicantName} has been offered a place.`);
+      setOfferingPlaceTo(undefined);
+      getAllWaitlist({ maxResultCount: 50, skipCount: 0 });
+    } catch {
+      // The interceptor shows what the server said.
+    } finally {
+      setOffering(false);
+    }
+  };
 
   const [selectedAcademicYearId, setSelectedAcademicYearId] = useState<string | undefined>(undefined);
   const [selectedGradeId, setSelectedGradeId] = useState<string | undefined>(undefined);
@@ -320,9 +345,20 @@ function AdmissionsContent() {
     },
   ];
 
-  // No detail page exists for waitlist entries yet; row actions are intentionally
-  // empty until that route is scaffolded.
-  const waitlistRowActions: RowAction<IWaitlist>[] = [];
+  /* A waiting list nobody can be offered a place from is a list. The endpoint
+     and the permission existed; no screen called it, so an entry sat Active
+     for ever however many places came free. */
+  const waitlistRowActions: RowAction<IWaitlist>[] = [
+    {
+      key: 'offer',
+      label: 'Offer a place',
+      icon: <ClockCircleOutlined />,
+      // Only while they are still waiting. An entry already offered, accepted,
+      // declined or withdrawn is not somebody to offer a place to.
+      visible: (record) => mayOfferWaitlistPlace && record.statusDisplayName === 'Active',
+      onClick: (record) => setOfferingPlaceTo(record),
+    },
+  ];
 
   const tabItems = [
     {
@@ -498,6 +534,32 @@ function AdmissionsContent() {
           getAllSettings(selectedAcademicYearId, selectedGradeId);
         }}
       />
+
+      <Modal
+        open={!!offeringPlaceTo}
+        title={`Offer ${offeringPlaceTo?.applicantName ?? 'this applicant'} a place?`}
+        okText="Offer the place"
+        okButtonProps={{ loading: offering }}
+        onOk={offerTheirPlace}
+        onCancel={() => setOfferingPlaceTo(undefined)}
+      >
+        <Paragraph>
+          {offeringPlaceTo?.applicantName} is number {offeringPlaceTo?.position} on the
+          waiting list for {offeringPlaceTo?.gradeName}. The family will be told, and the
+          place is held for them until they answer or the offer runs out.
+        </Paragraph>
+        <Paragraph type="secondary" style={{ marginBottom: 8 }}>
+          How long should they have to answer?
+        </Paragraph>
+        <InputNumber
+          min={1}
+          max={30}
+          value={offerDays}
+          onChange={(v) => setOfferDays(v ?? 7)}
+          addonAfter="days"
+          style={{ width: 160 }}
+        />
+      </Modal>
     </div>
   );
 }

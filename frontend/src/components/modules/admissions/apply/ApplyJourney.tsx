@@ -18,6 +18,7 @@ import { ApplicantParentProvider, useApplicantParentState } from '@/providers/ad
 import { ApplicationDocumentProvider } from '@/providers/admissions/application_documents';
 import { ApplicationFeeProvider } from '@/providers/admissions/application_fees';
 import { EnrollmentProvider } from '@/providers/admissions/enrollments';
+import { WaitlistProvider } from '@/providers/admissions/waitlists';
 import {
   AdmissionSettingsProvider, useAdmissionSettingsActions,
 } from '@/providers/admissions/admission_settings';
@@ -435,7 +436,9 @@ export default function ApplyJourney() {
             <ApplicationDocumentProvider>
               <ApplicationFeeProvider>
                 <EnrollmentProvider>
+                  <WaitlistProvider>
                 <ApplyContent />
+                  </WaitlistProvider>
                 </EnrollmentProvider>
               </ApplicationFeeProvider>
             </ApplicationDocumentProvider>
