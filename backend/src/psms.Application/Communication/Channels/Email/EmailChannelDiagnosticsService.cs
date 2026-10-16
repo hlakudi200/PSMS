@@ -27,6 +27,12 @@ public class EmailChannelTestResult
 
     /// <summary>The provider's own id for the message, where it gives one.</summary>
     public string ProviderMessageId { get; set; }
+
+    /// <summary>
+    /// Every provider and what each is still waiting for, so a send that went
+    /// through the wrong one can be explained rather than guessed at.
+    /// </summary>
+    public EmailProviderReadiness[] Providers { get; set; }
 }
 
 /// <summary>
@@ -91,6 +97,43 @@ public class EmailChannelDiagnosticsService : ApplicationService
             NotConfigured = result.NotConfigured,
             Error = result.Error,
             ProviderMessageId = result.ProviderMessageId,
+            Providers = (_gateway as ConfiguredEmailGateway)?.Providers,
         };
     }
+
+    /// <summary>
+    /// Reports which providers are configured, and which one a send would go
+    /// through, without sending anything.
+    /// <para>
+    /// The send test cannot answer this on its own. A deployment reporting
+    /// <c>Smtp</c> after a Resend key was added looks the same whether the key
+    /// did not take or the running build predates the preference change, and
+    /// SMTP takes twenty seconds to time out before saying so. This answers in
+    /// one call and costs nothing — no message, no provider quota, no row in
+    /// the delivery log.
+    /// </para>
+    /// <para>
+    /// Setting names only, never values.
+    /// </para>
+    /// </summary>
+    public Task<EmailChannelStatus> GetStatusAsync()
+    {
+        var configured = _gateway as ConfiguredEmailGateway;
+
+        return Task.FromResult(new EmailChannelStatus
+        {
+            SelectedProvider = configured?.SelectedProvider ?? "unknown",
+            Providers = configured?.Providers ?? new EmailProviderReadiness[0],
+        });
+    }
+}
+
+/// <summary>What the email channel is set up to do, without doing it.</summary>
+public class EmailChannelStatus
+{
+    /// <summary>The provider a send would go through: Resend, Smtp, or none.</summary>
+    public string SelectedProvider { get; set; }
+
+    /// <summary>Both providers, each with the settings it still needs.</summary>
+    public EmailProviderReadiness[] Providers { get; set; }
 }

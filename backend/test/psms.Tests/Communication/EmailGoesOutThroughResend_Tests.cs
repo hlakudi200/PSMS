@@ -257,6 +257,61 @@ public class EmailGoesOutThroughResend_Tests
             "Communication", "Channels", "Email", "EmailChannelDiagnosticsService.cs");
     }
 
+    // ---- what the diagnostic is allowed to say ----
+
+    [Fact]
+    public void The_readiness_report_names_the_blank_settings()
+    {
+        var providers = Routed(("Resend:ApiKey", "re_test_key")).Providers;
+
+        var resend = System.Linq.Enumerable.Single(providers, p => p.Name == "Resend");
+        resend.IsConfigured.ShouldBeFalse();
+        resend.MissingSettings.ShouldBe(new[] { "Resend__From" });
+
+        var smtp = System.Linq.Enumerable.Single(providers, p => p.Name == "Smtp");
+        smtp.MissingSettings.ShouldBe(new[] { "Smtp__Host", "Smtp__UserName", "Smtp__Password" });
+    }
+
+    [Fact]
+    public void The_readiness_report_says_which_one_a_send_would_use()
+    {
+        // Both configured: the API wins, and the report has to show that rather
+        // than leave somebody guessing why their SMTP account looks idle.
+        var both = Routed(
+            ("Smtp:Host", "smtp.gmail.com"), ("Smtp:UserName", "a@example.test"), ("Smtp:Password", "p"),
+            ("Resend:ApiKey", "re_test_key"), ("Resend:From", "a@example.test")).Providers;
+
+        System.Linq.Enumerable.Single(both, p => p.WouldBeUsed).Name.ShouldBe("Resend");
+
+        // SMTP only: it is the one that would be used, and it is configured.
+        var smtpOnly = Routed(
+            ("Smtp:Host", "smtp.gmail.com"), ("Smtp:UserName", "a@example.test"), ("Smtp:Password", "p")).Providers;
+
+        System.Linq.Enumerable.Single(smtpOnly, p => p.WouldBeUsed).Name.ShouldBe("Smtp");
+
+        // Neither: nothing claims it would be used.
+        System.Linq.Enumerable.Count(Routed().Providers, p => p.WouldBeUsed).ShouldBe(0);
+    }
+
+    [Fact]
+    public void The_readiness_report_never_carries_a_secret()
+    {
+        // This result travels to whoever can open the admin screen. The names
+        // of blank settings are useful; a key or a password is not theirs.
+        const string apiKey = "re_live_do_not_leak_me";
+        const string password = "app-password-do-not-leak-me";
+
+        var providers = Routed(
+            ("Resend:ApiKey", apiKey), ("Resend:From", "a@example.test"),
+            ("Smtp:Host", "smtp.gmail.com"), ("Smtp:UserName", "a@example.test"),
+            ("Smtp:Password", password)).Providers;
+
+        var rendered = System.Text.Json.JsonSerializer.Serialize(providers);
+
+        rendered.ShouldNotContain(apiKey);
+        rendered.ShouldNotContain(password);
+    }
+
     [Fact]
     public async Task The_scaffold_default_still_exists_for_the_channels_that_need_it()
     {

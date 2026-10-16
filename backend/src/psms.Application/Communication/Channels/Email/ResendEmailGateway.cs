@@ -1,6 +1,7 @@
 ﻿using Castle.Core.Logging;
 using Microsoft.Extensions.Configuration;
 using System;
+using System.Collections.Generic;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -71,6 +72,27 @@ public class ResendEmailGateway : IEmailGateway
         {
             var (apiKey, from, _) = GetConfig();
             return !string.IsNullOrWhiteSpace(apiKey) && !string.IsNullOrWhiteSpace(from);
+        }
+    }
+
+    /// <summary>
+    /// The settings this provider still needs, by the name they are set under.
+    /// Empty when it is ready.
+    /// <para>
+    /// Only the names — never a value. Knowing that <c>Resend__ApiKey</c> is
+    /// blank is what an operator needs; the key itself is a secret and this
+    /// result is read over the wire.
+    /// </para>
+    /// </summary>
+    public string[] MissingSettings
+    {
+        get
+        {
+            var (apiKey, from, _) = GetConfig();
+            var missing = new List<string>();
+            if (string.IsNullOrWhiteSpace(apiKey)) missing.Add("Resend__ApiKey");
+            if (string.IsNullOrWhiteSpace(from)) missing.Add("Resend__From");
+            return missing.ToArray();
         }
     }
 

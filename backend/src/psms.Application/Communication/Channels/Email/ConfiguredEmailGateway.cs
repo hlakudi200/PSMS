@@ -26,6 +26,24 @@ namespace psms.Communication.Channels.Email;
 /// is where somebody debugging a silent channel actually looks.
 /// </para>
 /// </summary>
+/// <summary>One provider's readiness, as the diagnostic reports it.</summary>
+public class EmailProviderReadiness
+{
+    /// <summary><c>Resend</c> or <c>Smtp</c>.</summary>
+    public string Name { get; set; }
+
+    /// <summary>True when everything it needs has been set.</summary>
+    public bool IsConfigured { get; set; }
+
+    /// <summary>
+    /// The settings it is still waiting for, by name — never a value.
+    /// </summary>
+    public string[] MissingSettings { get; set; }
+
+    /// <summary>True for the one a send would actually go through.</summary>
+    public bool WouldBeUsed { get; set; }
+}
+
 public class ConfiguredEmailGateway : IEmailGateway
 {
     private readonly SmtpEmailGateway _smtp;
@@ -52,6 +70,40 @@ public class ConfiguredEmailGateway : IEmailGateway
     /// </summary>
     public string SelectedProvider =>
         _resend.IsConfigured ? "Resend" : _smtp.IsConfigured ? "Smtp" : "none";
+
+    /// <summary>
+    /// Both providers and what each is still waiting for, so the chosen one
+    /// can be told apart from the only one available.
+    /// <para>
+    /// <c>SelectedProvider</c> alone cannot answer the question an operator
+    /// actually has. Seeing <c>Smtp</c> after setting a Resend key means
+    /// either the key did not take or the build predates the preference
+    /// change, and from outside those look identical — which cost a morning.
+    /// Reporting both, with the names of the blank settings, separates them.
+    /// </para>
+    /// <para>
+    /// Setting names only. No value from either provider's configuration is
+    /// returned: this travels over the wire to whoever can open the admin
+    /// screen, and an API key is not theirs to read.
+    /// </para>
+    /// </summary>
+    public EmailProviderReadiness[] Providers => new[]
+    {
+        new EmailProviderReadiness
+        {
+            Name = "Resend",
+            IsConfigured = _resend.IsConfigured,
+            MissingSettings = _resend.MissingSettings,
+            WouldBeUsed = _resend.IsConfigured,
+        },
+        new EmailProviderReadiness
+        {
+            Name = "Smtp",
+            IsConfigured = _smtp.IsConfigured,
+            MissingSettings = _smtp.MissingSettings,
+            WouldBeUsed = !_resend.IsConfigured && _smtp.IsConfigured,
+        },
+    };
 
     public Task<GatewaySendResult> SendAsync(string toEmail, string subject, string htmlBody)
     {
