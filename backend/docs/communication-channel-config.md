@@ -66,13 +66,38 @@ channels, the channel **routing** (COMM-11), and per-category **preferences** (C
 - **Notes:** body-only, ~160 chars/segment (cost per segment); normalize number to
   E.164. Delivery receipts → update the delivery log by provider message id.
 
-## Channel: Email  — gateway: `IEmailGateway`  (COMM-09)  ✅ wired (Resend)
+## Channel: Email  — gateway: `IEmailGateway`  (COMM-09)  ✅ wired (SMTP or Resend)
 
-`ResendEmailGateway` is the registered implementation. It reports **NotConfigured**
-when no key is set — exactly as the scaffold did — so the same build runs with and
-without email, and there is nothing to switch when the key arrives.
+`ConfiguredEmailGateway` is the registered implementation and picks whichever provider
+this deployment has been given: **SMTP wins when it is configured**, otherwise Resend.
+With neither it reports **NotConfigured** — exactly as the scaffold did — so the same
+build runs with and without email, and there is nothing to switch when settings arrive.
 
-- **Provider:** [Resend](https://resend.com) — one HTTPS `POST https://api.resend.com/emails` per message.
+### Option A — SMTP (Gmail, Workspace, or the school's own host)
+
+Nothing to verify and nothing to wait for: an account the school already has.
+
+| Key | Env var (Render) | Notes |
+| --- | --- | --- |
+| `Smtp:Host` | `Smtp__Host` | `smtp.gmail.com` |
+| `Smtp:UserName` | `Smtp__UserName` | the full address |
+| `Smtp:Password` | `Smtp__Password` | **secret** — for Gmail an *app password* |
+| `Smtp:Port` | `Smtp__Port` | optional, 587 |
+| `Smtp:FromName` | `Smtp__FromName` | optional display name |
+
+- **Gmail needs an app password**, not the account password — Google stopped accepting
+  those from applications in 2022, and generating one requires 2-Step Verification.
+- **Gmail rewrites the From** to the authenticated account, so parents see the Gmail
+  address rather than `admissions@theschool.co.za`. `Smtp:From` is therefore pointless
+  on Gmail and defaults to the user name.
+- **Daily cap:** about 500 messages on a free account, 2000 on Workspace. Fine for
+  admissions; not for a school-wide announcement.
+- Port 587 with STARTTLS. Port 25 is blocked by most hosts including Render.
+
+### Option B — Resend
+
+Better to grow into: real delivery events, no daily cap, and a sending address on
+the school's own domain. One HTTPS `POST https://api.resend.com/emails` per message.
 - **Config keys:**
 
   | Key | Env var (Render) | Notes |

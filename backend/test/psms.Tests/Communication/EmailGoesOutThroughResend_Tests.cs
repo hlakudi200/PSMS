@@ -26,14 +26,20 @@ namespace psms.Tests.Communication;
 /// </summary>
 public class EmailGoesOutThroughResend_Tests
 {
-    private static ResendEmailGateway With(params (string Key, string Value)[] settings)
-    {
-        var configuration = new ConfigurationBuilder()
+    private static IConfiguration Config(params (string Key, string Value)[] settings) =>
+        new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string>(
                 System.Linq.Enumerable.ToDictionary(settings, x => x.Key, x => x.Value)))
             .Build();
 
-        return new ResendEmailGateway(configuration);
+    private static ResendEmailGateway With(params (string Key, string Value)[] settings) =>
+        new ResendEmailGateway(Config(settings));
+
+    private static ConfiguredEmailGateway Routed(params (string Key, string Value)[] settings)
+    {
+        var configuration = Config(settings);
+        return new ConfiguredEmailGateway(
+            new SmtpEmailGateway(configuration), new ResendEmailGateway(configuration));
     }
 
     [Fact]
@@ -126,6 +132,61 @@ public class EmailGoesOutThroughResend_Tests
         // Application logs are read by more people than the mailbox is, and a
         // parent's address is theirs.
         ResendEmailGateway.Mask(email).ShouldBe(expected);
+    }
+
+    [Fact]
+    public void An_smtp_account_is_enough_on_its_own()
+    {
+        /* The point of having both. Resend will not deliver to anybody but the
+           account holder until a domain is verified in its dashboard, which
+           needs DNS access and a wait; a Gmail app password works in five
+           minutes. */
+        new SmtpEmailGateway(Config(
+            ("Smtp:Host", "smtp.gmail.com"),
+            ("Smtp:UserName", "school@example.test"),
+            ("Smtp:Password", "app-password")))
+            .IsConfigured.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void An_smtp_host_with_no_password_is_not_enough()
+    {
+        new SmtpEmailGateway(Config(("Smtp:Host", "smtp.gmail.com")))
+            .IsConfigured.ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task With_neither_configured_both_options_are_named()
+    {
+        /* Naming only the provider somebody did not choose is how "Email
+           gateway is not configured" sent an operator looking at the key they
+           had just set. */
+        var result = await Routed().SendAsync("parent@example.test", "s", "<p>b</p>");
+
+        result.NotConfigured.ShouldBeTrue();
+        result.Error.ShouldContain("Smtp__Host");
+        result.Error.ShouldContain("Resend__ApiKey");
+    }
+
+    [Fact]
+    public async Task Smtp_wins_when_a_school_has_filled_it_in()
+    {
+        /* A school that configured SMTP has said what it wants. Reaching for
+           Resend instead would send from an address they did not choose. */
+        var routed = Routed(
+            ("Smtp:Host", "smtp.invalid.test"),
+            ("Smtp:UserName", "school@example.test"),
+            ("Smtp:Password", "app-password"),
+            ("Resend:ApiKey", "re_test_key"),
+            ("Resend:From", "a@example.test"));
+
+        var result = await routed.SendAsync("parent@example.test", "s", "<p>b</p>");
+
+        // The host does not resolve, so it fails — but as SMTP, not as Resend,
+        // and not as "not configured".
+        result.NotConfigured.ShouldBeFalse();
+        result.Success.ShouldBeFalse();
+        result.Error.ShouldContain("mail server");
     }
 
     [Fact]

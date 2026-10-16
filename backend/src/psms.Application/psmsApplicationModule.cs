@@ -37,12 +37,15 @@ public class psmsApplicationModule : AbpModule
             psms.Communication.Channels.WhatsApp.NotConfiguredWhatsAppGateway>(Abp.Dependency.DependencyLifeStyle.Transient);
         IocManager.Register<psms.Communication.Channels.Sms.ISmsGateway,
             psms.Communication.Channels.Sms.NotConfiguredSmsGateway>(Abp.Dependency.DependencyLifeStyle.Transient);
-        /* Email is the one that is wired. ResendEmailGateway reports NotConfigured
-           when no key is set, exactly as the scaffold did, so this single
-           registration is correct in an environment with email and one without —
-           there is nothing to switch when Resend__ApiKey arrives. */
+        /* Email is the one that is wired, and to two providers: SMTP for a
+           school that has an account already, Resend for one with a domain it
+           can verify. ConfiguredEmailGateway picks whichever this deployment
+           has been given and reports NotConfigured when neither — exactly as
+           the scaffold did, so the same build runs with email and without. */
+        IocManager.Register<psms.Communication.Channels.Email.SmtpEmailGateway>(Abp.Dependency.DependencyLifeStyle.Transient);
+        IocManager.Register<psms.Communication.Channels.Email.ResendEmailGateway>(Abp.Dependency.DependencyLifeStyle.Transient);
         IocManager.Register<psms.Communication.Channels.Email.IEmailGateway,
-            psms.Communication.Channels.Email.ResendEmailGateway>(Abp.Dependency.DependencyLifeStyle.Transient);
+            psms.Communication.Channels.Email.ConfiguredEmailGateway>(Abp.Dependency.DependencyLifeStyle.Transient);
         IocManager.Register<psms.Communication.Channels.Push.IPushGateway,
             psms.Communication.Channels.Push.NotConfiguredPushGateway>(Abp.Dependency.DependencyLifeStyle.Transient);
 
