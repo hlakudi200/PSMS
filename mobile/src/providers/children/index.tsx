@@ -62,7 +62,8 @@ const loadLatestPublishedReport = async (
       id: latest.id,
       termName: latest.termName ?? undefined,
       publishedDate: latest.publishedDate ?? undefined,
-      overallPercentage: latest.overallPercentage ?? undefined,
+      // RC-19: Foundation Phase cards (Grades R–3) report levels only, never a percentage.
+      overallPercentage: latest.reportsPercentages === false ? undefined : latest.overallPercentage ?? undefined,
     };
   } catch {
     return undefined;
