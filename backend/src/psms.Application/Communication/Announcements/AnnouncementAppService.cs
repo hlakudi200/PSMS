@@ -22,34 +22,49 @@ namespace psms.Communication.Announcements;
 public class AnnouncementAppService : ApplicationService, IAnnouncementAppService
 {
     private readonly IRepository<Announcement, Guid> _announcementRepository;
+    private readonly IFamilyAnnouncementScope _familyScope;
 
-    public AnnouncementAppService(IRepository<Announcement, Guid> announcementRepository)
+    public AnnouncementAppService(
+        IRepository<Announcement, Guid> announcementRepository,
+        IFamilyAnnouncementScope familyScope)
     {
         _announcementRepository = announcementRepository;
+        _familyScope = familyScope;
     }
 
     [AbpAuthorize(PermissionNames.Communication_Announcements_View)]
     public async Task<AnnouncementDto> GetAsync(Guid id)
     {
+        // #203: a parent or learner reads only what is addressed to them.
+        var audience = await _familyScope.ResolveAsync();
+
         var announcement = await _announcementRepository
             .GetAll()
             .Include(a => a.Reads)
-            .FirstOrDefaultAsync(a => a.Id == id && a.TenantId == AbpSession.TenantId);
+            .Where(a => a.TenantId == AbpSession.TenantId)
+            .VisibleTo(audience)
+            .FirstOrDefaultAsync(a => a.Id == id);
 
         if (announcement == null)
             throw new UserFriendlyException(CommunicationExceptionCodes.AnnouncementNotFound,
                 "Announcement not found.");
 
-        return ObjectMapper.Map<AnnouncementDto>(announcement);
+        var dto = ObjectMapper.Map<AnnouncementDto>(announcement);
+        dto.IsReadByMe = announcement.Reads.Any(r => r.UserId == AbpSession.UserId);
+        return dto;
     }
 
     [AbpAuthorize(PermissionNames.Communication_Announcements_View)]
     public async Task<PagedResultDto<AnnouncementListDto>> GetAllAsync(GetAnnouncementsInput input)
     {
+        // #203: a parent or learner lists only what is addressed to them.
+        var audience = await _familyScope.ResolveAsync();
+
         var query = _announcementRepository
             .GetAll()
             .Include(a => a.Reads)
             .Where(a => a.TenantId == AbpSession.TenantId)
+            .VisibleTo(audience)
             .WhereIf(input.Type.HasValue, a => a.Type == input.Type.Value)
             .WhereIf(input.Priority.HasValue, a => a.Priority == input.Priority.Value)
             .WhereIf(input.TargetAudience.HasValue, a => a.TargetAudience == input.TargetAudience.Value)
@@ -67,9 +82,11 @@ public class AnnouncementAppService : ApplicationService, IAnnouncementAppServic
             .PageBy(input)
             .ToListAsync();
 
-        return new PagedResultDto<AnnouncementListDto>(
-            totalCount,
-            ObjectMapper.Map<List<AnnouncementListDto>>(items));
+        var dtos = ObjectMapper.Map<List<AnnouncementListDto>>(items);
+        foreach (var (dto, item) in dtos.Zip(items))
+            dto.IsReadByMe = item.Reads.Any(r => r.UserId == AbpSession.UserId);
+
+        return new PagedResultDto<AnnouncementListDto>(totalCount, dtos);
     }
 
     [AbpAuthorize(PermissionNames.Communication_Announcements_Create)]
