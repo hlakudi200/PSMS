@@ -187,6 +187,8 @@ public class ReportAppService : ApplicationService, IReportAppService
         // same scale as the PDF.
         dto.ReportsPercentages = psms.Domain.Assessment.ReportingScale
             .ReportsPercentages(report.Class?.Grade?.GradeLevel);
+        if (!dto.ReportsPercentages && (selfId.HasValue || childIds != null))
+            WithholdPercentagesFromFamily(dto);
 
         // RC-21, §25(8): the fields the print view was missing. Loaded here
         // rather than mapped so the browser's card carries what the PDF does.
@@ -281,6 +283,13 @@ public class ReportAppService : ApplicationService, IReportAppService
 
             if (scaleByReport.TryGetValue(dto.Id, out var reportsPercentages))
                 dto.ReportsPercentages = reportsPercentages;
+
+            // RC-19: see WithholdPercentagesFromFamily.
+            if (!dto.ReportsPercentages && (selfId.HasValue || childIds != null))
+            {
+                dto.OverallPercentage = null;
+                dto.ClassPosition = null;
+            }
         }
 
         return new PagedResultDto<ReportListDto>(totalCount, dtos);
@@ -323,6 +332,11 @@ public class ReportAppService : ApplicationService, IReportAppService
         if (taughtClassIds != null && !taughtClassIds.Contains(report.ClassId))
             throw new UserFriendlyException(AssessmentExceptionCodes.ReportNotFound, "Report not found.");
 
+        // RE-004, as GetAsync: a family reads only a card the school has
+        // issued. This route skipped the check, so a parent who knew the term
+        // could read a draft.
+        await AssertIssuedIfReadingAsFamilyAsync(report);
+
         var dto = ObjectMapper.Map<ReportDto>(report);
         dto.SubjectReports = ObjectMapper.Map<List<ReportSubjectDto>>(report.SubjectReports.OrderBy(sr => sr.Subject?.SubjectName).ToList());
         dto.CanSignAsClassTeacher = await CanSignAsClassTeacherAsync(report.ClassId);
@@ -331,6 +345,8 @@ public class ReportAppService : ApplicationService, IReportAppService
         // same scale as the PDF.
         dto.ReportsPercentages = psms.Domain.Assessment.ReportingScale
             .ReportsPercentages(report.Class?.Grade?.GradeLevel);
+        if (!dto.ReportsPercentages && (selfId.HasValue || childIds != null))
+            WithholdPercentagesFromFamily(dto);
 
         // RC-21, §25(8): the fields the print view was missing. Loaded here
         // rather than mapped so the browser's card carries what the PDF does.
@@ -973,6 +989,35 @@ public class ReportAppService : ApplicationService, IReportAppService
                 + "whenever you sign a report card.");
 
         return svg;
+    }
+
+    /// <summary>
+    /// RC-19 for a family reading a Foundation Phase card (Grades R–3): no
+    /// percentage and no rank, the same as the PDF they are given.
+    /// <para>
+    /// §17(4)(a) reports this phase in a code and its description. The screens
+    /// already hide these figures when <see cref="ReportDto.ReportsPercentages"/>
+    /// is false, but the API still sent them, so any reader of the response, or
+    /// the next screen that forgot the flag, had them. Staff still see them:
+    /// the school works from the marks.
+    /// </para>
+    /// </summary>
+    private static void WithholdPercentagesFromFamily(ReportDto dto)
+    {
+        dto.OverallPercentage = null;
+        dto.ClassPosition = null;
+        dto.TotalStudentsInClass = null;
+
+        foreach (var subject in dto.SubjectReports ?? new List<ReportSubjectDto>())
+        {
+            subject.TermMark = null;
+            subject.ExamMark = null;
+            subject.FinalMark = null;
+            subject.SubjectPosition = null;
+            subject.ClassAverage = null;
+            subject.HighestInClass = null;
+            subject.LowestInClass = null;
+        }
     }
 
     /// <summary>
@@ -2199,6 +2244,13 @@ public class ReportAppService : ApplicationService, IReportAppService
             throw new UserFriendlyException(AssessmentExceptionCodes.ReportNotPublished,
                 "Report must be published before it can be acknowledged by a parent.");
 
+        // Once only. The date records when the family received this card; a
+        // second call overwrote it, and the first comment with it. A card the
+        // school withdraws and issues again starts unacknowledged (Report.Publish).
+        if (report.ParentAcknowledgedDate.HasValue)
+            throw new UserFriendlyException(AssessmentExceptionCodes.ReportAlreadyAcknowledged,
+                "This report card has already been acknowledged.");
+
         report.AcknowledgeByParent(input.Comment);
         await _reportRepository.UpdateAsync(report);
         await CurrentUnitOfWork.SaveChangesAsync();
@@ -2325,19 +2377,17 @@ public class ReportAppService : ApplicationService, IReportAppService
         if (report == null)
             throw new UserFriendlyException(AssessmentExceptionCodes.ReportNotFound, "Report not found.");
 
-        // The Student and Parent roles both hold ReportCards.View, and this
-        // response carries subject names with exact percentages. Without these
-        // two checks — the same ones GetAsync carries — any learner or parent
-        // could read any classmate's marks and promotion outcome by report id.
-        //
-        // LC-10: a student may only read their own report card.
+        // #444: staff only. The Student and Parent roles both hold
+        // ReportCards.View, and this response carries subject names with exact
+        // percentages and a recommendation the school has not yet decided on.
+        // Scoping a family to their own child still let them read it before the
+        // card was issued (RE-004), and with percentages on a Foundation Phase
+        // card (RC-19). It is the advice the promotion screen works from, and
+        // no family screen asks for it; what a family is told is the decision
+        // printed on the issued card.
         var selfId = await _currentStudent.GetCurrentStudentIdAsync();
-        if (selfId.HasValue && selfId.Value != report.StudentId)
-            throw new UserFriendlyException(AssessmentExceptionCodes.ReportNotFound, "Report not found.");
-
-        // MOB-BE-04: a parent may only read their own children's report cards.
         var childIds = await _currentParent.GetCurrentChildStudentIdsAsync();
-        if (childIds != null && !childIds.Contains(report.StudentId))
+        if (selfId.HasValue || childIds != null)
             throw new UserFriendlyException(AssessmentExceptionCodes.ReportNotFound, "Report not found.");
 
         // RC-08: the Teacher role holds ReportCards.View too, and this response
