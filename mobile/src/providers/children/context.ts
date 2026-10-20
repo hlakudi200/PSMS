@@ -28,8 +28,6 @@ export interface IChildrenStateContext {
   myChildren?: IChildSummary[];
   /** The child every other parent screen scopes its reads to. */
   selectedChildId?: string;
-  /** Resolved per signed-in user by the backend, not per child. */
-  unreadNotifications?: number;
 }
 
 export interface IChildrenActionContext {
