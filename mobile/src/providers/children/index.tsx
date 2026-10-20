@@ -70,15 +70,6 @@ const loadLatestPublishedReport = async (
   }
 };
 
-const loadUnreadNotifications = async (instance: AxiosInstance): Promise<number | undefined> => {
-  try {
-    const { data } = await instance.get("/api/services/app/Notification/GetUnreadCount");
-    return data.result ?? undefined;
-  } catch {
-    return undefined;
-  }
-};
-
 export const ChildrenProvider = ({ children }: { children: React.ReactNode }) => {
   const [state, dispatch] = useReducer(ChildrenReducer, INITIAL_STATE);
   const instance = useRef(getAxiosInstance()).current;
@@ -96,11 +87,11 @@ export const ChildrenProvider = ({ children }: { children: React.ReactNode }) =>
       // Student/GetAll resolves a parent caller to their own children
       // server-side (MOB-BE-04) and already carries each child's name,
       // admission number, grade and class — so it replaces a per-child
-      // Student/Get fan-out. None of these three depend on each other.
-      const [childrenResponse, term, unreadNotifications] = await Promise.all([
+      // Student/Get fan-out. Neither depends on the other. (The unread
+      // notification count is the notifications provider's.)
+      const [childrenResponse, term] = await Promise.all([
         instance.get("/api/services/app/Student/GetAll"),
         loadCurrentTermRange(instance),
-        loadUnreadNotifications(instance),
       ]);
 
       // Every per-child metric below is best-effort: a child still lists with
@@ -133,7 +124,7 @@ export const ChildrenProvider = ({ children }: { children: React.ReactNode }) =>
         ? previous
         : myChildren[0]?.studentId;
 
-      dispatch(getSuccess({ myChildren, selectedChildId, unreadNotifications }));
+      dispatch(getSuccess({ myChildren, selectedChildId }));
     } catch {
       dispatch(getError());
     } finally {

@@ -6,23 +6,28 @@ import { colors, spacing, typography } from "../../theme";
 import { useAuthActions, useAuthState } from "../../providers/auth";
 import { useAnnouncementsActions, useAnnouncementsState } from "../../providers/announcements";
 import { useChildrenActions, useChildrenState } from "../../providers/children";
+import { useNotificationsActions, useNotificationsState } from "../../providers/notifications";
 import type { IChildSummary } from "../../providers/children/context";
 import { formatDate, formatPercentage } from "../../utils/assessment-labels";
 
 export function ParentHomeScreen() {
   const { currentUser } = useAuthState();
   const { signOut } = useAuthActions();
-  const { myChildren, selectedChildId, isPending, isError, unreadNotifications } = useChildrenState();
+  const { myChildren, selectedChildId, isPending, isError } = useChildrenState();
   const { getMyChildrenAsync, selectChild } = useChildrenActions();
   const { unreadCount: unreadAnnouncements } = useAnnouncementsState();
   const { getUnreadCountAsync } = useAnnouncementsActions();
+  const { unreadCount: unreadNotifications } = useNotificationsState();
+  const { getUnreadCountAsync: getUnreadNotificationsAsync } = useNotificationsActions();
 
   useEffect(() => { void getMyChildrenAsync(); }, [getMyChildrenAsync]);
 
+  // Sequential: the shared database pool is small.
   const refresh = useCallback(async () => {
     await getMyChildrenAsync();
+    await getUnreadNotificationsAsync();
     await getUnreadCountAsync();
-  }, [getMyChildrenAsync, getUnreadCountAsync]);
+  }, [getMyChildrenAsync, getUnreadNotificationsAsync, getUnreadCountAsync]);
 
   const handleSignOut = useCallback(async () => {
     await signOut();
@@ -55,15 +60,8 @@ export function ParentHomeScreen() {
           <View>
             <Badge label="PARENT PORTAL" />
             <Text style={styles.title}>Welcome{currentUser?.name ? `, ${currentUser.name}` : ""}</Text>
-            {!!unreadNotifications && (
-              <View style={styles.unreadRow}>
-                <Badge
-                  label={`${unreadNotifications} unread notification${unreadNotifications === 1 ? "" : "s"}`}
-                  tone="warning"
-                />
-              </View>
-            )}
             {isError && <Text style={styles.inlineError}>Couldn&apos;t refresh — showing what loaded earlier.</Text>}
+            <NotificationsCard unreadCount={unreadNotifications} onPress={() => router.push("/(parent)/alerts")} />
             <AnnouncementsCard unreadCount={unreadAnnouncements} onPress={() => router.navigate({ pathname: "/(parent)/(tabs)/messages", params: { view: "news" } })} />
           </View>
         }
@@ -84,6 +82,23 @@ export function ParentHomeScreen() {
         }
       />
     </Screen>
+  );
+}
+
+/** The badge count, already loaded for the tab bar; the centre has the list. */
+function NotificationsCard({ unreadCount, onPress }: { unreadCount?: number; onPress: () => void }) {
+  return (
+    <Pressable accessibilityRole="button" accessibilityLabel="Open notifications" onPress={onPress} style={styles.cardWrapper}>
+      <Card>
+        <View style={styles.cardTop}>
+          <Text style={styles.childName}>Notifications</Text>
+          {!!unreadCount && <Badge label={`${unreadCount} new`} tone="warning" />}
+        </View>
+        <Text style={styles.subtitle}>
+          {unreadCount ? "About your children, from the school" : "You're up to date · see all notifications"}
+        </Text>
+      </Card>
+    </Pressable>
   );
 }
 
@@ -154,7 +169,6 @@ function ChildCard({ child, isSelected, onPress }: { child: IChildSummary; isSel
 const styles = StyleSheet.create({
   title: { color: colors.text, fontSize: typography.title, fontWeight: "800", marginTop: spacing.lg },
   list: { paddingBottom: spacing.xxl },
-  unreadRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.md },
   inlineError: { color: colors.danger, fontSize: 14, marginTop: spacing.md },
   cardWrapper: { marginTop: spacing.md },
   selectedCard: { borderColor: colors.primary, borderWidth: 2 },
