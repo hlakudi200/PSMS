@@ -3,20 +3,28 @@ import { RoleGuard } from "../../src/navigation/RoleGuard";
 import { AnnouncementsProvider } from "../../src/providers/announcements";
 import { ChildrenProvider } from "../../src/providers/children";
 import { MarksProvider } from "../../src/providers/marks";
+import { MessagesProvider } from "../../src/providers/messages";
 import { ReportCardsProvider } from "../../src/providers/report-cards";
 
+/**
+ * One navigator, inside every provider its screens share. Each provider wraps
+ * the same Stack: two Stacks side by side render the app twice, and the
+ * screens in one of them cannot reach the other's provider.
+ */
 export default function ParentLayout() {
   return (
     <RoleGuard role="parent">
       <ChildrenProvider>
         <MarksProvider>
-          {/* Shared by the feed, its detail screen, Home and the tab badge. */}
-          <AnnouncementsProvider>
-            <Stack screenOptions={{ headerShown: false }} />
-          </AnnouncementsProvider>
-          {/* Shared by the report card list and its detail screen. */}
+          {/* The report card list and its detail screen. */}
           <ReportCardsProvider>
-            <Stack screenOptions={{ headerShown: false }} />
+            {/* The school news feed, its detail screen, Home and the tab badge. */}
+            <AnnouncementsProvider>
+              {/* Conversations with teachers, a conversation and the compose screen. */}
+              <MessagesProvider>
+                <Stack screenOptions={{ headerShown: false }} />
+              </MessagesProvider>
+            </AnnouncementsProvider>
           </ReportCardsProvider>
         </MarksProvider>
       </ChildrenProvider>
