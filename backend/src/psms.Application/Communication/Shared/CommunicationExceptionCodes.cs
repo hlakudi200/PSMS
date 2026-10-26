@@ -25,6 +25,18 @@ public static class CommunicationExceptionCodes
     public const string CannotMessageSelf = "COMM_CANNOT_MESSAGE_SELF";
     public const string MessageNotVisible = "COMM_MESSAGE_NOT_VISIBLE";
     public const string RecipientNotFound = "COMM_RECIPIENT_NOT_FOUND";
+
+    /// <summary>
+    /// #204. A parent started a conversation with someone who does not teach
+    /// any of their children. They may still reply to anyone who wrote to them.
+    /// </summary>
+    public const string RecipientNotAllowed = "COMM_RECIPIENT_NOT_ALLOWED";
+
+    /// <summary>
+    /// #204. A reply named a message the sender is not part of, or was
+    /// addressed to someone other than the other person in that conversation.
+    /// </summary>
+    public const string ReplyOutsideThread = "COMM_REPLY_OUTSIDE_THREAD";
     public const string OnlySenderCanDelete = "COMM_ONLY_SENDER_CAN_DELETE";
     public const string OnlyRecipientCanDelete = "COMM_ONLY_RECIPIENT_CAN_DELETE";
     public const string OnlyRecipientCanMarkRead = "COMM_ONLY_RECIPIENT_CAN_MARK_READ";

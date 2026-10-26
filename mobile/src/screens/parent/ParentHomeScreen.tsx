@@ -64,7 +64,7 @@ export function ParentHomeScreen() {
               </View>
             )}
             {isError && <Text style={styles.inlineError}>Couldn&apos;t refresh — showing what loaded earlier.</Text>}
-            <AnnouncementsCard unreadCount={unreadAnnouncements} onPress={() => router.navigate("/(parent)/(tabs)/messages")} />
+            <AnnouncementsCard unreadCount={unreadAnnouncements} onPress={() => router.navigate({ pathname: "/(parent)/(tabs)/messages", params: { view: "news" } })} />
           </View>
         }
         ListEmptyComponent={
