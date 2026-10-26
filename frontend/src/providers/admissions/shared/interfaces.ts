@@ -714,6 +714,8 @@ export interface IEnrollment {
   /** Returned once, on the enrolment that created the account. Never on a read. */
   loginUserName?: string;
   temporaryPassword?: string;
+  /** #437. On the enrolment response only: how many guardians were linked from the application. */
+  guardiansLinked?: number;
 }
 
 export interface IAcceptOffer {

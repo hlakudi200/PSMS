@@ -136,7 +136,7 @@ public class StudentAppService : ApplicationService, IStudentAppService
     }
 
     [AbpAuthorize(PermissionNames.Academic_Students_View)]
-    public async Task<PagedResultDto<StudentListDto>> GetAllAsync(GetAcademicEntityInput input)
+    public async Task<PagedResultDto<StudentListDto>> GetAllAsync(GetStudentsInput input)
     {
         // LC-08: a student-portal user only ever sees their own record.
         var selfStudentId = await _currentStudent.GetCurrentStudentIdAsync();
@@ -166,7 +166,9 @@ public class StudentAppService : ApplicationService, IStudentAppService
             .WhereIf(input.IsActive.HasValue,
                 s => s.IsActive == input.IsActive.Value)
             .WhereIf(input.Gender.HasValue,
-                s => (int)s.Gender == input.Gender.Value);
+                s => (int)s.Gender == input.Gender.Value)
+            // #437: the learners nobody can be contacted about.
+            .WhereIf(input.WithoutGuardian == true, s => !s.ParentLinks.Any());
 
         var totalCount = await query.CountAsync();
 

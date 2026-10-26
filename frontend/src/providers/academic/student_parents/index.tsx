@@ -80,6 +80,8 @@ export const StudentParentProvider = ({
       .catch((error) => {
         console.error(error);
         dispatch(linkError());
+        // The caller (the link dialog) shows the server's reason and stays open.
+        throw error;
       });
   };
 

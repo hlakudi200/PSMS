@@ -354,7 +354,7 @@ public class EnrollmentAppService : ApplicationService, IEnrollmentAppService
         var login = await _loginProvisioner.ProvisionAsync(student);
 
         // Link parents to student (ADM-027)
-        await LinkParentsToStudentAsync(application.Id, student.Id);
+        var guardiansLinked = await LinkParentsToStudentAsync(application.Id, student.Id);
 
         // Update application status to enrolled
         application.MarkAsEnrolled(student.Id);
@@ -375,6 +375,8 @@ public class EnrollmentAppService : ApplicationService, IEnrollmentAppService
         // can hand the credentials to the family (never returned on reads).
         dto.LoginUserName = login.UserName;
         dto.TemporaryPassword = login.TemporaryPassword;
+        // #437: a warning, not a refusal. The learner is enrolled either way.
+        dto.GuardiansLinked = guardiansLinked;
         return dto;
     }
 
@@ -437,7 +439,8 @@ public class EnrollmentAppService : ApplicationService, IEnrollmentAppService
         return $"{prefix}{nextSequence:D4}";
     }
 
-    private async Task LinkParentsToStudentAsync(Guid applicationId, Guid studentId)
+    /// <returns>How many guardians were linked.</returns>
+    private async Task<int> LinkParentsToStudentAsync(Guid applicationId, Guid studentId)
     {
         // Get applicant parents
         var applicantParents = await _applicantParentRepository
@@ -498,6 +501,8 @@ public class EnrollmentAppService : ApplicationService, IEnrollmentAppService
 
             await _studentParentRepository.InsertAsync(studentParent);
         }
+
+        return applicantParents.Count;
     }
 
     #endregion

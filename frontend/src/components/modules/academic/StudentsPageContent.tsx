@@ -4,6 +4,7 @@ import React, { useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { usePortalBase } from '@/utils/portal-base';
 import { EyeOutlined } from '@ant-design/icons';
+import { Tag } from 'antd';
 import { EnterpriseTable } from '@/components/shared/enterprise-table';
 import type { ColumnConfig, TableQuery, RowAction } from '@/components/shared/enterprise-table';
 import { StudentProvider, useStudentState, useStudentActions } from '@/providers/academic/students';
@@ -49,6 +50,15 @@ function StudentsContent() {
       },
     },
     { key: 'age', title: 'Age', dataIndex: 'age', sortable: true, hideOnMobile: true, width: 70 },
+    {
+      // #437: the learners nobody can be contacted about, to work through.
+      key: 'parentCount', title: 'Guardians', dataIndex: 'parentCount', width: 110,
+      filterable: true, filterType: 'enum', filterKey: 'withoutGuardian',
+      filterOptions: [{ label: 'None linked', value: true }],
+      render: (count: number) => (count > 0
+        ? <span>{count}</span>
+        : <Tag color="red">None</Tag>),
+    },
     {
       key: 'isActive', title: 'Status', dataIndex: 'isActive',
       filterable: true, filterType: 'enum',

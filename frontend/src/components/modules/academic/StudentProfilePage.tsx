@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { usePortalBase } from '@/utils/portal-base';
 import {
+  Alert,
   Card,
   Descriptions,
   Tag,
@@ -28,6 +29,7 @@ import {
   TeamOutlined,
   DollarOutlined,
   MedicineBoxOutlined,
+  PlusOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { StudentProvider, useStudentState, useStudentActions } from '@/providers/academic/students';
@@ -35,14 +37,17 @@ import { StudentParentProvider, useStudentParentState, useStudentParentActions }
 import { StudentSubjectProvider, useStudentSubjectState, useStudentSubjectActions } from '@/providers/academic/student_subjects';
 import { StudentFeeProvider, useStudentFeeState, useStudentFeeActions } from '@/providers/financial/student_fees';
 import type { IStudent, IStudentParent, IStudentSubject } from '@/providers/academic/shared/interfaces';
+import LinkGuardianModal, { RELATIONSHIP_OPTIONS } from '@/components/modals/academic/LinkGuardianModal';
 import type { IStudentFeeList } from '@/providers/financial/shared/interfaces';
 
 const { Title, Text } = Typography;
 
-const genderLabels: Record<number, string> = { 0: 'Male', 1: 'Female', 2: 'Other' };
-const relationshipLabels: Record<number, string> = {
-  0: 'Father', 1: 'Mother', 2: 'Guardian', 3: 'Grandparent', 4: 'Sibling', 5: 'Other',
-};
+// The backend Gender and RelationshipType enums start at 1. These started at 0,
+// so a Father showed as "Mother" and a Guardian as "Grandparent".
+const genderLabels: Record<number, string> = { 1: 'Male', 2: 'Female', 3: 'Other' };
+const relationshipLabels: Record<number, string> = Object.fromEntries(
+  RELATIONSHIP_OPTIONS.map((o) => [o.value, o.label]),
+);
 const feeStatusLabels: Record<number, { label: string; color: string }> = {
   1: { label: 'Pending', color: 'orange' },
   2: { label: 'Paid', color: 'green' },
@@ -127,9 +132,14 @@ function SubjectsSection({ studentId }: { studentId: string }) {
 }
 
 // ─── Parents Tab ───────────────────────────────────────────────
-function ParentsSection({ studentId }: { studentId: string }) {
+function ParentsSection({ studentId, studentName, onLinked }: {
+  studentId: string;
+  studentName?: string;
+  onLinked: () => void;
+}) {
   const { studentParents, isPending } = useStudentParentState();
   const { getByStudentAsync } = useStudentParentActions();
+  const [linking, setLinking] = useState(false);
 
   useEffect(() => {
     getByStudentAsync(studentId);
@@ -164,15 +174,32 @@ function ParentsSection({ studentId }: { studentId: string }) {
   ];
 
   return (
-    <Table<IStudentParent>
-      dataSource={studentParents ?? []}
-      columns={columns}
-      rowKey="id"
-      loading={isPending}
-      pagination={false}
-      size="small"
-      locale={{ emptyText: <Empty description="No parents linked" image={Empty.PRESENTED_IMAGE_SIMPLE} /> }}
-    />
+    <>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
+        <Button type="primary" icon={<PlusOutlined />} onClick={() => setLinking(true)}>
+          Link a parent or guardian
+        </Button>
+      </div>
+      <Table<IStudentParent>
+        dataSource={studentParents ?? []}
+        columns={columns}
+        rowKey="id"
+        loading={isPending}
+        pagination={false}
+        size="small"
+        locale={{ emptyText: <Empty description="No parents linked" image={Empty.PRESENTED_IMAGE_SIMPLE} /> }}
+      />
+      <LinkGuardianModal
+        open={linking}
+        studentId={studentId}
+        studentName={studentName}
+        onClose={() => setLinking(false)}
+        onLinked={() => {
+          getByStudentAsync(studentId);
+          onLinked();
+        }}
+      />
+    </>
   );
 }
 
@@ -291,7 +318,13 @@ function StudentProfileContent() {
     {
       key: 'parents',
       label: <span><TeamOutlined /> Parents ({student.parentCount})</span>,
-      children: <ParentsSection studentId={studentId} />,
+      children: (
+        <ParentsSection
+          studentId={studentId}
+          studentName={[student.firstName, student.lastName].filter(Boolean).join(' ')}
+          onLinked={() => getAsync(studentId)}
+        />
+      ),
     },
     {
       key: 'fees',
@@ -332,8 +365,19 @@ function StudentProfileContent() {
         </Space>
       </Card>
 
+      {/* #437: nobody to contact, and nobody a report card can be shown to. */}
+      {student.parentCount === 0 && (
+        <Alert
+          type="error"
+          showIcon
+          style={{ marginBottom: 24 }}
+          message="No parent or guardian is linked to this learner"
+          description="The school has nobody to contact about them, and no one can see their report cards, marks or attendance in the parent app. Link one on the Parents tab."
+        />
+      )}
+
       <Card>
-        <Tabs items={tabItems} defaultActiveKey="bio" />
+        <Tabs items={tabItems} defaultActiveKey={student.parentCount === 0 ? 'parents' : 'bio'} />
       </Card>
     </div>
   );

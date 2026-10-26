@@ -144,6 +144,17 @@ export default function EnrolLearnerModal({
           }
         />
 
+        {/* #437: enrolled either way, but nobody can be contacted about this learner yet. */}
+        {done.guardiansLinked === 0 && (
+          <Alert
+            type="error"
+            showIcon
+            style={{ marginBottom: 16 }}
+            message="No parent or guardian is linked to this learner"
+            description="The application had no parent on it, so the school has nobody to contact about this learner, and no one can see their report cards. Link a guardian from the learner's profile."
+          />
+        )}
+
         {done.loginUserName && (
           <Alert
             type="warning"
