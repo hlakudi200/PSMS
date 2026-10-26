@@ -12,6 +12,7 @@ using psms.Academic.Attendances.Dto;
 using psms.Academic.Parents;
 using psms.Academic.Shared;
 using psms.Academic.Students;
+using psms.Academic.Students.Dto;
 using psms.Academic.StudentParents;
 using psms.Assessment.Reports;
 using psms.Assessment.Reports.Dto;
@@ -243,7 +244,7 @@ public class ParentDataScoping_Tests : psmsTestBase
     {
         LoginAs(_parentAUserId);
 
-        var result = await _studentAppService.GetAllAsync(new GetAcademicEntityInput());
+        var result = await _studentAppService.GetAllAsync(new GetStudentsInput());
 
         result.Items.Select(s => s.Id).ShouldBe(new[] { _studentAId });
     }
@@ -253,7 +254,7 @@ public class ParentDataScoping_Tests : psmsTestBase
     {
         LoginAsDefaultTenantAdmin();
 
-        var result = await _studentAppService.GetAllAsync(new GetAcademicEntityInput());
+        var result = await _studentAppService.GetAllAsync(new GetStudentsInput());
 
         result.Items.Select(s => s.Id).ShouldContain(_studentAId);
         result.Items.Select(s => s.Id).ShouldContain(_studentBId);

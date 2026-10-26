@@ -475,6 +475,8 @@ export interface IBulkCaptureAttendance {
 export interface IGetStudentsInput extends IPagedAndSortedResultRequest {
   isActive?: boolean;
   gender?: number;
+  /** #437. Only the learners with no parent or guardian linked. */
+  withoutGuardian?: boolean;
 }
 
 export interface IGetAttendanceInput extends IPagedAndSortedResultRequest {

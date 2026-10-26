@@ -57,4 +57,12 @@ public class EnrollmentDto : EntityDto<Guid>
     // never returned on reads (the password isn't stored in plaintext).
     public string LoginUserName { get; set; }
     public string TemporaryPassword { get; set; }
+
+    /// <summary>
+    /// #437. How many parents or guardians enrolment linked to the new learner,
+    /// from the application. Zero means nobody can be contacted about them yet
+    /// and no report card can be shown to anyone, so the officer is warned.
+    /// Only on the CompleteEnrollment response.
+    /// </summary>
+    public int? GuardiansLinked { get; set; }
 }

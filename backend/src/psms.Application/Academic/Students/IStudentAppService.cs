@@ -13,7 +13,7 @@ namespace psms.Academic.Students;
 public interface IStudentAppService : IApplicationService
 {
     Task<StudentDto> GetAsync(Guid id);
-    Task<PagedResultDto<StudentListDto>> GetAllAsync(GetAcademicEntityInput input);
+    Task<PagedResultDto<StudentListDto>> GetAllAsync(GetStudentsInput input);
     Task<StudentDto> CreateAsync(CreateStudentDto input);
     Task<StudentDto> UpdateAsync(Guid id, UpdateStudentDto input);
     Task DeleteAsync(Guid id);
